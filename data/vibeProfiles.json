@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "profiles": [
+    {
+      "id": "vibe_soft_waves",
+      "nameRu": "Мягкие волны",
+      "descriptionRu": "Низкий фон с редкими подъёмами. Для разогрева и клетки.",
+      "segments": [
+        { "durationSec": 20, "level": 1, "labelRu": "фон" },
+        { "durationSec": 12, "level": 2, "labelRu": "чуть сильнее" },
+        { "durationSec": 18, "level": 1, "labelRu": "фон" },
+        { "durationSec": 15, "level": 3, "labelRu": "волна" },
+        { "durationSec": 20, "level": 1, "labelRu": "сброс" }
+      ]
+    },
+    {
+      "id": "vibe_build",
+      "nameRu": "Нарастание",
+      "descriptionRu": "Ступенями вверх, потом короткий сброс.",
+      "segments": [
+        { "durationSec": 15, "level": 1, "labelRu": "1" },
+        { "durationSec": 15, "level": 2, "labelRu": "2" },
+        { "durationSec": 15, "level": 3, "labelRu": "3" },
+        { "durationSec": 12, "level": 4, "labelRu": "4" },
+        { "durationSec": 10, "level": 2, "labelRu": "сброс" }
+      ]
+    },
+    {
+      "id": "vibe_pulse_hold",
+      "nameRu": "Пульс — удержание",
+      "descriptionRu": "Чередование тишины/фона и сильного плато.",
+      "segments": [
+        { "durationSec": 10, "level": 0, "labelRu": "тишина" },
+        { "durationSec": 18, "level": 3, "labelRu": "держать" },
+        { "durationSec": 8, "level": 0, "labelRu": "тишина" },
+        { "durationSec": 20, "level": 4, "labelRu": "держать" },
+        { "durationSec": 12, "level": 1, "labelRu": "фон" }
+      ]
+    },
+    {
+      "id": "vibe_tease_deny",
+      "nameRu": "Тизер / отказ",
+      "descriptionRu": "Резкие всплески и обрыв — для chastity denial.",
+      "segments": [
+        { "durationSec": 12, "level": 2, "labelRu": "дразнить" },
+        { "durationSec": 6, "level": 5, "labelRu": "пик" },
+        { "durationSec": 14, "level": 0, "labelRu": "стоп" },
+        { "durationSec": 16, "level": 3, "labelRu": "снова" },
+        { "durationSec": 8, "level": 5, "labelRu": "пик" },
+        { "durationSec": 15, "level": 0, "labelRu": "отказ" }
+      ]
+    },
+    {
+      "id": "vibe_edge_plateau",
+      "nameRu": "Плато у края",
+      "descriptionRu": "Долгое среднее, короткий максимум, снова среднее.",
+      "segments": [
+        { "durationSec": 25, "level": 3, "labelRu": "плато" },
+        { "durationSec": 10, "level": 5, "labelRu": "к краю" },
+        { "durationSec": 20, "level": 3, "labelRu": "удержать" },
+        { "durationSec": 12, "level": 1, "labelRu": "отпустить" }
+      ]
+    }
+  ]
+}

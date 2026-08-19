@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "patterns": [
+    {
+      "id": "meter_1_2",
+      "name": "1-2",
+      "nameRu": "Раз-два",
+      "descriptionRu": "Двухдольный метр: 1 — слабая доля, 2 — сильный акцент. Базовый ритм.",
+      "kind": "meter",
+      "steps": [1, 2],
+      "cuesRu": ["Раз — слабо.", "Два — акцент."],
+      "enabled": true
+    },
+    {
+      "id": "meter_1_2_2",
+      "name": "1-2-2",
+      "nameRu": "Раз-два-два",
+      "descriptionRu": "Трёхдольный: слабая, затем два акцента подряд.",
+      "kind": "meter",
+      "steps": [1, 2, 2],
+      "cuesRu": ["Слабая, акцент, акцент."],
+      "enabled": true
+    },
+    {
+      "id": "meter_1_1_2_2",
+      "name": "1-1-2-2",
+      "nameRu": "Раз-раз-два-два",
+      "descriptionRu": "Четыре доли: две слабых, две сильных.",
+      "kind": "meter",
+      "steps": [1, 1, 2, 2],
+      "cuesRu": ["Две слабых, две сильных."],
+      "enabled": true
+    },
+    {
+      "id": "meter_1_2_1_2_2",
+      "name": "1-2-1-2-2",
+      "nameRu": "Раз-два-раз-два-два",
+      "descriptionRu": "Пятидольная схема с двумя акцентами в конце. Не сглаживай сильные доли.",
+      "kind": "meter",
+      "steps": [1, 2, 1, 2, 2],
+      "cuesRu": ["Качайся по схеме, не сглаживай акценты."],
+      "enabled": true
+    },
+    {
+      "id": "meter_straight",
+      "name": "Straight",
+      "nameRu": "Ровный",
+      "descriptionRu": "Каждый тик метронома — одно полноценное движение. Без чередования слабых/сильных.",
+      "kind": "meter",
+      "steps": [2],
+      "cuesRu": ["Каждый тик = движение."],
+      "enabled": true
+    },
+    {
+      "id": "special_double",
+      "name": "Double",
+      "nameRu": "Двойные ходы",
+      "descriptionRu": "На каждый бит — два коротких движения вместо одного.",
+      "kind": "special",
+      "params": { "strokesPerBeat": 2 },
+      "cuesRu": ["На каждый бит — два коротких хода."],
+      "enabled": true
+    },
+    {
+      "id": "special_half",
+      "name": "Half time",
+      "nameRu": "Вполовину",
+      "descriptionRu": "Темп вдвое медленнее номинального BPM блока. Длинные, тяжёлые ходы.",
+      "kind": "special",
+      "params": { "bpmScale": 0.5 },
+      "cuesRu": ["Вдвое медленнее номинального BPM."],
+      "enabled": true
+    },
+    {
+      "id": "special_accel",
+      "name": "Acceleration",
+      "nameRu": "Ускорение",
+      "descriptionRu": "Внутри блока BPM растёт от медленного к быстрому.",
+      "kind": "special",
+      "params": { "fromBpmScale": 0.7, "toBpmScale": 1.3 },
+      "cuesRu": ["Разгоняйся от медленного к быстрому."],
+      "enabled": true
+    },
+    {
+      "id": "special_rlgl",
+      "name": "Red / Green",
+      "nameRu": "Стоп / ход",
+      "descriptionRu": "Red light / green light: зелёный — двигайся, красный — полный стоп. Длительности случайные в диапазоне.",
+      "kind": "special",
+      "params": { "greenSecMin": 3, "greenSecMax": 8, "redSecMin": 2, "redSecMax": 5 },
+      "cuesRu": ["Зелёный — двигайся.", "Красный — стоп полностью."],
+      "enabled": true
+    },
+    {
+      "id": "special_cluster",
+      "name": "Cluster",
+      "nameRu": "Пачка",
+      "descriptionRu": "Кластер: серия быстрых движений → пауза → снова пачка.",
+      "kind": "special",
+      "params": { "burstCount": 4, "pauseSec": 2 },
+      "cuesRu": ["Пачка быстрых → пауза → снова."],
+      "enabled": true
+    },
+    {
+      "id": "special_tease",
+      "name": "Tease",
+      "nameRu": "Тизер",
+      "descriptionRu": "Чередование: несколько долей полноценной работы и столько же едва касаешься.",
+      "kind": "special",
+      "params": { "onBeats": 2, "offBeats": 2 },
+      "cuesRu": ["Два бита работаешь — два бита едва касаешься."],
+      "enabled": true
+    },
+    {
+      "id": "vibe_timeline",
+      "name": "Vibe timeline",
+      "nameRu": "Шкала вибрации",
+      "descriptionRu": "Не метр ударов: сегменты по времени и силе (0–5). Смотри шкалу на экране.",
+      "kind": "special",
+      "params": {},
+      "cuesRu": ["Сила вибрации по шкале.", "Бита нет — только время и уровень."],
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,1719 @@
+{
+  "feeling": [
+    {
+      "id": "f_hold",
+      "kind": "feeling",
+      "speakEn": "Still holding for the court — or crumbling already?",
+      "labelRu": "После «держи»: ещё терпишь приговор или сыпешься?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю / ок",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Плохо / срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "hold"
+      ]
+    },
+    {
+      "id": "f_breath",
+      "kind": "feeling",
+      "speakEn": "Lungs on trial. How was that breath hold — bearable or pathetic?",
+      "labelRu": "После задержки дыхания: терпимо или жалко?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю / ок",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Плохо / срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "breath"
+      ]
+    },
+    {
+      "id": "f_edge",
+      "kind": "feeling",
+      "speakEn": "That edge was my verdict. Still on the line — or melting for the gallery?",
+      "labelRu": "После эджа: ещё на грани или уже плывёшь?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю / ок",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Плохо / срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "edge"
+      ]
+    },
+    {
+      "id": "f_brain",
+      "kind": "feeling",
+      "speakEn": "Is your brain still yours — or just cock and applause?",
+      "labelRu": "Мозг ещё твой — или только член и аплодисменты?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю / ок",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Плохо / срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "f_pain",
+      "kind": "feeling",
+      "speakEn": "Balls still ringing from my sentence? Be honest for the record.",
+      "labelRu": "Яйца ещё гудят после приговора? Честно.",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю / ок",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Плохо / срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "cbt pain"
+    },
+    {
+      "id": "f_prone",
+      "kind": "feeling",
+      "speakEn": "Face-down looks good on you. How desperate are you lying there?",
+      "labelRu": "Лёжа на животе: насколько ты уже отчаянный?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю / ок",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Плохо / срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "prone"
+    },
+    {
+      "id": "f_water",
+      "kind": "feeling",
+      "speakEn": "Tide rising. Soft strokes — or are you drowning already?",
+      "labelRu": "Прилив: мягко держишься или уже тонешь?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю / ок",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Плохо / срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "moods": [
+        "sweet",
+        "horny"
+      ]
+    },
+    {
+      "id": "f_cruel",
+      "kind": "feeling",
+      "speakEn": "Look at me. Does the judge scare you — or excite you?",
+      "labelRu": "Судья пугает или возбуждает?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю / ок",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Плохо / срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "moods": [
+        "cruel",
+        "chaotic"
+      ]
+    },
+    {"id":"f_denial_tide","kind":"feeling","speakEn":"Still denied beneath the tide, or leaking through the verdict?","labelRu":"В отказе под приливом: держишься или уже течёшь?","options":[{"id":"good","labelRu":"Держусь","effect":"feeling_good"},{"id":"bad","labelRu":"Срываюсь","effect":"feeling_bad"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"denial","afterGoals":["hold","edge"]},
+    {"id":"f_humiliate_after","kind":"feeling","speakEn":"After the applause, are you proud or properly embarrassed?","labelRu":"После аплодисментов: гордишься или достаточно унижен?","options":[{"id":"good","labelRu":"Терплю","effect":"feeling_good"},{"id":"bad","labelRu":"Стыдно","effect":"feeling_bad"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"humiliation"}
+  ],
+  "wagerGood": [
+    {
+      "id": "wg_soft",
+      "kind": "wager",
+      "speakEn": "Want a softer verdict for five minutes? Earn it.",
+      "labelRu": "Хочешь мягче на 5 минут? Заслужи.",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_prone",
+      "kind": "wager",
+      "speakEn": "Lie prone and stroke slow — yes if you obey the stage.",
+      "labelRu": "Лечь на живот и медленно? Да — если слушаешь сцену.",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "prone"
+    },
+    {
+      "id": "wg_praise",
+      "kind": "wager",
+      "speakEn": "Beg for one kind line from me. Say yes.",
+      "labelRu": "Попросить одну добрую реплику?",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_show",
+      "kind": "wager",
+      "speakEn": "Fill the screen with Furina and stare. Yes?",
+      "labelRu": "Заполнить экран Фуриной и смотреть?",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_edge_soft",
+      "kind": "wager",
+      "speakEn": "One clean edge for the applause. Accept?",
+      "labelRu": "Один чистый эдж под аплодисменты?",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_water",
+      "kind": "wager",
+      "speakEn": "Slow tide strokes only — no rushing the court. Yes?",
+      "labelRu": "Только медленный «прилив» — без спешки?",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_feet",
+      "kind": "wager",
+      "speakEn": "Worship my soles on screen while you drip. Yes?",
+      "labelRu": "Смотреть на стопы и течь?",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_rest",
+      "kind": "wager",
+      "speakEn": "Thirty seconds hands-off as mercy. Take it?",
+      "labelRu": "30 сек без рук как милость?",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {"id":"wg_aftercare","kind":"wager","speakEn":"Earn a gentle aftercare intermission: breathe and drink water. Accept?","labelRu":"Заслужить мягкий антракт: дыхание и вода?","pool":"good","options":[{"id":"yes","labelRu":"Да","effect":"wager_yes"},{"id":"no","labelRu":"Нет","effect":"wager_no"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"aftercare"},
+    {"id":"wg_deny_grace","kind":"wager","speakEn":"Hold still for thirty seconds and I may soften the denial. Deal?","labelRu":"Замереть на 30 сек ради мягкого отказа?","pool":"good","options":[{"id":"yes","labelRu":"Да","effect":"wager_yes"},{"id":"no","labelRu":"Нет","effect":"wager_no"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"denial"}
+  ],
+  "wagerBad": [
+    {
+      "id": "wb_balls",
+      "kind": "wager",
+      "speakEn": "Squeeze your balls on my count. Refuse and I escalate.",
+      "labelRu": "Сжать яйца по счёту? Отказ = жёстче.",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "cbt"
+    },
+    {
+      "id": "wb_pain",
+      "kind": "wager",
+      "speakEn": "Three sharp taps — verdict of pain. Accept?",
+      "labelRu": "Три резких удара — приговор боли?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "pain"
+    },
+    {
+      "id": "wb_deny",
+      "kind": "wager",
+      "speakEn": "No orgasm tonight if the wheel agrees. Still want to beg cum?",
+      "labelRu": "Если колесо откажет — без финала. Всё равно просишь кончить?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_prone_hard",
+      "kind": "wager",
+      "speakEn": "Prone, face in the pillow, faster than you like. Yes?",
+      "labelRu": "На животе, лицом в подушку, быстрее чем хочется?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "prone"
+    },
+    {
+      "id": "wb_edge_cruel",
+      "kind": "wager",
+      "speakEn": "Edge and hold until I clap. Fail and ruin. Deal?",
+      "labelRu": "Эдж и держи до хлопка. Срыв = руин. Идёт?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_humiliate",
+      "kind": "wager",
+      "speakEn": "Say out loud: I am the court’s prop. Yes or mute.",
+      "labelRu": "Скажи вслух: я реквизит суда.",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_cage",
+      "kind": "wager",
+      "speakEn": "If you own a cage — lock it for the next act. Yes?",
+      "labelRu": "Если есть клетка — надеть на акт?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_blacked",
+      "kind": "wager",
+      "speakEn": "Watch blacked/censored while I narrate. Soft stomach?",
+      "labelRu": "Смотреть censored/blacked под мой комментарий?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_spank",
+      "kind": "wager",
+      "speakEn": "Slap your tip twice for the gallery. Accept?",
+      "labelRu": "Два шлепка по головке для зала?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "pain"
+    },
+    {
+      "id": "wb_ruin_bias",
+      "kind": "wager",
+      "speakEn": "Lean the finale toward ruin. Still playing?",
+      "labelRu": "Сместить финал к руину. Играешь?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {"id":"wb_cbt_court","kind":"wager","speakEn":"Offer your balls for ten counted taps. The court is watching. Accept?","labelRu":"Подставить яйца под 10 отсчитанных шлепков?","pool":"bad","options":[{"id":"yes","labelRu":"Да","effect":"wager_yes"},{"id":"no","labelRu":"Нет","effect":"wager_no"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"cbt pain"},
+    {"id":"wb_denial_oath","kind":"wager","speakEn":"Swear to leave denied if I order it. Will you sign the verdict?","labelRu":"Поклясться принять отказ, если прикажу?","pool":"bad","options":[{"id":"yes","labelRu":"Подпишу","effect":"wager_yes"},{"id":"no","labelRu":"Нет","effect":"wager_no"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"denial verdict"}
+  ],
+  "dare": [
+    {
+      "id": "d_ball_timer",
+      "kind": "dare",
+      "speakEn": "Court timer: squeeze your balls gently for 20 seconds. Report when done.",
+      "labelRu": "Приговор: 20 сек мягко сжимать яйца. Отметь.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "timed_report",
+      "taskSec": 20,
+      "tags": "cbt"
+    },
+    {
+      "id": "d_breath",
+      "kind": "dare",
+      "speakEn": "Breath trial — hold as I count. Fail and I mock you.",
+      "labelRu": "Испытание дыханием.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "breath_challenge",
+      "tags": "pain"
+    },
+    {
+      "id": "d_prone",
+      "kind": "dare",
+      "speakEn": "Face down. Stroke prone for 25 seconds. Curtain up.",
+      "labelRu": "На живот. 25 сек prone-дрочки.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "timed_report",
+      "taskSec": 25,
+      "tags": "prone"
+    },
+    {
+      "id": "d_dice",
+      "kind": "dare",
+      "speakEn": "Chaos dice for the court. Roll my mood.",
+      "labelRu": "Кости хаоса для суда.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "dice_chaos"
+    },
+    {
+      "id": "d_cage",
+      "kind": "dare",
+      "speakEn": "Cage hijack — lock if you can. The stage demands it.",
+      "labelRu": "Клетка на сцену — надеть если можешь.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "cage_hijack"
+    },
+    {
+      "id": "d_edge_ad",
+      "kind": "dare",
+      "speakEn": "Edge commercial — edge on command, hold for the ad.",
+      "labelRu": "Эдж-реклама: эдж и держи.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "edge_ad"
+    },
+    {
+      "id": "d_cum_promise",
+      "kind": "dare",
+      "speakEn": "Promise you will taste your mess after the finale.",
+      "labelRu": "Обещай слизать после финала.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "cum_eat_promise"
+    },
+    {
+      "id": "d_slap",
+      "kind": "dare",
+      "speakEn": "Five light ball taps on the beat. Count aloud.",
+      "labelRu": "5 лёгких ударов по яйцам в бит.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "timed_report",
+      "taskSec": 18,
+      "tags": "cbt"
+    },
+    {
+      "id": "d_stare",
+      "kind": "dare",
+      "speakEn": "Eyes on Furina only for 30 seconds. No looking away.",
+      "labelRu": "30 сек только на Фурину.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "timed_report",
+      "taskSec": 30
+    },
+    {
+      "id": "d_cold",
+      "kind": "dare",
+      "speakEn": "Cold hands on your tip — ten strokes. Report.",
+      "labelRu": "Холодные руки на головке — 10 движений.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "timed_report",
+      "taskSec": 15,
+      "tags": "pain"
+    },
+    {"id":"d_breath_verdict","kind":"dare","speakEn":"Breath challenge: hold while the judge counts the applause.","labelRu":"Дыхательный приговор: держи, пока суд считает аплодисменты.","options":[{"id":"accept","labelRu":"Принимаю","effect":"dare_accept"},{"id":"refuse","labelRu":"Отказываюсь","effect":"dare_refuse"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"taskType":"breath_challenge","tags":"verdict denial"},
+    {"id":"d_cage_sentence","kind":"dare","speakEn":"Cage hijack: lock up for the next scene, if you have one.","labelRu":"Клетка на следующий акт, если она есть.","options":[{"id":"accept","labelRu":"Принимаю","effect":"dare_accept"},{"id":"refuse","labelRu":"Отказываюсь","effect":"dare_refuse"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"taskType":"cage_hijack","tags":"denial verdict"}
+  ],
+  "confess": [
+    {
+      "id": "c_furina",
+      "kind": "confess",
+      "speakEn": "Confess — leaking for Furina specifically, or any blue-haired judge?",
+      "labelRu": "Течёшь именно на Фурину — или на любую «судью»?",
+      "options": [
+        {
+          "id": "like",
+          "labelRu": "Именно Фурина",
+          "effect": "confess_like",
+          "preferKey": "furina"
+        },
+        {
+          "id": "dislike",
+          "labelRu": "Любая подойдёт",
+          "effect": "confess_dislike"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "c_cbt",
+      "kind": "confess",
+      "speakEn": "Admit it — do you get harder when I sentence your balls?",
+      "labelRu": "Возбуждает, когда я «сужу» яйца?",
+      "options": [
+        {
+          "id": "like",
+          "labelRu": "Да",
+          "effect": "confess_like",
+          "preferKey": "cbt"
+        },
+        {
+          "id": "dislike",
+          "labelRu": "Нет",
+          "effect": "confess_dislike"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "cbt"
+    },
+    {
+      "id": "c_prone",
+      "kind": "confess",
+      "speakEn": "Prone masturbation — favorite pose for my verdicts?",
+      "labelRu": "Prone — любимая поза под приговор?",
+      "options": [
+        {
+          "id": "like",
+          "labelRu": "Да",
+          "effect": "confess_like",
+          "preferKey": "prone"
+        },
+        {
+          "id": "dislike",
+          "labelRu": "Нет",
+          "effect": "confess_dislike"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "prone"
+    },
+    {
+      "id": "c_pain",
+      "kind": "confess",
+      "speakEn": "Pain as applause — do you like it when it stings?",
+      "labelRu": "Боль как аплодисменты — нравится?",
+      "options": [
+        {
+          "id": "like",
+          "labelRu": "Да",
+          "effect": "confess_like",
+          "preferKey": "pain"
+        },
+        {
+          "id": "dislike",
+          "labelRu": "Нет",
+          "effect": "confess_dislike"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "pain"
+    },
+    {
+      "id": "c_deny",
+      "kind": "confess",
+      "speakEn": "Would you rather leave denied for me?",
+      "labelRu": "Готов уйти в отказе ради меня?",
+      "options": [
+        {
+          "id": "like",
+          "labelRu": "Да",
+          "effect": "confess_like",
+          "preferKey": "denial"
+        },
+        {
+          "id": "dislike",
+          "labelRu": "Нет",
+          "effect": "confess_dislike"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "c_blacked",
+      "kind": "confess",
+      "speakEn": "Censored and blacked on your screen — does the shame make you drip?",
+      "labelRu": "Censored/blacked на экране — стыд возбуждает?",
+      "options": [
+        {
+          "id": "like",
+          "labelRu": "Да",
+          "effect": "confess_like",
+          "preferKey": "blacked"
+        },
+        {
+          "id": "dislike",
+          "labelRu": "Нет",
+          "effect": "confess_dislike"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {"id":"c_humiliation","kind":"confess","speakEn":"Does being called the court's prop make you harder?","labelRu":"Титул «реквизит суда» возбуждает?","options":[{"id":"like","labelRu":"Да","effect":"confess_like","preferKey":"humiliation"},{"id":"dislike","labelRu":"Нет","effect":"confess_dislike"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"humiliation"},
+    {"id":"c_aftercare","kind":"confess","speakEn":"After a cruel scene, do you want gentle words from your judge?","labelRu":"После жёсткой сцены хочешь мягких слов?","options":[{"id":"like","labelRu":"Да","effect":"confess_like","preferKey":"aftercare"},{"id":"dislike","labelRu":"Нет","effect":"confess_dislike"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"aftercare"}
+  ],
+  "loyalty": [
+    {
+      "id": "l_name",
+      "kind": "loyalty",
+      "speakEn": "Say my name — Furina — three times. Loyalty check.",
+      "labelRu": "Скажи «Фурина» три раза.",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Сказал",
+          "effect": "loyalty_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не сказал",
+          "effect": "loyalty_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "l_court",
+      "kind": "loyalty",
+      "speakEn": "Who owns this session — you, or the Hydro court?",
+      "labelRu": "Кто ведёт сессию — ты или суд?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Суд / ты",
+          "effect": "loyalty_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Я",
+          "effect": "loyalty_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "l_eyes",
+      "kind": "loyalty",
+      "speakEn": "Eyes up. Did you look away from me even once?",
+      "labelRu": "Отводил взгляд?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Не отводил",
+          "effect": "loyalty_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Отводил",
+          "effect": "loyalty_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "l_obey",
+      "kind": "loyalty",
+      "speakEn": "If I order pain next — will you still thank me?",
+      "labelRu": "Если дальше боль — всё равно скажешь спасибо?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "loyalty_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "loyalty_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {"id":"l_verdict","kind":"loyalty","speakEn":"Will you accept my verdict without bargaining?","labelRu":"Примешь мой приговор без торга?","options":[{"id":"yes","labelRu":"Приму","effect":"loyalty_yes"},{"id":"no","labelRu":"Буду спорить","effect":"loyalty_no"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"verdict"},
+    {"id":"l_aftercare","kind":"loyalty","speakEn":"Will you drink water and recover when I call the intermission?","labelRu":"Выпьешь воды и отдохнёшь, когда объявлю антракт?","options":[{"id":"yes","labelRu":"Да","effect":"loyalty_yes"},{"id":"no","labelRu":"Нет","effect":"loyalty_no"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"aftercare"}
+  ],
+  "obey": [
+    {
+      "id": "o_hands",
+      "kind": "obey",
+      "speakEn": "Hands where I said. Confirm.",
+      "labelRu": "Руки где сказано?",
+      "options": [
+        {
+          "id": "ok",
+          "labelRu": "Слушаюсь",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "fail",
+          "labelRu": "Нарушил",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "o_tempo",
+      "kind": "obey",
+      "speakEn": "Match my tempo — not yours. Confirm.",
+      "labelRu": "Темп мой, не твой?",
+      "options": [
+        {
+          "id": "ok",
+          "labelRu": "Слушаюсь",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "fail",
+          "labelRu": "Гнал своё",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "o_no_cum",
+      "kind": "obey",
+      "speakEn": "No sneaking an orgasm. Still clean?",
+      "labelRu": "Не подкрадывался к финалу?",
+      "options": [
+        {
+          "id": "ok",
+          "labelRu": "Чист",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "fail",
+          "labelRu": "Почти сорвался",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "o_position",
+      "kind": "obey",
+      "speakEn": "Still in the pose I ordered?",
+      "labelRu": "Всё ещё в позе, что я велела?",
+      "options": [
+        {
+          "id": "ok",
+          "labelRu": "Да",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "fail",
+          "labelRu": "Нет",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "o_balls",
+      "kind": "obey",
+      "speakEn": "Balls free for the next sentence — not tucked away. Confirm.",
+      "labelRu": "Яйца доступны для приговора?",
+      "options": [
+        {
+          "id": "ok",
+          "labelRu": "Да",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "fail",
+          "labelRu": "Нет",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "cbt"
+    },
+    {"id":"o_prone_court","kind":"obey","speakEn":"Stay face-down until the court changes the scene. Confirm.","labelRu":"Остаёшься на животе, пока суд не сменит сцену?","options":[{"id":"ok","labelRu":"Слушаюсь","effect":"obey_ok"},{"id":"fail","labelRu":"Нарушил","effect":"obey_fail"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"prone"},
+    {"id":"o_denial","kind":"obey","speakEn":"No touching during the denial intermission. Still obeying?","labelRu":"Не трогаешь во время антракта отказа?","options":[{"id":"ok","labelRu":"Слушаюсь","effect":"obey_ok"},{"id":"fail","labelRu":"Трогал","effect":"obey_fail"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"denial"}
+  ],
+  "moodOffer": [
+    {
+      "id": "mo_harsher",
+      "kind": "mood_offer",
+      "speakEn": "Shall I sharpen the verdict? Harsher mood.",
+      "labelRu": "Сделать приговор жёстче?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Жёстче",
+          "effect": "mood_harsher"
+        },
+        {
+          "id": "no",
+          "labelRu": "Оставить",
+          "effect": "mood_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "mo_softer",
+      "kind": "mood_offer",
+      "speakEn": "Intermission — softer tide for a minute?",
+      "labelRu": "Антракт — мягче на минуту?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Мягче",
+          "effect": "mood_softer"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не надо",
+          "effect": "mood_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "mo_horny",
+      "kind": "mood_offer",
+      "speakEn": "Turn the court hungry — horny mood. Want it?",
+      "labelRu": "Сделать меня голодной?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "mood_horny"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "mood_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "mo_cruel",
+      "kind": "mood_offer",
+      "speakEn": "Full judge mode. Cold. Accept the shift?",
+      "labelRu": "Полный режим судьи?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "mood_harsher"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "mood_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "moods": [
+        "calm",
+        "sweet"
+      ]
+    },
+    {"id":"mo_aftercare","kind":"mood_offer","speakEn":"Intermission after the storm: shall I turn softer?","labelRu":"Антракт после шторма: стать мягче?","options":[{"id":"yes","labelRu":"Мягче","effect":"mood_softer"},{"id":"no","labelRu":"Не надо","effect":"mood_refuse"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"aftercare"},
+    {"id":"mo_deny","kind":"mood_offer","speakEn":"Should the court become colder and lean into denial?","labelRu":"Сделать суд холоднее и сместиться к отказу?","options":[{"id":"yes","labelRu":"Да","effect":"mood_harsher"},{"id":"no","labelRu":"Нет","effect":"mood_refuse"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"denial verdict"}
+  ],
+  "permission": [
+    {
+      "id": "p_beg",
+      "kind": "permission",
+      "speakEn": "Finale approaches. Beg the court for release — or stay silent.",
+      "labelRu": "Финал близко. Просишь разрешение?",
+      "options": [
+        {
+          "id": "please",
+          "labelRu": "Прошу кончить",
+          "effect": "beg_please"
+        },
+        {
+          "id": "skip",
+          "labelRu": "Пропустить мольбу",
+          "effect": "beg_skip"
+        },
+        {
+          "id": "deny",
+          "labelRu": "Хочу отказ",
+          "effect": "beg_deny_want"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "p_stage",
+      "kind": "permission",
+      "speakEn": "Curtain call. Do you deserve cum under my lights?",
+      "labelRu": "Заслуживаешь кончить под мой свет?",
+      "options": [
+        {
+          "id": "please",
+          "labelRu": "Да, прошу",
+          "effect": "beg_please"
+        },
+        {
+          "id": "skip",
+          "labelRu": "Молчу",
+          "effect": "beg_skip"
+        },
+        {
+          "id": "deny",
+          "labelRu": "Оставь в отказе",
+          "effect": "beg_deny_want"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {"id":"p_verdict","kind":"permission","speakEn":"Give your closing plea to the court: release, silence, or denial.","labelRu":"Последняя мольба суду: финал, молчание или отказ?","options":[{"id":"please","labelRu":"Прошу финал","effect":"beg_please"},{"id":"skip","labelRu":"Молчу","effect":"beg_skip"},{"id":"deny","labelRu":"Прошу отказ","effect":"beg_deny_want"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"verdict"},
+    {"id":"p_aftercare","kind":"permission","speakEn":"Ask politely for a water-break before the final curtain.","labelRu":"Вежливо попросить воды перед финальным занавесом?","options":[{"id":"please","labelRu":"Прошу","effect":"beg_please"},{"id":"skip","labelRu":"Молчу","effect":"beg_skip"},{"id":"deny","labelRu":"Лучше отказ","effect":"beg_deny_want"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"aftercare"}
+  ],
+  "finaleBias": [
+    {
+      "id": "fb_want",
+      "kind": "finale_bias",
+      "speakEn": "What does the accused want — cum, ruin, or denial?",
+      "labelRu": "Чего хочешь на финале: cum / ruin / deny?",
+      "options": [
+        {
+          "id": "cum",
+          "labelRu": "Кончить",
+          "effect": "finale_want_cum"
+        },
+        {
+          "id": "ruin",
+          "labelRu": "Руинить",
+          "effect": "finale_want_ruin"
+        },
+        {
+          "id": "deny",
+          "labelRu": "Отказ",
+          "effect": "finale_want_deny"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "fb_court",
+      "kind": "finale_bias",
+      "speakEn": "The court hears pleas. Pick your preferred sentence.",
+      "labelRu": "Выбери желаемый приговор финала.",
+      "options": [
+        {
+          "id": "cum",
+          "labelRu": "Cum",
+          "effect": "finale_want_cum"
+        },
+        {
+          "id": "ruin",
+          "labelRu": "Ruin",
+          "effect": "finale_want_ruin"
+        },
+        {
+          "id": "deny",
+          "labelRu": "Deny",
+          "effect": "finale_want_deny"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {"id":"fb_tide","kind":"finale_bias","speakEn":"Choose the tide's final verdict: release, ruin, or denial.","labelRu":"Выбери приговор прилива: финал, руин или отказ.","options":[{"id":"cum","labelRu":"Финал","effect":"finale_want_cum"},{"id":"ruin","labelRu":"Руин","effect":"finale_want_ruin"},{"id":"deny","labelRu":"Отказ","effect":"finale_want_deny"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"verdict"},
+    {"id":"fb_humiliate","kind":"finale_bias","speakEn":"For the final applause, do you request mercy, ruin, or denial?","labelRu":"Для финальных аплодисментов: милость, руин или отказ?","options":[{"id":"cum","labelRu":"Милость","effect":"finale_want_cum"},{"id":"ruin","labelRu":"Руин","effect":"finale_want_ruin"},{"id":"deny","labelRu":"Отказ","effect":"finale_want_deny"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"humiliation"}
+  ],
+  "choice": [
+    {
+      "id": "ch_speed",
+      "kind": "choice",
+      "speakEn": "Faster curtain — extend the act?",
+      "labelRu": "Продлить акт (быстрее к финалу по времени)?",
+      "choiceAction": "extend_sec",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Быстрее",
+          "effect": "choice_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Медленнее",
+          "effect": "choice_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "ch_edge",
+      "kind": "choice",
+      "speakEn": "Edge tax. Want me to spin how many edges I add to your quota?",
+      "labelRu": "Крутить рулетку «сколько эджей я тебе добавлю»?",
+      "choiceAction": "extra_edges",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "choice_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "choice_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "ch_toy",
+      "kind": "choice",
+      "speakEn": "Longer hold for the court?",
+      "labelRu": "Дольше держать для суда?",
+      "choiceAction": "hold_sec",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "choice_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "choice_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "ch_media",
+      "kind": "choice",
+      "speakEn": "Tip-only tease for the gallery?",
+      "labelRu": "Только головка — тизер для зала?",
+      "choiceAction": "tip_sec",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "choice_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "choice_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {"id":"ch_breath_court","kind":"choice","speakEn":"Add a breath-hold between acts for the court?","labelRu":"Добавить задержку дыхания между актами?","choiceAction":"breath_hold","options":[{"id":"yes","labelRu":"Да","effect":"choice_yes"},{"id":"no","labelRu":"Нет","effect":"choice_no"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"verdict"},
+    {"id":"ch_ruin_tide","kind":"choice","speakEn":"Call one deliberate ruined edge from the tide?","labelRu":"Позвать один намеренный руин от прилива?","choiceAction":"ruin_now","options":[{"id":"yes","labelRu":"Да","effect":"choice_yes"},{"id":"no","labelRu":"Нет","effect":"choice_no"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"denial verdict"}
+  ],
+  "equip": [
+    {
+      "id": "eq_plug",
+      "kind": "equip",
+      "speakEn": "Insert the plug for the next scene. Ready?",
+      "labelRu": "Вставить пробку на сцену?",
+      "toyId": "vibrating_plug",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Надел",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не сейчас",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "eq_cage",
+      "kind": "equip",
+      "speakEn": "Cage for the Hydro court. Lock it.",
+      "labelRu": "Клетка для суда — надеть?",
+      "toyId": "chastity_cage",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Надел",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не сейчас",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "eq_wand",
+      "kind": "equip",
+      "speakEn": "Wand on stage — against the sentence.",
+      "labelRu": "Wand на сцену?",
+      "toyId": "wand",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Взял",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не сейчас",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "eq_vibe_bullet",
+      "kind": "equip",
+      "speakEn": "Bullet vibe as a prop — press where the verdict lands.",
+      "labelRu": "Вибропуля на сцену? Как wand, компактнее.",
+      "toyId": "vibe_bullet",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Взял",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не сейчас",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "eq_dildo",
+      "kind": "equip",
+      "speakEn": "Medium dildo — thrust, plapping, or worn grind under the verdict. Equip?",
+      "labelRu": "Средний дилдо: thrust, plapping или worn-grind. Экип?",
+      "toyId": "dildo_medium_vibe",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Готов",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не сейчас",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {"id":"eq_ring","kind":"equip","speakEn":"Cock ring as a stage prop for the next act. Equip?","labelRu":"Кольцо как реквизит для следующего акта?","toyId":"cock_ring","options":[{"id":"yes","labelRu":"Надел","effect":"equip_yes"},{"id":"no","labelRu":"Не сейчас","effect":"equip_no"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"denial"},
+    {"id":"eq_ball_stretcher","kind":"equip","speakEn":"Ball stretcher for a colder verdict. Put it on?","labelRu":"Болл-стретчер для холодного приговора?","toyId":"ball_stretcher","options":[{"id":"yes","labelRu":"Надел","effect":"equip_yes"},{"id":"no","labelRu":"Не сейчас","effect":"equip_no"},{"id":"mute","labelRu":"Не отвечу","effect":"mute"}],"tags":"cbt pain verdict"}
+  ]
+}

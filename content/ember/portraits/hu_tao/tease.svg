@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="480" viewBox="0 0 360 480">
+  <rect width="360" height="480" fill="#2a1418"/>
+  <ellipse cx="180" cy="200" rx="90" ry="110" fill="#f0c8b0"/>
+  <ellipse cx="180" cy="120" rx="100" ry="50" fill="#2a1810"/>
+  <path d="M90 140 Q180 40 270 140" fill="#2a1810"/>
+  <circle cx="150" cy="198" r="8" fill="#1a1010"/>
+  <circle cx="210" cy="198" r="8" fill="#1a1010"/>
+  <circle cx="155" cy="230" r="6" fill="#e08090" opacity="0.7"/>
+  <circle cx="205" cy="230" r="6" fill="#e08090" opacity="0.7"/>
+  <ellipse cx="180" cy="260" rx="12" ry="8" fill="#c06070"/>
+  <text x="180" y="420" text-anchor="middle" fill="#e08090" font-size="20" font-family="sans-serif">tease</text>
+</svg>

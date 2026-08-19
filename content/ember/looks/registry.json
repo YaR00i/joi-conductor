@@ -1,0 +1,68 @@
+{
+  "presets": [
+    {
+      "id": "look_mry0sttv_ss96",
+      "nameRu": "вечер",
+      "ambientColor": "#2a140c",
+      "ambientAlpha": 0.22,
+      "fillIntensity": 1.05,
+      "sunAzimuth": 210,
+      "sunElevation": 25,
+      "sunColor": "#ff9a4a",
+      "sunIntensity": 1.57,
+      "bloomStrength": 0.41,
+      "bloomThreshold": 0.7,
+      "bloomRadius": 0.35,
+      "grade": {
+        "tone": 0.28,
+        "brightness": 1.18,
+        "saturation": 1.23
+      },
+      "atmosphere": {
+        "fog": 0.02,
+        "fogColor": "#c89068",
+        "rain": 0,
+        "wind": 0.22,
+        "cloudShadows": 0.22,
+        "cloudSpeed": 0.18,
+        "dust": 1,
+        "fireflies": 0,
+        "vignette": 0.3,
+        "haze": 0,
+        "sunGlare": 0.97
+      }
+    },
+    {
+      "id": "look_mrwwuccj_oi7j",
+      "nameRu": "кладбищехутао",
+      "ambientColor": "#032472",
+      "ambientAlpha": 0.92,
+      "fillIntensity": 2.35,
+      "sunAzimuth": 144,
+      "sunElevation": 26,
+      "sunColor": "#789ef7",
+      "sunIntensity": 1.41,
+      "bloomStrength": 0.4,
+      "bloomThreshold": 0.78,
+      "bloomRadius": 0.14,
+      "grade": {
+        "tone": -0.78,
+        "brightness": 0.63,
+        "saturation": 1.61
+      },
+      "atmosphere": {
+        "fog": 0.06,
+        "fogColor": "#141018",
+        "rain": 0,
+        "wind": 0.35,
+        "cloudShadows": 0.48,
+        "cloudSpeed": 0.94,
+        "dust": 0.55,
+        "fireflies": 1,
+        "vignette": 0.5,
+        "haze": 0,
+        "sunGlare": 0
+      }
+    }
+  ]
+}

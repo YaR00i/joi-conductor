@@ -1,0 +1,54 @@
+{
+  "id": "hu_tao_p1",
+  "entries": [
+    {
+      "atSec": 0,
+      "untilSec": 45,
+      "enemyId": "perv_walker",
+      "count": 2,
+      "intervalSec": 1.4,
+      "regionGroup": "any"
+    },
+    {
+      "atSec": 20,
+      "untilSec": 90,
+      "enemyId": "perv_runner",
+      "count": 1,
+      "intervalSec": 2.2,
+      "regionGroup": "any"
+    },
+    {
+      "atSec": 40,
+      "untilSec": 200,
+      "enemyId": "slime_spitter",
+      "count": 1,
+      "intervalSec": 3.5,
+      "regionGroup": "any"
+    },
+    {
+      "atSec": 60,
+      "untilSec": 280,
+      "enemyId": "grabber",
+      "count": 1,
+      "intervalSec": 5,
+      "regionGroup": "any"
+    },
+    {
+      "atSec": 45,
+      "untilSec": 300,
+      "enemyId": "perv_walker",
+      "count": 3,
+      "intervalSec": 1.1,
+      "regionGroup": "any"
+    },
+    {
+      "atSec": 120,
+      "untilSec": 121,
+      "enemyId": "boss_tourist",
+      "count": 1,
+      "intervalSec": 999,
+      "regionGroup": "north",
+      "once": true
+    }
+  ]
+}

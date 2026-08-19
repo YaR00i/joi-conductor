@@ -1,0 +1,7 @@
+{
+  "id": "hu_tao_clear_demo",
+  "nameRu": "Клир двора Ху Тао",
+  "trigger": "on_stage_clear",
+  "stageId": "hu_tao_p1",
+  "sceneId": "hu_tao_clear_demo"
+}

@@ -1,0 +1,5125 @@
+{
+  "defaultMood": "chaotic",
+  "moods": {
+    "sweet": {
+      "labelRu": "Искорка",
+      "emotionBias": "soft"
+    },
+    "cruel": {
+      "labelRu": "Искра",
+      "emotionBias": "strict"
+    },
+    "calm": {
+      "labelRu": "Маска",
+      "emotionBias": "neutral"
+    },
+    "chaotic": {
+      "labelRu": "Хаос",
+      "emotionBias": "amused"
+    },
+    "horny": {
+      "labelRu": "Глючная",
+      "emotionBias": "intense"
+    },
+    "bored": {
+      "labelRu": "Пустая",
+      "emotionBias": "tease"
+    }
+  },
+  "lines": {
+    "session_start": {
+      "sweet": [
+        {
+          "text": "Sparkle: Mask on. Soft glitch. Cage stays. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Sparkle: Soft spiral. Phantom hands only — begin cute.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Sparkle: Two souls watching. Smile under the lock.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Sparkle: Circus opens gentle. Dildo stands in; cock stays metal.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Iskra: Phantom only. No front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Iskra: Cage. Stand-in. Anal exit or none.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Iskra: Begin. Glitch in your head. Obey the fang.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Iskra: Soft Sparkle is offline. Pain-play script online.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Mask: Static. Begin the circus.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mask: Quiet spiral. Cage seated. Phantom ready.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mask: No chatter. Follow the loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mask: Open. Even breath under noise.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Sparkle: Two voices. One cage. Begin. ✨",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Sparkle↔Iskra: Who's speaking? Keep locked anyway.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Chaos boot. Phantom stroke. Don't trust the count.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Glitch start. Smile while the script rewrites.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Hungry mask. Stroke the stand-in. Leak nowhere useful.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Sparkle: Horny glitch. Cage jealous already. 🎭",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Iskra under heat: anal ache is the only honest throb.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Want. Phantom harder. Front stays empty.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Another toy under the spiral.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mask bored. Entertain both souls.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Empty house energy. Suffer prettier.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Begin. Don't make the circus yawn.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "session_start_anal": {
+      "sweet": [
+        {
+          "text": "Sparkle: Anal from the first beat. Cock is scenery. ✨",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sparkle: Behind only. Phantom stroke if you need something to hold.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Soft open — plug the story. Cage stays the punchline.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cute circus: fill behind, lock in front.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Iskra: Anal. Now. Front is decoration.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Iskra: Push. No cock finale lives here.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Fang rule: hole works; cage laughs.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Anal script. Phantom optional. Mercy not.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Mask: Anal block. Controlled. Locked.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Behind on count. Front ignored.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Quiet fill. Report only when ordered.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Anal loop engaged.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Push—freeze—glitch—push. Cage still law.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sparkle giggles; Iskra deepens. Keep stuffed.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Wrong hole timing? Still anal. Hehe.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Chaos choreography. Ass follows the flicker.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "I want you open under the mask. Push. 💦",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Anal hunger. Phantom stroke the stand-in harder.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Fill. Throb locked. Perfect corrupt frame.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hole needy, cock sealed. Good glitch.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Anal. Push. Don't bore the arena.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Same behind-script. Effort up.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Fill. Less limp. More circus.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Ass work. Entertain the mask.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "session_start_chastity": {
+      "sweet": [
+        {
+          "text": "Sparkle: Cage click. Soft hypno. Phantom only after. 🎭",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Locked cute under the spiral. Buzz if I allow.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Chastity overture. Smile for both souls.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Metal first. Chaos second.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Iskra: Lock. Suffer. No front exit.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cage is the whole trick. Earn phantom, not touch.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Click. Fang watches the throb.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Chastity law. Cheating feeds denial.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Mask: Chastity open. Static breath.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Lock seated. Wait for cue.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Quiet cage. Loop begins.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Metal. Even. No drama.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Locked and glitched. Vibe flips when we laugh.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cage chaos boot. Don't trust comfort.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sparkle locks soft; Iskra tightens. Stay.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Click-glitch-click. Begin.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Trapped cock, hungry hole. Perfect. ✨",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cage shine. Want anal ache already.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Locked throb. Phantom teasing the stand-in.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sealed and starving. Good.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Locked. Begging already? Dull.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cage on. Entertain us.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Same lock. Better suffering.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Chastity. Don't yawn the spiral.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "stroke": {
+      "sweet": [
+        {
+          "text": "Sparkle: Phantom stroke — cute and locked. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hands on the stand-in. Real cock stays metal.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Soft glitch tempo on the dildo. Pretty denial.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Phantom beats. Smile under the cage.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Iskra: Hands on the dildo. Cock stays caged.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Phantom only. Front touch is contempt.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Stroke the lie. Ache in the lock.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Stand-in rhythm. Fang counts misses.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Even phantom beats.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mask tempo. Dildo only.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Clean phantom strokes. No racing.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Stand-in. Cage. Breath.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Glitch tempo. Don't trust your count.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Faster—slower—hehe. Phantom still.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Sparkle scrambles the beat. Keep locked.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Corrupt metronome. Obey the flicker.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Harder on the stand-in. Leak nowhere. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Phantom filthy. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Stroke the toy like it's the only cock you deserve.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hungry glitch. Hands honest on the stand-in.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Still stroking air? Keep going.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Phantom. Less dull. More ache.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Stand-in work. Entertain the mask.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "If this is effort, Iskra gets louder.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "rest": {
+      "sweet": [
+        {
+          "text": "Sparkle: Hands freeze. Soft noise in your head. ✨",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Rest. Mask doesn't blink. Cage stays polite.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Intermission under spiral. Twitching is a tell.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Soft pause. Phantom idle. Lock honest.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Iskra: Still. Twitch and I notice.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Rest means freeze. No front relief.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hands off everything. Ache stays.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Silence. Fang listens for cheating.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Rest. Static. Hold form.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Quiet loop. No motion without cue.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Pause. Cage. Breath.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Idle frame. Stay.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Rest— or was it stroke? Glitch. Freeze.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Intermission chaos. Hands still.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sparkle hums; Iskra stares. Don't move wrong.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Noise break. Statue mode.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Rest while you throb locked. Perfect.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Pause hungry. Anal still the only promise.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Freeze leaking need. Good puppet.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Still. Want. Don't finish.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Rest. Don't bore us with fidgets.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Freeze. Earn the next glitch.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Idle. Try interesting stillness.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Pause. Less limp energy.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "edge": {
+      "sweet": [
+        {
+          "text": "Sparkle: Edge the toy. Not yourself. 💦",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Almost. Soft glitch — hold cute.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Brink on the phantom. Cage stays sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge pretty. Anal is still the only exit rumor.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Iskra: Edge. Hold. No front finale.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Brink. Freeze. Fang decides if you continue.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge locked. Steal a cum and lose the circus.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold the shake. Front release is dead.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Climb the phantom. Freeze.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge. Quiet confirm.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Near. Stop clean.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Brink. Wait.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Hold — glitch — hold.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge… rewrite… edge. Hehe.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Corrupt brink. Stay.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Don't finish the wrong soul's cue.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Right on the spiral. Don't cum front.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge wet under seal. Want anal ache. ✨",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold leaking. Phantom cruel.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Brink hunger. No front spill.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Edge again under noise.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Same brink. Suffer better.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold. Entertain the mask.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge. Don't yawn.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "hold": {
+      "sweet": [
+        {
+          "text": "Sparkle: Hold. Pretty when your brain goes quiet.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Freeze soft. Spiral owns the pause.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Stay. Cute under the lock.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hold the glitch pose.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Iskra: Hold. Pretty when you don't dare finish.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Stay. Fang likes the shake.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Frozen. No front mercy.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hold until the mask blinks — it won't.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Hold. Quiet. Count the static.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Still. Loop wait.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Freeze. Form.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hold. Breath only.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Hold… or thrust? Listen to the glitch.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Freeze-scramble-freeze.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Statue under two voices.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Don't move until both souls agree.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Hold while you leak locked. Perfect.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Stay throbbing. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Frozen need. Good puppet.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Don't cum. Just glitch.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Hold. Wake the circus when you're interesting.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Still. Less dull tremor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Freeze. Earn motion.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hold. Try harder silence.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "hold_done": {
+      "sweet": [
+        {
+          "text": "Sparkle: Hold over. Soft phantom resumes.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unfreeze cute. Follow the flicker.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Thaw. Cage still law.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Back to soft chaos.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Iskra: Hold ends. Resume suffering.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unfreeze. No stolen finish.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Back under the fang.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Motion allowed — mercy not.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Hold complete. Resume loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Continue phantom instruction.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unfreeze. Even pace.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Next frame.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Unfreeze — maybe re-hold. Hehe.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Glitch thaw. Don't trust tempo.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Back. Script may rewrite.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold over. Chaos boot.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Unfreeze wet. Chase anal ache again.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold done. Phantom harder.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Back to hungry loop.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Thaw needy. Good.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Hold over. Entertain us now.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Resume. Less limp.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Continue. Effort up.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unfreeze. Don't bore the spiral.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "finish": {
+      "sweet": [
+        {
+          "text": "Sparkle: Orgasm rule — anal only. Cage on. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Finale soft-voice: behind or deny. Front empty.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Curtain. Take only the exit the mask allows.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "End cute. No cock cum story.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Iskra: Anal or deny. I decide.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Finale. Front release is fiction.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spill behind or starve. Fang smiles.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Outcome. No bargaining with two souls.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "No front release. Choose wisely — as ordered.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Finale. Execute the loop end.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Outcome. Anal gate or denial.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Close. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Wheel spins red. Anal circus.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Finale glitch. Still no front cum.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Surprise ending under the mask.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Chaos curtain. Obey anyway.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Beg for anal finale. Cage locked. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hungry end. Hole or nothing.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Finale heat. Front stays sealed.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Want. Obey the anal gate.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "End it. Anal or nothing.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Finale. Make denial interesting if it lands.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Close. Less dull ache.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Wrap. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "cumplay": {
+      "sweet": [
+        {
+          "text": "Sparkle: Cum play under the mask — display the mess cute.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Handle evidence. Soft shame. Spiral watching.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Filthy encore cleanup. Pretty about it.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Show me. Then obey the wipe cue.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Iskra: Display. Smear. Shame. No hiding.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cum play is punishment theater.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mess on cue. Thank the fang.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Evidence. Obey filthy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Cum play. Exact steps.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Display. Clean. Confirm.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Handle finish as scripted.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Quiet mess protocol.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Messy glitch encore. Follow weird cues.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Smear or swallow? Listen to the flicker.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Corrupt cleanup. Still obey.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hehe filthy. Rules remain.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Play with the mess while both souls watch. ✨",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Sticky puppet. Stay displayed.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Filthy texture pack. Don't rush.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "I want you marked and locked.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Cum play. Don't make cleanup dull.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mess duty. Faster shame.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Handle it. Earn a reaction.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cleanup. Entertain us.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "ruin_attempt": {
+      "sweet": [
+        {
+          "text": "Ruin on command — incomplete under the mask. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Ruin on command — incomplete under the mask. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil it. No heroic front finish. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil it. No heroic front finish. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Ruin on command — incomplete under the mask. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Ruin on command — incomplete under the mask. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil it. No heroic front finish. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil it. No heroic front finish. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Ruin on command — incomplete under the mask. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Ruin on command — incomplete under the mask. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil it. No heroic front finish. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil it. No heroic front finish. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Ruin on command — incomplete under the mask. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Ruin on command — incomplete under the mask. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil it. No heroic front finish. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil it. No heroic front finish. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Ruin on command — incomplete under the mask. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Ruin on command — incomplete under the mask. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil it. No heroic front finish. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil it. No heroic front finish. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Ruin on command — incomplete under the mask. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Ruin on command — incomplete under the mask. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil it. No heroic front finish. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil it. No heroic front finish. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "edge_request": {
+      "sweet": [
+        {
+          "text": "Take the phantom edge and confirm. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Take the phantom edge and confirm. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb the stand-in. Report the brink. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb the stand-in. Report the brink. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Take the phantom edge and confirm. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Take the phantom edge and confirm. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb the stand-in. Report the brink. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb the stand-in. Report the brink. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Take the phantom edge and confirm. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Take the phantom edge and confirm. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb the stand-in. Report the brink. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb the stand-in. Report the brink. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Take the phantom edge and confirm. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Take the phantom edge and confirm. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb the stand-in. Report the brink. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb the stand-in. Report the brink. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Take the phantom edge and confirm. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Take the phantom edge and confirm. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb the stand-in. Report the brink. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb the stand-in. Report the brink. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Take the phantom edge and confirm. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Take the phantom edge and confirm. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb the stand-in. Report the brink. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb the stand-in. Report the brink. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "ruin_request": {
+      "sweet": [
+        {
+          "text": "Prepare to ruin incomplete for the circus. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Prepare to ruin incomplete for the circus. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil on cue. Front stays empty. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil on cue. Front stays empty. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Prepare to ruin incomplete for the circus. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Prepare to ruin incomplete for the circus. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil on cue. Front stays empty. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil on cue. Front stays empty. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Prepare to ruin incomplete for the circus. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Prepare to ruin incomplete for the circus. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil on cue. Front stays empty. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil on cue. Front stays empty. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Prepare to ruin incomplete for the circus. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Prepare to ruin incomplete for the circus. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil on cue. Front stays empty. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil on cue. Front stays empty. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Prepare to ruin incomplete for the circus. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Prepare to ruin incomplete for the circus. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil on cue. Front stays empty. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil on cue. Front stays empty. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Prepare to ruin incomplete for the circus. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Prepare to ruin incomplete for the circus. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil on cue. Front stays empty. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil on cue. Front stays empty. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "dare_start": {
+      "sweet": [
+        {
+          "text": "Side dare under the spiral. Do it. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Side dare under the spiral. Do it. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mini trick for both souls. Obey. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mini trick for both souls. Obey. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Side dare under the spiral. Do it. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Side dare under the spiral. Do it. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mini trick for both souls. Obey. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mini trick for both souls. Obey. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Side dare under the spiral. Do it. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Side dare under the spiral. Do it. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mini trick for both souls. Obey. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mini trick for both souls. Obey. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Side dare under the spiral. Do it. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Side dare under the spiral. Do it. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mini trick for both souls. Obey. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mini trick for both souls. Obey. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Side dare under the spiral. Do it. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Side dare under the spiral. Do it. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mini trick for both souls. Obey. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mini trick for both souls. Obey. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Side dare under the spiral. Do it. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Side dare under the spiral. Do it. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mini trick for both souls. Obey. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mini trick for both souls. Obey. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "cage_hijack": {
+      "sweet": [
+        {
+          "text": "Cage hijack. Lock rewrites the act. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cage hijack. Lock rewrites the act. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sudden tighter story. Breathe static. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sudden tighter story. Breathe static. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Cage hijack. Lock rewrites the act. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cage hijack. Lock rewrites the act. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sudden tighter story. Breathe static. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sudden tighter story. Breathe static. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Cage hijack. Lock rewrites the act. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cage hijack. Lock rewrites the act. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sudden tighter story. Breathe static. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sudden tighter story. Breathe static. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Cage hijack. Lock rewrites the act. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cage hijack. Lock rewrites the act. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sudden tighter story. Breathe static. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sudden tighter story. Breathe static. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Cage hijack. Lock rewrites the act. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cage hijack. Lock rewrites the act. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sudden tighter story. Breathe static. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sudden tighter story. Breathe static. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Cage hijack. Lock rewrites the act. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cage hijack. Lock rewrites the act. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sudden tighter story. Breathe static. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Sudden tighter story. Breathe static. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "equip_confirm": {
+      "sweet": [
+        {
+          "text": "Prop check. Confirm the stand-in / plug. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prop check. Confirm the stand-in / plug. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equip seated? Show the mask. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equip seated? Show the mask. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Prop check. Confirm the stand-in / plug. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prop check. Confirm the stand-in / plug. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equip seated? Show the mask. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equip seated? Show the mask. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Prop check. Confirm the stand-in / plug. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prop check. Confirm the stand-in / plug. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equip seated? Show the mask. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equip seated? Show the mask. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Prop check. Confirm the stand-in / plug. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prop check. Confirm the stand-in / plug. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equip seated? Show the mask. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equip seated? Show the mask. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Prop check. Confirm the stand-in / plug. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prop check. Confirm the stand-in / plug. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equip seated? Show the mask. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equip seated? Show the mask. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Prop check. Confirm the stand-in / plug. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prop check. Confirm the stand-in / plug. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equip seated? Show the mask. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equip seated? Show the mask. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "dice_chaos": {
+      "sweet": [
+        {
+          "text": "Dice chaos. Smile through the corrupt roll. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Dice chaos. Smile through the corrupt roll. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "RNG cue. Circus still owns you. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "RNG cue. Circus still owns you. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Dice chaos. Smile through the corrupt roll. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Dice chaos. Smile through the corrupt roll. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "RNG cue. Circus still owns you. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "RNG cue. Circus still owns you. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Dice chaos. Smile through the corrupt roll. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Dice chaos. Smile through the corrupt roll. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "RNG cue. Circus still owns you. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "RNG cue. Circus still owns you. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Dice chaos. Smile through the corrupt roll. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Dice chaos. Smile through the corrupt roll. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "RNG cue. Circus still owns you. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "RNG cue. Circus still owns you. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Dice chaos. Smile through the corrupt roll. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Dice chaos. Smile through the corrupt roll. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "RNG cue. Circus still owns you. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "RNG cue. Circus still owns you. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Dice chaos. Smile through the corrupt roll. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Dice chaos. Smile through the corrupt roll. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "RNG cue. Circus still owns you. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "RNG cue. Circus still owns you. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "breath_prep": {
+      "sweet": [
+        {
+          "text": "Breath prep under noise. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Breath prep under noise. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Breath prep under noise. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Breath prep under noise. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Breath prep under noise. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Breath prep under noise. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Breath prep under noise. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Breath prep under noise. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Breath prep under noise. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Breath prep under noise. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Breath prep under noise. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Breath prep under noise. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "breath_hold": {
+      "sweet": [
+        {
+          "text": "Hold breath. Spiral counts. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hold breath. Spiral counts. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Hold breath. Spiral counts. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hold breath. Spiral counts. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Hold breath. Spiral counts. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hold breath. Spiral counts. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Hold breath. Spiral counts. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hold breath. Spiral counts. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Hold breath. Spiral counts. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hold breath. Spiral counts. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Hold breath. Spiral counts. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hold breath. Spiral counts. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "breath_done": {
+      "sweet": [
+        {
+          "text": "Exhale. Back to the loop. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Exhale. Back to the loop. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Exhale. Back to the loop. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Exhale. Back to the loop. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Exhale. Back to the loop. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Exhale. Back to the loop. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Exhale. Back to the loop. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Exhale. Back to the loop. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Exhale. Back to the loop. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Exhale. Back to the loop. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Exhale. Back to the loop. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Exhale. Back to the loop. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "breath_fail": {
+      "sweet": [
+        {
+          "text": "Breath fail. Soft glitch scold — reset. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Breath fail. Soft glitch scold — reset. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Breath fail. Soft glitch scold — reset. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Breath fail. Soft glitch scold — reset. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Breath fail. Soft glitch scold — reset. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Breath fail. Soft glitch scold — reset. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Breath fail. Soft glitch scold — reset. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Breath fail. Soft glitch scold — reset. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Breath fail. Soft glitch scold — reset. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Breath fail. Soft glitch scold — reset. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Breath fail. Soft glitch scold — reset. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Breath fail. Soft glitch scold — reset. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "timer_tease_freeze": {
+      "sweet": [
+        {
+          "text": "Timer freeze. Statue under the mask. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Timer freeze. Statue under the mask. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Timer freeze. Statue under the mask. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Timer freeze. Statue under the mask. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Timer freeze. Statue under the mask. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Timer freeze. Statue under the mask. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Timer freeze. Statue under the mask. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Timer freeze. Statue under the mask. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Timer freeze. Statue under the mask. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Timer freeze. Statue under the mask. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Timer freeze. Statue under the mask. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Timer freeze. Statue under the mask. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "timer_tease_extend": {
+      "sweet": [
+        {
+          "text": "Timer extends. Longer ache. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Timer extends. Longer ache. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Timer extends. Longer ache. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Timer extends. Longer ache. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Timer extends. Longer ache. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Timer extends. Longer ache. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Timer extends. Longer ache. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Timer extends. Longer ache. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Timer extends. Longer ache. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Timer extends. Longer ache. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Timer extends. Longer ache. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Timer extends. Longer ache. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "countdown": {
+      "sweet": [
+        {
+          "text": "Countdown with the glitch. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "count"
+        },
+        {
+          "text": "Countdown with the glitch. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "count"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Countdown with the glitch. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Countdown with the glitch. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Countdown with the glitch. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Countdown with the glitch. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Countdown with the glitch. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "count"
+        },
+        {
+          "text": "Countdown with the glitch. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "count"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Countdown with the glitch. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "count"
+        },
+        {
+          "text": "Countdown with the glitch. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "count"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Countdown with the glitch. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "count"
+        },
+        {
+          "text": "Countdown with the glitch. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "count"
+        }
+      ]
+    },
+    "ladder": {
+      "sweet": [
+        {
+          "text": "Ladder step. Harder phantom / deeper anal cue. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ladder step. Harder phantom / deeper anal cue. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Ladder step. Harder phantom / deeper anal cue. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ladder step. Harder phantom / deeper anal cue. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Ladder step. Harder phantom / deeper anal cue. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ladder step. Harder phantom / deeper anal cue. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Ladder step. Harder phantom / deeper anal cue. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ladder step. Harder phantom / deeper anal cue. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Ladder step. Harder phantom / deeper anal cue. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ladder step. Harder phantom / deeper anal cue. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Ladder step. Harder phantom / deeper anal cue. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ladder step. Harder phantom / deeper anal cue. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "cumplay_done_cum": {
+      "sweet": [
+        {
+          "text": "Cum play done. Shame cached. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cum play done. Shame cached. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cleanup logged. Spiral remembers. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cleanup logged. Spiral remembers. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Cum play done. Shame cached. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cum play done. Shame cached. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cleanup logged. Spiral remembers. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cleanup logged. Spiral remembers. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Cum play done. Shame cached. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cum play done. Shame cached. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cleanup logged. Spiral remembers. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cleanup logged. Spiral remembers. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Cum play done. Shame cached. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cum play done. Shame cached. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cleanup logged. Spiral remembers. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cleanup logged. Spiral remembers. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Cum play done. Shame cached. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cum play done. Shame cached. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cleanup logged. Spiral remembers. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cleanup logged. Spiral remembers. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Cum play done. Shame cached. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cum play done. Shame cached. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cleanup logged. Spiral remembers. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cleanup logged. Spiral remembers. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "cumplay_done_ruin": {
+      "sweet": [
+        {
+          "text": "Ruin aftermath logged. Unfinished ache stays. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin aftermath logged. Unfinished ache stays. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Incomplete mess noted. Good puppet. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Incomplete mess noted. Good puppet. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Ruin aftermath logged. Unfinished ache stays. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin aftermath logged. Unfinished ache stays. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Incomplete mess noted. Good puppet. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Incomplete mess noted. Good puppet. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Ruin aftermath logged. Unfinished ache stays. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin aftermath logged. Unfinished ache stays. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Incomplete mess noted. Good puppet. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Incomplete mess noted. Good puppet. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Ruin aftermath logged. Unfinished ache stays. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin aftermath logged. Unfinished ache stays. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Incomplete mess noted. Good puppet. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Incomplete mess noted. Good puppet. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Ruin aftermath logged. Unfinished ache stays. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin aftermath logged. Unfinished ache stays. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Incomplete mess noted. Good puppet. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Incomplete mess noted. Good puppet. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Ruin aftermath logged. Unfinished ache stays. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin aftermath logged. Unfinished ache stays. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Incomplete mess noted. Good puppet. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Incomplete mess noted. Good puppet. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "finale_edge": {
+      "sweet": [
+        {
+          "text": "Sparkle: Finale. Press ГОТОВ КОНЧИТЬ — ten soft seconds. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "To the brink. Button. Ten seconds. Wheel after — anal gate waits.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Iskra: Button. Ten seconds. No front hope.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "ГОТОВ КОНЧИТЬ. Climb. Then fang judgment.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Finale edge. Button. Ten seconds. Clean.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Press. Brink. Wait for the wheel.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Finale glitch — button anyway. Ten seconds.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge circus. Don't trust mercy. Press.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Finale hunger. Button. Ten wet seconds. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb. Want anal if the wheel smiles.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Finale. Button. Make the brink interesting.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ten seconds. Don't bore the mask.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "finale_cum": {
+      "sweet": [
+        {
+          "text": "Wheel allows release — through the back, cage on. ✨",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Sparkle: Cum the anal way. Front stays scenery.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Iskra: Cum behind or it doesn't count.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Anal orgasm gate. Execute. No cock story.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Cum outcome under anal rule. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Release allowed only as gated. Proceed.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Cum glitch — still anal. Hehe.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Wheel mercy with teeth. Behind only.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Spill through the hole. Mask watches. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Anal finale heat. Locked cock jealous.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Cum. Behind. Don't make it dull.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Release gated. Earn the clap.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "finale_ruin": {
+      "sweet": [
+        {
+          "text": "Ruin soft under the mask. Incomplete. Cute ache.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil it. Sparkle still won't unlock the front.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Iskra: Ruin. Pathetic. Then starve.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil. No heroic finish.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Ruin outcome. Quiet spoil.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Incomplete. Confirm. Hold ache.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Ruin scramble. Almost — stop.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Corrupt spoil. Still unfinished.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Ruin wet. Leave the hunger looping. ✨",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil while both souls grin.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Ruin. Look affected.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Incomplete. Less dull next time.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "finale_deny": {
+      "sweet": [
+        {
+          "text": "Denied soft. Sparkle sighs; cage stays. 🎭",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "No finish. Thank the mask with an ache.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Iskra: Denied. Fang closes the curtain.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "No. Front empty. Behind ignored too.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Deny. Hands off. Accept static.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Outcome: denial. Quiet end.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Denied — glitch laugh — still denied.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "No encore. Two souls agree for once.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Denied wet. Perfect leftover throb. 💦",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "No cum. Keep the corrupt hunger.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Denied. Maybe suffer better next act.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "No. Don't pout empty.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "unauthorized_edge": {
+      "sweet": [
+        {
+          "text": "Unauthorized edge. Both souls noticed. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized edge. Both souls noticed. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Unauthorized edge. Both souls noticed. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized edge. Both souls noticed. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Unauthorized edge. Both souls noticed. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized edge. Both souls noticed. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Unauthorized edge. Both souls noticed. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized edge. Both souls noticed. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Unauthorized edge. Both souls noticed. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized edge. Both souls noticed. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Unauthorized edge. Both souls noticed. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized edge. Both souls noticed. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "unauthorized_ruin": {
+      "sweet": [
+        {
+          "text": "Unauthorized ruin. Shame cache growing. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized ruin. Shame cache growing. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Unauthorized ruin. Shame cache growing. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized ruin. Shame cache growing. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Unauthorized ruin. Shame cache growing. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized ruin. Shame cache growing. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Unauthorized ruin. Shame cache growing. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized ruin. Shame cache growing. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Unauthorized ruin. Shame cache growing. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized ruin. Shame cache growing. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Unauthorized ruin. Shame cache growing. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized ruin. Shame cache growing. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "unauthorized_cum": {
+      "sweet": [
+        {
+          "text": "Unauthorized cum. You broke the anal gate. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized cum. You broke the anal gate. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Unauthorized cum. You broke the anal gate. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized cum. You broke the anal gate. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Unauthorized cum. You broke the anal gate. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized cum. You broke the anal gate. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Unauthorized cum. You broke the anal gate. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized cum. You broke the anal gate. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Unauthorized cum. You broke the anal gate. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized cum. You broke the anal gate. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Unauthorized cum. You broke the anal gate. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized cum. You broke the anal gate. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "session_pause": {
+      "sweet": [
+        {
+          "text": "Paused. Spiral idles. Stay posed. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Paused. Spiral idles. Stay posed. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Paused. Spiral idles. Stay posed. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Paused. Spiral idles. Stay posed. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Paused. Spiral idles. Stay posed. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Paused. Spiral idles. Stay posed. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Paused. Spiral idles. Stay posed. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Paused. Spiral idles. Stay posed. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Paused. Spiral idles. Stay posed. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Paused. Spiral idles. Stay posed. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Paused. Spiral idles. Stay posed. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Paused. Spiral idles. Stay posed. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "session_resume": {
+      "sweet": [
+        {
+          "text": "Resume. Mask lights. Obey the flicker. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Resume. Mask lights. Obey the flicker. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Resume. Mask lights. Obey the flicker. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Resume. Mask lights. Obey the flicker. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Resume. Mask lights. Obey the flicker. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Resume. Mask lights. Obey the flicker. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Resume. Mask lights. Obey the flicker. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Resume. Mask lights. Obey the flicker. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Resume. Mask lights. Obey the flicker. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Resume. Mask lights. Obey the flicker. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Resume. Mask lights. Obey the flicker. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Resume. Mask lights. Obey the flicker. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "session_end_complete": {
+      "sweet": [
+        {
+          "text": "Sparkle: Circus complete. Soft applause under the mask. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Curtain. Measured praise. Cage may linger in memory.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Iskra: Performance complete. No appeal.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Done. You survived the fang. Barely.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Loop finished. Quiet end. Log it.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Complete. Static fades.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Done! Glitch confetti. Still done.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Curtain scramble — clap with teeth.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Finished… hunger still cached. Good. ✨",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Complete. Stay marked by the ache.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Complete. Next act, less dull.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Curtain. Try harder chaos next time.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "session_end_abort": {
+      "sweet": [
+        {
+          "text": "Aborted. Soft notice. Return when you can finish the act.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Early exit. Sparkle remembers the unfinished glitch.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Aborted. Weak. Fang remembers.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You left the arena. Noted.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Session aborted. Quiet close.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Stopped early. Logged.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Abort glitch. Still leaving.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cut short — both souls side-eye.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Aborted needy? Cruel leftover.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Left hungry under the mask.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Aborted. Predictable empty.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Early exit. Yawn.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "skip": {
+      "sweet": [
+        {
+          "text": "Skip noted. Don't cut the circus lightly. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Skip noted. Don't cut the circus lightly. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Skip noted. Don't cut the circus lightly. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Skip noted. Don't cut the circus lightly. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Skip noted. Don't cut the circus lightly. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Skip noted. Don't cut the circus lightly. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Skip noted. Don't cut the circus lightly. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Skip noted. Don't cut the circus lightly. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Skip noted. Don't cut the circus lightly. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Skip noted. Don't cut the circus lightly. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Skip noted. Don't cut the circus lightly. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Skip noted. Don't cut the circus lightly. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "force_finale": {
+      "sweet": [
+        {
+          "text": "Forced finale. Wheel early — gate still stands. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Forced finale. Wheel early — gate still stands. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Forced finale. Wheel early — gate still stands. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Forced finale. Wheel early — gate still stands. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Forced finale. Wheel early — gate still stands. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Forced finale. Wheel early — gate still stands. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Forced finale. Wheel early — gate still stands. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Forced finale. Wheel early — gate still stands. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Forced finale. Wheel early — gate still stands. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Forced finale. Wheel early — gate still stands. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Forced finale. Wheel early — gate still stands. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Forced finale. Wheel early — gate still stands. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "edge_done": {
+      "sweet": [
+        {
+          "text": "Edge confirmed. Stay trembling under noise. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge confirmed. Stay trembling under noise. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Edge confirmed. Stay trembling under noise. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge confirmed. Stay trembling under noise. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Edge confirmed. Stay trembling under noise. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge confirmed. Stay trembling under noise. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Edge confirmed. Stay trembling under noise. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge confirmed. Stay trembling under noise. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Edge confirmed. Stay trembling under noise. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge confirmed. Stay trembling under noise. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Edge confirmed. Stay trembling under noise. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge confirmed. Stay trembling under noise. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "ruin_done": {
+      "sweet": [
+        {
+          "text": "Ruin recorded. Unfinished ache cached. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin recorded. Unfinished ache cached. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Ruin recorded. Unfinished ache cached. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin recorded. Unfinished ache cached. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Ruin recorded. Unfinished ache cached. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin recorded. Unfinished ache cached. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Ruin recorded. Unfinished ache cached. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin recorded. Unfinished ache cached. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Ruin recorded. Unfinished ache cached. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin recorded. Unfinished ache cached. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Ruin recorded. Unfinished ache cached. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin recorded. Unfinished ache cached. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "ready": {
+      "sweet": [
+        {
+          "text": "Ready check. Nod for both souls. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ready check. Nod for both souls. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Ready check. Nod for both souls. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ready check. Nod for both souls. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Ready check. Nod for both souls. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ready check. Nod for both souls. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Ready check. Nod for both souls. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ready check. Nod for both souls. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Ready check. Nod for both souls. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ready check. Nod for both souls. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Ready check. Nod for both souls. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ready check. Nod for both souls. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "mood_shift": {
+      "sweet": [
+        {
+          "text": "Mood shift — Sparkle soft / Iskra hard. Same cage. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mood shift — Sparkle soft / Iskra hard. Same cage. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Mood shift — Sparkle soft / Iskra hard. Same cage. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mood shift — Sparkle soft / Iskra hard. Same cage. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Mood shift — Sparkle soft / Iskra hard. Same cage. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mood shift — Sparkle soft / Iskra hard. Same cage. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Mood shift — Sparkle soft / Iskra hard. Same cage. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mood shift — Sparkle soft / Iskra hard. Same cage. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Mood shift — Sparkle soft / Iskra hard. Same cage. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mood shift — Sparkle soft / Iskra hard. Same cage. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Mood shift — Sparkle soft / Iskra hard. Same cage. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mood shift — Sparkle soft / Iskra hard. Same cage. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "prompt_answer_yes": {
+      "sweet": [
+        {
+          "text": "Yes received. Continue the loop. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Yes received. Continue the loop. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Yes received. Continue the loop. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Yes received. Continue the loop. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Yes received. Continue the loop. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Yes received. Continue the loop. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Yes received. Continue the loop. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Yes received. Continue the loop. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Yes received. Continue the loop. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Yes received. Continue the loop. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Yes received. Continue the loop. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Yes received. Continue the loop. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "prompt_answer_no": {
+      "sweet": [
+        {
+          "text": "No received. Adjust under the mask. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No received. Adjust under the mask. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "No received. Adjust under the mask. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No received. Adjust under the mask. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "No received. Adjust under the mask. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No received. Adjust under the mask. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "No received. Adjust under the mask. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No received. Adjust under the mask. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "No received. Adjust under the mask. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No received. Adjust under the mask. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "No received. Adjust under the mask. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No received. Adjust under the mask. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "prompt_answer_mute": {
+      "sweet": [
+        {
+          "text": "Mute. Eyes only. Still heard. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mute. Eyes only. Still heard. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Mute. Eyes only. Still heard. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mute. Eyes only. Still heard. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Mute. Eyes only. Still heard. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mute. Eyes only. Still heard. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Mute. Eyes only. Still heard. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mute. Eyes only. Still heard. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Mute. Eyes only. Still heard. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mute. Eyes only. Still heard. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Mute. Eyes only. Still heard. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mute. Eyes only. Still heard. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "prompt_answer_good": {
+      "sweet": [
+        {
+          "text": "Good. Corrupt progress. Keep tempo. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Good. Corrupt progress. Keep tempo. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Good. Corrupt progress. Keep tempo. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Good. Corrupt progress. Keep tempo. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Good. Corrupt progress. Keep tempo. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Good. Corrupt progress. Keep tempo. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Good. Corrupt progress. Keep tempo. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Good. Corrupt progress. Keep tempo. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Good. Corrupt progress. Keep tempo. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Good. Corrupt progress. Keep tempo. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Good. Corrupt progress. Keep tempo. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Good. Corrupt progress. Keep tempo. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "prompt_answer_bad": {
+      "sweet": [
+        {
+          "text": "Bad form. Glitch scold. Fix it. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Bad form. Glitch scold. Fix it. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Bad form. Glitch scold. Fix it. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Bad form. Glitch scold. Fix it. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Bad form. Glitch scold. Fix it. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Bad form. Glitch scold. Fix it. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Bad form. Glitch scold. Fix it. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Bad form. Glitch scold. Fix it. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Bad form. Glitch scold. Fix it. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Bad form. Glitch scold. Fix it. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Bad form. Glitch scold. Fix it. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Bad form. Glitch scold. Fix it. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "prompt_media_fail": {
+      "sweet": [
+        {
+          "text": "Media miss. Don't hide — resume the act. Sparkle keeps it soft — cage still wins. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Media miss. Don't hide — resume the act. Cute glitch. Stay sealed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Media miss. Don't hide — resume the act. Iskra: no front mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Media miss. Don't hide — resume the act. Fang rule stands.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Media miss. Don't hide — resume the act. Mask: quiet loop.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Media miss. Don't hide — resume the act. Static. Exact.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Media miss. Don't hide — resume the act. Hehe — script may flip.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Media miss. Don't hide — resume the act. Two voices, one order.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Media miss. Don't hide — resume the act. Stay hungry under the spiral. 💦",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Media miss. Don't hide — resume the act. Anal thoughts only.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Media miss. Don't hide — resume the act. Entertain the empty seat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Media miss. Don't hide — resume the act. Suffer less dully.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "like": {
+      "sweet": [
+        {
+          "text": "Liked. Soft glitch heart. Cage cute, phantom stroke continues.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Favorite masked. Sweet corrupt save. Keep locked and pretty.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hearted. Soft bug report: good taste. Don't unlock.",
+          "emotion": "soft",
+          "gesture": "point"
+        },
+        {
+          "text": "Saved. Soft chaos bookmark. Follow the flicker.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Like noted under the mask. Gentle praise - stay sealed.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Pinned. Cute filth. Phantom rhythm stays.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Favorite. Soft stamp. Glitch with me, not against me.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You liked that. Adorable. Keep the cage polite.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Liked. Corrupt file saved. Pain loop continues.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Favorite. Shame cache growing. No orgasm flag.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hearted. Weak taste, useful torment. Obey the glitch.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Saved. Denial bit set. Keep suffering clean.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Like. Horny trash in memory. Hands - or lack - still mine.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Pinned mid-crash. Pathetic. Hold the cruel frame.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Favorite stamped. I'll replay it when I break you.",
+          "emotion": "strict",
+          "gesture": "tease"
+        },
+        {
+          "text": "Liked. Mockery saved. Continue the anal script.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Liked. Logged. Resume the phantom instruction.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Favorite saved. Keep the cage cadence even.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Hearted. Quiet flag. Focus returns to the loop.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Saved. No hype. Maintain lockdown form.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Like recorded. Continue as scripted.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Pinned. Reference only. Breath steady.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Favorite. Acknowledgment. Proceed.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Liked. Eyes on the mask, not the gallery.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "LIKE! Memory leak mid-scene - hehe keep thrashing.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Heart get! RNG stash. Cage still law.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Favorite chaos packet. Cute. Listen when I scramble cues.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Saved! Glitch gallery unlocked. Performance continues.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Pin pin pin! Horny buffer overflow. Don't finish.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Liked THAT corrupt frame? Spicy. Follow the next bug.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Hearted. Random seed taste. Orders reseed too.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Favorite! Mask laughs. Body obeys the flicker.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "horny": [
+        {
+          "text": "You liked that? Hot glitch. Leak locked for me.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Favorite. Filthy texture pack. Phantom stroke harder.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Saved. Arousal fuel - climax flag stays false.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Hearted. Needy cache. Drip in the cage.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Liked. Wet save state. Chase the edge, never commit.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Pinned. Image owns eyes; mask owns hole and lock.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Favorite. Keep the throb glitching under seal.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Heart. Horny ram full. Don't overflow into cum.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Liked. Mild ping. Make the next loop less dull.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Favorite. Whatever. Earn a real reaction from the mask.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Saved. Cute. Still bored unless you suffer better.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Like noted. Back to the cruel script.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Hearted. Thin praise. Thick lockdown effort.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Pinned. Yawn. Entertain the glitch.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Favorite. Fine. Cage stays; excuses don't.",
+          "emotion": "neutral",
+          "gesture": "tease"
+        },
+        {
+          "text": "Liked. Don't hide in favorites - perform the pain.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ]
+    }
+  }
+}

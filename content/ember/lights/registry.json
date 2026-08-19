@@ -1,0 +1,17 @@
+{
+  "presets": [
+    {
+      "id": "lamp_mrwnamm6_s81j",
+      "nameRu": "123",
+      "lampColor": "#ff0000",
+      "lampFaceColor": "#ff2e2e",
+      "lampRange": 3,
+      "lampDiscCore": 1,
+      "lampDiscMid": 1,
+      "lampHeight": 1.15,
+      "lampShowCore": true,
+      "lampStrength0": 0.62,
+      "lampStrengthFalloff": 0.45
+    }
+  ]
+}

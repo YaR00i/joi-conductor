@@ -1,0 +1,10 @@
+{
+  "id": "p1_weapons",
+  "entries": [
+    { "itemId": "spirit_bolt", "weight": 40, "rarity": "common" },
+    { "itemId": "butterfly_fan", "weight": 25, "rarity": "common" },
+    { "itemId": "pyre_ring", "weight": 18, "rarity": "rare" },
+    { "itemId": "cleansing_ward", "weight": 12, "rarity": "rare" },
+    { "itemId": "heal_ember", "weight": 30, "rarity": "common" }
+  ]
+}

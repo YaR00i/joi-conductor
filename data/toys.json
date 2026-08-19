@@ -1,0 +1,185 @@
+{
+  "version": 2,
+  "note": "Инвентарь. requiresToys у функций + satisfies (группы). Комбо = отдельные function id.",
+  "toys": [
+    {
+      "id": "chastity_cage",
+      "nameRu": "Клетка (chastity)",
+      "descriptionRu": "Не постоянная носка: надевается на блоки denial / hands-free. Блокирует обычную дрочку рукой.",
+      "owned": true,
+      "tags": ["chastity", "denial", "worn"],
+      "role": "worn",
+      "vibe": false,
+      "satisfies": ["chastity"]
+    },
+    {
+      "id": "lovense_edge2",
+      "nameRu": "Lovense Edge 2",
+      "descriptionRu": "Простатный массажёр / вибро-плаг. Пульс под бит или постоянный фон. App-API — позже.",
+      "owned": true,
+      "tags": ["vibe", "anal", "prostate", "app"],
+      "role": "active",
+      "vibe": true,
+      "satisfies": ["prostate_vibe", "anal_vibe"]
+    },
+    {
+      "id": "wand",
+      "nameRu": "Wand",
+      "descriptionRu": "Массажный вибромассажёр Hitachi-style. Головка, уздечка, поверх клетки, в комбо с плагами.",
+      "owned": true,
+      "tags": ["vibe", "external"],
+      "role": "active",
+      "vibe": true,
+      "satisfies": ["wand", "external_vibe"]
+    },
+    {
+      "id": "vibe_bullet",
+      "nameRu": "Вибропуля",
+      "descriptionRu": "Компактная внешняя вибрация (bullet). Тот же слот и те же ходы, что у wand: головка, уздечка, поверх клетки, комбо.",
+      "owned": true,
+      "tags": ["vibe", "external", "bullet"],
+      "role": "active",
+      "vibe": true,
+      "satisfies": ["wand", "external_vibe"]
+    },
+    {
+      "id": "dildo_small",
+      "nameRu": "Дилдо маленький",
+      "descriptionRu": "Маленький. Thrust / plapping, либо worn: сиди с ним внутри и гринди пассивно (как пробка).",
+      "owned": true,
+      "tags": ["anal", "plapping", "dildo", "worn"],
+      "role": "worn",
+      "vibe": false,
+      "size": "s",
+      "satisfies": ["dildo", "plug_static"]
+    },
+    {
+      "id": "dildo_medium_vibe",
+      "nameRu": "Дилдо средний (vibe)",
+      "descriptionRu": "Средний vibrating. Thrust под бит, либо worn-grind с вибрацией как фоном (как вибро-пробка по роли).",
+      "owned": true,
+      "tags": ["anal", "plapping", "dildo", "vibe", "worn"],
+      "role": "worn",
+      "vibe": true,
+      "size": "m",
+      "satisfies": ["dildo", "dildo_vibe", "plug_static"]
+    },
+    {
+      "id": "dildo_large",
+      "nameRu": "Дилдо большой",
+      "descriptionRu": "Большой. Глубокий thrust или тяжёлая worn-наполненность / grind бёдрами.",
+      "owned": true,
+      "tags": ["anal", "dildo", "worn"],
+      "role": "worn",
+      "vibe": false,
+      "size": "l",
+      "satisfies": ["dildo", "plug_static"]
+    },
+    {
+      "id": "vibrating_plug",
+      "nameRu": "Вибрирующая пробка",
+      "descriptionRu": "Вибро-plug: носится во время хода/ванда или как основной стимул. Фон или пульс под акцент.",
+      "owned": true,
+      "tags": ["anal", "vibe", "worn", "plug"],
+      "role": "worn",
+      "vibe": true,
+      "satisfies": ["plug", "anal_vibe"]
+    },
+    {
+      "id": "plug",
+      "nameRu": "Пробка (обычная)",
+      "descriptionRu": "Невибрирующий buttplug. Пассивный worn-модификатор: наполненность без отдельного «хода».",
+      "owned": true,
+      "tags": ["anal", "worn", "plug"],
+      "role": "worn",
+      "vibe": false,
+      "satisfies": ["plug", "plug_static"]
+    }
+  ],
+  "combos": [
+    {
+      "id": "vibrating_plug_wand",
+      "nameRu": "Вибро-пробка + Wand",
+      "descriptionRu": "Пробка внутри (вибро), wand снаружи на головку/уздечку. Руки по команде блока.",
+      "toys": ["vibrating_plug", "wand"],
+      "functionId": "combo_vibe_plug_wand"
+    },
+    {
+      "id": "vibrating_plug_bullet",
+      "nameRu": "Вибро-пробка + вибропуля",
+      "descriptionRu": "Пробка внутри (вибро), пуля снаружи на головку/уздечку. Тот же ход, что plug+wand.",
+      "toys": ["vibrating_plug", "vibe_bullet"],
+      "functionId": "combo_vibe_plug_wand"
+    },
+    {
+      "id": "edge2_wand",
+      "nameRu": "Edge 2 + Wand",
+      "descriptionRu": "Простата (Edge 2) + внешний wand. Двойной вибро-слой под бит.",
+      "toys": ["lovense_edge2", "wand"],
+      "functionId": "combo_edge2_wand"
+    },
+    {
+      "id": "edge2_bullet",
+      "nameRu": "Edge 2 + вибропуля",
+      "descriptionRu": "Простата (Edge 2) + внешняя пуля. Тот же ход, что Edge2+wand.",
+      "toys": ["lovense_edge2", "vibe_bullet"],
+      "functionId": "combo_edge2_wand"
+    },
+    {
+      "id": "cage_wand",
+      "nameRu": "Клетка + Wand",
+      "descriptionRu": "Chastity on: дрочки нет, только wand по клетке/головке через прутья или к уздечке.",
+      "toys": ["chastity_cage", "wand"],
+      "functionId": "combo_cage_wand"
+    },
+    {
+      "id": "cage_bullet",
+      "nameRu": "Клетка + вибропуля",
+      "descriptionRu": "Chastity on: дрочки нет, только пуля по клетке / к головке / уздечке.",
+      "toys": ["chastity_cage", "vibe_bullet"],
+      "functionId": "combo_cage_wand"
+    },
+    {
+      "id": "cage_vibrating_plug",
+      "nameRu": "Клетка + вибро-пробка",
+      "descriptionRu": "Клетка спереди, вибро-plug сзади. Hands-free denial с анальным фоном.",
+      "toys": ["chastity_cage", "vibrating_plug"],
+      "functionId": "combo_cage_vibe_plug"
+    },
+    {
+      "id": "cage_edge2",
+      "nameRu": "Клетка + Edge 2",
+      "descriptionRu": "Клетка + простатный Edge 2. Классический chastity + prostate vibe.",
+      "toys": ["chastity_cage", "lovense_edge2"],
+      "functionId": "combo_cage_edge2"
+    },
+    {
+      "id": "cage_dildo_small",
+      "nameRu": "Клетка + дилдо (S)",
+      "descriptionRu": "Клетка спереди, маленькое дилдо worn сзади — сиди и гринди, ствол не гладить.",
+      "toys": ["chastity_cage", "dildo_small"],
+      "functionId": "plug_passive"
+    },
+    {
+      "id": "cage_dildo_medium",
+      "nameRu": "Клетка + дилдо (M vibe)",
+      "descriptionRu": "Клетка + среднее vibe-дилдо внутри. Пассивный grind / фон вибрации.",
+      "toys": ["chastity_cage", "dildo_medium_vibe"],
+      "functionId": "plug_passive"
+    },
+    {
+      "id": "cage_dildo_large",
+      "nameRu": "Клетка + дилдо (L)",
+      "descriptionRu": "Клетка + большое дилдо worn. Тяжёлая наполненность, лёгкий grind бёдрами.",
+      "toys": ["chastity_cage", "dildo_large"],
+      "functionId": "plug_passive"
+    },
+    {
+      "id": "cage_plug_static",
+      "nameRu": "Клетка + пробка",
+      "descriptionRu": "Клетка + обычная пробка. Наполненность без thrust, ствол закрыт.",
+      "toys": ["chastity_cage", "plug"],
+      "functionId": "plug_passive"
+    }
+  ]
+}

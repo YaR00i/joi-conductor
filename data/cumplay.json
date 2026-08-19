@@ -1,0 +1,173 @@
+{
+  "version": 2,
+  "cumplay": [
+    {
+      "id": "none",
+      "nameRu": "Ничего",
+      "descriptionRu": "Вытереть или смыть. Cumplay не выполняется.",
+      "ladderRank": 0,
+      "enabled": true,
+      "tags": ["skip"]
+    },
+    {
+      "id": "hold",
+      "nameRu": "Подержать",
+      "descriptionRu": "Подержать сперму в руке / показать, не слизывать.",
+      "ladderRank": 1,
+      "enabled": true,
+      "tags": ["show", "soft"]
+    },
+    {
+      "id": "smell",
+      "nameRu": "Понюхать",
+      "descriptionRu": "Поднести к лицу, вдохнуть запах — унижение без проглатывания.",
+      "ladderRank": 2,
+      "enabled": true,
+      "tags": ["humiliation", "soft"]
+    },
+    {
+      "id": "smear_lips",
+      "nameRu": "Обмазать губы",
+      "descriptionRu": "Провести по губам, не обязательно глотать.",
+      "ladderRank": 2,
+      "enabled": true,
+      "tags": ["cei", "soft"]
+    },
+    {
+      "id": "smear_chest",
+      "nameRu": "Размазать по груди",
+      "descriptionRu": "Размазать по груди / животу, показать.",
+      "ladderRank": 2,
+      "enabled": true,
+      "tags": ["messy", "soft"]
+    },
+    {
+      "id": "taste",
+      "nameRu": "Взять в рот",
+      "descriptionRu": "Взять в рот, подержать. Глотать не обязательно.",
+      "ladderRank": 3,
+      "enabled": true,
+      "tags": ["cei"]
+    },
+    {
+      "id": "lick_fingers",
+      "nameRu": "Слизать с пальцев",
+      "descriptionRu": "Вылизать пальцы / ладонь начисто.",
+      "ladderRank": 3,
+      "enabled": true,
+      "tags": ["cei"]
+    },
+    {
+      "id": "swallow",
+      "nameRu": "Проглотить",
+      "descriptionRu": "Проглотить полностью.",
+      "ladderRank": 4,
+      "enabled": true,
+      "tags": ["cei", "hard"]
+    },
+    {
+      "id": "snowball_solo",
+      "nameRu": "Snowball",
+      "descriptionRu": "Изо рта в руку и обратно (соло-snowball).",
+      "ladderRank": 6,
+      "enabled": true,
+      "tags": ["cei", "hard"]
+    },
+    {
+      "id": "on_food_eat",
+      "nameRu": "Съесть с едой",
+      "descriptionRu": "Если кончил на еду — съесть вместе с едой.",
+      "ladderRank": 5,
+      "enabled": true,
+      "tags": ["cei", "food"]
+    },
+    {
+      "id": "on_drink",
+      "nameRu": "Выпить с напитком",
+      "descriptionRu": "Если кончил в напиток — выпить до дна.",
+      "ladderRank": 5,
+      "enabled": true,
+      "tags": ["cei", "drink", "hard"]
+    },
+    {
+      "id": "feet_lick",
+      "nameRu": "Слизать со стоп",
+      "descriptionRu": "Если кончил на стопы — слизать. Иначе слизать с пальцев.",
+      "ladderRank": 5,
+      "enabled": false,
+      "tags": ["cei", "feet", "hard"]
+    },
+    {
+      "id": "lick_toy",
+      "nameRu": "Слизать с игрушки",
+      "descriptionRu": "Слизать кончу с клетки / пробки / дилдо.",
+      "ladderRank": 4,
+      "enabled": true,
+      "tags": ["cei", "toy", "hard"]
+    },
+    {
+      "id": "hold_then_wipe",
+      "nameRu": "Подержать и вытереть",
+      "descriptionRu": "Подержать на виду, потом вытереть только с разрешения.",
+      "ladderRank": 1,
+      "enabled": true,
+      "tags": ["show", "soft"]
+    },
+    {
+      "id": "ruin_inspect",
+      "nameRu": "Осмотреть и описать",
+      "descriptionRu": "Мягкий cumplay: показать каплю/лужу, описать вслух, не вытирать сразу. Не про число mid-руинов.",
+      "ladderRank": 1,
+      "enabled": true,
+      "tags": ["ruin", "humiliation", "soft"]
+    },
+    {
+      "id": "smear_nose",
+      "nameRu": "Обмазать нос",
+      "descriptionRu": "Провести по носу / верхней губе — запах и стыд.",
+      "ladderRank": 3,
+      "enabled": true,
+      "tags": ["humiliation", "soft"]
+    },
+    {
+      "id": "tongue_hold",
+      "nameRu": "На язык (не глотать)",
+      "descriptionRu": "Выложить на язык и держать, не глотая, пока не разрешат.",
+      "ladderRank": 4,
+      "enabled": true,
+      "tags": ["cei", "hard"]
+    },
+    {
+      "id": "chew",
+      "nameRu": "Пожевать",
+      "descriptionRu": "Пожевать во рту перед глотком — унизительно медленно.",
+      "ladderRank": 5,
+      "enabled": true,
+      "tags": ["cei", "hard"]
+    },
+    {
+      "id": "spit_catch",
+      "nameRu": "Выплюнуть в ладонь",
+      "descriptionRu": "Выплюнуть обратно в руку, показать, потом решить что дальше.",
+      "ladderRank": 5,
+      "enabled": true,
+      "tags": ["cei", "hard", "messy"]
+    },
+    {
+      "id": "kiss_palm",
+      "nameRu": "Поцеловать ладонь",
+      "descriptionRu": "Поцеловать лужу на ладони — как «спасибо».",
+      "ladderRank": 3,
+      "enabled": true,
+      "tags": ["humiliation", "soft"]
+    },
+    {
+      "id": "rub_gums",
+      "nameRu": "Размазать по дёснам",
+      "descriptionRu": "Размазать по зубам/дёснам пальцем, не глотая сразу.",
+      "ladderRank": 5,
+      "enabled": true,
+      "tags": ["cei", "hard"]
+    }
+  ]
+}

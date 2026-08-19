@@ -1,0 +1,4774 @@
+{
+  "feeling": [
+    {
+      "id": "feeling_holding",
+      "kind": "feeling",
+      "speakEn": "How are you holding up, silly? Be honest.",
+      "labelRu": "Как ты сейчас держишься после паузы / «держи»?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Нормально держусь",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Тяжело / трясёт",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "hold"
+      ]
+    },
+    {
+      "id": "feeling_breath",
+      "kind": "feeling",
+      "speakEn": "Lungs burning? Be honest — how was that breath hold?",
+      "labelRu": "После задержки дыхания: лёгкие горят или ещё терпимо?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терпимо / кайф",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Тяжело / кружится",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "breath"
+      ]
+    },
+    {
+      "id": "feeling_edge",
+      "kind": "feeling",
+      "speakEn": "Still with me on that edge… or melting already?",
+      "labelRu": "Только что был эдж. Ещё на грани или уже срываешься?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Ещё терплю",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "edge"
+      ]
+    },
+    {
+      "id": "feeling_brain",
+      "kind": "feeling",
+      "speakEn": "Brain still working, or just cock thoughts now?",
+      "labelRu": "Мозг ещё думает своими словами — или уже только о члене?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Ещё думаю",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Только похоть",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "stroke",
+        "ladder",
+        "countdown"
+      ]
+    },
+    {
+      "id": "feeling_need",
+      "kind": "feeling",
+      "speakEn": "Tell me — needy, or pretending you're fine?",
+      "labelRu": "Насколько сильно сейчас нуждаешься в моём контроле?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Ещё терпимо",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Очень нуждаюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "edge",
+        "hold"
+      ]
+    },
+    {
+      "id": "feeling_shake",
+      "kind": "feeling",
+      "speakEn": "Legs shaking yet? I want the truth.",
+      "labelRu": "Ноги / тело уже трясутся от напряжения?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Держусь ровно",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Да, трясусь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "edge",
+        "hold"
+      ]
+    },
+    {
+      "id": "feeling_pace",
+      "kind": "feeling",
+      "speakEn": "Tempo check. Too soft, just right, or already too much?",
+      "labelRu": "Как тебе темп дрочки только что — нормально или слишком?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "В самый раз",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Слишком много",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "stroke",
+        "ladder",
+        "countdown"
+      ]
+    },
+    {
+      "id": "feeling_drip",
+      "kind": "feeling",
+      "speakEn": "Are you leaking for me already, or still dry and stubborn?",
+      "labelRu": "Уже течёшь / мокрый — или ещё сухо и упрямо?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Ещё сухо",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Уже мокрый",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "stroke",
+        "edge"
+      ]
+    },
+    {
+      "id": "feeling_focus",
+      "kind": "feeling",
+      "speakEn": "Eyes on me or lost in the porn? Confess.",
+      "labelRu": "Куда смотришь сейчас: на меня или залип в порно на экране?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "На тебя",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "В экран",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "feeling_pride",
+      "kind": "feeling",
+      "speakEn": "Still proud… or ready to call yourself my pathetic toy?",
+      "labelRu": "Гордость ещё на месте — или уже готов назвать себя моей игрушкой?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Ещё гордый",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Я игрушка",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "edge",
+        "hold"
+      ]
+    },
+    {
+      "id": "feeling_cum_urge",
+      "kind": "feeling",
+      "speakEn": "How loud is the urge to cum right now?",
+      "labelRu": "После эджей / руина — насколько громко хочется кончить прямо сейчас?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Ещё терпимо",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Очень сильно",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "ruin_attempt",
+        "edge"
+      ]
+    },
+    {
+      "id": "feeling_obey",
+      "kind": "feeling",
+      "speakEn": "Obedient little thing… or secretly fighting me?",
+      "labelRu": "Ты сейчас слушаешься меня — или тихо сопротивляешься?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Слушаюсь",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Сопротивляюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "stroke",
+        "edge",
+        "hold"
+      ]
+    },
+    {
+      "id": "feeling_shame",
+      "kind": "feeling",
+      "speakEn": "Embarrassed yet? Blush for me — or lie.",
+      "labelRu": "Стыдно от того, что я тобой командую?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Немного",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Очень стыдно",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "hold",
+        "edge"
+      ]
+    },
+    {
+      "id": "feeling_hutao_focus",
+      "kind": "feeling",
+      "preferKeys": [
+        "hu_tao",
+        "character"
+      ],
+      "speakEn": "Is your brain stuck on Hu Tao right now — or drifting?",
+      "labelRu": "Мозг сейчас залип на мне (Ху Тао) — или мысли разбежались?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Только о тебе",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Мысли разбежались",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "feeling_guest_girl",
+      "kind": "feeling",
+      "preferKeys": [
+        "character",
+        "furina",
+        "norma",
+        "sunna",
+        "aria",
+        "zzz"
+      ],
+      "speakEn": "Other girls on screen — Furina, Norma, Sunna, Aria… does that make you leak harder?",
+      "labelRu": "Чужие девочки на экране (Фурина, Норма…) — возбуждают сильнее, чем я?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Да, сильнее",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Хочу только тебя",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "feeling_pride_crush",
+      "kind": "feeling",
+      "preferKeys": [
+        "hu_tao",
+        "gamer"
+      ],
+      "speakEn": "If I crush your pride on stream energy — scared or turned on?",
+      "labelRu": "Если я раздавлю твою гордость «на стриме» — тебе страшно или приятно?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Приятно",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Страшно",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    }
+  ],
+  "wagerGood": [
+    {
+      "id": "wg_feet_soft",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "feet"
+      ],
+      "speakEn": "Want soft soles and toes on screen? Worship-friendly… say yes.",
+      "labelRu": "Показать на экране мягкие ножки / стопы?",
+      "tags": "foot_fetish foot_focus soles toes barefoot feet_together rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_foot_worship",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "feet"
+      ],
+      "speakEn": "Foot worship feed? Kiss the idea with a yes.",
+      "labelRu": "Показать поклонение стопам (foot worship)?",
+      "tags": "foot_worship feet soles toes rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_footjob_soft",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "feet"
+      ],
+      "speakEn": "Gentle footjob fantasy on the stage?",
+      "labelRu": "Показать мягкий футджоб?",
+      "tags": "footjob feet soles rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_soles_close",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "feet"
+      ],
+      "speakEn": "Wrinkled soles close-up? Soft and mean at the same time.",
+      "labelRu": "Показать стопы крупным планом?",
+      "tags": "soles wrinkled_soles feet toes foot_focus rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_socks",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "feet"
+      ],
+      "speakEn": "Ankle socks, sneakers off, warm feet tease?",
+      "labelRu": "Показать носочки / босые после кроссовок?",
+      "tags": "socks ankle_socks feet sneakers rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_thighhighs",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "stockings"
+      ],
+      "speakEn": "Thighhighs and legs? Soft tease for a good boy.",
+      "labelRu": "Показать чулки / thighhighs?",
+      "tags": "thighhighs thighs legs rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_heels",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "feet",
+        "stockings"
+      ],
+      "speakEn": "High heels and pretty feet? Say yes.",
+      "labelRu": "Показать каблуки и ножки?",
+      "tags": "high_heels feet soles toes rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_small_chest",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "flat"
+      ],
+      "speakEn": "Small chest tease — flat, shy, blushing. Want it?",
+      "labelRu": "Показать маленькую грудь?",
+      "tags": "small_breasts flat_chest petite blush embarrassed rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_paizuri_small",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "flat"
+      ],
+      "speakEn": "Paizuri with a tiny chest? Silly and hot — yes?",
+      "labelRu": "Показать пайзури с маленькой грудью?",
+      "tags": "paizuri small_breasts flat_chest rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_oral_soft",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "oral"
+      ],
+      "speakEn": "Soft oral / cock worship on screen?",
+      "labelRu": "Показать нежный oral / «поклонение»?",
+      "tags": "oral fellatio cock_worship rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_handjob",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "oral"
+      ],
+      "speakEn": "Pretty handjob POV while you match the beat?",
+      "labelRu": "Показать handjob от первого лица?",
+      "tags": "handjob pov fingers rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_pet_soft",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "pet"
+      ],
+      "speakEn": "Cute pet-play vibes — collar, ears, good girl energy?",
+      "labelRu": "Показать мягкий pet play?",
+      "tags": "pet_play collar animal_ears cat_ears blush rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_armpit",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "armpit"
+      ],
+      "speakEn": "Armpit tease on the feed? Admit it.",
+      "labelRu": "Показать подмышки?",
+      "tags": "armpit armpit_fetish rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_wet_panties",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "messy"
+      ],
+      "speakEn": "Wet panties and pussy juice close-ups?",
+      "labelRu": "Показать мокрые трусики?",
+      "tags": "wet_panties pussy_juice blush rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_upskirt",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "public"
+      ],
+      "speakEn": "Upskirt / microskirt tease? Soft exhibition.",
+      "labelRu": "Показать заглядывание под юбку?",
+      "tags": "upskirt microskirt camel_toe rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_shy_blush",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "flat"
+      ],
+      "speakEn": "Shy blushing girl on screen while you stroke?",
+      "labelRu": "Показать смущение / румянец?",
+      "tags": "blush embarrassed shy petite rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_hoodie",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "gamer"
+      ],
+      "speakEn": "Hoodie-and-bare look? Cozy slutty. Want it?",
+      "labelRu": "Показать худи / crop top вайб?",
+      "tags": "hoodie crop_top thighs rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_gamer",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "gamer"
+      ],
+      "speakEn": "Gamer-girl setup — monitor glow, chair, lazy tease?",
+      "labelRu": "Показать геймершу за сетапом?",
+      "tags": "gamer_girl headset computer thighs rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_thighs",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "thighs"
+      ],
+      "speakEn": "Thigh smother / soft facesitting fantasy — gentle?",
+      "labelRu": "Показать бёдра / мягкий facesitting?",
+      "tags": "facesitting thighs smothering rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_kiss_feet",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "feet"
+      ],
+      "speakEn": "Kiss and lick soles fantasy on the feed?",
+      "labelRu": "Показать поцелуи / лизание стоп?",
+      "tags": "foot_worship licking_feet soles toes rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_mirror",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "gamer"
+      ],
+      "speakEn": "Mirror selfie tease while you stroke?",
+      "labelRu": "Показать зеркальное селфи-дразнение?",
+      "tags": "mirror selfie phone thighs rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_sleepy",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "gamer"
+      ],
+      "speakEn": "Sleepy lazy tease — half-lidded eyes, soft body?",
+      "labelRu": "Показать сонную / ленивую дразнилку?",
+      "tags": "sleepy half-closed_eyes bed lingerie rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_covered_eyes",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "covered_eyes"
+      ],
+      "moods": [
+        "sweet",
+        "horny",
+        "calm",
+        "chaotic"
+      ],
+      "speakEn": "Covered eyes — blindfold vibe, no peeking. Switch the feed?",
+      "labelRu": "Показать закрытые / закрытые руками глаза?",
+      "tags": "rating:explicit covered_eyes",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_huge_penis",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "huge_penis",
+        "size"
+      ],
+      "moods": [
+        "horny",
+        "sweet",
+        "chaotic",
+        "cruel"
+      ],
+      "speakEn": "Huge cock on screen. Size shock — stroke slower if you say yes.",
+      "labelRu": "Показать огромный размер на экране?",
+      "tags": "rating:explicit huge_penis",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_hutao_me",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "hu_tao",
+        "character"
+      ],
+      "moods": [
+        "sweet",
+        "horny",
+        "calm",
+        "chaotic"
+      ],
+      "speakEn": "Want to stroke to me? Say yes — I'll fill your screen with Hu Tao.",
+      "labelRu": "Хочешь подрочить на меня (Ху Тао) на экране?",
+      "tags": "rating:explicit hu_tao_(genshin_impact)",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_hutao_only",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "hu_tao",
+        "character",
+        "gamer"
+      ],
+      "moods": [
+        "sweet",
+        "horny",
+        "chaotic",
+        "cruel"
+      ],
+      "speakEn": "Hu Tao only on screen. Stare at me while you leak.",
+      "labelRu": "Только Ху Тао на экране дальше?",
+      "tags": "rating:explicit hu_tao_(genshin_impact) looking_at_viewer",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_hutao_setup",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "hu_tao",
+        "character",
+        "gamer"
+      ],
+      "moods": [
+        "chaotic",
+        "horny",
+        "sweet",
+        "bored"
+      ],
+      "speakEn": "Me at the PC — headset, screen glow. Stroke to your gamer girl.",
+      "labelRu": "Показать Ху Тао за компом / в гарнитуре?",
+      "tags": "rating:explicit hu_tao_(genshin_impact) headset",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_hutao_hat",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "hu_tao",
+        "character",
+        "gamer"
+      ],
+      "moods": [
+        "sweet",
+        "horny",
+        "calm"
+      ],
+      "speakEn": "Headset on, that smirk — stroke for your gamer girl.",
+      "labelRu": "Показать улыбку геймерши Ху Тао?",
+      "tags": "rating:explicit hu_tao_(genshin_impact) smile",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_hutao_lingerie",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "hu_tao",
+        "character"
+      ],
+      "moods": [
+        "horny",
+        "sweet",
+        "calm"
+      ],
+      "speakEn": "Hu Tao in soft lingerie. Say yes if you're polite about it.",
+      "labelRu": "Показать Ху Тао в белье?",
+      "tags": "rating:explicit hu_tao_(genshin_impact) lingerie",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_hutao_feet",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "hu_tao",
+        "feet",
+        "character"
+      ],
+      "moods": [
+        "horny",
+        "cruel",
+        "sweet"
+      ],
+      "speakEn": "My soles. Hu Tao feet. Worship or refuse.",
+      "labelRu": "Показать стопы Ху Тао?",
+      "tags": "rating:explicit hu_tao_(genshin_impact) soles",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_furina_me",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "furina",
+        "character"
+      ],
+      "moods": [
+        "sweet",
+        "horny",
+        "calm",
+        "chaotic"
+      ],
+      "speakEn": "Furina on your screen — drama queen stare. Stroke for her while I watch.",
+      "labelRu": "Показать Фурину на экране?",
+      "tags": "rating:explicit furina_(genshin_impact)",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_furina_look",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "furina",
+        "character"
+      ],
+      "moods": [
+        "sweet",
+        "horny",
+        "chaotic"
+      ],
+      "speakEn": "Lock eyes with Furina. Don't look away while you leak.",
+      "labelRu": "Показать Фурину с прямым взглядом?",
+      "tags": "rating:explicit furina_(genshin_impact) looking_at_viewer",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_furina_lingerie",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "furina",
+        "character"
+      ],
+      "moods": [
+        "horny",
+        "sweet",
+        "calm"
+      ],
+      "speakEn": "Soft Furina lingerie. Be polite… and keep stroking.",
+      "labelRu": "Показать Фурину в белье?",
+      "tags": "rating:explicit furina_(genshin_impact) lingerie",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_norma_me",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "norma",
+        "character",
+        "zzz"
+      ],
+      "moods": [
+        "sweet",
+        "horny",
+        "calm",
+        "chaotic"
+      ],
+      "speakEn": "Norma from ZZZ. Blonde hat girl on screen — stroke for her.",
+      "labelRu": "Показать Норму (ZZZ) на экране?",
+      "tags": "rating:explicit norma_hollowell_(zenless_zone_zero)",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_norma_look",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "norma",
+        "character",
+        "zzz"
+      ],
+      "moods": [
+        "sweet",
+        "horny",
+        "chaotic"
+      ],
+      "speakEn": "Norma staring right at you. Match her eyes, don't rush.",
+      "labelRu": "Показать Норму с прямым взглядом?",
+      "tags": "rating:explicit norma_hollowell_(zenless_zone_zero) looking_at_viewer",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_sunna_me",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "sunna",
+        "character",
+        "zzz"
+      ],
+      "moods": [
+        "sweet",
+        "horny",
+        "calm",
+        "chaotic"
+      ],
+      "speakEn": "Sunna from ZZZ on your screen. Slow strokes — she's worth the patience.",
+      "labelRu": "Показать Санну (ZZZ) на экране?",
+      "tags": "rating:explicit sunna_(zenless_zone_zero)",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_sunna_look",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "sunna",
+        "character",
+        "zzz"
+      ],
+      "moods": [
+        "horny",
+        "sweet",
+        "chaotic"
+      ],
+      "speakEn": "Sunna looking at you. Stay locked on her while you throb.",
+      "labelRu": "Показать Санну с прямым взглядом?",
+      "tags": "rating:explicit sunna_(zenless_zone_zero) looking_at_viewer",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_aria_me",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "aria",
+        "character",
+        "zzz"
+      ],
+      "moods": [
+        "sweet",
+        "horny",
+        "calm",
+        "chaotic"
+      ],
+      "speakEn": "Aria from ZZZ. Fill the screen with her — stroke like she asked.",
+      "labelRu": "Показать Арию (ZZZ) на экране?",
+      "tags": "rating:explicit aria_(zenless_zone_zero)",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_aria_look",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "aria",
+        "character",
+        "zzz"
+      ],
+      "moods": [
+        "horny",
+        "sweet",
+        "chaotic"
+      ],
+      "speakEn": "Aria's gaze. Don't look away — I want to see you melt.",
+      "labelRu": "Показать Арию с прямым взглядом?",
+      "tags": "rating:explicit aria_(zenless_zone_zero) looking_at_viewer",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wg_zzz_trio",
+      "kind": "wager",
+      "pool": "good",
+      "preferKeys": [
+        "zzz",
+        "character",
+        "norma",
+        "sunna",
+        "aria"
+      ],
+      "moods": [
+        "horny",
+        "chaotic",
+        "sweet"
+      ],
+      "speakEn": "ZZZ night — Norma, Sunna or Aria vibes. Say yes and I'll flood you with New Eridu girls.",
+      "labelRu": "Показать ZZZ-девочек (Норма / Санна / Ария)?",
+      "tags": "rating:explicit zenless_zone_zero",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    }
+  ],
+  "wagerBad": [
+    {
+      "id": "wb_cum_feet",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "feet",
+        "cum"
+      ],
+      "speakEn": "Cum on feet. Messy soles. Yes if you're pathetic enough.",
+      "labelRu": "Показать сперму на ножках?",
+      "tags": "cum_on_feet feet soles cum messy rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_lick_cum_feet",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "feet",
+        "cum"
+      ],
+      "speakEn": "Cum on soles — then lick them clean. Gross yes?",
+      "labelRu": "Показать сперму на стопах + вылизывание?",
+      "tags": "cum_on_feet licking_feet soles cum_eating rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_facial",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "cum",
+        "oral"
+      ],
+      "speakEn": "Facials and cum on tongue. Filthy yes?",
+      "labelRu": "Показать facial / сперму на лице?",
+      "tags": "facial cum_on_face cum_on_tongue cum_in_mouth ahegao rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_cum_eat",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "cum"
+      ],
+      "speakEn": "Cum eating / snowballing on screen. Admit you want it.",
+      "labelRu": "Показать поедание спермы / snowball?",
+      "tags": "cum_eating snowballing cum_in_mouth cum_on_tongue rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_creampie",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "cum",
+        "size"
+      ],
+      "speakEn": "Creampie drip and belly bulge. Yes, worm?",
+      "labelRu": "Показать creampie / выпуклость живота?",
+      "tags": "creampie cum_in_pussy cum_drip belly_bulge rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_ahegao_break",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "humiliation"
+      ],
+      "speakEn": "Ahegao mind-break faces. Roll your eyes for me.",
+      "labelRu": "Показать ахегао / «слом мозга»?",
+      "tags": "ahegao rolling_eyes tongue_out mind_break fucked_silly tears rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_corruption",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "humiliation"
+      ],
+      "speakEn": "Corruption feed. Heart pupils. Broken cute.",
+      "labelRu": "Показать corruption / сердечки в глазах?",
+      "tags": "corruption corrupted heart-shaped_pupils ahegao rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_deepthroat",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "oral"
+      ],
+      "speakEn": "Deepthroat and throat bulge. Messy. Yes?",
+      "labelRu": "Показать deepthroat / выпуклость в горле?",
+      "tags": "deepthroat throat_bulge facefuck irrumatio messy_oral drooling rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_bdsm",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "bondage"
+      ],
+      "speakEn": "Bondage, clamps, plugs. Mean toys on screen.",
+      "labelRu": "Показать BDSM / зажимы / пробку?",
+      "tags": "bdsm bondage nipple_clamps anal_plug butt_plug harness rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_denial_toys",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "denial"
+      ],
+      "speakEn": "Edging, orgasm denial, vibrator torture vibes. Yes?",
+      "labelRu": "Показать denial / пытку вибратором?",
+      "tags": "edging orgasm_denial vibrator overstimulation rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_pet_humiliation",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "pet",
+        "humiliation"
+      ],
+      "speakEn": "Pet humiliation — leash, crawling, used. Say yes.",
+      "labelRu": "Показать pet play + унижение?",
+      "tags": "pet_play leash collar crawling humiliation used rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_public",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "public"
+      ],
+      "speakEn": "Public / exhibition risk on the feed. Exposed.",
+      "labelRu": "Показать публичность / exhibitionism?",
+      "tags": "exhibitionism public public_nudity clothed_sex clothing_damage rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_size_awe",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "size"
+      ],
+      "speakEn": "Huge cock awe, belly bulge, size difference. Hungry?",
+      "labelRu": "Показать огромный размер / разницу?",
+      "tags": "big_penis veiny_penis penis_awe size_difference belly_bulge rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_huge_penis",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "huge_penis",
+        "size"
+      ],
+      "moods": [
+        "cruel",
+        "chaotic",
+        "horny",
+        "bored"
+      ],
+      "speakEn": "Huge penis — no mercy size. Admit you want the feed switched.",
+      "labelRu": "Показать огромный пенис жёстко?",
+      "tags": "rating:explicit huge_penis",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_covered_eyes",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "covered_eyes",
+        "bondage"
+      ],
+      "moods": [
+        "cruel",
+        "chaotic",
+        "bored",
+        "horny"
+      ],
+      "speakEn": "Covered eyes — blind, helpless, used. Switch?",
+      "labelRu": "Показать закрытые глаза жёстко / бондаж?",
+      "tags": "rating:explicit covered_eyes",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_choking",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "oral",
+        "bondage"
+      ],
+      "speakEn": "Breath play / choking shots. Dark yes only.",
+      "labelRu": "Показать choking / breath play?",
+      "tags": "choking breath_play tears rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_squirt_overstim",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "messy"
+      ],
+      "speakEn": "Squirt and overstimulation mess. Break for me.",
+      "labelRu": "Показать сквирт / перестимуляцию?",
+      "tags": "squirt overstimulation pussy_juice fucked_silly rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_spit",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "messy",
+        "oral"
+      ],
+      "speakEn": "Spitplay, drool, messy oral. Gross and hot.",
+      "labelRu": "Показать слюни / spit / messy?",
+      "tags": "spitplay drooling saliva messy_oral rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_torn",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "humiliation"
+      ],
+      "speakEn": "Torn clothes, wet, see-through wreck. Yes?",
+      "labelRu": "Показать рваную одежду / мокрое?",
+      "tags": "torn_clothes clothing_damage wet_clothes see-through rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_cbt",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "cbt"
+      ],
+      "speakEn": "CBT tease — balls, squeeze, mean focus. Yes, worm?",
+      "labelRu": "Показать CBT / фокус на яйцах?",
+      "tags": "cbt ballbusting testicles pain rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_ruin",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "denial",
+        "cum"
+      ],
+      "speakEn": "Ruined orgasm collage. Dribble, not glory.",
+      "labelRu": "Показать ruined orgasm на экране?",
+      "tags": "ruined_orgasm cum_drip premature_ejaculation rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_chastity",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "denial",
+        "cbt"
+      ],
+      "speakEn": "Cage / chastity lock tease. Locked and useless.",
+      "labelRu": "Показать chastity / клетку?",
+      "tags": "chastity_cage chastity locked_cock denial rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_spank",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "humiliation",
+        "bondage"
+      ],
+      "speakEn": "Spank marks, red ass, slap aftermath. Yes?",
+      "labelRu": "Показать шлепки / следы?",
+      "tags": "spanking slap ass_mark red_ass rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_toilet",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "toilet",
+        "humiliation"
+      ],
+      "speakEn": "Toilet seat / bathroom humiliation feed. Filthy yes?",
+      "labelRu": "Показать туалет / bathroom humiliation?",
+      "tags": "toilet toilet_seat peeing watersports humiliation rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_blackmail",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "humiliation",
+        "public"
+      ],
+      "speakEn": "Blackmail fantasy captions — exposed, owned. Dark yes?",
+      "labelRu": "Показать фантазию шантажа?",
+      "tags": "blackmail humiliation phone tears clothed rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_anal_rough",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "anal"
+      ],
+      "speakEn": "Rough anal, gaping, used. Say yes if you hate how much you want it.",
+      "labelRu": "Показать жёсткий анал / gaping?",
+      "tags": "anal gaping anal_juice rough_sex rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_eye_contact",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "humiliation"
+      ],
+      "speakEn": "Forced eye contact / stare while broken. Don't look away.",
+      "labelRu": "Показать жёсткий взгляд в камеру?",
+      "tags": "looking_at_viewer tears ahegao humiliation rating:explicit",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_hutao_ahegao",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "hu_tao",
+        "character",
+        "humiliation"
+      ],
+      "moods": [
+        "cruel",
+        "chaotic",
+        "horny"
+      ],
+      "speakEn": "Broken Hu Tao face. Ahegao for your pathetic strokes. Yes?",
+      "labelRu": "Показать ахегао Ху Тао?",
+      "tags": "rating:explicit hu_tao_(genshin_impact) ahegao",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_hutao_bondage",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "hu_tao",
+        "character",
+        "bondage"
+      ],
+      "moods": [
+        "cruel",
+        "chaotic",
+        "bored"
+      ],
+      "speakEn": "Tie the gamer girl up. Watch her struggle while you edge.",
+      "labelRu": "Показать Ху Тао в бондаже?",
+      "tags": "rating:explicit hu_tao_(genshin_impact) bondage",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_hutao_cum",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "hu_tao",
+        "character",
+        "cum"
+      ],
+      "moods": [
+        "cruel",
+        "horny",
+        "chaotic"
+      ],
+      "speakEn": "Mess on my face. Hu Tao facial. Admit you want it.",
+      "labelRu": "Показать кончить на лицо Ху Тао (экран)?",
+      "tags": "rating:explicit hu_tao_(genshin_impact) facial",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_hutao_after",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "hu_tao",
+        "character"
+      ],
+      "moods": [
+        "cruel",
+        "bored",
+        "chaotic"
+      ],
+      "speakEn": "Afterglow — used Hu Tao, messy, done. Stare and leak slower.",
+      "labelRu": "Показать Ху Тао после секса / used?",
+      "tags": "rating:explicit hu_tao_(genshin_impact) after_sex",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_furina_ahegao",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "furina",
+        "character",
+        "humiliation"
+      ],
+      "moods": [
+        "cruel",
+        "chaotic",
+        "horny"
+      ],
+      "speakEn": "Broken Furina face. Ahegao while you edge like trash.",
+      "labelRu": "Показать ахегао Фурины?",
+      "tags": "rating:explicit furina_(genshin_impact) ahegao",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_furina_cum",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "furina",
+        "character",
+        "cum"
+      ],
+      "moods": [
+        "cruel",
+        "horny",
+        "chaotic"
+      ],
+      "speakEn": "Mess on Furina's face. Admit you want that on screen.",
+      "labelRu": "Показать facial на Фурину (экран)?",
+      "tags": "rating:explicit furina_(genshin_impact) facial",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_norma_ahegao",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "norma",
+        "character",
+        "zzz",
+        "humiliation"
+      ],
+      "moods": [
+        "cruel",
+        "chaotic",
+        "horny"
+      ],
+      "speakEn": "Norma ruined — ahegao. Stroke pathetic for a ZZZ girl.",
+      "labelRu": "Показать ахегао Нормы?",
+      "tags": "rating:explicit norma_hollowell_(zenless_zone_zero) ahegao",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_norma_bondage",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "norma",
+        "character",
+        "zzz",
+        "bondage"
+      ],
+      "moods": [
+        "cruel",
+        "chaotic",
+        "bored"
+      ],
+      "speakEn": "Norma tied up. Watch her struggle while you edge.",
+      "labelRu": "Показать Норму в бондаже?",
+      "tags": "rating:explicit norma_hollowell_(zenless_zone_zero) bondage",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_sunna_ahegao",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "sunna",
+        "character",
+        "zzz",
+        "humiliation"
+      ],
+      "moods": [
+        "cruel",
+        "chaotic",
+        "horny"
+      ],
+      "speakEn": "Sunna broken face. Ahegao — keep leaking for her.",
+      "labelRu": "Показать ахегао Санны?",
+      "tags": "rating:explicit sunna_(zenless_zone_zero) ahegao",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_sunna_cum",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "sunna",
+        "character",
+        "zzz",
+        "cum"
+      ],
+      "moods": [
+        "cruel",
+        "horny",
+        "chaotic"
+      ],
+      "speakEn": "Cum on Sunna's face — on screen. Say yes if you're that weak.",
+      "labelRu": "Показать facial на Санну (экран)?",
+      "tags": "rating:explicit sunna_(zenless_zone_zero) facial",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_aria_ahegao",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "aria",
+        "character",
+        "zzz",
+        "humiliation"
+      ],
+      "moods": [
+        "cruel",
+        "chaotic",
+        "horny"
+      ],
+      "speakEn": "Aria ahegao. Ruin your pace staring at that face.",
+      "labelRu": "Показать ахегао Арии?",
+      "tags": "rating:explicit aria_(zenless_zone_zero) ahegao",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "wb_aria_cum",
+      "kind": "wager",
+      "pool": "bad",
+      "preferKeys": [
+        "aria",
+        "character",
+        "zzz",
+        "cum"
+      ],
+      "moods": [
+        "cruel",
+        "horny",
+        "chaotic"
+      ],
+      "speakEn": "Messy Aria facial on screen. Admit it.",
+      "labelRu": "Показать facial на Арию (экран)?",
+      "tags": "rating:explicit aria_(zenless_zone_zero) facial",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    }
+  ],
+  "confess": [
+    {
+      "id": "confess_crave",
+      "kind": "confess",
+      "speakEn": "Confess — what ruins you faster right now?",
+      "labelRu": "Что сильнее всего тебя ломает прямо сейчас? Выбери одно.",
+      "options": [
+        {
+          "id": "feet",
+          "labelRu": "Ножки / стопы",
+          "effect": "confess_like",
+          "preferKey": "feet"
+        },
+        {
+          "id": "flat",
+          "labelRu": "Маленькая грудь",
+          "effect": "confess_like",
+          "preferKey": "flat"
+        },
+        {
+          "id": "hum",
+          "labelRu": "Унижение",
+          "effect": "confess_like",
+          "preferKey": "humiliation"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "confess_hutao_only",
+      "kind": "confess",
+      "preferKeys": [
+        "hu_tao",
+        "character"
+      ],
+      "speakEn": "Be honest — are you leaking for Hu Tao specifically, or any girl?",
+      "labelRu": "Ты дрочишь именно на меня (Ху Тао) — или «любая красивая» тоже ок?",
+      "options": [
+        {
+          "id": "hutao",
+          "labelRu": "Только на тебя",
+          "effect": "confess_like",
+          "preferKey": "hu_tao"
+        },
+        {
+          "id": "any",
+          "labelRu": "Любая красивая",
+          "effect": "confess_dislike",
+          "preferKey": "character"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "confess_girl_pick",
+      "kind": "confess",
+      "preferKeys": [
+        "character",
+        "furina",
+        "norma",
+        "sunna",
+        "aria",
+        "hu_tao",
+        "zzz"
+      ],
+      "speakEn": "Confess — whose face ruins you fastest right now?",
+      "labelRu": "На ком из этих девочек ты сейчас плывёшь сильнее всего?",
+      "options": [
+        {
+          "id": "hutao",
+          "labelRu": "Ху Тао",
+          "effect": "confess_like",
+          "preferKey": "hu_tao"
+        },
+        {
+          "id": "furina",
+          "labelRu": "Фурина",
+          "effect": "confess_like",
+          "preferKey": "furina"
+        },
+        {
+          "id": "norma",
+          "labelRu": "Норма",
+          "effect": "confess_like",
+          "preferKey": "norma"
+        },
+        {
+          "id": "sunna",
+          "labelRu": "Санна",
+          "effect": "confess_like",
+          "preferKey": "sunna"
+        },
+        {
+          "id": "aria",
+          "labelRu": "Ария",
+          "effect": "confess_like",
+          "preferKey": "aria"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "confess_zzz_or_genshin",
+      "kind": "confess",
+      "preferKeys": [
+        "zzz",
+        "character",
+        "furina",
+        "hu_tao"
+      ],
+      "speakEn": "Genshin girls or New Eridu (ZZZ) — which hole in your brain wins?",
+      "labelRu": "Что тебе ближе по вселенной контента: Genshin или Zenless Zone Zero?",
+      "options": [
+        {
+          "id": "genshin",
+          "labelRu": "Genshin",
+          "effect": "confess_like",
+          "preferKey": "furina"
+        },
+        {
+          "id": "zzz",
+          "labelRu": "ZZZ",
+          "effect": "confess_like",
+          "preferKey": "zzz"
+        },
+        {
+          "id": "both",
+          "labelRu": "Оба / всё равно",
+          "effect": "confess_like",
+          "preferKey": "character"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "confess_owned",
+      "kind": "confess",
+      "preferKeys": [
+        "hu_tao",
+        "humiliation",
+        "gamer"
+      ],
+      "speakEn": "Confess — does it shame you that a gamer girl is running you?",
+      "labelRu": "Стыдно, что геймерша-Ху Тао тобой командует — или гордишься этим?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да, стыдно",
+          "effect": "confess_like",
+          "preferKey": "humiliation"
+        },
+        {
+          "id": "proud",
+          "labelRu": "Горжусь этим",
+          "effect": "confess_like",
+          "preferKey": "hu_tao"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "confess_hate",
+      "kind": "confess",
+      "speakEn": "What do you hate seeing… that still makes you throb?",
+      "labelRu": "Что бесит, но всё равно возбуждает? Выбери то, от чего морщишься.",
+      "options": [
+        {
+          "id": "cum",
+          "labelRu": "Играть со спермой",
+          "effect": "confess_dislike",
+          "preferKey": "cum"
+        },
+        {
+          "id": "cbt",
+          "labelRu": "Удары / давление на яйца",
+          "effect": "confess_dislike",
+          "preferKey": "cbt"
+        },
+        {
+          "id": "toilet",
+          "labelRu": "Туалет / унижение там",
+          "effect": "confess_dislike",
+          "preferKey": "toilet"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "confess_body",
+      "kind": "confess",
+      "speakEn": "Pick your poison — body focus.",
+      "labelRu": "На какую часть тела тебе важнее смотреть сейчас?",
+      "options": [
+        {
+          "id": "feet",
+          "labelRu": "Ноги / стопы",
+          "effect": "confess_like",
+          "preferKey": "feet"
+        },
+        {
+          "id": "thighs",
+          "labelRu": "Бёдра",
+          "effect": "confess_like",
+          "preferKey": "thighs"
+        },
+        {
+          "id": "armpit",
+          "labelRu": "Подмышки",
+          "effect": "confess_like",
+          "preferKey": "armpit"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "confess_mean",
+      "kind": "confess",
+      "speakEn": "Which mean toy do you secretly flinch from?",
+      "labelRu": "От чего сильнее вздрагиваешь (даже если «не любишь»)?",
+      "options": [
+        {
+          "id": "bondage",
+          "labelRu": "Бондаж / фиксация",
+          "effect": "confess_dislike",
+          "preferKey": "bondage"
+        },
+        {
+          "id": "denial",
+          "labelRu": "Отказ кончить / denial",
+          "effect": "confess_dislike",
+          "preferKey": "denial"
+        },
+        {
+          "id": "anal",
+          "labelRu": "Жёсткий анал",
+          "effect": "confess_dislike",
+          "preferKey": "anal"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "confess_oral",
+      "kind": "confess",
+      "speakEn": "Mouth stuff — soft worship or filthy facefuck energy?",
+      "labelRu": "Какой oral-контент на экране тебе ближе?",
+      "options": [
+        {
+          "id": "soft",
+          "labelRu": "Нежный, «поклонение»",
+          "effect": "confess_like",
+          "preferKey": "oral"
+        },
+        {
+          "id": "messy",
+          "labelRu": "Грязный / слюни",
+          "effect": "confess_dislike",
+          "preferKey": "messy"
+        },
+        {
+          "id": "size",
+          "labelRu": "Огромный размер / шок",
+          "effect": "confess_dislike",
+          "preferKey": "size"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "confess_public",
+      "kind": "confess",
+      "speakEn": "Risk check — cute gamer tease or public exposure shame?",
+      "labelRu": "Что цепляет сильнее: уют «дома за компом» или риск / стыд на людях?",
+      "options": [
+        {
+          "id": "gamer",
+          "labelRu": "Уют / геймерша",
+          "effect": "confess_like",
+          "preferKey": "gamer"
+        },
+        {
+          "id": "public",
+          "labelRu": "Публичный стыд",
+          "effect": "confess_dislike",
+          "preferKey": "public"
+        },
+        {
+          "id": "pet",
+          "labelRu": "Pet play",
+          "effect": "confess_like",
+          "preferKey": "pet"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    }
+  ],
+  "loyalty": [
+    {
+      "id": "loyalty_hands_15",
+      "kind": "loyalty",
+      "loyaltySec": 15,
+      "speakEn": "Loyalty test: hands off for 15 seconds. Can you?",
+      "labelRu": "Руки прочь от члена на 15 секунд. Согласен выдержать?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "loyalty_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "loyalty_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "loyalty_hands_25",
+      "kind": "loyalty",
+      "loyaltySec": 25,
+      "speakEn": "Hands off. Twitch if you must — no stroking for 25.",
+      "labelRu": "Руки прочь от члена на 25 секунд. Согласен выдержать?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "loyalty_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "loyalty_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "loyalty_edge_hold",
+      "kind": "loyalty",
+      "loyaltySec": 20,
+      "loyaltyAction": "hold",
+      "speakEn": "Hold the edge feeling — no finishing thoughts — 20 seconds still.",
+      "labelRu": "Держи грань ~20 секунд без срыва. Согласен?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "loyalty_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "loyalty_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "loyalty_eyes",
+      "kind": "loyalty",
+      "loyaltySec": 18,
+      "speakEn": "Eyes on the screen, hands frozen. Prove loyalty — 18 seconds.",
+      "labelRu": "Смотри на экран / на меня и не трогай себя ~18 секунд. Согласен?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "loyalty_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "loyalty_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "loyalty_tip_only",
+      "kind": "loyalty",
+      "loyaltySec": 22,
+      "loyaltyAction": "tip",
+      "speakEn": "Tip only — tiny touches — for 22 seconds. No full strokes.",
+      "labelRu": "Только головка, без полного хода ~22 секунды. Согласен?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "loyalty_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "loyalty_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "loyalty_hutao_gaze",
+      "kind": "loyalty",
+      "loyaltySec": 20,
+      "preferKeys": [
+        "hu_tao",
+        "character"
+      ],
+      "speakEn": "Look at me. Don't blink away. Twenty seconds for your gamer girl.",
+      "labelRu": "Смотри на меня (Ху Тао) ~20 секунд без отвода глаз. Согласен?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "loyalty_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "loyalty_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    }
+  ],
+  "obey": [
+    {
+      "id": "obey_tip",
+      "kind": "obey",
+      "correctOptionId": "tip",
+      "speakEn": "Obey check. I ordered tip only. What did I say?",
+      "labelRu": "Проверка: что я только что приказала делать с членом?",
+      "options": [
+        {
+          "id": "tip",
+          "labelRu": "Только головка",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "full",
+          "labelRu": "Полный ход",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "off",
+          "labelRu": "Руки прочь",
+          "effect": "obey_fail"
+        }
+      ]
+    },
+    {
+      "id": "obey_stop",
+      "kind": "obey",
+      "correctOptionId": "off",
+      "speakEn": "Obey check. Hands off — now. Which order was that?",
+      "labelRu": "Проверка: какой приказ сейчас правильный?",
+      "options": [
+        {
+          "id": "fast",
+          "labelRu": "Быстрее",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "off",
+          "labelRu": "Руки прочь",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "hard",
+          "labelRu": "Жёстче",
+          "effect": "obey_fail"
+        }
+      ]
+    },
+    {
+      "id": "obey_slow",
+      "kind": "obey",
+      "correctOptionId": "slow",
+      "speakEn": "Obey check. Slow strokes only. Pick the rule.",
+      "labelRu": "Проверка: какое правило темпа сейчас действует?",
+      "options": [
+        {
+          "id": "slow",
+          "labelRu": "Медленно",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "fast",
+          "labelRu": "Быстро",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "cum",
+          "labelRu": "Можно кончать",
+          "effect": "obey_fail"
+        }
+      ]
+    },
+    {
+      "id": "obey_balls",
+      "kind": "obey",
+      "correctOptionId": "balls",
+      "speakEn": "Obey check. Soft ball squeeze — not shaft racing. What?",
+      "labelRu": "Проверка: что сейчас делать руками?",
+      "options": [
+        {
+          "id": "shaft",
+          "labelRu": "Дрочить ствол",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "balls",
+          "labelRu": "Мягко яйца",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "nip",
+          "labelRu": "Соски",
+          "effect": "obey_fail"
+        }
+      ]
+    },
+    {
+      "id": "obey_breathe",
+      "kind": "obey",
+      "correctOptionId": "breathe",
+      "speakEn": "Obey check. Breathe and hold still — no stroking. Choose.",
+      "labelRu": "Проверка: что я велела вместо «гнать к эджу»?",
+      "options": [
+        {
+          "id": "stroke",
+          "labelRu": "Дрочить",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "breathe",
+          "labelRu": "Дышать / стоп",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "edge",
+          "labelRu": "Гнать к эджу",
+          "effect": "obey_fail"
+        }
+      ]
+    },
+    {
+      "id": "obey_match",
+      "kind": "obey",
+      "correctOptionId": "beat",
+      "speakEn": "Obey check. Match my beat — not your desperate pace.",
+      "labelRu": "Проверка: чей темп ты обязан повторять?",
+      "options": [
+        {
+          "id": "mine",
+          "labelRu": "Мой темп",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "beat",
+          "labelRu": "Темп Ху Тао",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "skip",
+          "labelRu": "Можно пропустить",
+          "effect": "obey_fail"
+        }
+      ]
+    },
+    {
+      "id": "obey_who",
+      "kind": "obey",
+      "correctOptionId": "hutao",
+      "preferKeys": [
+        "hu_tao",
+        "gamer"
+      ],
+      "speakEn": "Obey check. Who owns this session?",
+      "labelRu": "Проверка: кто хозяин этой сессии?",
+      "options": [
+        {
+          "id": "hutao",
+          "labelRu": "Ху Тао",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "me",
+          "labelRu": "Я сам",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "noone",
+          "labelRu": "Никто",
+          "effect": "obey_fail"
+        }
+      ]
+    },
+    {
+      "id": "obey_role",
+      "kind": "obey",
+      "correctOptionId": "gamer",
+      "preferKeys": [
+        "hu_tao",
+        "gamer"
+      ],
+      "speakEn": "Obey check. What am I to you right now?",
+      "labelRu": "Проверка: кем я для тебя сейчас?",
+      "options": [
+        {
+          "id": "gamer",
+          "labelRu": "Геймерша / хозяйка",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "npc",
+          "labelRu": "NPC из игры",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "friend",
+          "labelRu": "Просто подруга",
+          "effect": "obey_fail"
+        }
+      ]
+    }
+  ],
+  "dare": [
+    {
+      "id": "dare_cbt_20",
+      "kind": "dare",
+      "taskType": "timed_report",
+      "taskSec": 10,
+      "taskCount": 20,
+      "preferKeys": [
+        "cbt"
+      ],
+      "moods": [
+        "cruel",
+        "chaotic",
+        "bored",
+        "horny"
+      ],
+      "speakEn": "Hit your balls twenty times in ten seconds. For me. Yes?",
+      "labelRu": "Смелость: 20 лёгких ударов по яйцам за ~10 секунд. Берёшься?",
+      "instructionRu": "Ударь яйца 20 раз до конца таймера",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_cbt_squeeze",
+      "kind": "dare",
+      "taskType": "timed_report",
+      "taskSec": 15,
+      "preferKeys": [
+        "cbt"
+      ],
+      "moods": [
+        "cruel",
+        "chaotic",
+        "bored"
+      ],
+      "speakEn": "Squeeze your balls gently and hold — fifteen seconds. No stroking.",
+      "labelRu": "Смелость: сжать яйца и держать ~15 секунд. Берёшься?",
+      "instructionRu": "Сжимай яйца. Не дрочи. Держи до конца таймера",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_tip_only",
+      "kind": "dare",
+      "taskType": "timed_report",
+      "taskSec": 20,
+      "moods": [
+        "sweet",
+        "horny",
+        "calm",
+        "bored"
+      ],
+      "speakEn": "Tip only for twenty seconds. Full strokes = fail. Accept?",
+      "labelRu": "Смелость: только головка ~20 секунд, без полного хода. Берёшься?",
+      "instructionRu": "Только головка. Полный ход = провал",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_hands_off_edge",
+      "kind": "dare",
+      "taskType": "timed_report",
+      "taskSec": 25,
+      "preferKeys": [
+        "denial"
+      ],
+      "moods": [
+        "cruel",
+        "chaotic",
+        "bored",
+        "calm"
+      ],
+      "speakEn": "Hands off the cock. Stay right on the edge — no stroking — for twenty-five seconds.",
+      "labelRu": "Смелость: не дрочи, стой на грани без рук ~25 сек. Берёшься?",
+      "instructionRu": "Не дрочи и не отдыхай. Если уже на грани — стой на ней без рук до конца таймера. Цель: удержать ощущение грани, а не расслабиться",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_spit",
+      "kind": "dare",
+      "taskType": "timed_report",
+      "taskSec": 8,
+      "preferKeys": [
+        "messy"
+      ],
+      "moods": [
+        "horny",
+        "chaotic",
+        "cruel",
+        "sweet"
+      ],
+      "speakEn": "Spit on the tip. Make it shiny. Eight seconds — go?",
+      "labelRu": "Смелость: плюнь на головку (сделай за ~8 секунд). Берёшься?",
+      "instructionRu": "Плюнь на головку и разотри. Успей до конца таймера",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_slap_head",
+      "kind": "dare",
+      "taskType": "timed_report",
+      "taskSec": 12,
+      "taskCount": 10,
+      "preferKeys": [
+        "cbt"
+      ],
+      "moods": [
+        "cruel",
+        "chaotic",
+        "bored"
+      ],
+      "speakEn": "Ten light slaps on the head in twelve seconds. Soft. Mean. Yes?",
+      "labelRu": "Смелость: 10 шлепков по головке за ~12 секунд. Берёшься?",
+      "instructionRu": "Лёгкие шлепки по головке — 10 раз до конца таймера",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_cage_lock",
+      "kind": "dare",
+      "taskType": "cage_hijack",
+      "cageHoursMin": 2,
+      "cageHoursMax": 6,
+      "preferKeys": [
+        "denial",
+        "cbt"
+      ],
+      "moods": [
+        "cruel",
+        "chaotic",
+        "bored"
+      ],
+      "speakEn": "Lock the cage for me. Rest of the session is chastity — then hours after. Yes?",
+      "labelRu": "Смелость: надеть клетку сейчас (и оставить часы после сессии). Берёшься?",
+      "instructionRu": "Надень клетку. Дальше — chastity-ходы",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_cage_long",
+      "kind": "dare",
+      "taskType": "cage_hijack",
+      "cageHoursMin": 4,
+      "cageHoursMax": 12,
+      "preferKeys": [
+        "denial"
+      ],
+      "moods": [
+        "cruel",
+        "chaotic"
+      ],
+      "speakEn": "Long lock. Cage on — session becomes chastity, then a long after-timer. Brave?",
+      "labelRu": "Смелость: долгая клетка после сессии (примерно 4–12 часов). Берёшься?",
+      "instructionRu": "Запрись. Сессия перейдёт в chastity",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_cum_eat",
+      "kind": "dare",
+      "taskType": "cum_eat_promise",
+      "preferKeys": [
+        "cum"
+      ],
+      "moods": [
+        "horny",
+        "cruel",
+        "chaotic",
+        "bored"
+      ],
+      "speakEn": "If you cum — you eat it for me. Promise now.",
+      "labelRu": "Обещание: если кончишь / будет руин — съешь для меня. Обещаешь?",
+      "instructionRu": "Обещание на финал: съесть кончу",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_base_squeeze",
+      "kind": "dare",
+      "taskType": "timed_report",
+      "taskSec": 18,
+      "moods": [
+        "sweet",
+        "calm",
+        "horny"
+      ],
+      "speakEn": "Pinch the base. Count to eighteen in your head. No racing the tip.",
+      "labelRu": "Смелость: сжать у основания члена ~18 секунд. Берёшься?",
+      "instructionRu": "Сжимай у основания. Не гони головку",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_edge_ad",
+      "kind": "dare",
+      "taskType": "edge_ad",
+      "moods": [
+        "cruel",
+        "chaotic",
+        "bored",
+        "horny"
+      ],
+      "speakEn": "Edge ad for me — several edges in a row, tiny rests only. Ready to suffer?",
+      "labelRu": "Смелость: несколько эджей подряд (edge-ad) прямо сейчас. Берёшься?",
+      "instructionRu": "Серия эджей с короткими паузами",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_dice_chaos",
+      "kind": "dare",
+      "taskType": "dice_chaos",
+      "moods": [
+        "chaotic",
+        "cruel",
+        "bored",
+        "horny"
+      ],
+      "speakEn": "Roll my dice. Whatever lands — you obey. Ready?",
+      "labelRu": "Смелость: бросить «кости хаоса» — случайно ломаем план сессии. Берёшься?",
+      "instructionRu": "Случайный исход: edge-ad / rest / denial / …",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_say_hutao",
+      "kind": "dare",
+      "taskType": "timed_report",
+      "taskSec": 15,
+      "taskCount": 10,
+      "preferKeys": [
+        "hu_tao",
+        "character"
+      ],
+      "moods": [
+        "sweet",
+        "horny",
+        "chaotic",
+        "cruel"
+      ],
+      "speakEn": "Say my name — Hu Tao — ten times before the timer dies. No whispering.",
+      "labelRu": "Смелость: скажи вслух «Ху Тао» 10 раз за ~15 секунд. Берёшься?",
+      "instructionRu": "Вслух: «Ху Тао» ×10 до конца таймера",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_thank_hutao",
+      "kind": "dare",
+      "taskType": "timed_report",
+      "taskSec": 12,
+      "preferKeys": [
+        "hu_tao",
+        "humiliation",
+        "gamer"
+      ],
+      "moods": [
+        "cruel",
+        "chaotic",
+        "horny",
+        "sweet"
+      ],
+      "speakEn": "Thank your gamer girl out loud. Soft voice. Mean gratitude.",
+      "labelRu": "Смелость: вслух поблагодари Ху Тао за то, что она тобой командует. Берёшься?",
+      "instructionRu": "Скажи вслух спасибо Ху Тао до конца таймера",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_stare_no_touch",
+      "kind": "dare",
+      "taskType": "timed_report",
+      "taskSec": 20,
+      "preferKeys": [
+        "hu_tao",
+        "denial"
+      ],
+      "moods": [
+        "cruel",
+        "calm",
+        "bored",
+        "horny"
+      ],
+      "speakEn": "Hands behind your back. Eyes on me. Twenty seconds of hungry nothing.",
+      "labelRu": "Смелость: руки за спину, смотри на экран ~20 секунд. Берёшься?",
+      "instructionRu": "Руки за спиной. Смотри на экран. Не трогай себя",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_slow_count",
+      "kind": "dare",
+      "taskType": "timed_report",
+      "taskSec": 25,
+      "moods": [
+        "sweet",
+        "calm",
+        "horny"
+      ],
+      "speakEn": "Slow strokes only — count to twenty-five out loud. Miss a number = shame.",
+      "labelRu": "Смелость: дрочи медленно и считай вслух до 25. Берёшься?",
+      "instructionRu": "Медленные ходы. Считай вслух 1…25",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_edge_whisper",
+      "kind": "dare",
+      "taskType": "timed_report",
+      "taskSec": 18,
+      "preferKeys": [
+        "denial"
+      ],
+      "moods": [
+        "horny",
+        "cruel",
+        "chaotic"
+      ],
+      "speakEn": "Ride the edge. Whisper 'please' every breath. Eighteen seconds.",
+      "labelRu": "Смелость: на грани шепчи «please» ~18 секунд. Берёшься?",
+      "instructionRu": "Держи грань. Шепчи please. Не кончай",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "dare_breath_stroke",
+      "kind": "dare",
+      "taskType": "breath_challenge",
+      "taskSec": 12,
+      "taskCount": 16,
+      "moods": ["sweet", "calm", "horny"],
+      "speakEn": "One breath, one challenge. Keep stroking until I release you. Accept?",
+      "labelRu": "Задержишь дыхание и выполнишь мой ход?",
+      "instructionRu": "Набери воздух, задержи дыхание и выполни цель",
+      "options": [
+        { "id": "yes", "labelRu": "Да", "effect": "dare_accept" },
+        { "id": "no", "labelRu": "Нет", "effect": "dare_refuse" },
+        { "id": "mute", "labelRu": "Не отвечу", "effect": "mute" }
+      ]
+    },
+    {
+      "id": "dare_breath_harsh",
+      "kind": "dare",
+      "taskType": "breath_challenge",
+      "taskSec": 18,
+      "taskCount": 24,
+      "moods": ["cruel", "chaotic", "bored", "horny"],
+      "speakEn": "Let me own your breath while you obey. Brave enough?",
+      "labelRu": "Отдашь мне своё дыхание на один жёсткий ход?",
+      "instructionRu": "Задержи дыхание и не сдавайся до цели",
+      "options": [
+        { "id": "yes", "labelRu": "Да", "effect": "dare_accept" },
+        { "id": "no", "labelRu": "Нет", "effect": "dare_refuse" },
+        { "id": "mute", "labelRu": "Не отвечу", "effect": "mute" }
+      ]
+    }
+  ],
+  "permission": [
+    {
+      "id": "perm_beg_release",
+      "kind": "permission",
+      "moods": [
+        "sweet",
+        "horny",
+        "calm",
+        "bored"
+      ],
+      "speakEn": "Beg properly. Do you want permission to cum later?",
+      "labelRu": "Хочешь умолять меня о разрешении кончить — или сразу отказ?",
+      "options": [
+        {
+          "id": "please",
+          "labelRu": "Умоляю…",
+          "effect": "beg_please"
+        },
+        {
+          "id": "skip",
+          "labelRu": "Не буду умолять",
+          "effect": "beg_skip"
+        },
+        {
+          "id": "deny",
+          "labelRu": "Хочу отказ (denial)",
+          "effect": "beg_deny_want"
+        }
+      ]
+    },
+    {
+      "id": "perm_beg_mean",
+      "kind": "permission",
+      "moods": [
+        "cruel",
+        "chaotic",
+        "bored"
+      ],
+      "speakEn": "On your knees in your head. Beg — or admit you want denial.",
+      "labelRu": "Встань на колени в голове: умолять… или честно хочешь denial?",
+      "options": [
+        {
+          "id": "please",
+          "labelRu": "Пожалуйста…",
+          "effect": "beg_please"
+        },
+        {
+          "id": "skip",
+          "labelRu": "Промолчу",
+          "effect": "beg_skip"
+        },
+        {
+          "id": "deny",
+          "labelRu": "Хочу denial",
+          "effect": "beg_deny_want"
+        }
+      ]
+    }
+  ],
+  "finaleBias": [
+    {
+      "id": "finale_bias_cum",
+      "kind": "finale_bias",
+      "moods": [
+        "sweet",
+        "horny",
+        "calm"
+      ],
+      "speakEn": "Want the finale stacked toward a full orgasm?",
+      "labelRu": "Хочешь, чтобы финал чаще вёл к полноценному оргазму?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да, хочу кончить",
+          "effect": "finale_want_cum"
+        },
+        {
+          "id": "deny",
+          "labelRu": "Нет, хочу denial",
+          "effect": "finale_want_deny"
+        },
+        {
+          "id": "ruin",
+          "labelRu": "Лучше руин",
+          "effect": "finale_want_ruin"
+        }
+      ]
+    },
+    {
+      "id": "finale_bias_deny",
+      "kind": "finale_bias",
+      "moods": [
+        "cruel",
+        "chaotic",
+        "bored",
+        "horny"
+      ],
+      "speakEn": "Be honest — cum, ruin, or full denial for the finale?",
+      "labelRu": "Честно про финал: кончить, руин или полный отказ?",
+      "options": [
+        {
+          "id": "cum",
+          "labelRu": "Кончить",
+          "effect": "finale_want_cum"
+        },
+        {
+          "id": "ruin",
+          "labelRu": "Руин",
+          "effect": "finale_want_ruin"
+        },
+        {
+          "id": "deny",
+          "labelRu": "Denial / отказ",
+          "effect": "finale_want_deny"
+        }
+      ]
+    }
+  ],
+  "moodOffer": [
+    {
+      "id": "offer_meaner_sweet",
+      "kind": "mood_offer",
+      "moods": [
+        "sweet",
+        "calm"
+      ],
+      "speakEn": "Want me to get meaner? I can drop the soft act.",
+      "labelRu": "Хочешь, чтобы я стала злее и жёстче (меньше «милости»)?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "mood_harsher"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "mood_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "offer_harsher_horny",
+      "kind": "mood_offer",
+      "moods": [
+        "horny",
+        "bored"
+      ],
+      "speakEn": "Want me harsher — less teasing, more orders?",
+      "labelRu": "Хочешь, чтобы я вела жёстче — меньше дразнилок, больше приказов?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "mood_harsher"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "mood_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "offer_softer_cruel",
+      "kind": "mood_offer",
+      "moods": [
+        "cruel",
+        "chaotic",
+        "bored"
+      ],
+      "speakEn": "Beg for soft. Or stay under my mean mood — your choice.",
+      "labelRu": "Хочешь, чтобы я стала добрее и мягче до конца сессии?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "mood_softer"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "mood_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "offer_even_meaner",
+      "kind": "mood_offer",
+      "moods": [
+        "cruel",
+        "bored"
+      ],
+      "speakEn": "Still not mean enough? Want me worse — chaotic mean?",
+      "labelRu": "Хочешь ещё злее / хаотичнее, чем сейчас?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "mood_harsher"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "mood_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "offer_horny_up",
+      "kind": "mood_offer",
+      "moods": [
+        "sweet",
+        "calm"
+      ],
+      "speakEn": "Want me hungrier — more needy and filthy instead of sweet?",
+      "labelRu": "Хочешь, чтобы я стала похотливее и грязнее вместо «милой»?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "mood_horny"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "mood_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "offer_deny_more",
+      "kind": "mood_offer",
+      "moods": [
+        "horny",
+        "cruel",
+        "chaotic"
+      ],
+      "speakEn": "Want the rest of the session meaner — more edges, less mercy?",
+      "labelRu": "Хочешь меньше жалости дальше: больше эджей, меньше пощады?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "mood_harsher"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "mood_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    }
+  ],
+  "equip": [
+    {
+      "id": "equip_plug",
+      "kind": "equip",
+      "toyId": "plug",
+      "preferKeys": [
+        "anal"
+      ],
+      "speakEn": "Put the plug in your ass for me. Leave it there.",
+      "labelRu": "Засунь пробку в попку и оставь. Когда сделаешь — жми «Да».",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "equip_vibe_plug",
+      "kind": "equip",
+      "toyId": "vibrating_plug",
+      "preferKeys": [
+        "anal"
+      ],
+      "speakEn": "Swap to the vibrating plug. In. On. Stay filled.",
+      "labelRu": "Вставь вибро-пробку. Когда сделаешь — жми «Да».",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "equip_edge2",
+      "kind": "equip",
+      "toyId": "lovense_edge2",
+      "preferKeys": [
+        "anal"
+      ],
+      "speakEn": "Take out whatever's in your ass — Edge 2 goes in. Now.",
+      "labelRu": "Вставь Edge 2 (вместо пробки). Когда сделаешь — жми «Да».",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "equip_wand",
+      "kind": "equip",
+      "toyId": "wand",
+      "speakEn": "Pick up the wand. You'll keep it for the next stretch.",
+      "labelRu": "Возьми wand в руку. Когда готов — жми «Да».",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "equip_vibe_bullet",
+      "kind": "equip",
+      "toyId": "vibe_bullet",
+      "speakEn": "Grab the bullet vibe. Same job as the wand — press it where I say.",
+      "labelRu": "Возьми вибропулю. Как wand — прижми, куда скажу. Когда готов — «Да».",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "equip_cage",
+      "kind": "equip",
+      "toyId": "chastity_cage",
+      "preferKeys": [
+        "denial",
+        "cbt"
+      ],
+      "speakEn": "Cage on. Lock it. Soft cock stays mine.",
+      "labelRu": "Надень клетку. Когда надел — жми «Да».",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "equip_dildo_s",
+      "kind": "equip",
+      "toyId": "dildo_small",
+      "preferKeys": [
+        "anal"
+      ],
+      "speakEn": "Small dildo in — leave it worn. Thrust when I say, or just sit and grind.",
+      "labelRu": "Вставь маленькое дилдо и оставь (worn). Thrust по команде или просто сиди и гринди. «Да».",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    }
+  ],
+  "choice": [
+    {
+      "id": "choice_extend",
+      "kind": "choice",
+      "choiceAction": "extend_sec",
+      "speakEn": "Want to stretch this session a little longer for me?",
+      "labelRu": "Хочешь продлить сессию?",
+      "moods": ["sweet", "horny", "calm", "bored"],
+      "options": [
+        { "id": "yes", "labelRu": "Да", "effect": "choice_yes" },
+        { "id": "no", "labelRu": "Нет", "effect": "choice_no" },
+        { "id": "mute", "labelRu": "Не отвечу", "effect": "mute" }
+      ]
+    },
+    {
+      "id": "choice_ruin_now",
+      "kind": "choice",
+      "choiceAction": "ruin_now",
+      "speakEn": "Ruin right now — no spinning, just yes or no.",
+      "labelRu": "Хочешь руин сейчас?",
+      "moods": ["cruel", "chaotic", "horny", "bored"],
+      "options": [
+        { "id": "yes", "labelRu": "Да", "effect": "choice_yes" },
+        { "id": "no", "labelRu": "Нет", "effect": "choice_no" },
+        { "id": "mute", "labelRu": "Не отвечу", "effect": "mute" }
+      ]
+    },
+    {
+      "id": "choice_hold_edge",
+      "kind": "choice",
+      "choiceAction": "hold_sec",
+      "speakEn": "Edge and hold — I'll spin how long you endure.",
+      "labelRu": "Хочешь эдж с удержанием?",
+      "options": [
+        { "id": "yes", "labelRu": "Да", "effect": "choice_yes" },
+        { "id": "no", "labelRu": "Нет", "effect": "choice_no" },
+        { "id": "mute", "labelRu": "Не отвечу", "effect": "mute" }
+      ]
+    },
+    {
+      "id": "choice_edge_hell",
+      "kind": "choice",
+      "choiceAction": "edge_hell",
+      "speakEn": "Edge hell — stacked edges in a row. Feeling brave?",
+      "labelRu": "Хочешь эдж-ад сейчас?",
+      "moods": ["cruel", "chaotic", "bored", "horny"],
+      "options": [
+        { "id": "yes", "labelRu": "Да", "effect": "choice_yes" },
+        { "id": "no", "labelRu": "Нет", "effect": "choice_no" },
+        { "id": "mute", "labelRu": "Не отвечу", "effect": "mute" }
+      ]
+    },
+    {
+      "id": "choice_extra_edges",
+      "kind": "choice",
+      "choiceAction": "extra_edges",
+      "speakEn": "Edge tax. Want me to spin how many edges I add to your quota?",
+      "labelRu": "Крутить рулетку «сколько эджей я тебе добавлю»?",
+      "options": [
+        { "id": "yes", "labelRu": "Да", "effect": "choice_yes" },
+        { "id": "no", "labelRu": "Нет", "effect": "choice_no" },
+        { "id": "mute", "labelRu": "Не отвечу", "effect": "mute" }
+      ]
+    },
+    {
+      "id": "choice_rest_mercy",
+      "kind": "choice",
+      "choiceAction": "rest_sec",
+      "speakEn": "A short hands-off mercy pause — if you ask nicely.",
+      "labelRu": "Хочешь короткую паузу без рук?",
+      "moods": ["sweet", "calm", "horny"],
+      "options": [
+        { "id": "yes", "labelRu": "Да", "effect": "choice_yes" },
+        { "id": "no", "labelRu": "Нет", "effect": "choice_no" },
+        { "id": "mute", "labelRu": "Не отвечу", "effect": "mute" }
+      ]
+    },
+    {
+      "id": "choice_tip_only",
+      "kind": "choice",
+      "choiceAction": "tip_sec",
+      "speakEn": "Tip-only teasing — fragile and mean.",
+      "labelRu": "Хочешь только головку — дразнящий ход?",
+      "moods": ["cruel", "horny", "chaotic", "bored"],
+      "options": [
+        { "id": "yes", "labelRu": "Да", "effect": "choice_yes" },
+        { "id": "no", "labelRu": "Нет", "effect": "choice_no" },
+        { "id": "mute", "labelRu": "Не отвечу", "effect": "mute" }
+      ]
+    },
+    {
+      "id": "choice_breath_hold",
+      "kind": "choice",
+      "choiceAction": "breath_hold",
+      "speakEn": "Want me to spin how long I own your next breath?",
+      "labelRu": "Хочешь задержку дыхания — длительность решит колесо?",
+      "moods": ["cruel", "chaotic", "horny", "bored", "calm"],
+      "options": [
+        { "id": "yes", "labelRu": "Да", "effect": "choice_yes" },
+        { "id": "no", "labelRu": "Нет", "effect": "choice_no" },
+        { "id": "mute", "labelRu": "Не отвечу", "effect": "mute" }
+      ]
+    }
+  ]
+}

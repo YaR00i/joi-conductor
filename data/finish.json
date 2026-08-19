@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "finish": [
+    {
+      "id": "hand",
+      "nameRu": "В руку",
+      "descriptionRu": "Кончить в ладонь / пальцы.",
+      "tags": ["basic"],
+      "enabled": true
+    },
+    {
+      "id": "glass",
+      "nameRu": "В стакан",
+      "descriptionRu": "Кончить в стакан или другую ёмкость для cumplay.",
+      "tags": ["cei"],
+      "enabled": true
+    },
+    {
+      "id": "food",
+      "nameRu": "На еду",
+      "descriptionRu": "Кончить на еду (дальше — ступень cumplay).",
+      "tags": ["cei", "food"],
+      "enabled": true
+    },
+    {
+      "id": "drink",
+      "nameRu": "В напиток",
+      "descriptionRu": "Кончить в напиток (сок, кофе, вода…) — дальше cumplay с глотком.",
+      "tags": ["cei", "drink"],
+      "enabled": true
+    },
+    {
+      "id": "feet",
+      "nameRu": "На стопы",
+      "descriptionRu": "Кончить на ноги / стопы.",
+      "tags": ["feet"],
+      "enabled": false
+    },
+    {
+      "id": "face",
+      "nameRu": "На лицо",
+      "descriptionRu": "Facial — кончить на лицо (зеркало / поза).",
+      "tags": ["facial"],
+      "enabled": true
+    },
+    {
+      "id": "chest",
+      "nameRu": "На грудь / живот",
+      "descriptionRu": "Кончить на грудь, живот или торс.",
+      "tags": ["basic"],
+      "enabled": true
+    },
+    {
+      "id": "toy",
+      "nameRu": "На / в игрушку",
+      "descriptionRu": "Кончить на игрушку или внутрь (дилдо, туннель и т.п.).",
+      "tags": ["toy"],
+      "enabled": true
+    },
+    {
+      "id": "floor",
+      "nameRu": "На пол",
+      "descriptionRu": "Кончить на пол — без сбора, «впустую» относительно cumplay.",
+      "tags": ["deny_adjacent"],
+      "enabled": true
+    }
+  ]
+}

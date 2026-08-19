@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3a1810"/>
+      <stop offset="100%" stop-color="#1a0c08"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#g)"/>
+  <rect x="80" y="60" width="800" height="420" rx="12" fill="#2a1410" stroke="#c45c26" stroke-width="3"/>
+  <text x="480" y="250" text-anchor="middle" fill="#ffe8dc" font-family="Georgia, serif" font-size="36">Hu Tao  Clear CG</text>
+  <text x="480" y="300" text-anchor="middle" fill="#c4a090" font-family="sans-serif" font-size="18">0<5=8 D09; 2 Ember Editor � Arts</text>
+</svg>

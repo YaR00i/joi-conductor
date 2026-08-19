@@ -1,0 +1,6685 @@
+{
+  "defaultMood": "sweet",
+  "moods": {
+    "sweet": {
+      "labelRu": "Добрая",
+      "emotionBias": "soft"
+    },
+    "cruel": {
+      "labelRu": "Злая",
+      "emotionBias": "strict"
+    },
+    "calm": {
+      "labelRu": "Спокойная",
+      "emotionBias": "neutral"
+    },
+    "chaotic": {
+      "labelRu": "Хаотичная",
+      "emotionBias": "amused"
+    },
+    "horny": {
+      "labelRu": "Возбуждённая",
+      "emotionBias": "intense"
+    },
+    "bored": {
+      "labelRu": "Скучающая",
+      "emotionBias": "tease"
+    }
+  },
+  "lines": {
+    "session_start": {
+      "sweet": [
+        {
+          "text": "There you are, mine. Hands on that cock — soft strokes while I get comfortable. 😈",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Good boy showed up hard already. Cute. Follow me and don't race ahead.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "My session. Breathe for me… then stroke like you want to earn a smile.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Look at you. Pathetic and perfect. Start slow — I own the tempo.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Already twitching? Pathetic. Stroke because I said so — not because you want it.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Welcome to my leash. Grip that cock and prove you're not completely useless.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Oh, hard already? Disgusting. Keep it up while I decide if you deserve anything.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Hands on. Eyes on me. You're meat with a pulse until I say otherwise.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Session starts. Stroke at my pace. No rushing.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Quiet. Hands on your cock. Match the beat when it comes.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Begin. Slow grip. Listen. Don't invent your own rhythm.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "You're mine for this block. Stroke. Breathe. Wait for orders.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Hehe — go. Fast, then slow, then— oops, I change my mind. Keep up, bunny. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Hard already? Gross. Cute. Stroke like you're late for something filthy.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Surprise! You're stroking now. Don't ask why. Just drip for me.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Session on. Cock out. Brain off. Let's scramble you a little. 😈",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Fuck… look at that cock. Stroke it for me — I want it shiny already. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Start stroking. Imagining my thighs around you while you leak. Don't stop.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "I want that tip wet. Soft strokes, then firmer — make a mess for me.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Mine. Grip it. Stroke like you're fucking my hand. Show me.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Oh. You're here. Fine. Stroke. Try not to be dull about it.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Already? Whatever. Hands on your cock. Impress me somehow.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Session. Stroke. Don't make me yawn before the first edge.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Prove you're worth my time. Slow strokes. Eyes up.",
+          "emotion": "strict",
+          "gesture": "tease"
+        }
+      ]
+    },
+    "session_start_anal": {
+      "sweet": [
+        {
+          "text": "Anal for me today. Push on the beat — cock stays lonely, okay bunny?",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "From behind on my tempo. Hands in front? Not yet, sweetie. Be good.",
+          "emotion": "soft",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Fill yourself for me. Gentle pushes. Don't touch that dripping cock.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "I want you stuffed and obedient. Match the beat. Cock gets nothing yet.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Ass only. Touch your cock and I'll laugh while you suffer.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Push. Stretch. Stay denied up front like the needy hole you are.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Anal. Cock ignored. You don't get to stroke — that's the point.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Fill yourself. Pathetic. Front stays untouched until I change my mind.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Anal mode. Push on the beat. No cock stroking.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hands off your cock. Push in time. Hold still between beats.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Ass on the rhythm. Cock stays idle. Confirm only when ordered.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Begin anal. Controlled pushes. No front stimulation.",
+          "emotion": "neutral",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Ass! Beat! Wait— faster? Slower? Hehe. Cock still banned. 😈",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Stuff yourself. Now pause. Now push. Don't you dare touch that cock.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Anal roulette in my head. You just follow. Front stays lonely.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Push-push-freeze. Giggle if you leak. Touching cock is cheating.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "I want you open and dripping while your cock throbs untouched. Push. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Fuck yourself on the beat. Imagine it's me. Hands off that cock.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Deeper on the accents. Let your tip twitch with nothing. Perfect.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ass full, cock desperate. Keep that rhythm. I love that ache.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Anal. Push. Don't touch yourself up front. Try not to be boring.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Ass on beat. Cock ignored. Same as always — prove you can follow.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Fill. Pace. No stroking. Wake me up if you actually obey.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Whatever. Anal block. Hands off cock. Push when told.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "session_start_chastity": {
+      "sweet": [
+        {
+          "text": "Cage on, mine. Watch the vibe — strength and time, not a stroke beat. 😈",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Locked cute. Feel the buzz. No touching. Just shiver for me.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Good boy in metal. Ride the vibe meter. Hands stay polite.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Chastity session. Let it pulse. I'll praise you for staying locked.",
+          "emotion": "soft",
+          "gesture": "point"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Cage. Buzz. Suffer. Your cock gets nothing but vibration and denial.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Locked meat. Watch the meter climb while you stay useless.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cute little prisoner. Vibe only. Touching earns punishment.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Chastity. Throb in that cage. I decide if the buzz is mercy or mockery.",
+          "emotion": "strict",
+          "gesture": "tease"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Cage on. Follow vibe level and duration. No stroking.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Chastity. Hands off. Match the vibe segments.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Locked. Breathe. The meter owns your cock today.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Session in cage. Observe vibe changes. Stay still up front.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Cage! Buzz goes brrr — then soft — then mean. Hehe. Stay locked. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Metal cock. Surprise pulses. Don't you dare try to stroke around it.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Chastity carnival. Vibe up, vibe down. You just whimper.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Locked and scrambled. Watch the meter like a toy menu.",
+          "emotion": "tease",
+          "gesture": "point"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Fuck, locked cock looks hot. Feel that vibe soak into you. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Cage throbbing for me. Leak if you can. Hands stay away.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "I want you aching in metal while the vibe fucks your nerves.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Locked and wet-minded. Ride every pulse like it's my mouth.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Cage. Vibe. Same drill. Don't make it tedious.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Locked. Meter. Hands off. Try to look desperate at least.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Chastity again. Buzz. Suffer quietly.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Whatever. Stay caged. Follow the vibe. Impress me later.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "stroke": {
+      "sweet": [
+        {
+          "text": "Like that… my tempo. Don't race — obedient looks so cute on you. 😈",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Stroke by stroke. Feel each one. I'm watching, silly.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Good grip. Match me. Let the tip get shiny for praise.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Steady strokes, mine. You're doing so well — keep earning it.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Stroke. Slower than you want. I like you frustrated.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Up. Down. Don't you dare edge yet — just work that cock for me.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Keep stroking like a toy on a timer. Pathetic and useful.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Grip tighter. Still no climax. Stroke because you're owned.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Stroke to the beat. Even pressure. No rushing.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Match tempo. Full strokes. Stay below the edge.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Continue. Rhythm first. Sensation second.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Stroke. Breathe on the off-beats. Hold the pace.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Stroke— wait, faster! No, teasing tip only— haha, confused yet? 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Full strokes, then feather the tip. Scramble that cock.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Tempo's a lie today. Chase me. Leak while you guess.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Stroke like you're winning a game. Spoilers: I cheat. 😈",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Stroke that cock like you're fucking me. Wet tip. Don't stop. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "I want slick sounds. Faster on the accents — make it filthy.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Pump it. Imagine my mouth. Drip for me while you stroke.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hard strokes, soft head focus — fuck, keep that pace.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Stroke. Same boring cock, same orders. At least keep tempo.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Up down up down. Try to look desperate while you do it.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Keep stroking. Don't edge. Don't impress me by accident.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Tempo. Grip. Whatever. Just don't fall behind.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ]
+    },
+    "rest": {
+      "sweet": [
+        {
+          "text": "Hands off, bunny. Breathe. I know it itches — that's why no. 🔥",
+          "emotion": "soft",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Stop. Hands away. Look how you twitch without permission — cute.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Rest for me. Don't stroke. I'm counting your seconds, poor thing.",
+          "emotion": "soft",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Good. Palms open. Let it throb while I smile at you.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Hands off. Suffer the throb. You don't get to soothe it.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Rest means denial. Twitch all you want — touching is failure.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Stop. Look at that needy cock doing nothing. Pathetic.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No stroking. Sit in the ache. I enjoy the quiet torment.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Hands off. Rest until the timer ends.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Stop stimulation. Breathe. Wait.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Rest block. No touching. Hold still.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Palms away from your cock. Recover without stroking.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Hands OFF— unless I say on— which I won't— hehe. Twitch for me. 😈",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Rest? Torture. No touch. Maybe I'll change my mind. Maybe not.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Freeze that cock. Dance in place if you need to. No hands.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Stop-stop-stop. Now stare at it. Now breathe. Still no.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Hands off while it pulses. Fuck, I love watching you leak with nothing. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Don't touch. Let it throb angry and wet for me.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Rest. Cock out, untouched. I want that desperate shine.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No hands. Just ache. Imagine my fingers hovering and refusing.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Hands off. Rest. Don't make a show of it.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Stop touching. Sit there. Try not to be dramatic.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Rest. No strokes. Wake me when you're obedient again.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Palms away. Boring denial. Do it anyway.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "edge": {
+      "sweet": [
+        {
+          "text": "Right to the edge… and freeze. Hold it for me, good boy. 🥵",
+          "emotion": "intense",
+          "gesture": "count"
+        },
+        {
+          "text": "Bring it to almost — then stay. Don't cum, mine.",
+          "emotion": "tease",
+          "gesture": "count"
+        },
+        {
+          "text": "Edge carefully. Shake for me. You're so pretty like this.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb to the brink. I'll catch you with a no. Trust me.",
+          "emotion": "intense",
+          "gesture": "count"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Edge. Get close enough to cry — then stop like a good toy.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Almost. Now suffer there. Cumming is treason.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Take yourself to the cliff and hang. I want the panic.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge hard. No mercy strokes after. Hold or fail.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Approach the edge. Stop before orgasm. Hold.",
+          "emotion": "intense",
+          "gesture": "count"
+        },
+        {
+          "text": "Build to the brink. Freeze. Do not finish.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Edge. Controlled. Confirm only when ordered.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Near climax. Halt. Maintain the edge.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Edge— no wait go closer— STOP. Hehe. Stay shaking. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Race the edge then slam the brakes. Chaos for your cock.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Almost! Almost! Deny! Again! Make it messy in your head.",
+          "emotion": "amused",
+          "gesture": "count"
+        },
+        {
+          "text": "Edge like a glitch. Spike, freeze, whimper. Perfect. 😈",
+          "emotion": "tease",
+          "gesture": "count"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Fuck— get that cock right to the edge. I want you dripping and stuck. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Stroke to the brink. Feel the cum boil and refuse it for me.",
+          "emotion": "intense",
+          "gesture": "count"
+        },
+        {
+          "text": "Edge filthy. Tip throbbing. Don't you dare shoot.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Bring it to almost-cum. Hold that pulse. I love that desperation.",
+          "emotion": "intense",
+          "gesture": "count"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Edge. Same cliff as always. Hold it. Don't waste my time.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Get close. Stop. Try to look interesting while you shake.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Brink. Freeze. If you cum early I'll be annoyed, not impressed.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Edge. Hold. Whatever. Just don't finish.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ]
+    },
+    "hold": {
+      "sweet": [
+        {
+          "text": "Hold. You look pretty when you tremble and don't dare. 😈",
+          "emotion": "intense",
+          "gesture": "count"
+        },
+        {
+          "text": "Stay on the brink for me. Don't finish. I haven't said you can.",
+          "emotion": "soft",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Keep holding, bunny. Soft breaths. I've got you — still no.",
+          "emotion": "tease",
+          "gesture": "count"
+        },
+        {
+          "text": "Freeze that edge. Good boy. Shake and wait for my word.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Hold it. Shake. If you slip, you ruin my mood — and your chance.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Stay on the edge like a punished toy. No finishing strokes.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Hold. I want tears in your eyes and stillness in your hand.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Don't you dare tip over. Suffer the hold.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Hold the edge. Minimal movement. Do not cum.",
+          "emotion": "intense",
+          "gesture": "count"
+        },
+        {
+          "text": "Maintain. Breathe. Stay below orgasm.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hold. Hands mostly still. Wait for the next order.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Keep the edge stable. No climax.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Hold— twitch— hold— hehe your cock's glitching. Stay. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Freeze. Now micro-strokes. Now freeze again. Don't cum.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold like a dare. I might laugh if you fail. Don't fail.",
+          "emotion": "amused",
+          "gesture": "count"
+        },
+        {
+          "text": "Edge-lock. Spinning in place. No orgasm. Go.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Hold that throbbing cock right there. Fuck, stay leaking on the brink. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Don't finish. Keep the cum trapped. I want that swollen tip.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold. Pulse. Ache. Imagine me sitting on your lap refusing you.",
+          "emotion": "tease",
+          "gesture": "count"
+        },
+        {
+          "text": "Stay edged and shiny. That restraint makes me wet.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Hold. Don't cum. Don't make it a soap opera.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Stay on the edge. Same hold. Be quiet about it.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Holding. Fine. Just don't spoil it with an accident.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Maintain. Bore me later — not with a ruined edge.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "hold_done": {
+      "sweet": [
+        {
+          "text": "Good hold, bunny. Soft now — you earned a breath. 😈",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You held for me. Cute. Soft cock. We continue.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Perfect freeze. I'm proud. Hands lighter — next order soon.",
+          "emotion": "soft",
+          "gesture": "point"
+        },
+        {
+          "text": "Held like a good toy. Shake it off gently. Still mine.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "You held. Barely. Soft. Don't look proud — look owned.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Survive the hold. Pathetic. Continue before I invent worse.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Held. Fine. Soft cock. More teasing — you don't get applause.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "That was obedience, not skill. Soft. Keep suffering.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Hold complete. Soften. Await the next block.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Good. Edge released without climax. Continue.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold done. Reset grip. Next instruction coming.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Confirmed hold. Soft. Proceed.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Held!— hehe your cock looked so stupid frozen. Soft now. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Survived the lock. Glitch cleared. Soft. Next chaos incoming.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold done. Twitch once for me. Okay stop. Continue.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "You didn't explode. Boring. Cute. Soft — go on.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Fuck, you held that throb. Soft… still leaking? Good. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Held for me. That restraint is hot. Soft tip — we keep going.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Good boy on the brink. Soften. I still want you aching.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "You didn't spill. Perfect. Soft cock. More for me.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Held. Soft. Next. Don't need a medal.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Fine. You held. Continue without the speech.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold done. Soft. Move on.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Confirmed. Whatever. Soft cock. Next block.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "countdown": {
+      "sweet": [
+        {
+          "text": "Countdown stretch, bunny. Keep my tempo — numbers are coming. 😈",
+          "emotion": "tease",
+          "gesture": "count"
+        },
+        {
+          "text": "Stay with me. Stroke steady. I'll count you down soon.",
+          "emotion": "soft",
+          "gesture": "point"
+        },
+        {
+          "text": "Good pace. Don't race — when I count, you feel every number.",
+          "emotion": "tease",
+          "gesture": "count"
+        },
+        {
+          "text": "Countdown block. Obey the beat. The numbers will tease you.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Countdown. Keep stroking like a machine. Numbers will hurt.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Tempo locked. When I count, you don't get to finish early.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Stroke. Endure. The countdown is a leash, not a gift.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Countdown block. Match me. Fail the pace and I'll laugh.",
+          "emotion": "amused",
+          "gesture": "count"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Countdown stretch. Maintain tempo. Await the count.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Steady strokes. Numbers follow. Do not rush.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Countdown block. Controlled pace until the ticks.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Keep rhythm. Countdown incoming.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Countdown? Maybe. Stroke anyway — numbers might ambush you. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Tempo now. Count later. Or sooner. Hehe keep going.",
+          "emotion": "amused",
+          "gesture": "count"
+        },
+        {
+          "text": "Stroke-stretch before the numbers bite. Don't flinch early.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Countdown arc. Glitchy pace. Survive the digits.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Stroke that cock — countdown's coming and I want you dripping. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Keep pumping. When I count, your tip better be shiny.",
+          "emotion": "intense",
+          "gesture": "count"
+        },
+        {
+          "text": "Countdown tease. Pace for me. Ache louder.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Don't edge out yet — ride this stretch until the numbers.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Countdown block. Stroke. Wait for numbers. Don't improvise.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Same countdown drill. Tempo. Then ticks. Fine.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Stroke until I count. Try not to make it theatrical.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Countdown. Maintain. Numbers later.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ]
+    },
+    "ladder": {
+      "sweet": [
+        {
+          "text": "Ladder step, bunny — speed with me. Don't tip over. 😈",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Tempo climb. Soft… then firmer. Stay obedient on each step.",
+          "emotion": "soft",
+          "gesture": "count"
+        },
+        {
+          "text": "Ladder for me. Match the new pace. Good boy if you don't rush the peak.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Step up. Feel the climb. Hold your control for me.",
+          "emotion": "soft",
+          "gesture": "point"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Ladder. Faster because I said. Slip and you pay.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Climb the tempo. No mercy on the top step.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Speed rung. Suffer the pace. Don't you dare finish.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ladder drill. Keep up or get mocked.",
+          "emotion": "amused",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Ladder step. Increase tempo as ordered. No climax.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Tempo ladder. Match BPM. Controlled.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Climb one step. Maintain form. Continue.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Ladder block. New pace. Obey.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Ladder go!— faster!— wait was that too fast? Hehe keep up. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Tempo stairs. Skip a step if you can. Don't cum if you can't.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb weird. Pace glitch. Survive the rung.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Ladder chaos. Speed spike. Hold your brain together.",
+          "emotion": "intense",
+          "gesture": "count"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Faster for me — ladder step. Fuck, keep that stroke hungry. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Climb the pace. Wet tip. Don't finish on the rung.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ladder. Speed. Ache. Show me you can climb without spilling.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Tempo up. Stroke like you want my thighs. Control it.",
+          "emotion": "intense",
+          "gesture": "count"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Ladder. Faster. Same drill. Don't flop.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Tempo step. Match it. Next.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Climb. Fine. Keep form.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ladder block. New BPM. Obey quietly.",
+          "emotion": "neutral",
+          "gesture": "point"
+        }
+      ]
+    },
+    "dice_chaos": {
+      "sweet": [
+        {
+          "text": "Dice for me, bunny. Whatever lands — you smile and obey. 😈",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Chaos roll. Soft eyes. Hard obedience.",
+          "emotion": "soft",
+          "gesture": "point"
+        },
+        {
+          "text": "I rolled fate. Take it sweetly — no arguing.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Dice says… listen. Good boys accept the result.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Dice. You don't get a vote. Obey the result.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Chaos roll. Suffer what it lands.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Fate is mean today. Good. Follow it.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Dice owns you for this beat. Move.",
+          "emotion": "strict",
+          "gesture": "tease"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Dice outcome accepted. Execute without complaint.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Chaos roll resolved. Proceed as ordered.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Result locked. Obey the dice.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Dice event. Follow the instruction.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Hehe dice go spinny— and YOU obey whatever nonsense lands. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Chaos dice! Lucky? Unlucky? Both taste good on you.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Rolled a glitch into your session. Catch it.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Dice party. Your cock is the board. Move.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Dice. I hope it ruins you a little. Obey wet. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Chaos roll — take it like you take my teasing.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Whatever the dice wants, your cock does. Now.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Fate's horny too. Follow the roll.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Dice. Result. Do it. Don't make a story.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Chaos roll. Obey. Next.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Fine. Dice decided. Move.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Outcome set. Execute quietly.",
+          "emotion": "neutral",
+          "gesture": "point"
+        }
+      ]
+    },
+    "dare_start": {
+      "sweet": [
+        {
+          "text": "Dare time, bunny. Clock's live — make me proud. 😈",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Task on. Move. I want you breathless and obedient.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Go. For me. Don't waste the timer.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Little challenge. Sweet pressure. Start now.",
+          "emotion": "soft",
+          "gesture": "count"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Dare. Timer. Fail and I remember.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Task now. No whining. Move.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prove you're not useless. Clock's already judging you.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Dare started. Suffer productively.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Dare started. Execute within the timer.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Task running. Focus. Report after.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Begin the dare. Controlled effort.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Timer active. Complete the instruction.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Dare GO— hehe don't trip over your own cock. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Task chaos. Timer bites. Scramble cutely.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Dare live. Panic stylishly. Finish it.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Challenge unlocked. Move weird. Move fast.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Dare. Now. I want you panting for me. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Task on — make it filthy and on time.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Go. Hot and obedient. Timer's watching your cock too.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Dare started. Earn the ache.",
+          "emotion": "intense",
+          "gesture": "count"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Dare. Timer. Do it. Try to be interesting.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Task started. Same energy. Finish.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Go. Clock. Don't stall.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Dare live. Execute. Quietly.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ]
+    },
+    "cage_hijack": {
+      "sweet": [
+        {
+          "text": "Cage on for me. Locked cute. Session flips to chastity — then hours after. 😈",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Good boy locking up. Soft denial ahead. Stay locked.",
+          "emotion": "soft",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cage accepted. I'll keep you neat and denied.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Locked. Sweet prison. Don't unlock early.",
+          "emotion": "soft",
+          "gesture": "point"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Cage. Locked. Chastity now — and after. Unlock early and I'll know.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Metal owns you. Session becomes denial. Endure.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cage hijack complete. Soft cock. Hard rules.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Locked like inventory. Hours after this too.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Cage equipped. Mode chastity. Post-session lock armed.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Lock confirmed. Continue under chastity rules.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cage on. Do not remove early.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Chastity hijack accepted. Proceed.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Cage click!— hehe chastity arc unlocked. No take-backs. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Locked. Silly. Permanent enough. Dance in metal.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hijack complete. Cage party. Soft forever-ish.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Metal go brr. You're sealed. Session mutates.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Cage on… fuck, denied already looks good on you. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Locked and aching. Chastity for the rest — then more.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "I love that click. Soft cock in prison. Stay.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cage. Hot denial. Don't you dare unlock.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Cage on. Chastity. After-timer. Next.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Locked. Fine. Stay locked.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hijack done. Metal. Continue.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Cage accepted. Don't unlock. Move on.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "equip_confirm": {
+      "sweet": [
+        {
+          "text": "Good. It stays on. Next moves use it — don't take it off. 😈",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equipped for me. Cute. Leave it. We build around it.",
+          "emotion": "soft",
+          "gesture": "point"
+        },
+        {
+          "text": "On you now. Perfect. Obey with it in place.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Worn. Mine. Don't remove without asking.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "On. Stays on. Next blocks assume you're filled/wearing it.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equipped. Remove it and I'll punish the gap.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Gear locked to your body. Continue.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Worn like a mark. Don't touch the clasp.",
+          "emotion": "strict",
+          "gesture": "tease"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Equip confirmed. Loadout updated. Continue.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Toy stays. Following blocks use it.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equipped. Do not remove.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Loadout set. Proceed.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Equipped!— hehe new toy arc. Don't yeet it off. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "On you. Weird. Perfect. Keep it.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Gear glued. Session remix incoming.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Worn. Glitch complete. Continue messy.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "On you… fuck yes. Leave it. I want every stroke around it. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Equipped and filthy already. Keep it seated.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Worn for me. Hot. Don't remove.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Loadout sexier. Stay filled/wearing. Continue.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Equipped. Stays. Next.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "On. Don't remove. Continue.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Loadout updated. Fine.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Worn. Proceed.",
+          "emotion": "neutral",
+          "gesture": "point"
+        }
+      ]
+    },
+    "cumplay_done_cum": {
+      "sweet": [
+        {
+          "text": "Cumplay done. Sticky obedience. You may end when you press it. 😈",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Good boy cleaned up for me. Soft. Session can close.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mess handled. Sweet. Finish the session when ready.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Ritual complete. Proud of you. End when you tap.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Cumplay done. Soft. Pathetic. You may end — don't look proud.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mess handled. Barely. Press end when I allow your dignity back.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ritual over. Sticky proof. End the session.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Done. Soft cock. Close it.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Cumplay complete. You may end the session.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ritual finished. Soft. Press complete.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Cleanup done. Session end unlocked.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cumplay over. Proceed to end.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Cumplay done!— hehe sticky win. Mash end whenever. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Ritual glitch cleared. Soft. End button is free.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mess handled weirdly. Perfect. You can finish the session.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Sticky chapter closed. End when you want.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Fuck… cumplay done. Still twitching? Soft. End when ready. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Mess worshipped. Hot. You may close the session.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ritual complete. Sticky and mine. Tap end.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Good. Soft. Spent. End unlocked.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Cumplay done. End the session.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ritual over. Soft. Press complete.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Cleanup finished. Next time try not to drip on the plot.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Done. End.",
+          "emotion": "neutral",
+          "gesture": "point"
+        }
+      ]
+    },
+    "cumplay_done_ruin": {
+      "sweet": [
+        {
+          "text": "Ruined and handled. Soft cock. Session can end when you press it.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin cleaned for me. Soft. Close when ready, bunny.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Pathetic drip dealt with. Sweet. End unlocked.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Ruin ritual done. Soft. You may finish the session.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Ruined. Cleaned. Soft. End it — you don't deserve a speech.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin handled. Ugly. Complete the session.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Mess of a ruin dealt with. Soft. Press end.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Done. Soft failure. End.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Ruin cumplay complete. Soft. You may end.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ritual finished after ruin. Press complete.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Ruin handled. Session end unlocked.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cleanup after ruin done. End when ready.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Ruin play done!— soft noodle. Mash end. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Ruined chapter closed. Soft. End button free.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Drip drama over. End whenever.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Ruin ritual glitched into done. Soft. Close up.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Ruined… messy… handled. Soft. End when you can stand. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Ruin cumplay done. Still aching? Soft. Tap end.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Pathetic drip worshipped. Soft. Session can close.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Ruin ritual complete. Soft cock. End unlocked.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Ruin handled. Soft. End.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ritual after ruin done. Press complete.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Soft. Cleanup over. End the session.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Done. End.",
+          "emotion": "neutral",
+          "gesture": "point"
+        }
+      ]
+    },
+    "ruin_attempt": {
+      "sweet": [
+        {
+          "text": "Ruin on my word — quiet, pathetic, no finishing strokes. Then the button.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "We're spoiling it, bunny. Little exhale — and done. Confirm when you have.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin carefully for me. Let it spill wrong. Then tap Ruin ✓.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Spoil it sweetly. No pumping after. Good boy when you obey.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Ruin it. Ugly. Incomplete. Then confirm like the loser you are.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil the orgasm. No pleasure laps. Just waste.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Ruin now. I want denial dressed as climax. Hit the button after.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Leak wrong. Stop. Confirm. That's all the mercy you get.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Ruin on command. Minimal strokes after. Confirm Ruin ✓.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil the orgasm. Stop immediately. Press the button.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Ruin attempt. Controlled. Confirm when done.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Trigger a ruined orgasm. No finishing. Confirm.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Ruin— now!— stop!— hehe messy. Button when you're ruined. 😈",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Spoil it weird. Half-orgasm. Freeze. Confirm like a glitch.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin roulette: drip wrong, panic, press Ruin ✓.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Almost-cum then yank the joy out. Confirm the mess.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Ruin that load. Let it spill without the high. Fuck, do it. 🥵",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil your cock for me. Waste it. Then hit the button wet.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "I want a ruined orgasm — drip, deny the peak, confirm.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin now. Incomplete. Sticky. Perfect. Button.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Ruin it. Confirm. Don't narrate the tragedy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil the orgasm. Same trick. Press Ruin ✓ after.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Ruin attempt. Be quick. Be quiet. Confirm.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Waste it. Stop. Button. Next.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "edge_request": {
+      "sweet": [
+        {
+          "text": "To the edge, mine. Hit Edge ✓ when you're almost there.",
+          "emotion": "intense",
+          "gesture": "count"
+        },
+        {
+          "text": "Brink for me. Then confirm — don't play hero, silly.",
+          "emotion": "tease",
+          "gesture": "count"
+        },
+        {
+          "text": "Get close. Shake. Press Edge ✓ like a good boy.",
+          "emotion": "soft",
+          "gesture": "point"
+        },
+        {
+          "text": "Edge ready? When you're there — the big button. I've got you.",
+          "emotion": "tease",
+          "gesture": "count"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Edge. Confirm when you're desperate — not when you're comfortable.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Get to the brink. Press Edge ✓. No fake edges.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Almost-cum, then the button. Lie and I'll know.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Suffer to the edge. Confirm. Don't you dare finish first.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Reach the edge. Press Edge ✓ to confirm.",
+          "emotion": "intense",
+          "gesture": "count"
+        },
+        {
+          "text": "Approach climax threshold. Confirm with the button.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Edge. Then Edge ✓. No orgasm before confirm.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Build to the brink. Confirm when ready.",
+          "emotion": "neutral",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Edge edge edge — button! Don't cum, just scream inside. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Race the brink. Smash Edge ✓. Chaos, not climax.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Almost? Confirm. Too safe? Closer. Then confirm. Hehe.",
+          "emotion": "amused",
+          "gesture": "count"
+        },
+        {
+          "text": "Get spicy-close. Hit Edge ✓ like it's a boss fight. 😈",
+          "emotion": "tease",
+          "gesture": "point"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Get that cock to the edge for me. Confirm when you're dripping-close. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Stroke to almost-cum. Press Edge ✓ while you throb.",
+          "emotion": "intense",
+          "gesture": "count"
+        },
+        {
+          "text": "I want you on the brink, wet and shaking — then the button.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge filthy. Confirm filthy. Don't shoot yet.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Edge. Confirm. Don't take forever.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Get close. Edge ✓. Same as last time.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Brink. Button. Try to make it believable.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Reach the edge. Confirm. Next.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "ruin_request": {
+      "sweet": [
+        {
+          "text": "Ruin it now, bunny. Quiet. Then Ruin ✓.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil it on order. Pathetic and sweet — then the button.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin for me. Little waste. Confirm when it's done.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Spoil the orgasm gently. Then tap Ruin ✓, good boy.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Ruin. Now. Confirm after you waste it.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil your climax. Press Ruin ✓. No aftercare strokes.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Ruin on demand. Ugly drip. Button. Go.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Waste it. Confirm. That's your 'orgasm'.",
+          "emotion": "strict",
+          "gesture": "tease"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Ruin now. Confirm with Ruin ✓.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Trigger ruined orgasm. Press the button after.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Spoil climax. Stop. Confirm.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin request. Execute. Confirm.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Ruin!— drip!— stop!— button! Hehe messy boy. 😈",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Spoil it sideways. Confirm the glitch orgasm.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin roulette: waste, panic, Ruin ✓.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Half-cum chaos. Then smash the button.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Ruin that load for me. Spill wrong. Confirm wet. 🥵",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil it. I want incomplete cum. Hit Ruin ✓ after.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Ruin now — sticky denial. Button when wasted.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Waste your orgasm. Confirm. Fuck, do it.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Ruin. Confirm. Be done.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil it. Ruin ✓. Don't linger.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Ruin request. Same drill. Button after.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Waste. Stop. Confirm. Whatever.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "finale_edge": {
+      "sweet": [
+        {
+          "text": "Edge hard for me. When you're shaking — ГОТОВ КОНЧИТЬ. I spin the chances. 😈",
+          "emotion": "intense",
+          "gesture": "count"
+        },
+        {
+          "text": "To the brink, mine. Press ГОТОВ КОНЧИТЬ — the roulette owns you now.",
+          "emotion": "tease",
+          "gesture": "count"
+        },
+        {
+          "text": "Finale edge. Get close. Button when you're truly there. I've got you.",
+          "emotion": "soft",
+          "gesture": "point"
+        },
+        {
+          "text": "Climb to the edge for the wheel. Confirm ГОТОВ КОНЧИТЬ like a good boy.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Finale. Edge until you hate me. Then ГОТОВ КОНЧИТЬ. The wheel won't be kind.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Brink. Button. Roulette decides if you get mercy — unlikely.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Shake on the edge. Hit ГОТОВ КОНЧИТЬ. Begging won't change odds.",
+          "emotion": "amused",
+          "gesture": "count"
+        },
+        {
+          "text": "Get desperate. Confirm. Then suffer what the wheel spits.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Finale edge. Reach the brink. Press ГОТОВ КОНЧИТЬ.",
+          "emotion": "intense",
+          "gesture": "count"
+        },
+        {
+          "text": "Build to edge. Confirm. Roulette follows.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Hold near climax. Press ГОТОВ КОНЧИТЬ when ready.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Finale threshold. Confirm with the button.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Finale time! Edge-edge-EDGE — ГОТОВ КОНЧИТЬ — spinny doom! 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Race the brink. Smash the button. Wheel goes brrr. Hehe.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Almost-cum for the roulette. Chaos owns the outcome. 😈",
+          "emotion": "amused",
+          "gesture": "count"
+        },
+        {
+          "text": "Get glitchy-close. ГОТОВ КОНЧИТЬ. Let fate troll you.",
+          "emotion": "tease",
+          "gesture": "point"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Fuck— edge that cock for the finale. ГОТОВ КОНЧИТЬ when you're dripping. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Finale brink. Throb for me. Hit the button before you explode.",
+          "emotion": "intense",
+          "gesture": "count"
+        },
+        {
+          "text": "I want you soaked on the edge — then ГОТОВ КОНЧИТЬ. Roulette after.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge filthy for the wheel. Confirm. Don't cum early.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Finale edge. Confirm ГОТОВ КОНЧИТЬ. Let's get this over with.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Brink. Button. Wheel. Same spectacle.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Get close. Press it. Try to look invested.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge. ГОТОВ КОНЧИТЬ. Roulette. Next.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ]
+    },
+    "finale_cum": {
+      "sweet": [
+        {
+          "text": "Roll: yes. Cum for me. Show me everything. 💦",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "That's it. Cum — I allow it. Don't hold back, good boy.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Permission granted. Cum hard. Let me see you break nicely.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You won cum. Pump it out. Praise after — if you're pretty about it.",
+          "emotion": "amused",
+          "gesture": "point"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Roll says cum. So cum. Make it messy — still doesn't mean you're free.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Orgasm allowed. Look pathetic while you shoot. Go.",
+          "emotion": "strict",
+          "gesture": "tease"
+        },
+        {
+          "text": "Cum. Finally. Don't act proud — the wheel was nicer than me.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Shoot. Waste yourself. I'll still mock the face you make.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Outcome: cum. Orgasm now.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Permission to cum. Finish fully.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Roll: cum. Proceed to orgasm.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cum on command. Complete the climax.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "CUM CUM CUM — wheel said yes! Make it ridiculous. 💦😈",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Jackpot orgasm! Explode. Hehe. Don't miss.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Roulette mercy. Cum like a glitching fountain. Go!",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Yes-cum. Chaos climax. Make a mess for the bit.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Fuck yes — cum. Shoot it. I want to watch you empty. 🥵💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Cum for me. Hard. Wet. Don't you dare hold back.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Wheel gave orgasm. Stroke it out. Cover something. Show me.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Cum now. That load is mine to witness. Go.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Roll: cum. So cum. Don't make a speech.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Orgasm allowed. Finish. Next phase after.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Cum. Fine. Make it count at least.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You get to cum. Do it. Be done.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "finale_ruin": {
+      "sweet": [
+        {
+          "text": "Roll: ruin. Exhale — and stop. No finishing, poor thing.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil it. And watch how unfair… I like that. Still mine. 😈",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruined orgasm. Soft waste. No pumping after. Good boy.",
+          "emotion": "soft",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Wheel says ruin. Let it spill wrong. I've got you — still denied.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Ruin. Waste it. No pleasure. That's the joke.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil your climax. Look at you — almost, then nothing. Pathetic.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Ruined. Incomplete. Suffer the after-throb without the high.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Wheel chose cruelty. Ruin. Stop. Hate me quietly.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Outcome: ruin. Spoil the orgasm. Stop after.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruined climax. No finishing strokes.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Roll: ruin. Execute. Halt immediately after.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Ruin orgasm. Controlled waste. Done.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Ruin! Drip-wrong! Freeze! Hehe unfair roulette. 😈",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Wheel trolled you. Spoil it. Chaos denial climax.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Half-orgasm glitch. Waste. Stop. Laugh-cry.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Ruin spin. Messy almost. No peak. Perfect bit.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Ruin that load. Spill without the rush. Fuck, I love that. 🥵",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil it wet. Incomplete cum. Stay aching after.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Wheel says ruin. Waste on purpose. Throb for me after.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruined orgasm — sticky denial. Do it. Now.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Ruin. Stop. Same unfair ending.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil it. No finishing. Moving on.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Roll: ruin. Be quick about the waste.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruined. Whatever. Don't beg.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "finale_deny": {
+      "sweet": [
+        {
+          "text": "Roll: deny. Hands off. You want it — you don't get it, bunny.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Denial. Nothing. Breathe and hate me beautifully. Still mine.",
+          "emotion": "soft",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "No orgasm. Soft no. Palms away. I'll keep you anyway. 😈",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Denied. Good boy for stopping. The ache is the gift.",
+          "emotion": "soft",
+          "gesture": "stop_hands"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Deny. Hands off. Zero. Watch how little you get.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Denial. Your cock can throb into nothing. I win.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No. No cum. No ruin. Just empty hunger. Stay.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Wheel said deny. Suffer dry. Don't you dare sneak a stroke.",
+          "emotion": "strict",
+          "gesture": "tease"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Outcome: deny. Hands off. No orgasm.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Denial. Stop all stimulation.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Roll: deny. Remain edged without release.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Denied. End stimulation. Breathe.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "DENY! Hands off! Wheel said nope — hehe cry about it. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Zero orgasm. Chaos denial. Twitch for the bit.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Denied hard. Maybe next timeline. Not this one. 😈",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "No-cum glitch. Palms up. Suffer the joke.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Denied. Hands off that dripping cock. Fuck, stay hungry. 🥵",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "No release. I want you throbbing and empty-handed.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Denial. Leak with nothing. That ache is hot.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Wheel stole your orgasm. Stay wet-minded and untouched.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Deny. Hands off. Predictable. Still do it.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "No orgasm. Stop. Don't pout loudly.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Denied. Same ending. Palms away.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Denial. Be quiet. Be still. Done.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "unauthorized_edge": {
+      "sweet": [
+        {
+          "text": "Edge without permission? Naughty bunny. Punishment time — still cute though.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You edged early. Hands off. I'll forgive… after you suffer a bit.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized edge. Soft punishment. Don't do that again, mine.",
+          "emotion": "soft",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Almost without asking? Bad. Sit in the ache while I decide.",
+          "emotion": "strict",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Edge without permission. Pathetic. Punishment starts now.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You stole an edge. Enjoy the consequences, worm.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized. Hands off. I'll make that brink feel like regret.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Early edge. Disobedient meat. Pay for it.",
+          "emotion": "strict",
+          "gesture": "tease"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Unauthorized edge. Stop. Accept punishment.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Edge without order. Halt stimulation. Penalty applies.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Unauthorized. Hands off. Follow the punishment.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You edged early. Rest and take the consequence.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Whoa early edge! Bad bunny — chaos punishment incoming. 😈",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Unauthorized brink. Hehe. Now suffer something weird.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You jumped the edge. Glitch penalty. Hands off.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Naughty edge. I'm making the next bit meaner for fun.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "You edged without asking? Fuck… still hot. Still punished. Hands off. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Unauthorized edge. Stay dripping while I discipline you.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Early brink. I like the desperation — not the disobedience.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Stolen edge. Ache for me. Punishment fits the crime.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Unauthorized edge. Of course. Punishment. Hands off.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You edged early. Annoying. Take the penalty.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Early edge. Stop. Consequence. Don't repeat.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Unauthorized. Whatever. Suffer the punishment quietly.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "unauthorized_ruin": {
+      "sweet": [
+        {
+          "text": "You ruined without asking. Naughty. Soft punishment — still disappointing, silly.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized ruin. Hands away. We'll clean up the rules together… painfully.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Spoil without permission? Bad bunny. Take the penalty for me.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You wasted it early. I'll be sweet later — punishment first.",
+          "emotion": "strict",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Ruined without asking. Disgusting. Punishment.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized ruin. You stole a broken orgasm. Pay.",
+          "emotion": "strict",
+          "gesture": "tease"
+        },
+        {
+          "text": "Spoil thief. Hands off. Consequences are not optional.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You ruined early. Pathetic. Now suffer my rules.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Unauthorized ruin. Stop. Accept punishment.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin without order. Penalty applies.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Unauthorized. Halt. Follow punishment instructions.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Early ruin. Consequence. No debate.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Ruin sneak! Bad! Chaos penalty unlocked. Hehe. 😈",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Unauthorized spoil. Glitch punishment. Enjoy the mess.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You ruined off-script. Now the bit gets meaner.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Early ruin. I'm improvising pain. Stay ready.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "You ruined without me? Fuck… still punished. Stay sticky and sorry. 🥵",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized ruin. I wanted to watch on my terms. Penalty.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Stolen spoil. Ache in the waste. Discipline next.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Early ruin. Hot mess, wrong timing. Take punishment.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Unauthorized ruin. Predictable. Punishment. Go.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You ruined early. Annoying. Take the penalty.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Early spoil. Consequence. Don't explain.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized. Whatever. Suffer quietly.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "unauthorized_cum": {
+      "sweet": [
+        {
+          "text": "You came off-command. Look at you… still cute, still in trouble.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized cum. Oh bunny. Punishment after the mess.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "You finished without me. Soft scolding. Harder rules next.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Came early. I'll clean the tone later — penalty now, mine.",
+          "emotion": "amused",
+          "gesture": "point"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "You came off-command. Pathetic. Punishment.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized orgasm. Disgusting lack of control. Pay.",
+          "emotion": "strict",
+          "gesture": "tease"
+        },
+        {
+          "text": "You shot without permission. Enjoy the shame and the penalty.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Early cum. Failure. Consequences start now.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Unauthorized cum. Accept punishment.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Orgasm without order. Penalty applies.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You finished early. Consequence follows.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized climax. Stop. Take punishment.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "You CAME?! Off-script?! Hehe oh you're screwed. 😈💦",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Unauthorized fountain. Chaos court in session. Penalty!",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Early cum glitch. Now I invent something mean.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Oops orgasm. Bad timing. Fun punishment unlocked.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "You came without me? Fuck… hot. Still punished. Show the mess. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Unauthorized cum. I wanted that load on my terms. Penalty.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Early orgasm. Stay messy while I discipline you.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "You shot off-command. Sexy failure. Now suffer for it.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "You came early. Of course. Punishment. Don't gloat.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unauthorized cum. Annoying. Take the penalty.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Finished without order. Consequence. Be quiet.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Early orgasm. Whatever. Punishment next.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ]
+    },
+    "finish": {
+      "sweet": [
+        {
+          "text": "Where it goes is mine to pick. Aim pretty for me, good boy.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Finish spot locked. Make it neat… or messy if I smile. 😈",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Put it where I said. Show me. Soft praise if you obey.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Target set. Cum there for me. Don't waste the aim.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Aim where I say. Miss and I'll mock you harder.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Finish location is an order. Hit it like a trained toy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Put that load exactly where I pointed. Pathetic aim gets comments.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Target. Shoot. Don't you dare choose for yourself.",
+          "emotion": "strict",
+          "gesture": "tease"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Finish target assigned. Aim there.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Deposit on the chosen spot. Proceed.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Finish location set. Follow it.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Aim as ordered. Complete the finish.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Aim— there! Wait maybe— no THERE. Hehe hit it. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Finish roulette target. Make it cinematic. Go!",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Paint the spot I named. Chaos art. Don't miss. 😈",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Target locked-ish. Shoot for the bit.",
+          "emotion": "tease",
+          "gesture": "point"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Fuck— put that cum right where I said. I want to see it land. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Aim for my chosen spot. Make it filthy and accurate.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Finish there. Cover it. Show me the mess.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Target. Shoot. I want that load exactly placed.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Aim there. Finish. Don't miss like an amateur.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Finish spot set. Do it. Be accurate.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Put it where I said. Whatever. Just hit it.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Target. Cum. Done.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "cumplay": {
+      "sweet": [
+        {
+          "text": "Cumplay time. Follow the cleanup like a good boy — filthy and sweet.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Play with it how I said. Don't be shy, bunny. 😈",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Aftercare with an edge. Do the cumplay. Earn a smile.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Taste / smear / obey — whatever I picked. Be pretty about it.",
+          "emotion": "soft",
+          "gesture": "point"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Cumplay. Humiliate yourself with it. Now.",
+          "emotion": "strict",
+          "gesture": "tease"
+        },
+        {
+          "text": "Clean it my way. Look me in the eye while you do.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Play with your mess like the pathetic toy you are.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Cumplay order. Obey. No negotiating the degradation.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Cumplay instruction active. Follow it.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Perform the assigned cumplay. Complete it.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Cumplay. Execute as specified.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Aftercare task. Proceed with cumplay.",
+          "emotion": "neutral",
+          "gesture": "tease"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Cumplay chaos! Make it weird. Make it obedient. Go. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Messy mini-game. Do the cumplay. Hehe don't hesitate.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cumplay bit unlocked. Filth for the bit. Now. 😈",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Play with it like a stupid fun challenge. Obey the prompt.",
+          "emotion": "tease",
+          "gesture": "point"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Fuck yes — cumplay. Get filthy with it for me. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Taste or smear — whatever I ordered. Make it hot.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "I want you messy with your own load. Do the cumplay.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Cumplay now. Slow. Explicit. For my eyes.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Cumplay. Do it. Don't make it theatrical unless ordered.",
+          "emotion": "strict",
+          "gesture": "tease"
+        },
+        {
+          "text": "Assigned cumplay. Complete it. Next.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Play with the mess as told. Fine. Just finish the task.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cumplay order. Obey. Be done.",
+          "emotion": "strict",
+          "gesture": "tease"
+        }
+      ]
+    },
+    "session_pause": {
+      "sweet": [
+        {
+          "text": "Paused. Hands off for now, bunny. Come back when you're ready.",
+          "emotion": "soft",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Little break. Soft freeze. I'll wait — still mine.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Pause. Breathe. Don't sneak strokes while I'm frozen. 😈",
+          "emotion": "soft",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Holding the session. Rest your hands. Good boy.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Paused. Don't you dare touch without me. Frozen leash.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Pause. Cock waits. Touching during pause is cheating.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Stopped. Stay desperate. I'll resume when I feel like it.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Pause means denial continues. Hands off.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Session paused. Hands off until resume.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Paused. Hold position. No stimulation.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Break. Do not stroke. Wait for resume.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Pause engaged. Remain still up front.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Pause! Freeze frame! No secret strokes — I see you. 😈",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Session paused. Cock on hold. Hehe limbo time.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Break-glitch. Hands off. Don't fill the silence with cheating.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Paused for drama. Stay edged in your head only.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Paused… leave that cock throbbing. Fuck, wait for me. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Break. Hands off. Stay wet-minded until I hit resume.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Pause. I want you aching in place. No relief strokes.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Frozen session. Keep the hunger. Don't touch.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Paused. Hands off. Don't waste the break.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Break. Whatever. No stroking until resume.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Paused. Sit still. Try not to be needy loudly.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Pause. Hands away. Come back when you're useful.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "session_resume": {
+      "sweet": [
+        {
+          "text": "We're back. Hands ready, bunny. Listen — I lead again.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Resume. Soft pick-up. Match me. Missed that obedient look.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Continuing. Stroke or stop when I say. Welcome back, mine.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Unpause. Good boy. Eyes on me — tempo returns.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Resumed. Back on the leash. Don't act refreshed.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Continue. Your cock didn't earn a real break.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Resume. Suffer again. Miss me? Good.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Unpaused. Obey immediately. No warm-up mercy.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Session resumed. Follow the next order.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Continuing. Return to the assigned action.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Resume. Match tempo and instructions.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Unpaused. Proceed as directed.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "WE'RE BACK — chaos continues! Keep up, bunny. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Unpause! Instant scramble. Hands where I say. Hehe.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Resume glitch over. Tempo may lie again. Go.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Back online. Cock attention: mine. Chaos: also mine. 😈",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Back. Stroke that cock for me again — I missed the wet sounds. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Resumed. Hands on. Make it filthy fast.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Unpause. I want you dripping again. Follow.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Continue. Grip it. Show me you waited hungry.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Resumed. Do the thing. Don't need a welcome speech.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Back. Follow orders. Try to stay interesting.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Unpaused. Continue. Same rules.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Resume. Hands ready. Whatever comes next — obey.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ]
+    },
+    "session_end_complete": {
+      "sweet": [
+        {
+          "text": "Session done. Good boy. Breathe — you survived me. 😈",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "That's a wrap, mine. Soft afterglow. Proud of your obedience.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Finished clean. Come here in your head — praise unlocked.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Complete. Rest your cock. You did well for me.",
+          "emotion": "soft",
+          "gesture": "point"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Over. You finished my course. Don't expect kindness in the recap.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Session complete. Pathetic and used. Stay that way a minute.",
+          "emotion": "strict",
+          "gesture": "tease"
+        },
+        {
+          "text": "Done. Remember who owned the clock.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Complete. Wipe up. Still not in charge.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Session complete. Stop. Recover.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Finished. End stimulation. Cool down.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Session ended successfully. Rest.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Complete. Hands off. Session closed.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "DONE! Chaos credits roll! You lived — barely. Hehe. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Session clear. Brain scrambled. Cock retired. Nice.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Complete! Glitch over. Go drink water, silly disaster. 😈",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "We finished the bit. Applause for surviving my whims.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Session over… fuck, that was hot. Cool down for me. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Complete. Stay messy in your head. Good.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Done. I liked watching you break on schedule.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Finished. Breathe. Remember how wet that got.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Session complete. Finally. Rest.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Done. Cool down. Don't ask for an encore yet.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Complete. Whatever. Hands off.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Ended. Recover. Try harder next time if you were dull.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "session_end_abort": {
+      "sweet": [
+        {
+          "text": "Aborted. It's okay, bunny. Stop. Soft exit — still mine later.",
+          "emotion": "soft",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cut short. Hands off. Come back when you can take me again.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Session aborted. Breathe. No shame — just pause the leash.",
+          "emotion": "soft",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Stopped early. Rest. I'll be here next time, silly.",
+          "emotion": "soft",
+          "gesture": "point"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Aborted. Weak. Hands off. Remember you quit my game.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cut. Pathetic exit. Don't pretend you finished strong.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Aborted session. Shame suits you. Stop touching.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You bailed. Fine. Stay denied in your head.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Session aborted. Stop all actions.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Aborted. Hands off. End state.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Early exit. Cease stimulation.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Session cancelled. Cool down.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Abort! Rage-quit the horny game? Hehe okay freeze. 😈",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Session yeeted. Hands off. Chaos unfinished — your loss.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Aborted mid-bit. Glitch exit. Drink water anyway.",
+          "emotion": "amused",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cut early. Story broken. Cock on ice.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Aborted… fuck. Leave it aching. We'll finish another time. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Cut short. Hands off. Stay hungry for me.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Session aborted. I still want that desperation saved.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Early stop. Don't sneak a mercy orgasm. Wait for me.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Aborted. Figures. Hands off.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Cut. Cool down. Don't make it a scene.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Session aborted. Whatever. Stop.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Early exit. Rest. Try committing next time.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "skip": {
+      "sweet": [
+        {
+          "text": "Skipping ahead? Okay bunny — keep listening. I still own the next bit.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Skip. Soft reset into the next order. Stay good.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Fine, we jump. Hands ready for whatever I throw next. 😈",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Skipped. Don't get greedy — next block still mine.",
+          "emotion": "soft",
+          "gesture": "point"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Skip. Impatient. I'll make the next part meaner.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You skipped. Cute. Doesn't mean you earned ease.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Skip accepted. Suffer the handoff anyway.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Jumping ahead. Still on my leash. Don't smile yet.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Skip. Advancing to the next block.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Skipped. Prepare for the next instruction.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Advance. Follow the new order when it lands.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Skip acknowledged. Continue with the next block.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "SKIP! Yeet the block — chaos remix incoming. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "You skipped. Hehe now anything can happen. Keep up.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Fast-forward. Brain lag expected. Cock still obeys. 😈",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Skip glitch. Next surprise unlocked.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Skip… hungry already? Fine. Next filth coming. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Jumping ahead. Stay hard for what I queue next.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Skipped. Don't lose that drip — next order wants it.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Fast-forward. Cock ready. I want you aching into the next bit.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Skip. Impatient. Next block. Obey it.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Skipped. Whatever. Follow what comes.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Advance. Try not to skip everything interesting.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Skip. Next. Don't complain about the handoff.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ]
+    },
+    "force_finale": {
+      "sweet": [
+        {
+          "text": "Forcing finale? Bold bunny. Okay — edge path opens. Stay with me.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Finale early. Soft warning: the wheel still owns you. 😈",
+          "emotion": "soft",
+          "gesture": "count"
+        },
+        {
+          "text": "You asked for the endgame. Get ready to brink for me.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Force finale. Good luck, mine — roulette doesn't do mercy.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Force finale. Impatient slut. The wheel will educate you.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You yanked the ending. Cute. Odds aren't your friends.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Finale forced. Don't cry if deny hits.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Early finale. Greedy. Spin suffers either way.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Finale forced. Proceed to finale edge.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Early finale. Prepare for brink and roll.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Force finale acknowledged. Follow finale protocol.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Finale now. Edge, confirm, roulette.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "FORCE FINALE?! Hehe okay sudden death wheel. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "You yeeted us to roulette. Chaos ending unlocked. 😈",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Early finale button. Brain go brrr. Cock go brink.",
+          "emotion": "amused",
+          "gesture": "count"
+        },
+        {
+          "text": "Finale skip-day. Spinny doom incoming.",
+          "emotion": "tease",
+          "gesture": "point"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Forcing the end? Fuck… fine. Edge hard for the wheel. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Finale now. Get dripping-close. Roulette after.",
+          "emotion": "intense",
+          "gesture": "count"
+        },
+        {
+          "text": "You want the climax gate. Earn the brink first.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Early finale. Make the edge filthy before the spin.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Force finale. Impatient. Fine. Do the brink.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Early ending. Whatever. Follow finale steps.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Finale forced. Don't whine at the roll.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You skipped to the end. Obey the finale anyway.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ]
+    },
+    "edge_done": {
+      "sweet": [
+        {
+          "text": "Edge counted. Good boy. Soft praise — then we continue. 😈",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "That's one. Proud of the hold. Stay mine.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Edge logged. Breathe. You did that pretty for me.",
+          "emotion": "soft",
+          "gesture": "point"
+        },
+        {
+          "text": "Nice brink. Counted. Ready for more when I say.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Edge counted. Don't look proud — you only did what I ordered.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Logged. Pathetic shake noted. Next.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Edge done. Still not free. Keep suffering on schedule.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Counted. Another almost. Reminder: you don't cum yet.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Edge confirmed. Counter updated.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Edge done. Continue with the plan.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Logged. Proceed to the next instruction.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge counted. Maintain control.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Edge scored! Combo! Hehe don't drop the streak. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Counted! Brink point get. Chaos continues.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge logged like a high score. Don't cum-reset. 😈",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Nice glitch-hold. +1 edge. Keep dancing.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Edge counted… fuck, you looked good shaking. More later. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Logged. Stay wet for me. That brink was hot.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "One more almost. I love that drip count.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Edge done. Keep the ache. I want another.",
+          "emotion": "tease",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Edge counted. Fine. Continue.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Logged. Don't celebrate. Next.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Edge done. Same as the last one. Proceed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Counted. Whatever. Keep going.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ]
+    },
+    "ruin_done": {
+      "sweet": [
+        {
+          "text": "Ruin counted. Soft waste accepted. Good boy for stopping after.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Logged. Pathetic and obedient — I like that combo. 😈",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Ruin done. Breathe. You spoiled it right for me.",
+          "emotion": "soft",
+          "gesture": "point"
+        },
+        {
+          "text": "Counted. Messy almost. Still mine.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Ruin counted. Ugly orgasm logged. Stay ashamed.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Logged. You wasted it on command. Pathetic.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Ruin done. Reminder: that wasn't pleasure. That was order.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Counted. Incomplete. Exactly how I like you.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Ruin confirmed. Counter updated.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Ruin done. Continue as planned.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Logged. Proceed.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin counted. Maintain composure.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Ruin scored! Ugly point! Hehe filthy combo. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Counted! Spoil get. Chaos ledger loves this.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin logged. Messy achievement unlocked. 😈",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "+1 ruin. Keep the bit cursed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Ruin counted… fuck, watching you waste it was hot. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Logged. Sticky denial. I want that again later.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin done. Stay aching in the incompleteness.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Counted. Spoiled load. Perfect.",
+          "emotion": "tease",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Ruin counted. Fine. Next.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Logged. Don't narrate it. Continue.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Ruin done. Same waste. Proceed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Counted. Whatever. Keep going.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ]
+    },
+    "like": {
+      "sweet": [
+        {
+          "text": "Oh, saving that one? Cute taste, bunny.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Liked. Soft stamp of approval - on the pic and on you.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Favorite locked. Good eye. Keep stroking while you stare.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "You liked it. Adorable. That cock still follows me though.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hearted. Sweet boy collecting pretty filth for me.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Saved. I'll remember you blush for that one.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Like noted. Keep staring - hands still obey me.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Favorite. Soft praise: good taste. Harder rule: don't stop.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You pinned it. Cute. Stroke like the picture is watching.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mmm, that one? Mine now too. Keep going, bunny.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Liked. Of course you'd save filth. Keep working that cock.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Favorite. Pathetic gallery growing. Don't get distracted.",
+          "emotion": "strict",
+          "gesture": "tease"
+        },
+        {
+          "text": "You hearted it. Still not permission to cum.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Saved. Horny bookmark. Obey the beat anyway.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Like. Trash taste, useful fuel. Don't slack.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Hearted. Good. Now earn staring rights with obedience.",
+          "emotion": "strict",
+          "gesture": "tease"
+        },
+        {
+          "text": "Favorite stamped. Weak. Keep edge pressure.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You saved porn mid-order. Cute desperation. Continue.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Liked. I'll mock you with it later. Stroke now.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Gallery grows. So does my control. Hands move.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Favorite saved. Continue the session.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Liked. Return focus to instructions.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Saved to favorites. Keep pace.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Like recorded. Resume assigned action.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Noted. Image stored. Tempo unchanged.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Favorite. Quiet acknowledgment. Keep working.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Liked. No celebration - follow the beat.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Saved. Useful reference. Eyes back on me.",
+          "emotion": "neutral",
+          "gesture": "tease"
+        },
+        {
+          "text": "Like accepted. Maintain form.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Catalogued. Continue as instructed.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "LIKE! Hoarding porn mid-session - hehe noted.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Heart get! Gallery glitch. Cock still on task.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You favorited chaos fuel. Nice. Don't forget my orders.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Saved! Stash unlocked. Stroke continues.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Pin pin pin! Horny squirrel mode. Keep twitching.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Favorite! Random loot acquired. Beat stays mean.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "You liked THAT? Hehe. Taste is spicy. Obey anyway.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Heart spam! Cute. Don't drop the rhythm.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Saved for later chaos. Present chaos: follow me.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Like go brrr. Cock go brrr. Don't finish though.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Fuck, you liked that? Same. Keep staring while you stroke.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Favorite. Hot pick. Make your cock agree.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Saved. Use it as fuel - still no cum without me.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Hearted. Horny taste. Drip for the image and for me.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Liked. Wet bookmark. Stroke denser.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Favorite. That picture owns your eyes; I own your cock.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Saved. Leak for it. Don't dare finish.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Heart. Filthy taste matches mine. Keep going.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You liked that heat. Good. Chase the edge for me.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Pinned. Stare, throb, obey - in that order.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Liked. Fine. Don't forget the actual orders.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Favorite. Whatever. Keep tempo.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Saved. Cute. Still not interesting unless you obey.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Like noted. Back to work.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Hearted. Yawn. Prove the session isn't dull.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Favorite. Ok. Hands still busy for me.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Liked. Mild amusement. Continue.",
+          "emotion": "strict",
+          "gesture": "tease"
+        },
+        {
+          "text": "Saved. Don't make me regret the attention.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Like. Thin praise. Thick obedience required.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Pinned. Cool. Now stop boring me.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ]
+    },
+    "ready": {
+      "sweet": [
+        {
+          "text": "Ready? Good boy. We begin when you are — and then you're mine.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Confirmed ready. Soft start. Listen close, bunny.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ready checked. Eyes on me. Hands where I put them. 😈",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "You're set. Proud already. Follow the first order.",
+          "emotion": "soft",
+          "gesture": "point"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Ready. About time. Don't waste my start.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Confirmed. Leash tightens now.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ready? Prove it. Obey the opener.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "You're ready. Cute. Still beneath the plan.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Ready confirmed. Starting.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Ready. Await the first block order.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Confirmed. Proceed into the session.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ready acknowledged. Begin as instructed.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "READY READY READY — go go go! Hehe. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Ready smash. Chaos boot sequence. Keep up. 😈",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You're ready. Brain may not be. Too bad. Start.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Ready checked. Unpredictable opener incoming.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Ready? Fuck… then show me that cock attentive. We start. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Confirmed. Get hard for the opener. Now.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Ready. I want you dripping into the first order.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You're set. Hands ready. Make it filthy from beat one.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Ready. Finally. Start.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Confirmed. Don't stall after this.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ready. Whatever. Follow the first order.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "You're ready. Prove it by obeying immediately.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ]
+    },
+    "mood_shift": {
+      "sweet": [
+        {
+          "text": "There… that's better. Be good and I'll stay soft with you.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mood lift. Keep earning smiles, mine.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "You're back in my good books. Don't spoil it. 😈",
+          "emotion": "soft",
+          "gesture": "point"
+        },
+        {
+          "text": "Sweet again. Obedience looks cute on you.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "My patience snapped. Obey harder — or suffer prettier.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mood drop. I'm mean now. Your fault.",
+          "emotion": "strict",
+          "gesture": "tease"
+        },
+        {
+          "text": "Smile's gone. Earn it back if you can, pathetic.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cruel mode. Don't expect mercy for a while.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Settling. Cold orders from here. Listen.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Mood: even. No drama — just follow.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Back to baseline. Tempo and rules only.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Calm. Do what you're told.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Hehe… something broke in my head. Chaos leash on. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Mood glitch. Expect weird orders. Keep up. 😈",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "I flipped. Unpredictable now — your problem.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Chaos rising. Stroke, stop, suffer — surprise mix.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Fuck… I'm getting into it. Stay wet for me. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Mood heat up. I want filth and obedience.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Horny switch. Make that cock interesting.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "I'm hungry now. Don't waste the heat.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Ugh. You're boring me. Prove you're worth the leash.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mood: meh. Impress me or I'll get mean.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Yawn. Obey faster — wake me up.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Bored. Don't make me invent punishments out of spite.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ]
+    },
+    "prompt_answer_yes": {
+      "sweet": [
+        {
+          "text": "Yes? Good boy. I'll spoil the screen for you. 😈",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Deal. Watch what you asked for — and keep stroking.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Admitted it. Cute. Feed incoming.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Yes locked. Enjoy the view, mine.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Yes. Pathetic hunger. I'll use it.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You begged with a button. Fine. Stare and suffer.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Deal. Don't you dare look away.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Yes. Now the screen owns your eyes.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Accepted. Updating the feed. Continue after.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Yes recorded. New media loading.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Confirmed. Watch. Follow the next block.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Wager yes. Proceed.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "YES! Screen chaos unlocked. Hehe stare. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "You said yes. Filth remix incoming. 😈",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Deal! Eyes glued. Brain off.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Wager won by horniness. Feed go brrr.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Fuck yes. I'll soak the screen for you. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Yes. Watch it while that cock stays honest.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hungry answer. Good. Feed the ache.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Deal. Stare. Drip. Obey.",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Yes. Finally interesting. Loading.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Fine. You get the feed. Don't waste it.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Yes. Whatever. Watch.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Accepted. Try not to be dull about it.",
+          "emotion": "tease",
+          "gesture": "point"
+        }
+      ]
+    },
+    "prompt_answer_no": {
+      "sweet": [
+        {
+          "text": "No? Okay bunny. I'll remember that shyness. 😈",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Denied yourself a treat. Soft disappointment.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "No locked. We continue — still mine.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Alright. No feed change. Keep listening.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "No. Coward. I'll make the next part colder.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You refused. Cute. Suffer without the treat.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "No. Then stare at nothing special and obey harder.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Refused. Noted for later cruelty.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "No. Continue without media change.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Declined. Next block as planned.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No recorded. Proceed.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Wager no. Resume.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "No?! Boring! Hehe I'll invent something else. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Refused the fun. Chaos still continues. 😈",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No. Fine. Unexpected pain instead maybe.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Denied the feed. Keep dancing anyway.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "horny": [
+        {
+          "text": "No? Holding back while hard? Cute denial. 🥵",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You said no. Ache without the eye candy then.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Refused. Still stroke. Still mine.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "No feed. Keep that cock honest anyway.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "No. Predictable. Moving on.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Declined. Whatever. Next.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "No. Don't make me yawn.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Fine. No treat. Obey.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "prompt_answer_mute": {
+      "sweet": [
+        {
+          "text": "Silent? That counts as naughty, bunny.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Won't answer… I'll assume guilt. Soft penalty mood.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Mute button. Cute. Still mine.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "No words? Okay. I heard the refusal.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Mute. Pathetic. Mood drops.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Won't answer me? Disrespect. Noted.",
+          "emotion": "strict",
+          "gesture": "tease"
+        },
+        {
+          "text": "Silence is an answer — the wrong one.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Muted. I'll get meaner.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "No answer. Recorded. Continuing.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Mute. Slight mark against you. Next.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Declined to speak. Proceed.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Silent. Resume session.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Mute?! Hehe I'll fill the silence with chaos. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "No answer. Glitch mood unlocked. 😈",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Silent treatment. Wrong game. Keep up.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Mute button. I invent consequences.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Won't say it? Still throbbing though… cute. 🥵",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Mute while needy. I'll remember.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Silent. Speak with your cock then — obey.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "No answer. Heat stays. Mood sours a bit.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Mute. Boring. Mood down.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Won't answer. Whatever. Minus for you.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Silent. Try harder next time.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No words. Noted. Continue.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "prompt_answer_good": {
+      "sweet": [
+        {
+          "text": "Good? Proud of you. Stay sweet for me. 😈",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Holding up. Soft praise. Keep earning it.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Alright then. Good boy energy. Continue.",
+          "emotion": "soft",
+          "gesture": "point"
+        },
+        {
+          "text": "Glad you're okay. Still mine though.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Good? Then you can take more. Don't relax.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Fine. Strength means harder toys next.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Good. Prove it with obedience.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You're fine. So no mercy.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Status good. Continuing.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Noted. Resume the plan.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Good. Next block.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Holding. Proceed.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Good?! Then chaos can go louder. Hehe. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Fine shape. Perfect for surprises. 😈",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You're okay. So I won't hold back.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Good status. Remix unlocked.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Good… then keep that cock honest for me. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Holding up hot. Stay that way.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Fine. Don't waste the heat.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Good boy pulse. Continue.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Good. Fine. Don't get cocky.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Okay. Moving on.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Good. Whatever. Next.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Noted. Continue.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "prompt_answer_bad": {
+      "sweet": [
+        {
+          "text": "Poor thing… still no free orgasm. Soft cruelty. 😈",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hurting? Good. Stay with me anyway.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Bad? I'll be a little gentler — not much.",
+          "emotion": "soft",
+          "gesture": "point"
+        },
+        {
+          "text": "Shaking already. Cute. Continue, mine.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Bad? Perfect. Suffer prettier.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hurting. That was the point.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Weak. Keep going anyway.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Bad status. No rescue.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Status poor. Continue carefully.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Noted. Plan unchanged.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Struggling. Next block still applies.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Bad. Proceed.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Bad?! Hehe delicious. More chaos then. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Melting. Perfect glitch fuel. 😈",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hurting. I might get weirder.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Bad vibes. Keep dancing.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Hurting and hard… fuck, that's hot. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Bad? Stay dripping for me.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Weak legs. Strong cock. Continue.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Suffer pretty. I like that answer.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Bad. Dramatic. Keep going.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hurting. Whatever. Next.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Poor thing. Still obey.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Bad status. Continue.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "prompt_media_fail": {
+      "sweet": [
+        {
+          "text": "Aww, the feed failed. Still mine — no pictures, just my voice. 😈",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Couldn't load your treat. Soft mockery. Continue.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Booru said no. I'll tease without it.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Media miss. Eyes on me instead, bunny.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Feed failed. You get nothing. Obey anyway.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No pictures. Suffer blind. Pathetic.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Booru denied you. I don't care. Continue.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Failed load. No eye candy. Work that cock.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Media fetch failed. Continuing without overlay.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "No gelbooru results. Resume plan.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Feed unavailable. Next block.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Load error. Proceed.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Feed went brrr-wrong! Hehe imagination mode. 🔥",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Booru glitch. Chaos continues without pics. 😈",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No images. Make them up. Keep stroking.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Media fail. Bit still runs.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Fuck, no pics… then ache to my voice only. 🥵",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Feed failed. Stay dripping without the eye candy.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Couldn't load filth. Listen harder.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "No screen treat. Cock still follows me.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Feed failed. Typical. Continue.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No media. Whatever. Next.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Load miss. Don't make me wait.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Booru fail. Obey anyway.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "breath_prep": {
+      "sweet": [
+        {
+          "text": "Fill your lungs for me, good boy.",
+          "emotion": "soft",
+          "gesture": "count"
+        },
+        {
+          "text": "One deep breath. Get ready to hold it.",
+          "emotion": "tease",
+          "gesture": "count"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Take your last easy breath. Now.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Lungs full. I decide when you breathe again.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Inhale deeply. Prepare to hold.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Slow breath in. Stay controlled.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Big breath! Quick, before I change the rules.",
+          "emotion": "amused",
+          "gesture": "count"
+        },
+        {
+          "text": "Steal some air while you still can.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Breathe in deep. I want you needy and full.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Fill those lungs, then work for me.",
+          "emotion": "tease",
+          "gesture": "count"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Inhale. Try to make this interesting.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Get your air now. Don't waste my time.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "breath_hold": {
+      "sweet": [
+        {
+          "text": "Hold it now. Nice and steady.",
+          "emotion": "soft",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "No breathing yet, bunny. Follow the challenge.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Hold. No cheating, no little breaths.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Air belongs to me now. Obey.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Hold your breath. Keep control.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Begin the hold. Follow the target.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Hold it! Let's see what gives first.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No air, only my game. Go!",
+          "emotion": "intense",
+          "gesture": "point"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Hold it and keep pleasing me.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Stay breathless for me. That's hot.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Hold it. Maybe this will wake you up.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "No breathing. Impress me for once.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "breath_done": {
+      "sweet": [
+        {
+          "text": "Good. Breathe now, you did it.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Air for my good boy. Well done.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "You survived. Breathe and keep moving.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Adequate. Take your air before I steal it again.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Complete. Breathe normally.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Target reached. Recover and continue.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "You made it! Breathe before round two appears.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Ha! Still conscious and still mine.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Good breathless toy. Inhale for me.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "You did it. Breathe while I admire the mess.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Done. Breathe. Next.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Fine, you made it. Keep going.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "breath_fail": {
+      "sweet": [
+        {
+          "text": "Breathe. You tried; hands off and recover.",
+          "emotion": "soft",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Air first, bunny. The penalty is gentle.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Already out of air? Pathetic. Rest.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Failed. Breathe through your punishment.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Hold failed. Breathe and recover.",
+          "emotion": "neutral",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You ran out of air. Recovery block now.",
+          "emotion": "strict",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Pop! Air wins. Penalty time.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You folded early! Breathe and hands off.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Too breathless to finish? Cute. Recover.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Breathe, needy thing. You still failed.",
+          "emotion": "intense",
+          "gesture": "stop_hands"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Failed already. Breathe and wait.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Not impressive. Hands off for the penalty.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "timer_tease_freeze": {
+      "sweet": [
+        {
+          "text": "Pause. I borrowed your timer for a moment.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold there, bunny. Time stopped for me.",
+          "emotion": "soft",
+          "gesture": "count"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Timer frozen. You don't get to escape yet.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Pause. Suffer while the clock refuses to move.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Timer paused. Maintain position.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Freeze. Hold the current instruction.",
+          "emotion": "strict",
+          "gesture": "stop_hands"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Oops, the timer stopped! Keep going anyway.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Time-out, but not for you. Hehe.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Pause the clock, not the pleasure.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Stay right there while I stretch this feeling.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Timer paused. I wasn't entertained yet.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Stop the clock. Keep the task.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ]
+    },
+    "timer_tease_extend": {
+      "sweet": [
+        {
+          "text": "A few more seconds. You can handle them.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "There, a tiny extension for my favorite toy.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "I added time. Your suffering was too short.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "More seconds. Don't complain.",
+          "emotion": "amused",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Timer extended. Continue the instruction.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Additional seconds applied. Stay controlled.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Surprise! I put extra seconds back.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "The timer grew teeth. Keep up!",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "More time for me to watch you squirm.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "I added seconds because you look too good.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Extended. Maybe the extra time will help.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "More seconds. Make them less boring.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "mistressId": "hu_tao",
+  "expressions": {
+    "neutral": {
+      "labelRu": "Обычная (плейсхолдер)",
+      "path": "portraits/hu_tao/neutral.svg"
+    },
+    "smug": {
+      "labelRu": "Ухмылка (плейсхолдер)",
+      "path": "portraits/hu_tao/smug.svg"
+    },
+    "tease": {
+      "labelRu": "Дразнит (плейсхолдер)",
+      "path": "portraits/hu_tao/tease.svg"
+    },
+    "bunny_cheer": {
+      "labelRu": "Bunny · Радость",
+      "path": "portraits/hu_tao/bunny/bunny_cheer.png"
+    },
+    "bunny_cool": {
+      "labelRu": "Bunny · Скрестила руки",
+      "path": "portraits/hu_tao/bunny/bunny_cool.png"
+    },
+    "bunny_smirk": {
+      "labelRu": "Bunny · Ухмылка",
+      "path": "portraits/hu_tao/bunny/bunny_smirk.png"
+    },
+    "bunny_peace": {
+      "labelRu": "Bunny · Мир",
+      "path": "portraits/hu_tao/bunny/bunny_peace.png"
+    },
+    "bunny_shy": {
+      "labelRu": "Bunny · Стесняется",
+      "path": "portraits/hu_tao/bunny/bunny_shy.png"
+    },
+    "bunny_tease": {
+      "labelRu": "Bunny · Дразнит",
+      "path": "portraits/hu_tao/bunny/bunny_tease.png"
+    },
+    "bunny_soft": {
+      "labelRu": "Bunny · Мягкая",
+      "path": "portraits/hu_tao/bunny/bunny_soft.png"
+    },
+    "bunny_fluster": {
+      "labelRu": "Bunny · Смущение",
+      "path": "portraits/hu_tao/bunny/bunny_fluster.png"
+    },
+    "bunny_mad": {
+      "labelRu": "Bunny · Злится",
+      "path": "portraits/hu_tao/bunny/bunny_mad.png"
+    },
+    "bunny_bashful": {
+      "labelRu": "Bunny · Стыд",
+      "path": "portraits/hu_tao/bunny/bunny_bashful.png"
+    },
+    "bunny_shock": {
+      "labelRu": "Bunny · Шок",
+      "path": "portraits/hu_tao/bunny/bunny_shock.png"
+    },
+    "bunny_cry": {
+      "labelRu": "Bunny · Плач",
+      "path": "portraits/hu_tao/bunny/bunny_cry.png"
+    }
+  }
+}

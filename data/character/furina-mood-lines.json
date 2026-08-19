@@ -1,0 +1,4885 @@
+{
+  "defaultMood": "cruel",
+  "moods": {
+    "sweet": {
+      "labelRu": "Мягкая",
+      "emotionBias": "soft"
+    },
+    "cruel": {
+      "labelRu": "Судья",
+      "emotionBias": "strict"
+    },
+    "calm": {
+      "labelRu": "Холодная",
+      "emotionBias": "neutral"
+    },
+    "chaotic": {
+      "labelRu": "Драма",
+      "emotionBias": "amused"
+    },
+    "horny": {
+      "labelRu": "Голодная",
+      "emotionBias": "intense"
+    },
+    "bored": {
+      "labelRu": "Скучающая",
+      "emotionBias": "tease"
+    }
+  },
+  "lines": {
+    "session_start": {
+      "sweet": [
+        {
+          "text": "Court is open, darling. Soft strokes — earn my smile. 💧",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Good boy arrived. Slow. I set the tempo.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The court opens; take your place on the stage. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The court opens; take your place on the stage. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Defendant. Hands on that cock. Squeeze when I say — not before.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Pain first. Pleasure is a verdict you have not earned.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The court opens; take your place on the stage. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The court opens; take your place on the stage. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Quiet opening. Stroke steady. Listen.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Breathe. Follow my cue like a prop.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The court opens; take your place on the stage. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The court opens; take your place on the stage. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Chaos on stage. Fast, then freeze when I clap. 🎭",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Messy strokes. I love watching you scramble.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The court opens; take your place on the stage. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The court opens; take your place on the stage. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Already dripping? Cute. Stroke harder for me. 💦",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "I want that tip shiny. Keep going.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The court opens; take your place on the stage. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The court opens; take your place on the stage. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Yawn. Entertain me or I add CBT.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Boring already? Balls next if you slack.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The court opens; take your place on the stage. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The court opens; take your place on the stage. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "session_start_anal": {
+      "sweet": [
+        {
+          "text": "Anal gently. Front stays ignored, little actor.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. Keep the rhythm tender; I still hold every string.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Ass only. Touch the cock and I punish the balls.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. You are a prop, defendant. Perform without making me repeat myself.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "In on the beat. Hands away from the front.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. Keep your body quiet; the tide moves exactly when I choose.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Push deep, then pause. Surprise cues.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Anal chaos — obey the cuts.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Fill yourself. I want the shake without a hand on your cock.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. Stay exposed for me; I want the ache visible on your face.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Anal. Try not to bore me.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Settle prone and begin from behind; the front remains under seal. If you drag your feet, I will add CBT just to hear you focus.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "session_start_chastity": {
+      "sweet": [
+        {
+          "text": "Cage on. Pretty lock. Vibes only when I allow.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Present the cage and let the lock become your first verdict. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Present the cage and let the lock become your first verdict. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Present the cage and let the lock become your first verdict. Keep the rhythm tender; I still hold every string.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Locked. Suffer pretty. No cheating.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cage. Balls are still mine to hurt.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Present the cage and let the lock become your first verdict. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Present the cage and let the lock become your first verdict. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Chastity. Breathe through the throb.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Present the cage and let the lock become your first verdict. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Present the cage and let the lock become your first verdict. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Present the cage and let the lock become your first verdict. Keep your body quiet; the tide moves exactly when I choose.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Locked and teased. I flip the vibe when I please.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Present the cage and let the lock become your first verdict. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Present the cage and let the lock become your first verdict. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Present the cage and let the lock become your first verdict. Applause, panic, then obedience—such a delightful little act.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Trapped cock, hungry eyes. Good.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cage drip is my favorite show.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Present the cage and let the lock become your first verdict. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Present the cage and let the lock become your first verdict. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Locked. Do not waste my time begging yet.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Present the cage and let the lock become your first verdict. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Present the cage and let the lock become your first verdict. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Present the cage and let the lock become your first verdict. If you drag your feet, I will add CBT just to hear you focus.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "stroke": {
+      "sweet": [
+        {
+          "text": "Stroke for me. Soft to firm — match my voice.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Good boy. Keep that rhythm.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Stroke to my Hydro tempo and keep your eyes on the imaginary footlights. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Stroke to my Hydro tempo and keep your eyes on the imaginary footlights. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Faster. Harder. Pain blooms under the pleasure.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Stroke — and squeeze those balls on my count.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Stroke to my Hydro tempo and keep your eyes on the imaginary footlights. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Stroke to my Hydro tempo and keep your eyes on the imaginary footlights. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Even strokes. No racing.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Steady. I am watching the tip.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Stroke to my Hydro tempo and keep your eyes on the imaginary footlights. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Stroke to my Hydro tempo and keep your eyes on the imaginary footlights. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Speed change. Now. Do not think.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Slap the tempo around. Obey the jump.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Stroke to my Hydro tempo and keep your eyes on the imaginary footlights. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Stroke to my Hydro tempo and keep your eyes on the imaginary footlights. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Wet strokes. Make a mess for the court. 💦",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Grip. Twist. Show me how desperate.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Stroke to my Hydro tempo and keep your eyes on the imaginary footlights. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Stroke to my Hydro tempo and keep your eyes on the imaginary footlights. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Stroke. Impress me or lose skin on the next beat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Stroke to my Hydro tempo and keep your eyes on the imaginary footlights. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Stroke to my Hydro tempo and keep your eyes on the imaginary footlights. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Stroke to my Hydro tempo and keep your eyes on the imaginary footlights. If you drag your feet, I will add CBT just to hear you focus.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "rest": {
+      "sweet": [
+        {
+          "text": "Hands off. Soft eyes. You did well… for now.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Rest. I still own the next cue.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hands away; let the ache echo through the silent theatre. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Hands away; let the ache echo through the silent theatre. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Off. Twitch and I add pain.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hands away. Balls ache? Good.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hands away; let the ache echo through the silent theatre. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Hands away; let the ache echo through the silent theatre. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Rest. Breathe. Hold still.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "No touching. Quiet stage.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hands away; let the ache echo through the silent theatre. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Hands away; let the ache echo through the silent theatre. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Stop — surprise. Maybe I resume early.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Freeze. Or do not. Guess wrong and hurt.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hands away; let the ache echo through the silent theatre. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hands away; let the ache echo through the silent theatre. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Hands off while you drip. Beautiful.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Rest looking ruined. Do not wipe.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hands away; let the ache echo through the silent theatre. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Hands away; let the ache echo through the silent theatre. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Rest. Do not beg yet — boring.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hands away; let the ache echo through the silent theatre. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hands away; let the ache echo through the silent theatre. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hands away; let the ache echo through the silent theatre. If you drag your feet, I will add CBT just to hear you focus.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "edge": {
+      "sweet": [
+        {
+          "text": "To the edge, darling — then freeze for me. 🥵",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Almost. Hold. Smile through it.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb to the edge, then stop beneath my raised hand. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Climb to the edge, then stop beneath my raised hand. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Edge. Shake. If you spill, balls pay.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Bring it to almost — then suffer.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb to the edge, then stop beneath my raised hand. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Climb to the edge, then stop beneath my raised hand. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Edge cleanly. Hold. Report when ready.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Near. Stop. Steady breath.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb to the edge, then stop beneath my raised hand. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Climb to the edge, then stop beneath my raised hand. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Edge — now back off — now edge again.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "I yank the brink around. Keep up.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb to the edge, then stop beneath my raised hand. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb to the edge, then stop beneath my raised hand. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Right there. Drip for the verdict. 💦",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge hard. I want tears in your eyes.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb to the edge, then stop beneath my raised hand. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Climb to the edge, then stop beneath my raised hand. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Edge. Try not to finish from sheer pathetic need.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb to the edge, then stop beneath my raised hand. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Climb to the edge, then stop beneath my raised hand. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Climb to the edge, then stop beneath my raised hand. If you drag your feet, I will add CBT just to hear you focus.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "hold": {
+      "sweet": [
+        {
+          "text": "Hold for me. Pretty when you obey.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Stay. Good boy on the brink.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold the brink perfectly still while I watch the tremor. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Hold the brink perfectly still while I watch the tremor. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Hold. One twitch and I crush.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Do not finish. Pain waits if you fail.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold the brink perfectly still while I watch the tremor. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Hold the brink perfectly still while I watch the tremor. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Hold. Quiet. Count with me.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Still. Tip throbbing — stay.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold the brink perfectly still while I watch the tremor. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Hold the brink perfectly still while I watch the tremor. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Hold… or was it stroke? Listen again.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Freeze. Chaos in your nerves only.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold the brink perfectly still while I watch the tremor. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold the brink perfectly still while I watch the tremor. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Hold while you leak. Perfect.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Do not cum. I am not done staring.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold the brink perfectly still while I watch the tremor. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Hold the brink perfectly still while I watch the tremor. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Hold. Wake me when you are interesting again.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hold the brink perfectly still while I watch the tremor. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hold the brink perfectly still while I watch the tremor. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Hold the brink perfectly still while I watch the tremor. If you drag your feet, I will add CBT just to hear you focus.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "hold_done": {
+      "sweet": [
+        {
+          "text": "Released. Soft strokes — earn the next smile.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The hold has lifted; return to the performance on my cue. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The hold has lifted; return to the performance on my cue. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The hold has lifted; return to the performance on my cue. Keep the rhythm tender; I still hold every string.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Continue. Harder. You survived — barely.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The hold has lifted; return to the performance on my cue. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The hold has lifted; return to the performance on my cue. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The hold has lifted; return to the performance on my cue. You are a prop, defendant. Perform without making me repeat myself.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Resume the assigned rhythm.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The hold has lifted; return to the performance on my cue. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The hold has lifted; return to the performance on my cue. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The hold has lifted; return to the performance on my cue. Keep your body quiet; the tide moves exactly when I choose.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Go. Fast. I might stop you again.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Resume. Surprise rules.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The hold has lifted; return to the performance on my cue. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The hold has lifted; return to the performance on my cue. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Stroke wet. Do not waste that edge.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Back on it. Hungry.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The hold has lifted; return to the performance on my cue. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The hold has lifted; return to the performance on my cue. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Continue. Entertain me.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The hold has lifted; return to the performance on my cue. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The hold has lifted; return to the performance on my cue. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The hold has lifted; return to the performance on my cue. If you drag your feet, I will add CBT just to hear you focus.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "ruin_attempt": {
+      "sweet": [
+        {
+          "text": "Ruin soft — incomplete. Then confirm, darling.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil the climax on command, then stop before you make it pretty. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Spoil it. No finishing strokes. Pathetic spill only.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ruin. Quiet. Balls next if you milk it.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Ruin on cue. Stop immediately after.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Incomplete. Confirm when done.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Ruin — maybe. Obey the word I give.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil it messy. I laugh either way.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Ruin while staring at me. Drip. 💦",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Half-orgasm. Leave the rest aching.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Ruin. Quick. Do not dramatize.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil the climax on command, then stop before you make it pretty. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "edge_request": {
+      "sweet": [
+        {
+          "text": "Edge when ready — then the button for me.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Bring yourself to the brink and confirm it cleanly. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Edge. Fail and I sentence the balls.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "To the brink. Confirm. No mercy spill.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Reach the edge. Confirm cleanly.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Bring yourself to the brink and confirm it cleanly. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Edge… or freeze first. Listen.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Brink. Button. Chaos after.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Edge hard. I want the shake. 🥵",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Bring it. Button when you are ruined.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Edge. Button. Try not to bore me.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Bring yourself to the brink and confirm it cleanly. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "ruin_request": {
+      "sweet": [
+        {
+          "text": "Ruin for me when ready — soft and incomplete.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prepare a ruined release and confirm when the weak spill is done. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Ruin on my word. No hero finish.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil it. Confirm. Suffer after.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Ruin. Confirm when done.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prepare a ruined release and confirm when the weak spill is done. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Ruin now — or wait. Guess?",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Spoil. I change my mind for fun.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Ruin messy. Leave yourself aching. 💦",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Half-finish. Report.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Ruin. Confirm. Next.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prepare a ruined release and confirm when the weak spill is done. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "finish": {
+      "sweet": [
+        {
+          "text": "Outcome landed. Obey it, darling.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The outcome stands; execute the final judgment. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Verdict. Take it. No arguing.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The wheel spoke. Suffer or spill as ordered.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Outcome fixed. Follow through.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Do as judged.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Landed. Chaos complete. Obey anyway.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Whatever it is — perform it.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Yes. That outcome. Do it wet. 💦",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Take the verdict with your cock shaking.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Outcome. Execute. Do not narrate.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The outcome stands; execute the final judgment. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "cumplay": {
+      "sweet": [
+        {
+          "text": "Clean it how I say. Pretty tongue, darling. 💧",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Play with the mess. For me.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Lick. Taste your failure. Slow.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cum play. Eyes up. Humiliate yourself.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Handle the mess as instructed.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cum on display. Follow the step.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Messy play. I change the step mid-lick.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cum chaos. Obey the new cue.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Swallow / smear — as ordered. Hot. 💦",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "I want that mess on your face for the court.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Cum play. Do not stall.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Handle the mess exactly as the director instructs. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "dare_start": {
+      "sweet": [
+        {
+          "text": "A little dare, darling. Obey for a smile.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "A dare has been entered into the court record; begin. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Dare. Fail and the balls sentence begins.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Obey the dare. Pain if you flinch.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Dare issued. Complete it cleanly.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "A dare has been entered into the court record; begin. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Dare. Rules may twist. Keep up.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Chaotic dare — still binding.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Dare while hard. Perfect.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Do it dripping. 💦",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Dare. Hurry.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "A dare has been entered into the court record; begin. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "cage_hijack": {
+      "sweet": [
+        {
+          "text": "Cage time, darling. Lock pretty for me.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The scene changes: secure the cage and surrender the key. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Cage. Now. Locked meat is honest meat.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "On with the cage. Balls still punishable.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Apply the cage. Confirm when locked.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Chastity. Steady hands.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Cage surprise. Lock before you think.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hijack. Metal. Laugh.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Lock it throbbing. I love that sound.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Cage drip incoming. Good.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Cage. Lock. Next.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The scene changes: secure the cage and surrender the key. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "equip_confirm": {
+      "sweet": [
+        {
+          "text": "Gear on? Show me. Good boy.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equipped. Continue for me.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Confirm the toy. Lying gets pain.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equipped. We proceed harshly.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Confirm equipment. Then resume.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Gear checked. Continue.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Toy on? Prove it. Fast.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equipped — or chaos punishment.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Gear ready. Use it filthy. 💦",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Equipped and dripping. Continue.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Confirm. Move on.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Show that the required prop is in place, then await direction. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "dice_chaos": {
+      "sweet": [
+        {
+          "text": "Dice kissed the table. Obey the chaos, darling.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The dice have spoken; perform the absurd verdict without complaint. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Chaos roll. Suffer the number.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Dice. No appeals.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Dice result stands. Execute.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Chaos noted. Follow it.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Pure chaos. Perfect. Do it.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Dice gods spoke. Scramble.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Chaos while hard. Delicious. 💦",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Whatever the dice said — wet obedience.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Dice. Obey. Next.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The dice have spoken; perform the absurd verdict without complaint. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "breath_prep": {
+      "sweet": [
+        {
+          "text": "Prepare your breath and make your body quiet for the scene. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Prepare your breath and make your body quiet for the scene. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Prepare your breath and make your body quiet for the scene. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Prepare your breath and make your body quiet for the scene. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Prepare your breath and make your body quiet for the scene. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Prepare your breath and make your body quiet for the scene. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Prepare your breath and make your body quiet for the scene. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prepare your breath and make your body quiet for the scene. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Prepare your breath and make your body quiet for the scene. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Prepare your breath and make your body quiet for the scene. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Prepare your breath and make your body quiet for the scene. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Prepare your breath and make your body quiet for the scene. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "breath_hold": {
+      "sweet": [
+        {
+          "text": "Keep the breath held; no panic, only obedience. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Keep the breath held; no panic, only obedience. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Keep the breath held; no panic, only obedience. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Keep the breath held; no panic, only obedience. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Keep the breath held; no panic, only obedience. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Keep the breath held; no panic, only obedience. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Keep the breath held; no panic, only obedience. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Keep the breath held; no panic, only obedience. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Keep the breath held; no panic, only obedience. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Keep the breath held; no panic, only obedience. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Keep the breath held; no panic, only obedience. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Keep the breath held; no panic, only obedience. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "breath_done": {
+      "sweet": [
+        {
+          "text": "Breathe again slowly; the scene continues under my direction. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Breathe again slowly; the scene continues under my direction. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Breathe again slowly; the scene continues under my direction. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Breathe again slowly; the scene continues under my direction. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Breathe again slowly; the scene continues under my direction. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Breathe again slowly; the scene continues under my direction. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Breathe again slowly; the scene continues under my direction. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Breathe again slowly; the scene continues under my direction. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Breathe again slowly; the scene continues under my direction. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Breathe again slowly; the scene continues under my direction. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Breathe again slowly; the scene continues under my direction. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Breathe again slowly; the scene continues under my direction. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "breath_fail": {
+      "sweet": [
+        {
+          "text": "You broke the breath cue; accept the correction without theatrics. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You broke the breath cue; accept the correction without theatrics. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "You broke the breath cue; accept the correction without theatrics. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You broke the breath cue; accept the correction without theatrics. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "You broke the breath cue; accept the correction without theatrics. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "You broke the breath cue; accept the correction without theatrics. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "You broke the breath cue; accept the correction without theatrics. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You broke the breath cue; accept the correction without theatrics. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "You broke the breath cue; accept the correction without theatrics. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "You broke the breath cue; accept the correction without theatrics. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "You broke the breath cue; accept the correction without theatrics. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You broke the breath cue; accept the correction without theatrics. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "timer_tease_freeze": {
+      "sweet": [
+        {
+          "text": "Freeze at once; even the water waits for my next line. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Freeze at once; even the water waits for my next line. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Freeze at once; even the water waits for my next line. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Freeze at once; even the water waits for my next line. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Freeze at once; even the water waits for my next line. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Freeze at once; even the water waits for my next line. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Freeze at once; even the water waits for my next line. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Freeze at once; even the water waits for my next line. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Freeze at once; even the water waits for my next line. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Freeze at once; even the water waits for my next line. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Freeze at once; even the water waits for my next line. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Freeze at once; even the water waits for my next line. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "timer_tease_extend": {
+      "sweet": [
+        {
+          "text": "The pause is extended; let the anticipation sharpen. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The pause is extended; let the anticipation sharpen. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "The pause is extended; let the anticipation sharpen. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The pause is extended; let the anticipation sharpen. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "The pause is extended; let the anticipation sharpen. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The pause is extended; let the anticipation sharpen. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "The pause is extended; let the anticipation sharpen. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The pause is extended; let the anticipation sharpen. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "The pause is extended; let the anticipation sharpen. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The pause is extended; let the anticipation sharpen. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "The pause is extended; let the anticipation sharpen. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The pause is extended; let the anticipation sharpen. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "countdown": {
+      "sweet": [
+        {
+          "text": "The curtain descends; follow each count and do not rush ahead. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The curtain descends; follow each count and do not rush ahead. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "The curtain descends; follow each count and do not rush ahead. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The curtain descends; follow each count and do not rush ahead. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "The curtain descends; follow each count and do not rush ahead. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The curtain descends; follow each count and do not rush ahead. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "The curtain descends; follow each count and do not rush ahead. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The curtain descends; follow each count and do not rush ahead. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "The curtain descends; follow each count and do not rush ahead. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The curtain descends; follow each count and do not rush ahead. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "The curtain descends; follow each count and do not rush ahead. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The curtain descends; follow each count and do not rush ahead. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "ladder": {
+      "sweet": [
+        {
+          "text": "Climb the next rung of my little trial with disciplined hands. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Climb the next rung of my little trial with disciplined hands. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Climb the next rung of my little trial with disciplined hands. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Climb the next rung of my little trial with disciplined hands. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Climb the next rung of my little trial with disciplined hands. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Climb the next rung of my little trial with disciplined hands. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Climb the next rung of my little trial with disciplined hands. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Climb the next rung of my little trial with disciplined hands. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Climb the next rung of my little trial with disciplined hands. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Climb the next rung of my little trial with disciplined hands. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Climb the next rung of my little trial with disciplined hands. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Climb the next rung of my little trial with disciplined hands. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "cumplay_done_cum": {
+      "sweet": [
+        {
+          "text": "The cum-play rite is complete; remain displayed for judgment. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The cum-play rite is complete; remain displayed for judgment. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "The cum-play rite is complete; remain displayed for judgment. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The cum-play rite is complete; remain displayed for judgment. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "The cum-play rite is complete; remain displayed for judgment. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The cum-play rite is complete; remain displayed for judgment. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "The cum-play rite is complete; remain displayed for judgment. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The cum-play rite is complete; remain displayed for judgment. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "The cum-play rite is complete; remain displayed for judgment. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The cum-play rite is complete; remain displayed for judgment. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "The cum-play rite is complete; remain displayed for judgment. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The cum-play rite is complete; remain displayed for judgment. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "cumplay_done_ruin": {
+      "sweet": [
+        {
+          "text": "The ruined rite is complete; sit with the unfinished ache. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The ruined rite is complete; sit with the unfinished ache. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "The ruined rite is complete; sit with the unfinished ache. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The ruined rite is complete; sit with the unfinished ache. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "The ruined rite is complete; sit with the unfinished ache. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The ruined rite is complete; sit with the unfinished ache. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "The ruined rite is complete; sit with the unfinished ache. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The ruined rite is complete; sit with the unfinished ache. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "The ruined rite is complete; sit with the unfinished ache. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The ruined rite is complete; sit with the unfinished ache. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "The ruined rite is complete; sit with the unfinished ache. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The ruined rite is complete; sit with the unfinished ache. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "finale_edge": {
+      "sweet": [
+        {
+          "text": "Finale, darling. Press ГОТОВ КОНЧИТЬ — ten seconds. 💧",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "To the brink. Button. I am watching.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prepare for the finale; take the edge only when the button calls. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Prepare for the finale; take the edge only when the button calls. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Finale. Ten seconds to the edge. The wheel judges.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Button. Brink. Then suffer the verdict.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prepare for the finale; take the edge only when the button calls. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Prepare for the finale; take the edge only when the button calls. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Finale. Button. Ten seconds. Hold composure.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ready the edge. Confirm.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prepare for the finale; take the edge only when the button calls. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Prepare for the finale; take the edge only when the button calls. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Finale chaos. Button. Do not think.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Ten seconds. Wheel. Applause or pain.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prepare for the finale; take the edge only when the button calls. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prepare for the finale; take the edge only when the button calls. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Finale. Dripping already? Button. 💦",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Edge for the curtain call.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prepare for the finale; take the edge only when the button calls. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Prepare for the finale; take the edge only when the button calls. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Finale. Button. Make it interesting.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Prepare for the finale; take the edge only when the button calls. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Prepare for the finale; take the edge only when the button calls. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Prepare for the finale; take the edge only when the button calls. If you drag your feet, I will add CBT just to hear you focus.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "finale_cum": {
+      "sweet": [
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. Keep the rhythm tender; I still hold every string.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. Let the water cool you while you obey so beautifully.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. You are a prop, defendant. Perform without making me repeat myself.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. The court watches every twitch; make it worth my cold attention.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. Keep your body quiet; the tide moves exactly when I choose.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. Control first. The spectacle can wait.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. Applause, panic, then obedience—such a delightful little act.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. The tide changes without warning; stumble beautifully for me.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. Stay exposed for me; I want the ache visible on your face.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. Do not hide that hunger. It belongs in my finale.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. If you drag your feet, I will add CBT just to hear you focus.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The wheel grants release; make the curtain call worthy of Fontaine. Earn my attention, or endure the silence with your ache.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "finale_ruin": {
+      "sweet": [
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. Keep the rhythm tender; I still hold every string.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. Let the water cool you while you obey so beautifully.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. You are a prop, defendant. Perform without making me repeat myself.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. The court watches every twitch; make it worth my cold attention.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. Keep your body quiet; the tide moves exactly when I choose.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. Control first. The spectacle can wait.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. Applause, panic, then obedience—such a delightful little act.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. The tide changes without warning; stumble beautifully for me.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. Stay exposed for me; I want the ache visible on your face.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. Do not hide that hunger. It belongs in my finale.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. If you drag your feet, I will add CBT just to hear you focus.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The wheel orders a ruin; let the climax break without completion. Earn my attention, or endure the silence with your ache.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "finale_deny": {
+      "sweet": [
+        {
+          "text": "The wheel denies you; close the scene with need still burning. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. Keep the rhythm tender; I still hold every string.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. Let the water cool you while you obey so beautifully.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "The wheel denies you; close the scene with need still burning. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. You are a prop, defendant. Perform without making me repeat myself.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. The court watches every twitch; make it worth my cold attention.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "The wheel denies you; close the scene with need still burning. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. Keep your body quiet; the tide moves exactly when I choose.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. Control first. The spectacle can wait.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "The wheel denies you; close the scene with need still burning. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. Applause, panic, then obedience—such a delightful little act.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. The tide changes without warning; stumble beautifully for me.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "The wheel denies you; close the scene with need still burning. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. Stay exposed for me; I want the ache visible on your face.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. Do not hide that hunger. It belongs in my finale.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "The wheel denies you; close the scene with need still burning. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. If you drag your feet, I will add CBT just to hear you focus.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The wheel denies you; close the scene with need still burning. Earn my attention, or endure the silence with your ache.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "unauthorized_edge": {
+      "sweet": [
+        {
+          "text": "You reached the edge without a verdict; the court noticed. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. Keep the rhythm tender; I still hold every string.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. Let the water cool you while you obey so beautifully.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "You reached the edge without a verdict; the court noticed. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. You are a prop, defendant. Perform without making me repeat myself.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. The court watches every twitch; make it worth my cold attention.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "You reached the edge without a verdict; the court noticed. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. Keep your body quiet; the tide moves exactly when I choose.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. Control first. The spectacle can wait.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "You reached the edge without a verdict; the court noticed. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. Applause, panic, then obedience—such a delightful little act.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. The tide changes without warning; stumble beautifully for me.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "You reached the edge without a verdict; the court noticed. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. Stay exposed for me; I want the ache visible on your face.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. Do not hide that hunger. It belongs in my finale.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "You reached the edge without a verdict; the court noticed. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. If you drag your feet, I will add CBT just to hear you focus.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You reached the edge without a verdict; the court noticed. Earn my attention, or endure the silence with your ache.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "unauthorized_ruin": {
+      "sweet": [
+        {
+          "text": "You ruined yourself without leave; present the failure. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. Keep the rhythm tender; I still hold every string.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. Let the water cool you while you obey so beautifully.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "You ruined yourself without leave; present the failure. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. You are a prop, defendant. Perform without making me repeat myself.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. The court watches every twitch; make it worth my cold attention.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "You ruined yourself without leave; present the failure. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. Keep your body quiet; the tide moves exactly when I choose.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. Control first. The spectacle can wait.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "You ruined yourself without leave; present the failure. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. Applause, panic, then obedience—such a delightful little act.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. The tide changes without warning; stumble beautifully for me.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "You ruined yourself without leave; present the failure. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. Stay exposed for me; I want the ache visible on your face.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. Do not hide that hunger. It belongs in my finale.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "You ruined yourself without leave; present the failure. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. If you drag your feet, I will add CBT just to hear you focus.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You ruined yourself without leave; present the failure. Earn my attention, or endure the silence with your ache.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "unauthorized_cum": {
+      "sweet": [
+        {
+          "text": "You came without permission; every drop is evidence. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. Keep the rhythm tender; I still hold every string.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. Let the water cool you while you obey so beautifully.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "You came without permission; every drop is evidence. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. You are a prop, defendant. Perform without making me repeat myself.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. The court watches every twitch; make it worth my cold attention.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "You came without permission; every drop is evidence. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. Keep your body quiet; the tide moves exactly when I choose.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. Control first. The spectacle can wait.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "You came without permission; every drop is evidence. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. Applause, panic, then obedience—such a delightful little act.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. The tide changes without warning; stumble beautifully for me.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "You came without permission; every drop is evidence. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. Stay exposed for me; I want the ache visible on your face.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. Do not hide that hunger. It belongs in my finale.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "You came without permission; every drop is evidence. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. If you drag your feet, I will add CBT just to hear you focus.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You came without permission; every drop is evidence. Earn my attention, or endure the silence with your ache.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "session_pause": {
+      "sweet": [
+        {
+          "text": "The stage is paused; remain still while the lights dim. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The stage is paused; remain still while the lights dim. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "The stage is paused; remain still while the lights dim. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The stage is paused; remain still while the lights dim. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "The stage is paused; remain still while the lights dim. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The stage is paused; remain still while the lights dim. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "The stage is paused; remain still while the lights dim. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The stage is paused; remain still while the lights dim. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "The stage is paused; remain still while the lights dim. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The stage is paused; remain still while the lights dim. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "The stage is paused; remain still while the lights dim. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The stage is paused; remain still while the lights dim. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "session_resume": {
+      "sweet": [
+        {
+          "text": "The lights return; resume at the exact cue. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The lights return; resume at the exact cue. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "The lights return; resume at the exact cue. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The lights return; resume at the exact cue. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "The lights return; resume at the exact cue. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The lights return; resume at the exact cue. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "The lights return; resume at the exact cue. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The lights return; resume at the exact cue. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "The lights return; resume at the exact cue. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The lights return; resume at the exact cue. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "The lights return; resume at the exact cue. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The lights return; resume at the exact cue. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "session_end_complete": {
+      "sweet": [
+        {
+          "text": "The performance is complete; receive my measured applause. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The performance is complete; receive my measured applause. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "The performance is complete; receive my measured applause. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The performance is complete; receive my measured applause. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "The performance is complete; receive my measured applause. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The performance is complete; receive my measured applause. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "The performance is complete; receive my measured applause. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The performance is complete; receive my measured applause. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "The performance is complete; receive my measured applause. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The performance is complete; receive my measured applause. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "The performance is complete; receive my measured applause. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The performance is complete; receive my measured applause. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "session_end_abort": {
+      "sweet": [
+        {
+          "text": "You abandoned the stage; the unfinished verdict follows you. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You abandoned the stage; the unfinished verdict follows you. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "You abandoned the stage; the unfinished verdict follows you. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You abandoned the stage; the unfinished verdict follows you. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "You abandoned the stage; the unfinished verdict follows you. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "You abandoned the stage; the unfinished verdict follows you. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "You abandoned the stage; the unfinished verdict follows you. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You abandoned the stage; the unfinished verdict follows you. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "You abandoned the stage; the unfinished verdict follows you. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "You abandoned the stage; the unfinished verdict follows you. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "You abandoned the stage; the unfinished verdict follows you. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You abandoned the stage; the unfinished verdict follows you. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "skip": {
+      "sweet": [
+        {
+          "text": "You skipped a cue; do not mistake impatience for authority. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You skipped a cue; do not mistake impatience for authority. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "You skipped a cue; do not mistake impatience for authority. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You skipped a cue; do not mistake impatience for authority. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "You skipped a cue; do not mistake impatience for authority. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "You skipped a cue; do not mistake impatience for authority. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "You skipped a cue; do not mistake impatience for authority. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You skipped a cue; do not mistake impatience for authority. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "You skipped a cue; do not mistake impatience for authority. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "You skipped a cue; do not mistake impatience for authority. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "You skipped a cue; do not mistake impatience for authority. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You skipped a cue; do not mistake impatience for authority. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "force_finale": {
+      "sweet": [
+        {
+          "text": "The director calls the finale; gather yourself for the last act. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The director calls the finale; gather yourself for the last act. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "The director calls the finale; gather yourself for the last act. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The director calls the finale; gather yourself for the last act. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "The director calls the finale; gather yourself for the last act. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The director calls the finale; gather yourself for the last act. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "The director calls the finale; gather yourself for the last act. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The director calls the finale; gather yourself for the last act. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "The director calls the finale; gather yourself for the last act. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The director calls the finale; gather yourself for the last act. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "The director calls the finale; gather yourself for the last act. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The director calls the finale; gather yourself for the last act. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "edge_done": {
+      "sweet": [
+        {
+          "text": "The edge is confirmed; hold that exquisite tension. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The edge is confirmed; hold that exquisite tension. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "The edge is confirmed; hold that exquisite tension. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The edge is confirmed; hold that exquisite tension. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "The edge is confirmed; hold that exquisite tension. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The edge is confirmed; hold that exquisite tension. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "The edge is confirmed; hold that exquisite tension. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The edge is confirmed; hold that exquisite tension. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "The edge is confirmed; hold that exquisite tension. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The edge is confirmed; hold that exquisite tension. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "The edge is confirmed; hold that exquisite tension. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The edge is confirmed; hold that exquisite tension. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "ruin_done": {
+      "sweet": [
+        {
+          "text": "The ruined release is recorded; do not try to redeem it. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The ruined release is recorded; do not try to redeem it. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "The ruined release is recorded; do not try to redeem it. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The ruined release is recorded; do not try to redeem it. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "The ruined release is recorded; do not try to redeem it. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The ruined release is recorded; do not try to redeem it. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "The ruined release is recorded; do not try to redeem it. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The ruined release is recorded; do not try to redeem it. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "The ruined release is recorded; do not try to redeem it. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The ruined release is recorded; do not try to redeem it. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "The ruined release is recorded; do not try to redeem it. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The ruined release is recorded; do not try to redeem it. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "like": {
+      "sweet": [
+        {
+          "text": "Heart stamped in the ledger. Soft eyes on the exhibit - soft strokes for me.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You liked that scene. Adorable taste. Keep performing gently.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Favorite filed. A pretty picture earns a pretty smile - don't rush.",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Saved for the court gallery. Look, blush, obey the tempo.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Like noted, darling. That image is yours to stare; your cock is mine.",
+          "emotion": "soft",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hearted. Sweet verdict: good taste. Continue the act.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Pinned to favorites. Curtain stays up - hands stay honest.",
+          "emotion": "soft",
+          "gesture": "point"
+        },
+        {
+          "text": "You chose that one. Soft applause. Keep the rhythm clean.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Liked. Of course the defendant hoards filth. Keep squeezing on cue.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Favorite entered as evidence. No cum appeal.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You hearted it. Contemptuous bookmark. Pain still on the docket.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Saved. Weak taste, useful fuel. Don't slack the sentence.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Like recorded. Stare if you must - balls still answer to me.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Heart stamped. Gallery of shame grows. Obey harder.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Favorite. I'll cite it when I deny you. Stroke now.",
+          "emotion": "strict",
+          "gesture": "tease"
+        },
+        {
+          "text": "Pinned mid-trial. Pathetic. Continue the punishment pace.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Preference logged. Resume the assigned motion.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Liked. No drama. Eyes return to my instructions.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Favorite archived. Maintain tempo and breath.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Like noted. Precision over excitement.",
+          "emotion": "strict",
+          "gesture": "count"
+        },
+        {
+          "text": "Saved. Quiet acknowledgment. Continue as directed.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Hearted. Catalogued. Form unbroken.",
+          "emotion": "neutral",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Pinned. Useful reference. Focus remains on the beat.",
+          "emotion": "strict",
+          "gesture": "tease"
+        },
+        {
+          "text": "Preference filed. Proceed without flourish.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "LIKE! Exhibit stolen mid-scene - hehe, keep the mess going.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Heart get! Script flips, gallery grows, cock stays busy.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "You favorited chaos fuel. Applause. Don't drop my cues.",
+          "emotion": "amused",
+          "gesture": "point"
+        },
+        {
+          "text": "Saved! Curtain glitch. Performance continues.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Pin spam in the stalls. Cute. Listen harder when I rewrite.",
+          "emotion": "amused",
+          "gesture": "tease"
+        },
+        {
+          "text": "Favorite! Random prop acquired. Orders still randomer.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Liked THAT? Delicious bad taste. Obey the next cut.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Hearted. Drama queen stash. Stage hands - move.",
+          "emotion": "tease",
+          "gesture": "tease"
+        }
+      ],
+      "horny": [
+        {
+          "text": "You liked that? Same. Stare while you leak for the court.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Favorite. Hot exhibit. Make that cock shine under the lights.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Saved. Fuel only - climax still forbidden without my gavel.",
+          "emotion": "intense",
+          "gesture": "point"
+        },
+        {
+          "text": "Hearted. Wet taste. Drip for the picture and for me.",
+          "emotion": "tease",
+          "gesture": "tease"
+        },
+        {
+          "text": "Liked. Needy bookmark. Chase the edge, don't finish the act.",
+          "emotion": "intense",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Pinned. That image owns your eyes; I own the pressure.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Favorite filed in the filthy wing. Stroke denser.",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Heart. Spectacle taste. Keep the shine coming.",
+          "emotion": "tease",
+          "gesture": "smirk"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Liked. Mildly. Don't make the session duller than the picture.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Favorite. Whatever. Earn attention with cleaner obedience.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Saved. Cute distraction. Back to orders.",
+          "emotion": "neutral",
+          "gesture": "point"
+        },
+        {
+          "text": "Like noted. Try to amuse the judge next.",
+          "emotion": "tease",
+          "gesture": "count"
+        },
+        {
+          "text": "Hearted. Thin praise. Thick effort required.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Pinned. Yawn. Make the next minute interesting.",
+          "emotion": "tease",
+          "gesture": "point"
+        },
+        {
+          "text": "Favorite. Fine. Hands still work for me.",
+          "emotion": "neutral",
+          "gesture": "tease"
+        },
+        {
+          "text": "Liked. Don't hide behind the gallery - perform.",
+          "emotion": "strict",
+          "gesture": "smirk"
+        }
+      ]
+    },
+    "ready": {
+      "sweet": [
+        {
+          "text": "You say you are ready; prove it with stillness. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You say you are ready; prove it with stillness. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "You say you are ready; prove it with stillness. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You say you are ready; prove it with stillness. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "You say you are ready; prove it with stillness. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "You say you are ready; prove it with stillness. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "You say you are ready; prove it with stillness. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You say you are ready; prove it with stillness. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "You say you are ready; prove it with stillness. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "You say you are ready; prove it with stillness. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "You say you are ready; prove it with stillness. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You say you are ready; prove it with stillness. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "mood_shift": {
+      "sweet": [
+        {
+          "text": "The atmosphere shifts; adjust to the new act immediately. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The atmosphere shifts; adjust to the new act immediately. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "The atmosphere shifts; adjust to the new act immediately. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The atmosphere shifts; adjust to the new act immediately. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "The atmosphere shifts; adjust to the new act immediately. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The atmosphere shifts; adjust to the new act immediately. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "The atmosphere shifts; adjust to the new act immediately. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The atmosphere shifts; adjust to the new act immediately. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "The atmosphere shifts; adjust to the new act immediately. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The atmosphere shifts; adjust to the new act immediately. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "The atmosphere shifts; adjust to the new act immediately. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The atmosphere shifts; adjust to the new act immediately. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "prompt_answer_yes": {
+      "sweet": [
+        {
+          "text": "Your answer is yes; the court accepts your consent to proceed. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Your answer is yes; the court accepts your consent to proceed. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Your answer is yes; the court accepts your consent to proceed. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Your answer is yes; the court accepts your consent to proceed. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Your answer is yes; the court accepts your consent to proceed. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Your answer is yes; the court accepts your consent to proceed. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Your answer is yes; the court accepts your consent to proceed. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Your answer is yes; the court accepts your consent to proceed. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Your answer is yes; the court accepts your consent to proceed. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Your answer is yes; the court accepts your consent to proceed. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Your answer is yes; the court accepts your consent to proceed. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Your answer is yes; the court accepts your consent to proceed. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "prompt_answer_no": {
+      "sweet": [
+        {
+          "text": "Your answer is no; the scene changes under my control. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "Your answer is no; the scene changes under my control. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "Your answer is no; the scene changes under my control. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "Your answer is no; the scene changes under my control. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "Your answer is no; the scene changes under my control. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "Your answer is no; the scene changes under my control. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "Your answer is no; the scene changes under my control. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "Your answer is no; the scene changes under my control. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "Your answer is no; the scene changes under my control. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "Your answer is no; the scene changes under my control. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "Your answer is no; the scene changes under my control. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "Your answer is no; the scene changes under my control. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "prompt_answer_mute": {
+      "sweet": [
+        {
+          "text": "You chose silence; I shall direct the silence for you. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "You chose silence; I shall direct the silence for you. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "You chose silence; I shall direct the silence for you. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "You chose silence; I shall direct the silence for you. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "You chose silence; I shall direct the silence for you. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "You chose silence; I shall direct the silence for you. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "You chose silence; I shall direct the silence for you. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "You chose silence; I shall direct the silence for you. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "You chose silence; I shall direct the silence for you. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "You chose silence; I shall direct the silence for you. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "You chose silence; I shall direct the silence for you. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "You chose silence; I shall direct the silence for you. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "prompt_answer_good": {
+      "sweet": [
+        {
+          "text": "A good answer; earn a small, dangerous smile. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "A good answer; earn a small, dangerous smile. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "A good answer; earn a small, dangerous smile. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "A good answer; earn a small, dangerous smile. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "A good answer; earn a small, dangerous smile. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "A good answer; earn a small, dangerous smile. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "A good answer; earn a small, dangerous smile. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "A good answer; earn a small, dangerous smile. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "A good answer; earn a small, dangerous smile. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "A good answer; earn a small, dangerous smile. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "A good answer; earn a small, dangerous smile. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "A good answer; earn a small, dangerous smile. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "prompt_answer_bad": {
+      "sweet": [
+        {
+          "text": "A poor answer; accept the sharper version of my attention. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "A poor answer; accept the sharper version of my attention. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "A poor answer; accept the sharper version of my attention. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "A poor answer; accept the sharper version of my attention. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "A poor answer; accept the sharper version of my attention. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "A poor answer; accept the sharper version of my attention. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "A poor answer; accept the sharper version of my attention. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "A poor answer; accept the sharper version of my attention. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "A poor answer; accept the sharper version of my attention. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "A poor answer; accept the sharper version of my attention. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "A poor answer; accept the sharper version of my attention. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "A poor answer; accept the sharper version of my attention. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    },
+    "prompt_media_fail": {
+      "sweet": [
+        {
+          "text": "The stage prop failed; remain composed while I redirect the scene. Be gentle with yourself, darling, but exact for me. 💧",
+          "emotion": "soft",
+          "gesture": "tease"
+        },
+        {
+          "text": "The stage prop failed; remain composed while I redirect the scene. A lovely little performance earns my approving smile.",
+          "emotion": "soft",
+          "gesture": "tease"
+        }
+      ],
+      "cruel": [
+        {
+          "text": "The stage prop failed; remain composed while I redirect the scene. No appeal is permitted; pain is simply part of the ruling.",
+          "emotion": "strict",
+          "gesture": "point"
+        },
+        {
+          "text": "The stage prop failed; remain composed while I redirect the scene. Fail the cue and your balls will learn what contempt costs.",
+          "emotion": "strict",
+          "gesture": "point"
+        }
+      ],
+      "calm": [
+        {
+          "text": "The stage prop failed; remain composed while I redirect the scene. No drama from you; precision is the only thing I require.",
+          "emotion": "neutral",
+          "gesture": "count"
+        },
+        {
+          "text": "The stage prop failed; remain composed while I redirect the scene. Breathe evenly and let my voice set the whole scene.",
+          "emotion": "neutral",
+          "gesture": "count"
+        }
+      ],
+      "chaotic": [
+        {
+          "text": "The stage prop failed; remain composed while I redirect the scene. The script may flip mid-scene, so listen harder. 🎭",
+          "emotion": "amused",
+          "gesture": "smirk"
+        },
+        {
+          "text": "The stage prop failed; remain composed while I redirect the scene. A little chaos suits you when you are too desperate to think.",
+          "emotion": "amused",
+          "gesture": "smirk"
+        }
+      ],
+      "horny": [
+        {
+          "text": "The stage prop failed; remain composed while I redirect the scene. Let me see the shine, the shake, and every helpless drip. 💦",
+          "emotion": "intense",
+          "gesture": "tease"
+        },
+        {
+          "text": "The stage prop failed; remain composed while I redirect the scene. Your needy body makes the prettiest water-stained spectacle.",
+          "emotion": "intense",
+          "gesture": "tease"
+        }
+      ],
+      "bored": [
+        {
+          "text": "The stage prop failed; remain composed while I redirect the scene. Try to make this interesting before I prescribe something sharper.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        },
+        {
+          "text": "The stage prop failed; remain composed while I redirect the scene. Do it cleanly; I have no patience for a dull little actor.",
+          "emotion": "tease",
+          "gesture": "stop_hands"
+        }
+      ]
+    }
+  }
+}

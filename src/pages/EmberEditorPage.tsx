@@ -1,0 +1,654 @@
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
+import {
+  ArtsEditorPanel,
+  type LibNavigateFocus,
+  type LibNavigateTab,
+} from "../components/ember/editor/ArtsEditorPanel";
+import { MapEditorPanel } from "../components/ember/editor/MapEditorPanel";
+import { SceneEditorPanel } from "../components/ember/editor/SceneEditorPanel";
+import { SpriteEditorPanel } from "../components/ember/editor/SpriteEditorPanel";
+import { TileEditorPanel } from "../components/ember/editor/TileEditorPanel";
+import { VoxelSculptPanel } from "../components/ember/editor/VoxelSculptPanel";
+import {
+  clearAllLocalOverrides,
+  createEmptyScene,
+  createEventForScene,
+  listLocalOverrides,
+  loadEmberPack,
+  syncEventStageLinks,
+  upsertEvent,
+  upsertScene,
+  validatePack,
+  writeEmberJson,
+  type EmberPack,
+  type ValidationIssue,
+} from "../game";
+import type {
+  EmberArt,
+  EmberEvent,
+  EmberSpawnTable,
+  EmberStage,
+} from "../game/content/types";
+
+type Tab =
+  | "maps"
+  | "tiles"
+  | "sprites"
+  | "voxels"
+  | "scenes"
+  | "library"
+  | "validate";
+
+type Props = {
+  onBackToPlay: () => void;
+  onGrantCinders: (n: number) => void;
+};
+
+const NAV_GROUPS: Array<{
+  id: string;
+  title: string;
+  items: Array<{ id: Tab; label: string; hint: string }>;
+}> = [
+  {
+    id: "world",
+    title: "Мир",
+    items: [
+      {
+        id: "maps",
+        label: "Карты",
+        hint: "Тайлы, кисти, стадии, спавны, regions",
+      },
+    ],
+  },
+  {
+    id: "narrative",
+    title: "Нарратив",
+    items: [
+      { id: "scenes", label: "Сцены", hint: "Диалоги, splash, триггеры" },
+    ],
+  },
+  {
+    id: "tiles",
+    title: "Редактор тайлов",
+    items: [
+      {
+        id: "tiles",
+        label: "Редактор тайлов",
+        hint: "Пиксели и палитра текстур",
+      },
+    ],
+  },
+  {
+    id: "sprites",
+    title: "Редактор спрайтов",
+    items: [
+      {
+        id: "sprites",
+        label: "Редактор спрайтов",
+        hint: "Декор, герои, монстры",
+      },
+    ],
+  },
+  {
+    id: "voxels",
+    title: "Редактор вокселей",
+    items: [
+      {
+        id: "voxels",
+        label: "Редактор вокселей",
+        hint: "3D скульптор блоков по вокселям",
+      },
+    ],
+  },
+  {
+    id: "library",
+    title: "Библиотека",
+    items: [
+      {
+        id: "library",
+        label: "Библиотека",
+        hint: "Арты, тайлы, спрайты, портреты",
+      },
+    ],
+  },
+  {
+    id: "system",
+    title: "Система",
+    items: [{ id: "validate", label: "Validate", hint: "Проверка пака" }],
+  },
+];
+
+function tabMeta(tab: Tab): { group: string; label: string } {
+  for (const group of NAV_GROUPS) {
+    const item = group.items.find((i) => i.id === tab);
+    if (item) return { group: group.title, label: item.label };
+  }
+  return { group: "", label: tab };
+}
+
+export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
+  const [pack, setPack] = useState<EmberPack | null>(null);
+  const [issues, setIssues] = useState<ValidationIssue[]>([]);
+  const [tab, setTab] = useState<Tab>("maps");
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [overrides, setOverrides] = useState<string[]>([]);
+  const [sceneId, setSceneId] = useState<string | null>(null);
+  const [activeTilesetId, setActiveTilesetId] = useState<string | null>(null);
+  const [spriteFocusId, setSpriteFocusId] = useState<string | null>(null);
+  const [tileFocusId, setTileFocusId] = useState<number | null>(null);
+  const [voxelFocusId, setVoxelFocusId] = useState<string | null>(null);
+  const menubarRef = useRef<HTMLElement>(null);
+
+  const reload = useCallback(async () => {
+    setError(null);
+    try {
+      const { pack: p, issues: iss } = await loadEmberPack();
+      setPack(p);
+      setIssues(iss);
+      setOverrides(listLocalOverrides());
+      setSceneId((prev) => {
+        if (prev && p.scenes[prev]) return prev;
+        return Object.keys(p.scenes)[0] ?? null;
+      });
+      setStatus("Пак загружен");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "load failed");
+    }
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const createScene = useCallback(async () => {
+    if (!pack) return;
+    const speaker = Object.keys(pack.portraits)[0] ?? "hu_tao";
+    const scene = createEmptyScene({
+      speaker,
+      defaultBgArtId: pack.meta
+        ? Object.values(pack.scenes)[0]?.defaultBgArtId
+        : undefined,
+    });
+    const event = createEventForScene(scene, "manual");
+    let next = upsertScene(pack, scene);
+    next = upsertEvent(next, event);
+    setPack(next);
+    setIssues(validatePack(next));
+    setSceneId(scene.id);
+    const sceneRes = await writeEmberJson(`scenes/${scene.id}.json`, scene);
+    const evRes = await writeEmberJson(`events/${event.id}.json`, event);
+    setOverrides(listLocalOverrides());
+    if (sceneRes.ok && evRes.ok) {
+      setStatus(`Сцена «${scene.nameRu}» создана`);
+    } else {
+      setStatus(
+        `Сцена: ${sceneRes.ok ? "ok" : "error" in sceneRes ? sceneRes.error : "?"} · ивент: ${evRes.ok ? "ok" : "error" in evRes ? evRes.error : "?"}`,
+      );
+    }
+  }, [pack]);
+
+  const applyEventChange = useCallback(
+    async (event: EmberEvent) => {
+      if (!pack) return;
+      let next = upsertEvent(pack, event);
+      const synced = syncEventStageLinks(next, event);
+      next = synced.pack;
+      setPack(next);
+      setIssues(validatePack(next));
+      const evRes = await writeEmberJson(`events/${event.id}.json`, event);
+      for (const st of synced.stagesChanged) {
+        await writeEmberJson(`stages/${st.id}.json`, st);
+      }
+      setOverrides(listLocalOverrides());
+      setStatus(
+        evRes.ok
+          ? `Ивент обновлён (${evRes.source})`
+          : `Ивент: ${"error" in evRes ? evRes.error : "?"}`,
+      );
+    },
+    [pack],
+  );
+
+  useEffect(() => {
+    if (!openMenu) return;
+    const onDocDown = (e: MouseEvent) => {
+      const root = menubarRef.current;
+      if (root && !root.contains(e.target as Node)) {
+        setOpenMenu(null);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenMenu(null);
+    };
+    document.addEventListener("mousedown", onDocDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [openMenu]);
+
+  const mapId = pack ? Object.keys(pack.maps)[0] : null;
+  const tilesetId =
+    (activeTilesetId && pack?.tilesets[activeTilesetId]
+      ? activeTilesetId
+      : null) ?? (pack ? Object.keys(pack.tilesets)[0] : null);
+  const errorCount = issues.filter((i) => i.level === "error").length;
+  const warningCount = issues.filter((i) => i.level === "warn").length;
+  const issueCount = errorCount + warningCount;
+  const current = tabMeta(tab);
+
+  const selectTab = (id: Tab) => {
+    setTab(id);
+    setOpenMenu(null);
+  };
+
+  const applyStageChange = useCallback(
+    (stage: EmberStage) => {
+      if (!pack) return;
+      const next = {
+        ...pack,
+        stages: { ...pack.stages, [stage.id]: stage },
+      };
+      setPack(next);
+      setIssues(validatePack(next));
+    },
+    [pack],
+  );
+
+  const applySpawnChange = useCallback(
+    (spawn: EmberSpawnTable) => {
+      if (!pack) return;
+      const next = {
+        ...pack,
+        spawns: { ...pack.spawns, [spawn.id]: spawn },
+      };
+      setPack(next);
+      setIssues(validatePack(next));
+    },
+    [pack],
+  );
+
+  const navigateFromLibrary = (
+    nextTab: LibNavigateTab,
+    focus?: LibNavigateFocus,
+  ) => {
+    if (nextTab === "library") {
+      setTab("library");
+      return;
+    }
+    if (nextTab === "sprites") {
+      setSpriteFocusId(focus?.spriteId ?? null);
+      setTab("sprites");
+      setOpenMenu(null);
+      return;
+    }
+    if (nextTab === "tiles") {
+      if (focus?.tilesetId && pack?.tilesets[focus.tilesetId]) {
+        setActiveTilesetId(focus.tilesetId);
+      }
+      setTileFocusId(focus?.tileId ?? null);
+      setTab("tiles");
+      setOpenMenu(null);
+    }
+  };
+
+  useEffect(() => {
+    if (spriteFocusId == null) return;
+    const t = window.setTimeout(() => setSpriteFocusId(null), 200);
+    return () => window.clearTimeout(t);
+  }, [spriteFocusId]);
+
+  useEffect(() => {
+    if (tileFocusId == null) return;
+    const t = window.setTimeout(() => setTileFocusId(null), 200);
+    return () => window.clearTimeout(t);
+  }, [tileFocusId]);
+
+  const onMenuTrigger = (
+    e: ReactMouseEvent<HTMLButtonElement>,
+    groupId: string,
+    soleTab?: Tab,
+  ) => {
+    e.stopPropagation();
+    if (soleTab) {
+      selectTab(soleTab);
+      return;
+    }
+    setOpenMenu((cur) => (cur === groupId ? null : groupId));
+  };
+
+  return (
+    <div className="page page--ember-editor">
+      <nav
+        ref={menubarRef}
+        className="ember-menubar"
+        aria-label="Меню редактора"
+      >
+        <div
+          className="ember-menubar__brand"
+          title="Библиотека контента: карты · сцены · арты. Сохранение в content/ember (Electron) или local override."
+        >
+          Ember
+        </div>
+
+        {NAV_GROUPS.map((group) => {
+          const hasActive = group.items.some((i) => i.id === tab);
+          const soleTab =
+            group.items.length === 1 ? group.items[0]!.id : undefined;
+          const open = openMenu === group.id && !soleTab;
+          const showBadge =
+            group.id === "system" && issueCount > 0 ? issueCount : 0;
+          return (
+            <div
+              key={group.id}
+              className={`ember-menubar__menu ${open ? "is-open" : ""} ${hasActive ? "has-active" : ""}`}
+            >
+              <button
+                type="button"
+                className={`ember-menubar__trigger ${open ? "is-open" : ""} ${hasActive ? "is-active" : ""}`}
+                aria-haspopup={soleTab ? undefined : "menu"}
+                aria-expanded={soleTab ? undefined : open}
+                onClick={(e) => onMenuTrigger(e, group.id, soleTab)}
+                onMouseEnter={() => {
+                  if (soleTab || openMenu === null) return;
+                  setOpenMenu(group.id);
+                }}
+              >
+                <span>{group.title}</span>
+                {showBadge > 0 ? (
+                  <span className="ember-menubar__badge">{showBadge}</span>
+                ) : null}
+              </button>
+              {open ? (
+                <div className="ember-menubar__dropdown" role="menu">
+                  {group.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="menuitem"
+                      className={`ember-menubar__item ${tab === item.id ? "is-active" : ""}`}
+                      title={item.hint}
+                      onClick={() => selectTab(item.id)}
+                    >
+                      <span>{item.label}</span>
+                      {item.id === "validate" && issueCount > 0 ? (
+                        <span className="ember-menubar__badge">
+                          {issueCount}
+                        </span>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+
+        <div className="ember-menubar__current" aria-live="polite">
+          <span className="ember-menubar__crumb muted">{current.group}</span>
+          <span className="ember-menubar__crumb-sep" aria-hidden>
+            /
+          </span>
+          <strong>{current.label}</strong>
+          {status ? (
+            <span className="ember-menubar__status muted" title={status}>
+              · {status}
+            </span>
+          ) : null}
+          {overrides.length > 0 ? (
+            <span
+              className="ember-menubar__status muted"
+              title={overrides.join(", ")}
+            >
+              · override×{overrides.length}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="ember-menubar__actions">
+          <button type="button" className="ghost" onClick={onBackToPlay}>
+            К игре
+          </button>
+          <button type="button" className="ghost" onClick={() => void reload()}>
+            Reload
+          </button>
+          <button
+            type="button"
+            className="ghost"
+            title="Clear local overrides"
+            onClick={() => {
+              clearAllLocalOverrides();
+              setOverrides([]);
+              void reload();
+              setStatus("Overrides очищены");
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      </nav>
+
+      {error ? <p className="ember-error">{error}</p> : null}
+
+      <div className="ember-editor-shell">
+        <div className="ember-editor-body">
+          {!pack ? (
+            <p className="muted">Загрузка…</p>
+          ) : (
+            <>
+              {tab === "maps" && mapId && pack.maps[mapId] ? (
+                <MapEditorPanel
+                  pack={{
+                    ...pack,
+                    voxelModels: pack.voxelModels ?? {},
+                  }}
+                  map={pack.maps[mapId]}
+                  onChange={(map) => {
+                    const next = {
+                      ...pack,
+                      maps: { ...pack.maps, [map.id]: map },
+                    };
+                    setPack(next);
+                    setIssues(validatePack(next));
+                  }}
+                  onPackChange={(next) => {
+                    setPack(next);
+                    setIssues(validatePack(next));
+                  }}
+                  onStageChange={applyStageChange}
+                  onSpawnChange={applySpawnChange}
+                  onSaved={(msg) => {
+                    setStatus(msg);
+                    setOverrides(listLocalOverrides());
+                  }}
+                  onEditTile={(tileId) => {
+                    setTileFocusId(tileId);
+                    setTab("tiles");
+                    setOpenMenu(null);
+                  }}
+                  onEditSprite={(spriteId) => {
+                    setSpriteFocusId(spriteId);
+                    setTab("sprites");
+                    setOpenMenu(null);
+                  }}
+                />
+              ) : null}
+
+              {tab === "tiles" && tilesetId && pack.tilesets[tilesetId] ? (
+                <TileEditorPanel
+                  pack={pack}
+                  tileset={pack.tilesets[tilesetId]}
+                  favorites={pack.paletteFavorites ?? []}
+                  initialTileId={tileFocusId}
+                  onFavoritesChange={(paletteFavorites) => {
+                    const next = { ...pack, paletteFavorites };
+                    setPack(next);
+                    void writeEmberJson("sprites/registry.json", {
+                      paletteFavorites,
+                      sprites: Object.values(pack.sprites),
+                    });
+                  }}
+                  onChange={(tileset) => {
+                    const next = {
+                      ...pack,
+                      tilesets: { ...pack.tilesets, [tileset.id]: tileset },
+                    };
+                    setPack(next);
+                    setIssues(validatePack(next));
+                  }}
+                  onSaved={(msg) => {
+                    setStatus(msg);
+                    setOverrides(listLocalOverrides());
+                  }}
+                />
+              ) : null}
+
+              {tab === "sprites" ? (
+                <SpriteEditorPanel
+                  pack={pack}
+                  initialSpriteId={spriteFocusId}
+                  onChangePack={(next) => {
+                    setPack(next);
+                    setIssues(validatePack(next));
+                  }}
+                  onSaved={(msg) => {
+                    setStatus(msg);
+                    setOverrides(listLocalOverrides());
+                  }}
+                />
+              ) : null}
+
+              {tab === "voxels" ? (
+                <VoxelSculptPanel
+                  pack={{
+                    ...pack,
+                    voxelModels: pack.voxelModels ?? {},
+                    lightPresets: pack.lightPresets ?? {},
+                    lookPresets: pack.lookPresets ?? {},
+                  }}
+                  modelId={voxelFocusId}
+                  onActiveModelChange={setVoxelFocusId}
+                  onPackChange={(next) => {
+                    setPack(next);
+                    setIssues(validatePack(next));
+                    // Keep current focus; only fall back if the focused model was deleted.
+                    setVoxelFocusId((prev) => {
+                      if (prev && next.voxelModels[prev]) return prev;
+                      if (prev && !next.voxelModels[prev]) {
+                        return Object.keys(next.voxelModels)[0] ?? null;
+                      }
+                      return prev;
+                    });
+                  }}
+                  onSaved={(msg) => {
+                    setStatus(msg);
+                    setOverrides(listLocalOverrides());
+                  }}
+                />
+              ) : null}
+
+              {tab === "scenes" ? (
+                sceneId && pack.scenes[sceneId] ? (
+                  <SceneEditorPanel
+                    pack={pack}
+                    scene={pack.scenes[sceneId]}
+                    sceneId={sceneId}
+                    onSelectScene={setSceneId}
+                    onCreateScene={() => void createScene()}
+                    onChange={(scene) => {
+                      const next = {
+                        ...pack,
+                        scenes: { ...pack.scenes, [scene.id]: scene },
+                      };
+                      setPack(next);
+                      setIssues(validatePack(next));
+                    }}
+                    onArtsChange={(arts: EmberArt[]) => {
+                      const map: Record<string, EmberArt> = {};
+                      for (const a of arts) map[a.id] = a;
+                      const next = { ...pack, arts: map };
+                      setPack(next);
+                      setIssues(validatePack(next));
+                    }}
+                    onEventChange={(event) => void applyEventChange(event)}
+                    onEnsureEvent={() => {
+                      const scene = pack.scenes[sceneId];
+                      if (!scene) return;
+                      const event = createEventForScene(scene, "manual");
+                      void applyEventChange(event);
+                    }}
+                    onSaved={(msg) => {
+                      setStatus(msg);
+                      setOverrides(listLocalOverrides());
+                    }}
+                    onGrantCinders={onGrantCinders}
+                  />
+                ) : (
+                  <div className="ember-ed-card">
+                    <p className="muted">Нет сцен в паке.</p>
+                    <button
+                      type="button"
+                      className="primary"
+                      onClick={() => void createScene()}
+                    >
+                      + Создать сцену
+                    </button>
+                  </div>
+                )
+              ) : null}
+
+              {tab === "library" ? (
+                <ArtsEditorPanel
+                  pack={pack}
+                  onNavigate={navigateFromLibrary}
+                  onChange={(arts: EmberArt[]) => {
+                    const map: Record<string, EmberArt> = {};
+                    for (const a of arts) map[a.id] = a;
+                    const next = { ...pack, arts: map };
+                    setPack(next);
+                    setIssues(validatePack(next));
+                  }}
+                  onSaved={(msg) => {
+                    setStatus(msg);
+                    setOverrides(listLocalOverrides());
+                  }}
+                />
+              ) : null}
+
+              {tab === "validate" ? (
+                <div className="ember-ed-card ember-validate">
+                  <h3 className="ember-ed-card__title">Проверка пака</h3>
+                  {issues.length === 0 ? (
+                    <p>Ошибок нет ✓</p>
+                  ) : (
+                    issues.map((i) => (
+                      <div
+                        key={i.path + i.message}
+                        className={
+                          i.level === "error"
+                            ? "ember-validate--error"
+                            : "ember-validate--warn"
+                        }
+                      >
+                        [{i.level}] {i.path}: {i.message}
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

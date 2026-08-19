@@ -1,0 +1,65 @@
+{
+  "weapons": [
+    {
+      "id": "butterfly_fan",
+      "nameRu": "Веер бабочек",
+      "rarity": "common",
+      "kind": "orbit",
+      "damage": 8,
+      "cooldownMs": 900,
+      "count": 2,
+      "speed": 140,
+      "range": 48,
+      "levelBonus": { "damage": 2, "count": 0.5 }
+    },
+    {
+      "id": "spirit_bolt",
+      "nameRu": "Огонёк духа",
+      "rarity": "common",
+      "kind": "projectile",
+      "damage": 10,
+      "cooldownMs": 450,
+      "count": 1,
+      "speed": 280,
+      "range": 260,
+      "levelBonus": { "damage": 3, "count": 0.25 }
+    },
+    {
+      "id": "pyre_ring",
+      "nameRu": "Круг погребального огня",
+      "rarity": "rare",
+      "kind": "nova",
+      "damage": 14,
+      "cooldownMs": 1600,
+      "count": 1,
+      "speed": 0,
+      "range": 90,
+      "levelBonus": { "damage": 4, "range": 8 }
+    },
+    {
+      "id": "cleansing_ward",
+      "nameRu": "Оберег очищения",
+      "rarity": "rare",
+      "kind": "passive",
+      "damage": 0,
+      "cooldownMs": 0,
+      "count": 0,
+      "speed": 0,
+      "range": 0,
+      "passive": { "filthResist": 0.35, "moveSpeedMul": 1.08 },
+      "levelBonus": { "filthResist": 0.1 }
+    },
+    {
+      "id": "heal_ember",
+      "nameRu": "Тёплый уголёк",
+      "rarity": "common",
+      "kind": "instant_heal",
+      "damage": 0,
+      "cooldownMs": 0,
+      "count": 0,
+      "speed": 0,
+      "range": 0,
+      "heal": 28
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+node_modules
+dist
+.DS_Store
+*.local
+.vite
+.joi-conductor-server.pid
+.env
+.env.*
+backup/
+.zcode/
+scripts/__pycache__/
+scripts/.tmp-*/
+__pycache__/
+*.pyc
+*.lnk

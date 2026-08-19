@@ -1,0 +1,10 @@
+{
+  "id": "p1_chests",
+  "entries": [
+    { "itemId": "spirit_bolt", "weight": 30, "rarity": "common" },
+    { "itemId": "pyre_ring", "weight": 22, "rarity": "rare" },
+    { "itemId": "cleansing_ward", "weight": 18, "rarity": "rare" },
+    { "itemId": "heal_ember", "weight": 35, "rarity": "common" },
+    { "itemId": "butterfly_fan", "weight": 15, "rarity": "common" }
+  ]
+}

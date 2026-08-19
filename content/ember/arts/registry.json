@@ -1,0 +1,180 @@
+{
+  "arts": [
+    {
+      "id": "hu_tao_clear_placeholder",
+      "path": "arts/files/hu_tao_clear_placeholder.svg",
+      "mistressId": "hu_tao",
+      "nsfw": false,
+      "kind": "cg",
+      "tags": [
+        "demo",
+        "clear"
+      ],
+      "captionRu": "Плейсхолдер CG — замени своим артом"
+    },
+    {
+      "id": "hu_tao_bunny_cheer",
+      "path": "portraits/hu_tao/bunny/bunny_cheer.png",
+      "mistressId": "hu_tao",
+      "nsfw": true,
+      "kind": "portrait",
+      "tags": [
+        "bunny",
+        "dialogue",
+        "cheer"
+      ],
+      "captionRu": "Ху Тао bunny — радость"
+    },
+    {
+      "id": "hu_tao_bunny_cool",
+      "path": "portraits/hu_tao/bunny/bunny_cool.png",
+      "mistressId": "hu_tao",
+      "nsfw": true,
+      "kind": "portrait",
+      "tags": [
+        "bunny",
+        "dialogue",
+        "cool"
+      ],
+      "captionRu": "Ху Тао bunny — скрестила руки"
+    },
+    {
+      "id": "hu_tao_bunny_smirk",
+      "path": "portraits/hu_tao/bunny/bunny_smirk.png",
+      "mistressId": "hu_tao",
+      "nsfw": true,
+      "kind": "portrait",
+      "tags": [
+        "bunny",
+        "dialogue",
+        "smirk"
+      ],
+      "captionRu": "Ху Тао bunny — ухмылка"
+    },
+    {
+      "id": "hu_tao_bunny_peace",
+      "path": "portraits/hu_tao/bunny/bunny_peace.png",
+      "mistressId": "hu_tao",
+      "nsfw": true,
+      "kind": "portrait",
+      "tags": [
+        "bunny",
+        "dialogue",
+        "peace"
+      ],
+      "captionRu": "Ху Тао bunny — мир"
+    },
+    {
+      "id": "hu_tao_bunny_shy",
+      "path": "portraits/hu_tao/bunny/bunny_shy.png",
+      "mistressId": "hu_tao",
+      "nsfw": true,
+      "kind": "portrait",
+      "tags": [
+        "bunny",
+        "dialogue",
+        "shy"
+      ],
+      "captionRu": "Ху Тао bunny — стесняется"
+    },
+    {
+      "id": "hu_tao_bunny_tease",
+      "path": "portraits/hu_tao/bunny/bunny_tease.png",
+      "mistressId": "hu_tao",
+      "nsfw": true,
+      "kind": "portrait",
+      "tags": [
+        "bunny",
+        "dialogue",
+        "tease"
+      ],
+      "captionRu": "Ху Тао bunny — дразнит"
+    },
+    {
+      "id": "hu_tao_bunny_soft",
+      "path": "portraits/hu_tao/bunny/bunny_soft.png",
+      "mistressId": "hu_tao",
+      "nsfw": true,
+      "kind": "portrait",
+      "tags": [
+        "bunny",
+        "dialogue",
+        "soft"
+      ],
+      "captionRu": "Ху Тао bunny — мягкая"
+    },
+    {
+      "id": "hu_tao_bunny_fluster",
+      "path": "portraits/hu_tao/bunny/bunny_fluster.png",
+      "mistressId": "hu_tao",
+      "nsfw": true,
+      "kind": "portrait",
+      "tags": [
+        "bunny",
+        "dialogue",
+        "fluster"
+      ],
+      "captionRu": "Ху Тао bunny — смущение"
+    },
+    {
+      "id": "hu_tao_bunny_mad",
+      "path": "portraits/hu_tao/bunny/bunny_mad.png",
+      "mistressId": "hu_tao",
+      "nsfw": true,
+      "kind": "portrait",
+      "tags": [
+        "bunny",
+        "dialogue",
+        "mad"
+      ],
+      "captionRu": "Ху Тао bunny — злится"
+    },
+    {
+      "id": "hu_tao_bunny_bashful",
+      "path": "portraits/hu_tao/bunny/bunny_bashful.png",
+      "mistressId": "hu_tao",
+      "nsfw": true,
+      "kind": "portrait",
+      "tags": [
+        "bunny",
+        "dialogue",
+        "bashful"
+      ],
+      "captionRu": "Ху Тао bunny — стыд"
+    },
+    {
+      "id": "hu_tao_bunny_shock",
+      "path": "portraits/hu_tao/bunny/bunny_shock.png",
+      "mistressId": "hu_tao",
+      "nsfw": true,
+      "kind": "portrait",
+      "tags": [
+        "bunny",
+        "dialogue",
+        "shock"
+      ],
+      "captionRu": "Ху Тао bunny — шок"
+    },
+    {
+      "id": "hu_tao_bunny_cry",
+      "path": "portraits/hu_tao/bunny/bunny_cry.png",
+      "mistressId": "hu_tao",
+      "nsfw": true,
+      "kind": "portrait",
+      "tags": [
+        "bunny",
+        "dialogue",
+        "cry"
+      ],
+      "captionRu": "Ху Тао bunny — плач"
+    },
+    {
+      "id": "49bd31e4-b1e2-495d-b57d-eb01994be362",
+      "path": "arts/files/49bd31e4-b1e2-495d-b57d-eb01994be362.jpg",
+      "mistressId": "hu_tao",
+      "nsfw": false,
+      "kind": "cg",
+      "captionRu": ""
+    }
+  ]
+}

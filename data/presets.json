@@ -1,0 +1,260 @@
+{
+  "version": 2,
+  "presets": [
+    {
+      "id": "light",
+      "nameRu": "Лёгкий",
+      "descriptionRu": "Короче и мягче — выше шанс cum, спокойный BPM.",
+      "params": {
+        "durationSec": 420,
+        "edgesTarget": 3,
+        "ruinsTarget": 0,
+        "pCum": 0.7,
+        "pRuin": 0.15,
+        "bpmMin": 50,
+        "bpmMax": 90,
+        "blockSecMin": 20,
+        "blockSecMax": 35
+      }
+    },
+    {
+      "id": "medium",
+      "nameRu": "Средний",
+      "descriptionRu": "Баланс по умолчанию — ни сладко, ни жестоко.",
+      "params": {
+        "durationSec": 600,
+        "edgesTarget": 5,
+        "ruinsTarget": 0,
+        "pCum": 0.55,
+        "pRuin": 0.25,
+        "bpmMin": 60,
+        "bpmMax": 120
+      }
+    },
+    {
+      "id": "heavy",
+      "nameRu": "Тяжёлый",
+      "descriptionRu": "Дольше, больше эджей, жёстче темп и denial.",
+      "params": {
+        "durationSec": 900,
+        "edgesTarget": 8,
+        "ruinsTarget": 1,
+        "pCum": 0.35,
+        "pRuin": 0.3,
+        "bpmMin": 80,
+        "bpmMax": 140,
+        "blockSecMin": 30,
+        "blockSecMax": 50
+      }
+    },
+    {
+      "id": "anal_focus",
+      "nameRu": "Анал",
+      "descriptionRu": "Режим anal + умеренный темп. Нужен unlock режима.",
+      "params": {
+        "mode": "anal",
+        "durationSec": 600,
+        "edgesTarget": 4,
+        "pCum": 0.5,
+        "pRuin": 0.25,
+        "bpmMin": 55,
+        "bpmMax": 100
+      }
+    },
+    {
+      "id": "denial",
+      "nameRu": "Denial",
+      "descriptionRu": "Почти без cum — эджи и её ухмылка.",
+      "params": {
+        "durationSec": 720,
+        "edgesTarget": 7,
+        "ruinsTarget": 0,
+        "pCum": 0.1,
+        "pRuin": 0.2,
+        "finishId": "hand",
+        "cumplayId": "none"
+      }
+    },
+    {
+      "id": "chastity",
+      "nameRu": "Клетка",
+      "descriptionRu": "Chastity + вибро. Нужен unlock режима клетки.",
+      "params": {
+        "mode": "chastity",
+        "durationSec": 720,
+        "edgesTarget": 4,
+        "ruinsTarget": 0,
+        "pCum": 0.35,
+        "pRuin": 0.25,
+        "blockSecMin": 30,
+        "blockSecMax": 55,
+        "finishId": "hand",
+        "cumplayId": "none"
+      }
+    },
+    {
+      "id": "cei",
+      "nameRu": "CEI",
+      "descriptionRu": "Выше шанс cum и cumplay «на вкус».",
+      "params": {
+        "durationSec": 660,
+        "edgesTarget": 5,
+        "pCum": 0.65,
+        "pRuin": 0.15,
+        "finishId": "hand",
+        "cumplayId": "taste"
+      }
+    },
+    {
+      "id": "cbt_court",
+      "nameRu": "Суд CBT",
+      "descriptionRu": "Tide: режим CBT, боль и контроль. Нужен unlock CBT (Фурина).",
+      "params": {
+        "mode": "cbt",
+        "durationSec": 900,
+        "edgesTarget": 7,
+        "ruinsTarget": 1,
+        "pCum": 0.35,
+        "pRuin": 0.35,
+        "bpmMin": 60,
+        "bpmMax": 110,
+        "blockSecMin": 25,
+        "blockSecMax": 45
+      }
+    },
+    {
+      "id": "prone_tide",
+      "nameRu": "Prone",
+      "descriptionRu": "Tide: бёдрами лёжа, член в поверхность — без рук. Режим Prone (Фурина).",
+      "params": {
+        "mode": "prone",
+        "durationSec": 900,
+        "edgesTarget": 6,
+        "ruinsTarget": 1,
+        "pCum": 0.4,
+        "pRuin": 0.3,
+        "bpmMin": 55,
+        "bpmMax": 105,
+        "blockSecMin": 28,
+        "blockSecMax": 48
+      }
+    },
+    {
+      "id": "heavy_tide",
+      "nameRu": "Приговор",
+      "descriptionRu": "Tide: длинное слушание, CBT, эджи и руины, cum ≤50%.",
+      "params": {
+        "mode": "cbt",
+        "durationSec": 1200,
+        "edgesTarget": 9,
+        "ruinsTarget": 2,
+        "pCum": 0.28,
+        "pRuin": 0.4,
+        "bpmMin": 70,
+        "bpmMax": 130,
+        "blockSecMin": 30,
+        "blockSecMax": 50
+      }
+    },
+    {
+      "id": "denial_verdict",
+      "nameRu": "Отказ суда",
+      "descriptionRu": "Tide: почти без cum — приговор denial.",
+      "params": {
+        "durationSec": 900,
+        "edgesTarget": 8,
+        "ruinsTarget": 1,
+        "pCum": 0.08,
+        "pRuin": 0.35,
+        "bpmMin": 65,
+        "bpmMax": 120,
+        "finishId": "hand",
+        "cumplayId": "none"
+      }
+    },
+    {
+      "id": "idol_soft",
+      "nameRu": "Idol soft",
+      "descriptionRu": "Санна: клетка + вибро, без hand-stroke. Короткая мягкая репетиция.",
+      "params": {
+        "mode": "chastity",
+        "durationSec": 480,
+        "edgesTarget": 3,
+        "ruinsTarget": 0,
+        "pCum": 0.65,
+        "pRuin": 0.15,
+        "bpmMin": 45,
+        "bpmMax": 90,
+        "blockSecMin": 20,
+        "blockSecMax": 35
+      }
+    },
+    {
+      "id": "oral_rehearsal",
+      "nameRu": "Горло",
+      "descriptionRu": "Idol: режим oral — shallow/deep/hold. Нужен unlock орала (Санна).",
+      "params": {
+        "mode": "oral",
+        "durationSec": 600,
+        "edgesTarget": 4,
+        "ruinsTarget": 0,
+        "pCum": 0.55,
+        "pRuin": 0.2,
+        "bpmMin": 50,
+        "bpmMax": 95,
+        "blockSecMin": 22,
+        "blockSecMax": 40
+      }
+    },
+    {
+      "id": "anal_locked",
+      "nameRu": "Анал · клетка",
+      "descriptionRu": "Circus: anal-фокус (финал спереди не в её правилах). Нужен unlock anal.",
+      "params": {
+        "mode": "anal",
+        "durationSec": 720,
+        "edgesTarget": 5,
+        "ruinsTarget": 1,
+        "pCum": 0.4,
+        "pRuin": 0.3,
+        "bpmMin": 55,
+        "bpmMax": 110,
+        "blockSecMin": 28,
+        "blockSecMax": 48
+      }
+    },
+    {
+      "id": "phantom_cage",
+      "nameRu": "Phantom",
+      "descriptionRu": "Circus: клетка + phantom stroke. Нужен unlock chastity.",
+      "params": {
+        "mode": "chastity",
+        "durationSec": 780,
+        "edgesTarget": 5,
+        "ruinsTarget": 0,
+        "pCum": 0.3,
+        "pRuin": 0.25,
+        "blockSecMin": 30,
+        "blockSecMax": 55,
+        "finishId": "hand",
+        "cumplayId": "none"
+      }
+    },
+    {
+      "id": "mask_deny",
+      "nameRu": "Маска · deny",
+      "descriptionRu": "Circus: denial и хаос — почти без cum.",
+      "params": {
+        "durationSec": 840,
+        "edgesTarget": 7,
+        "ruinsTarget": 1,
+        "pCum": 0.12,
+        "pRuin": 0.35,
+        "bpmMin": 70,
+        "bpmMax": 130,
+        "finishId": "hand",
+        "cumplayId": "none"
+      }
+    }
+  ]
+}

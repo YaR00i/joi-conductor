@@ -1,0 +1,29 @@
+{
+  "id": "hu_tao_p1",
+  "nameRu": "Двор Ху Тао — срез",
+  "playerMistressId": "hu_tao",
+  "mapId": "hu_tao_yard",
+  "spawnTableId": "hu_tao_p1",
+  "weaponPoolId": "p1_weapons",
+  "chestPoolId": "p1_chests",
+  "starterWeaponId": "butterfly_fan",
+  "durationSec": 300,
+  "bossAtSec": 120,
+  "playerHp": 100,
+  "moveSpeed": 110,
+  "playerBody": {
+    "radiusVoxels": 2.5,
+    "heightVoxels": 12,
+    "stepHeightVoxels": 4,
+    "skinVoxels": 0.15,
+    "layer": "actor",
+    "mask": [
+      "world"
+    ]
+  },
+  "cindersClear": 28,
+  "cindersFail": 6,
+  "onClearEventId": "hu_tao_clear_demo",
+  "xpGemValue": 1,
+  "baseXpToLevel": 12
+}

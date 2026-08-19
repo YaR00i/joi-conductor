@@ -1,0 +1,11 @@
+{
+  "id": "ember_p1",
+  "version": 1,
+  "nameRu": "Ember Anomaly — Phase 1",
+  "defaultStageId": "hu_tao_p1",
+  "mistressDefaults": {
+    "hu_tao": {
+      "stageId": "hu_tao_p1"
+    }
+  }
+}

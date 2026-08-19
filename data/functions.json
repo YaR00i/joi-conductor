@@ -1,0 +1,1377 @@
+{
+  "version": 1,
+  "functions": [
+    {
+      "id": "stroke_left",
+      "name": "Left hand",
+      "nameRu": "Левая рука",
+      "descriptionRu": "Дрочка только левой рукой. Правая не участвует. Ход в такт бита.",
+      "category": "stroke",
+      "modes": [
+        "stroke"
+      ],
+      "intensity": 2,
+      "hands": "one",
+      "bodyFocus": [
+        "shaft",
+        "head"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [
+        "stroke_two_hands"
+      ],
+      "cuesRu": [
+        "Только левая.",
+        "Правая отдыхает.",
+        "Ровный ход по биту."
+      ],
+      "avatarHint": {
+        "gesture": "point_left",
+        "energy": 1
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "stroke_right",
+      "name": "Right hand",
+      "nameRu": "Правая рука",
+      "descriptionRu": "Дрочка только правой рукой. Левая не участвует. Ход в такт бита.",
+      "category": "stroke",
+      "modes": [
+        "stroke"
+      ],
+      "intensity": 2,
+      "hands": "one",
+      "bodyFocus": [
+        "shaft",
+        "head"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [
+        "stroke_two_hands"
+      ],
+      "cuesRu": [
+        "Только правая.",
+        "Левая отдыхает.",
+        "Держи темп бита."
+      ],
+      "avatarHint": {
+        "gesture": "point_right",
+        "energy": 1
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "stroke_two_hands",
+      "name": "Two hands",
+      "nameRu": "Две руки",
+      "descriptionRu": "Обе руки на члене. Можно встречное скручивание. Обе доли паттерна отрабатываются.",
+      "category": "stroke",
+      "modes": [
+        "stroke"
+      ],
+      "intensity": 3,
+      "hands": "two",
+      "bodyFocus": [
+        "shaft",
+        "head"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [
+        "stroke_left",
+        "stroke_right",
+        "stroke_reverse"
+      ],
+      "cuesRu": [
+        "Обе руки.",
+        "Можно скручивать встречно.",
+        "Не сбивайся с долей."
+      ],
+      "avatarHint": {
+        "gesture": "both_hands",
+        "energy": 2
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "stroke_reverse",
+      "name": "Reverse grip",
+      "nameRu": "Обратный хват",
+      "descriptionRu": "Хват «наоборот»: большой палец к себе. Короче ход, чётче попадание в бит.",
+      "category": "stroke",
+      "modes": [
+        "stroke"
+      ],
+      "intensity": 3,
+      "hands": "one",
+      "bodyFocus": [
+        "shaft",
+        "head"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [
+        "stroke_two_hands"
+      ],
+      "cuesRu": [
+        "Обратный хват.",
+        "Большой палец к себе.",
+        "Короче ход, чётче бит."
+      ],
+      "avatarHint": {
+        "gesture": "twist",
+        "energy": 2
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "stroke_prone",
+      "name": "Prone",
+      "nameRu": "Лёжа на животе",
+      "descriptionRu": "Prone Tide: на животе, член упирается в кровать/пол под тобой. Без рук — ритм бёдрами, давление в такт.",
+      "category": "stroke",
+      "modes": [
+        "prone",
+        "cbt"
+      ],
+      "intensity": 4,
+      "hands": "none",
+      "bodyFocus": [
+        "shaft",
+        "mixed"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [],
+      "cuesRu": [
+        "На живот. Руки не трогают член.",
+        "Упрись членом в поверхность под собой.",
+        "Качай бёдрами в бит — давление, не скорость."
+      ],
+      "avatarHint": {
+        "gesture": "look_down",
+        "energy": 2
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "stroke_head_only",
+      "name": "Head only",
+      "nameRu": "Только головка",
+      "descriptionRu": "Стимуляция только головки (и уздечки). Ствол не гладить. Мелкие движения в ритм.",
+      "category": "stroke",
+      "modes": [
+        "stroke"
+      ],
+      "intensity": 4,
+      "hands": "one",
+      "bodyFocus": [
+        "head"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [
+        "stroke_shaft_only"
+      ],
+      "cuesRu": [
+        "Только головка.",
+        "Смазка.",
+        "Мелкие движения в ритм."
+      ],
+      "avatarHint": {
+        "gesture": "pinch",
+        "energy": 2
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "stroke_shaft_only",
+      "name": "Shaft only",
+      "nameRu": "Только ствол",
+      "descriptionRu": "Длинный ход только по стволу. Головку не трогать — тизер и контроль.",
+      "category": "stroke",
+      "modes": [
+        "stroke"
+      ],
+      "intensity": 2,
+      "hands": "one",
+      "bodyFocus": [
+        "shaft"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [
+        "stroke_head_only"
+      ],
+      "cuesRu": [
+        "Головку не трогать.",
+        "Длинный ход по стволу.",
+        "Спокойнее, чем кажется."
+      ],
+      "avatarHint": {
+        "gesture": "wave",
+        "energy": 1
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "vibe_assist",
+      "name": "Vibe + hand",
+      "nameRu": "Вибро + рука",
+      "descriptionRu": "Внешняя вибрация (wand / вибропуля) на головке/уздечке, рука продолжает ход по биту.",
+      "category": "vibe",
+      "modes": [
+        "stroke",
+        "anal",
+        "oral"
+      ],
+      "intensity": 4,
+      "hands": "one",
+      "bodyFocus": [
+        "head",
+        "shaft",
+        "mixed"
+      ],
+      "requiresToys": [
+        "wand"
+      ],
+      "incompatibleWith": [
+        "hands_off_vibe",
+        "combo_cage_wand"
+      ],
+      "cuesRu": [
+        "Wand / пуля к головке/уздечке.",
+        "Рука продолжает бит.",
+        "Не сразу на максимум."
+      ],
+      "avatarHint": {
+        "gesture": "buzz",
+        "energy": 3
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "hands_off_vibe",
+      "name": "Hands-free vibe",
+      "nameRu": "Только вибро",
+      "descriptionRu": "Руки прочь. Только внешняя вибрация — wand или вибропуля (пульс под бит или постоянно).",
+      "category": "vibe",
+      "modes": [
+        "stroke",
+        "chastity",
+        "oral",
+        "plapping"
+      ],
+      "intensity": 3,
+      "hands": "none",
+      "bodyFocus": [
+        "head",
+        "shaft"
+      ],
+      "requiresToys": [
+        "wand"
+      ],
+      "incompatibleWith": [
+        "vibe_assist",
+        "vibe_press",
+        "stroke_left",
+        "stroke_right",
+        "stroke_two_hands"
+      ],
+      "cuesRu": [
+        "Руки убрать.",
+        "Только wand / вибропуля.",
+        "Держись."
+      ],
+      "avatarHint": {
+        "gesture": "stop_hands",
+        "energy": 2
+      },
+      "enabled": true,
+      "drive": "vibe"
+    },
+    {
+      "id": "vibe_press",
+      "name": "Vibe press on cage",
+      "nameRu": "Вибро к клетке",
+      "descriptionRu": "Руки только на игрушке: прижми wand / вибропулю к клетке/клитору. Ствол не гладить.",
+      "category": "vibe",
+      "modes": [
+        "chastity",
+        "oral",
+        "plapping"
+      ],
+      "intensity": 3,
+      "hands": "one",
+      "bodyFocus": [
+        "head",
+        "mixed"
+      ],
+      "requiresToys": [
+        "wand",
+        "chastity_cage"
+      ],
+      "incompatibleWith": [
+        "vibe_assist",
+        "hands_off_vibe",
+        "stroke_left",
+        "stroke_right",
+        "stroke_two_hands"
+      ],
+      "cuesRu": [
+        "Руки только на wand / пуле.",
+        "Прижми к клетке / клитору.",
+        "Ствол не трогать."
+      ],
+      "avatarHint": {
+        "gesture": "buzz",
+        "energy": 3
+      },
+      "enabled": true,
+      "drive": "vibe"
+    },
+    {
+      "id": "edge2_pulse",
+      "name": "Edge 2 pulse",
+      "nameRu": "Edge 2 под бит",
+      "descriptionRu": "Lovense Edge 2: простатный пульс в долю (или фон + акцент на сильной). Руки по желанию блока — по умолчанию без дрочки.",
+      "category": "vibe",
+      "modes": [
+        "chastity",
+        "anal"
+      ],
+      "intensity": 4,
+      "hands": "none",
+      "bodyFocus": [
+        "ass"
+      ],
+      "requiresToys": [
+        "lovense_edge2"
+      ],
+      "incompatibleWith": [],
+      "cuesRu": [
+        "Edge 2 внутри.",
+        "Пульс в долю / акцент.",
+        "Не дрочи, пока не скажу."
+      ],
+      "avatarHint": {
+        "gesture": "buzz",
+        "energy": 3
+      },
+      "enabled": true,
+      "drive": "vibe"
+    },
+    {
+      "id": "vibe_plug_active",
+      "name": "Vibrating plug",
+      "nameRu": "Вибро-пробка",
+      "descriptionRu": "Вибрирующая пробка как основной стимул. Можно лёгкий ход рукой, если блок не hands-off.",
+      "category": "vibe",
+      "modes": [
+        "chastity",
+        "anal",
+        "oral"
+      ],
+      "intensity": 3,
+      "hands": "one",
+      "bodyFocus": [
+        "ass",
+        "shaft"
+      ],
+      "requiresToys": [
+        "vibrating_plug"
+      ],
+      "incompatibleWith": [
+        "plug_passive"
+      ],
+      "cuesRu": [
+        "Вибро-plug внутри.",
+        "Фон или пульс под акцент.",
+        "Ход рукой — только если разрешу."
+      ],
+      "avatarHint": {
+        "gesture": "buzz",
+        "energy": 2
+      },
+      "enabled": true,
+      "drive": "vibe"
+    },
+    {
+      "id": "plug_passive",
+      "name": "Anal fill grind",
+      "nameRu": "Наполненность + grind",
+      "descriptionRu": "Пробка или дилдо worn внутри. Сиди / слегка качай бёдрами — без thrust-хода. В дрочке, онахоле и CBT рука работает по правилам режима; в клетке / plapping ствол не гладить.",
+      "category": "combo",
+      "modes": [
+        "stroke",
+        "chastity",
+        "cbt",
+        "plapping"
+      ],
+      "intensity": 3,
+      "hands": "one",
+      "bodyFocus": [
+        "ass",
+        "shaft",
+        "mixed"
+      ],
+      "requiresToys": [
+        "plug_static"
+      ],
+      "incompatibleWith": [
+        "vibe_plug_active",
+        "anal_thrust",
+        "anal_thrust_plus_nipple"
+      ],
+      "cuesRu": [
+        "Пробка или дилдо внутри (worn).",
+        "Гринди бёдрами — без вынимания.",
+        "Дрочка/онахол/CBT: руки по режиму; клетка: ствол не трогать."
+      ],
+      "avatarHint": {
+        "gesture": "point",
+        "energy": 2
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "nipple_play",
+      "name": "Nipples",
+      "nameRu": "Соски",
+      "descriptionRu": "Фокус на сосках: щипки, круги, растягивание в ритм долей. Член можно не трогать, если блок не говорит иначе.",
+      "category": "nipple",
+      "modes": [
+        "stroke",
+        "anal",
+        "chastity"
+      ],
+      "intensity": 2,
+      "hands": "one",
+      "bodyFocus": [
+        "nipples"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [],
+      "cuesRu": [
+        "Фокус на соски.",
+        "Щипки/круги в ритм.",
+        "Член не трогай, пока не скажут."
+      ],
+      "avatarHint": {
+        "gesture": "tease",
+        "energy": 2
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "nipple_plus_stroke",
+      "name": "Nipples + stroke",
+      "nameRu": "Соски + дрочка",
+      "descriptionRu": "Одна рука на соске, другая дрочит по биту. Если близко к краю — ослабь сосок, не темп руки.",
+      "category": "combo",
+      "modes": [
+        "stroke"
+      ],
+      "intensity": 3,
+      "hands": "two",
+      "bodyFocus": [
+        "nipples",
+        "shaft"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [
+        "hands_off_vibe"
+      ],
+      "cuesRu": [
+        "Одна рука — сосок, другая — по биту.",
+        "Не теряй долю.",
+        "Близко — ослабь сосок."
+      ],
+      "avatarHint": {
+        "gesture": "both_hands",
+        "energy": 2
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "cbt_light",
+      "name": "CBT light",
+      "nameRu": "CBT · яйца лёгкий",
+      "descriptionRu": "Лёгкие шлепки или сжатия яиц на долях бита. Только яйца — ствол не бить в этом ходе. Без клетки.",
+      "category": "cbt",
+      "modes": [
+        "stroke",
+        "cbt"
+      ],
+      "intensity": 3,
+      "hands": "one",
+      "bodyFocus": [
+        "balls"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [
+        "cbt_medium",
+        "plapping",
+        "cbt_cock_slap",
+        "cbt_cock_thwack",
+        "cbt_head_flick",
+        "cbt_underside_tap"
+      ],
+      "cuesRu": [
+        "Лёгкие шлепки/сжатия по яйцам.",
+        "На сильной доле — акцент. Ствол не бить.",
+        "Боль под контролем."
+      ],
+      "avatarHint": {
+        "gesture": "smirk",
+        "energy": 2
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "cbt_medium",
+      "name": "CBT medium",
+      "nameRu": "CBT · яйца средний",
+      "descriptionRu": "Сильнее сжатие или шлепки по яйцам на сильной доле; между — дыхание. Только яйца. Без клетки.",
+      "category": "cbt",
+      "modes": [
+        "stroke",
+        "cbt"
+      ],
+      "intensity": 4,
+      "hands": "one",
+      "bodyFocus": [
+        "balls"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [
+        "cbt_light",
+        "plapping",
+        "cbt_cock_slap",
+        "cbt_cock_thwack",
+        "cbt_head_flick",
+        "cbt_underside_tap"
+      ],
+      "cuesRu": [
+        "Удар/сжатие яиц на сильной доле.",
+        "Пауза и дыхание между акцентами.",
+        "Ствол не трогай — только яйца."
+      ],
+      "avatarHint": {
+        "gesture": "strict",
+        "energy": 3
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "cbt_cock_slap",
+      "name": "CBT cock slap",
+      "nameRu": "CBT · шлепки по стволу",
+      "descriptionRu": "Открытой ладонью шлёпай по стволу на сильную долю. Яйца не трогай в этом ходе. Только без клетки.",
+      "category": "cbt",
+      "modes": [
+        "stroke",
+        "cbt"
+      ],
+      "intensity": 3,
+      "hands": "one",
+      "bodyFocus": [
+        "shaft"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [
+        "cbt_light",
+        "cbt_medium",
+        "plapping",
+        "cbt_cock_thwack",
+        "cbt_head_flick",
+        "cbt_underside_tap",
+        "combo_cage_wand"
+      ],
+      "cuesRu": [
+        "Ладонь — шлепок по стволу.",
+        "На сильной доле / акценте.",
+        "Яйца и головку не бей в этом ходе."
+      ],
+      "avatarHint": {
+        "gesture": "slap_air",
+        "energy": 2
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "cbt_cock_thwack",
+      "name": "CBT cock thwack",
+      "nameRu": "CBT · жёстче по стволу",
+      "descriptionRu": "Плотнее шлепок ладонью или тыльной стороной по стволу на акцент. Между — пауза. Без клетки, без героизма.",
+      "category": "cbt",
+      "modes": [
+        "cbt"
+      ],
+      "intensity": 4,
+      "hands": "one",
+      "bodyFocus": [
+        "shaft"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [
+        "cbt_light",
+        "cbt_medium",
+        "plapping",
+        "cbt_cock_slap",
+        "cbt_head_flick",
+        "cbt_underside_tap",
+        "combo_cage_wand"
+      ],
+      "cuesRu": [
+        "Плотный шлепок по стволу на акцент.",
+        "Между — дыхание, не серия без паузы.",
+        "Контроль: жжёт — ок, травма — стоп."
+      ],
+      "avatarHint": {
+        "gesture": "strict",
+        "energy": 3
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "cbt_head_flick",
+      "name": "CBT head flick",
+      "nameRu": "CBT · щелчки по головке",
+      "descriptionRu": "Лёгкие щелчки пальцем по головке / уздечке на акцент. Острый тизер, не тяжёлый удар. Без клетки.",
+      "category": "cbt",
+      "modes": [
+        "stroke",
+        "cbt"
+      ],
+      "intensity": 3,
+      "hands": "one",
+      "bodyFocus": [
+        "head"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [
+        "cbt_light",
+        "cbt_medium",
+        "plapping",
+        "cbt_cock_slap",
+        "cbt_cock_thwack",
+        "cbt_underside_tap",
+        "combo_cage_wand"
+      ],
+      "cuesRu": [
+        "Щелчок пальцем по головке / уздечке.",
+        "На сильной доле — один чёткий flick.",
+        "Ствол и яйца не бей в этом ходе."
+      ],
+      "avatarHint": {
+        "gesture": "tease",
+        "energy": 2
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "cbt_underside_tap",
+      "name": "CBT underside tap",
+      "nameRu": "CBT · тычки снизу",
+      "descriptionRu": "Пальцами тыкай / постукивай по нижней стороне ствола в такт. Мягче шлепка, но чувствительно. Без клетки.",
+      "category": "cbt",
+      "modes": [
+        "stroke",
+        "cbt"
+      ],
+      "intensity": 2,
+      "hands": "one",
+      "bodyFocus": [
+        "shaft"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [
+        "cbt_light",
+        "cbt_medium",
+        "plapping",
+        "cbt_cock_slap",
+        "cbt_cock_thwack",
+        "cbt_head_flick",
+        "combo_cage_wand"
+      ],
+      "cuesRu": [
+        "Пальцы снизу по стволу — тычок в такт.",
+        "На акценте чуть заметнее.",
+        "Не шлепок ладонью — именно tap."
+      ],
+      "avatarHint": {
+        "gesture": "count",
+        "energy": 2
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "plapping",
+      "name": "Plapping",
+      "nameRu": "Шлепки дилдо",
+      "descriptionRu": "Plapping: дилдо как колотушка — шлепок по яйцам/члену на акцент паттерна. После серии — короткий ход рукой. Нужен dildo. Без клетки на ствол.",
+      "category": "cbt",
+      "modes": [
+        "stroke",
+        "cbt"
+      ],
+      "intensity": 4,
+      "hands": "one",
+      "bodyFocus": [
+        "balls",
+        "shaft"
+      ],
+      "requiresToys": [
+        "dildo"
+      ],
+      "incompatibleWith": [
+        "cbt_light",
+        "cbt_medium",
+        "cbt_cock_slap",
+        "cbt_cock_thwack",
+        "cbt_head_flick",
+        "cbt_underside_tap",
+        "combo_cage_wand"
+      ],
+      "cuesRu": [
+        "Дилдо как колотушка.",
+        "Шлепок на сильную долю / акцент.",
+        "После серии — короткий ход рукой."
+      ],
+      "avatarHint": {
+        "gesture": "slap_air",
+        "energy": 3
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "plapping_cage",
+      "name": "Caged plapping",
+      "nameRu": "Plapping в клетке",
+      "descriptionRu": "Клетка on: дилдо как колотушка — шлепок по яйцам на сильный акцент. Ствол/клитор не трогать. Счётчик ударов как у Tide.",
+      "category": "combo",
+      "modes": [
+        "plapping"
+      ],
+      "intensity": 4,
+      "hands": "one",
+      "bodyFocus": [
+        "balls"
+      ],
+      "requiresToys": [
+        "chastity_cage",
+        "dildo"
+      ],
+      "incompatibleWith": [
+        "plapping",
+        "cbt_light",
+        "cbt_medium",
+        "cbt_cock_slap",
+        "cbt_cock_thwack",
+        "anal_thrust"
+      ],
+      "cuesRu": [
+        "Клетка остаётся.",
+        "Дилдо — шлепок по яйцам на акцент.",
+        "Ствол / клитор не гладить."
+      ],
+      "avatarHint": {
+        "gesture": "slap_air",
+        "energy": 3
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "plapping_cage_heavy",
+      "name": "Caged plapping (heavy)",
+      "nameRu": "Plapping в клетке · жёстче",
+      "descriptionRu": "Тот же idol-plapping, плотнее и чаще на акцентах. Клетка on, только яйца, дилдо в руке.",
+      "category": "combo",
+      "modes": [
+        "plapping"
+      ],
+      "intensity": 5,
+      "hands": "one",
+      "bodyFocus": [
+        "balls"
+      ],
+      "requiresToys": [
+        "chastity_cage",
+        "dildo"
+      ],
+      "incompatibleWith": [
+        "plapping",
+        "plapping_cage",
+        "cbt_light",
+        "cbt_medium",
+        "anal_thrust"
+      ],
+      "cuesRu": [
+        "Клетка on.",
+        "Плотнее шлепай дилдо по яйцам на акцент.",
+        "Между акцентами — лёгкий grind, если дилдо ещё worn."
+      ],
+      "avatarHint": {
+        "gesture": "slap_air",
+        "energy": 3
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "anal_thrust",
+      "name": "Anal thrust",
+      "nameRu": "Анал под бит",
+      "descriptionRu": "Thrust любым дилдо в каждую долю бита. Средний vibe — можно добавить вибрацию на сильной доле. Большой — короче ход, ниже BPM комфортнее.",
+      "category": "anal",
+      "modes": [
+        "anal"
+      ],
+      "intensity": 4,
+      "hands": "none",
+      "bodyFocus": [
+        "ass"
+      ],
+      "requiresToys": [
+        "dildo"
+      ],
+      "incompatibleWith": [
+        "plug_passive"
+      ],
+      "cuesRu": [
+        "Не дрочи рукой — thrust дилдо.",
+        "Каждая доля = толчок.",
+        "Глубина стабильная, темп = BPM."
+      ],
+      "avatarHint": {
+        "gesture": "hip_beat",
+        "energy": 3
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "anal_thrust_plus_nipple",
+      "name": "Anal + nipples",
+      "nameRu": "Анал + соски",
+      "descriptionRu": "Thrust дилдо по биту, свободная рука на сосках. Нужен любой dildo.",
+      "category": "combo",
+      "modes": [
+        "anal"
+      ],
+      "intensity": 4,
+      "hands": "one",
+      "bodyFocus": [
+        "ass",
+        "nipples"
+      ],
+      "requiresToys": [
+        "dildo"
+      ],
+      "incompatibleWith": [],
+      "cuesRu": [
+        "Толчок по биту.",
+        "Свободная рука на сосках.",
+        "Не сбивай ритм бёдер."
+      ],
+      "avatarHint": {
+        "gesture": "tease",
+        "energy": 3
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "combo_vibe_plug_wand",
+      "name": "Vibe plug + external vibe",
+      "nameRu": "Вибро-пробка + внешнее вибро",
+      "descriptionRu": "Вибро-plug внутри + wand/пуля снаружи. Руки не дрочат, пока блок не скажет иначе — двойной вибро-слой под бит.",
+      "category": "combo",
+      "modes": [
+        "chastity",
+        "stroke"
+      ],
+      "intensity": 5,
+      "hands": "none",
+      "bodyFocus": [
+        "ass",
+        "head",
+        "mixed"
+      ],
+      "requiresToys": [
+        "vibrating_plug",
+        "wand"
+      ],
+      "incompatibleWith": [
+        "stroke_left",
+        "stroke_right",
+        "stroke_two_hands"
+      ],
+      "cuesRu": [
+        "Пробка вибрирует.",
+        "Wand / пуля на головку/уздечку.",
+        "Руки прочь — два слоя вибрации."
+      ],
+      "avatarHint": {
+        "gesture": "buzz",
+        "energy": 3
+      },
+      "enabled": true,
+      "drive": "vibe"
+    },
+    {
+      "id": "combo_edge2_wand",
+      "name": "Edge 2 + external vibe",
+      "nameRu": "Edge 2 + внешнее вибро",
+      "descriptionRu": "Простата (Edge 2) + wand/пуля снаружи. Синхрон: сильная доля = оба усиливают, слабая = фон.",
+      "category": "combo",
+      "modes": [
+        "chastity",
+        "stroke"
+      ],
+      "intensity": 5,
+      "hands": "none",
+      "bodyFocus": [
+        "ass",
+        "head"
+      ],
+      "requiresToys": [
+        "lovense_edge2",
+        "wand"
+      ],
+      "incompatibleWith": [
+        "stroke_two_hands"
+      ],
+      "cuesRu": [
+        "Edge 2 + wand/пуля вместе.",
+        "Акцент — оба громче.",
+        "Без дрочки."
+      ],
+      "avatarHint": {
+        "gesture": "buzz",
+        "energy": 3
+      },
+      "enabled": true,
+      "drive": "vibe"
+    },
+    {
+      "id": "combo_cage_wand",
+      "name": "Cage + external vibe",
+      "nameRu": "Клетка + внешнее вибро",
+      "descriptionRu": "Надень клетку. Дрочки нет: только wand / вибропуля по клетке / к доступной головке / уздечке.",
+      "category": "combo",
+      "modes": [
+        "chastity",
+        "plapping"
+      ],
+      "intensity": 4,
+      "hands": "none",
+      "bodyFocus": [
+        "head",
+        "shaft"
+      ],
+      "requiresToys": [
+        "chastity_cage",
+        "wand"
+      ],
+      "incompatibleWith": [
+        "stroke_left",
+        "stroke_right",
+        "stroke_two_hands",
+        "plapping"
+      ],
+      "cuesRu": [
+        "Клетка on.",
+        "Только wand / вибропуля.",
+        "Руками не гладить ствол."
+      ],
+      "avatarHint": {
+        "gesture": "stop_hands",
+        "energy": 3
+      },
+      "enabled": true,
+      "drive": "vibe"
+    },
+    {
+      "id": "combo_cage_vibe_plug",
+      "name": "Cage + vibe plug",
+      "nameRu": "Клетка + вибро-пробка",
+      "descriptionRu": "Клетка спереди + вибро-plug сзади. Hands-free: терпи вибрацию, не снимай клетку.",
+      "category": "combo",
+      "modes": [
+        "chastity",
+        "plapping"
+      ],
+      "intensity": 4,
+      "hands": "none",
+      "bodyFocus": [
+        "ass",
+        "shaft"
+      ],
+      "requiresToys": [
+        "chastity_cage",
+        "vibrating_plug"
+      ],
+      "incompatibleWith": [
+        "stroke_left",
+        "stroke_right",
+        "vibe_assist"
+      ],
+      "cuesRu": [
+        "Клетка + вибро-plug.",
+        "Hands off.",
+        "Дыши через волны."
+      ],
+      "avatarHint": {
+        "gesture": "stop_hands",
+        "energy": 3
+      },
+      "enabled": true,
+      "drive": "vibe"
+    },
+    {
+      "id": "combo_cage_edge2",
+      "name": "Cage + Edge 2",
+      "nameRu": "Клетка + Edge 2",
+      "descriptionRu": "Chastity + простатный Edge 2. Классика denial: спереди закрыто, сзади пульс под бит.",
+      "category": "combo",
+      "modes": [
+        "chastity",
+        "plapping"
+      ],
+      "intensity": 5,
+      "hands": "none",
+      "bodyFocus": [
+        "ass"
+      ],
+      "requiresToys": [
+        "chastity_cage",
+        "lovense_edge2"
+      ],
+      "incompatibleWith": [
+        "stroke_left",
+        "stroke_right",
+        "stroke_two_hands",
+        "vibe_assist"
+      ],
+      "cuesRu": [
+        "Клетка on.",
+        "Edge 2 — простата в долю.",
+        "Без рук на член."
+      ],
+      "avatarHint": {
+        "gesture": "strict",
+        "energy": 3
+      },
+      "enabled": true,
+      "drive": "vibe"
+    },
+    {
+      "id": "ball_pet",
+      "name": "Ball pet (cage mercy)",
+      "nameRu": "Яички · гладить",
+      "descriptionRu": "Клетка on: ствол недоступен — гладь яички мягко в такт. Пощада / тизер, не CBT.",
+      "category": "combo",
+      "modes": [
+        "chastity",
+        "oral",
+        "plapping"
+      ],
+      "intensity": 2,
+      "hands": "one",
+      "bodyFocus": [
+        "balls"
+      ],
+      "requiresToys": [
+        "chastity_cage"
+      ],
+      "incompatibleWith": [
+        "ball_tug",
+        "ball_cradle",
+        "ball_weight",
+        "cbt_light",
+        "cbt_medium",
+        "plapping"
+      ],
+      "cuesRu": [
+        "Клетка остаётся.",
+        "Мягко гладь яички в такт.",
+        "Ствол / клитор не трогать."
+      ],
+      "avatarHint": {
+        "gesture": "tease",
+        "energy": 1
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "ball_tug",
+      "name": "Ball tug (cage)",
+      "nameRu": "Яички · подтягивать",
+      "descriptionRu": "В клетке: ритмично подтягивай яички вниз/к себе на сильной доле. Чувствительно, без ударов.",
+      "category": "combo",
+      "modes": [
+        "chastity",
+        "plapping"
+      ],
+      "intensity": 3,
+      "hands": "one",
+      "bodyFocus": [
+        "balls"
+      ],
+      "requiresToys": [
+        "chastity_cage"
+      ],
+      "incompatibleWith": [
+        "ball_pet",
+        "ball_cradle",
+        "ball_weight",
+        "cbt_light",
+        "cbt_medium",
+        "plapping"
+      ],
+      "cuesRu": [
+        "Клетка on.",
+        "На сильной доле — мягкий tug вниз.",
+        "Между долями отпусти. Без шлепков."
+      ],
+      "avatarHint": {
+        "gesture": "count",
+        "energy": 2
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "ball_cradle",
+      "name": "Ball cradle (cage)",
+      "nameRu": "Яички · в ладони",
+      "descriptionRu": "Согрей и подержи яички в ладони под клеткой: вес, лёгкое сжатие в такт. Медленная пощада.",
+      "category": "combo",
+      "modes": [
+        "chastity",
+        "oral",
+        "plapping"
+      ],
+      "intensity": 2,
+      "hands": "one",
+      "bodyFocus": [
+        "balls"
+      ],
+      "requiresToys": [
+        "chastity_cage"
+      ],
+      "incompatibleWith": [
+        "ball_pet",
+        "ball_tug",
+        "ball_weight",
+        "cbt_light",
+        "cbt_medium",
+        "plapping"
+      ],
+      "cuesRu": [
+        "Ладонь под яичками.",
+        "Согрей, слегка сожми в такт.",
+        "Клитор в клетке — только яйца."
+      ],
+      "avatarHint": {
+        "gesture": "tease",
+        "energy": 1
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "ball_weight",
+      "name": "Ball weight (cage)",
+      "nameRu": "Яички · давление",
+      "descriptionRu": "Ладонь снизу под клеткой: на сильной доле чуть добавь вес/давление — без tug и без шлепка. Между долями почти не двигай.",
+      "category": "combo",
+      "modes": [
+        "chastity",
+        "oral",
+        "plapping"
+      ],
+      "intensity": 2,
+      "hands": "one",
+      "bodyFocus": [
+        "balls"
+      ],
+      "requiresToys": [
+        "chastity_cage"
+      ],
+      "incompatibleWith": [
+        "ball_pet",
+        "ball_tug",
+        "ball_cradle",
+        "cbt_light",
+        "cbt_medium",
+        "plapping"
+      ],
+      "cuesRu": [
+        "Ладонь снизу под яичками.",
+        "На акценте — чуть давления весом руки.",
+        "Без тяги, без шлепка. Между — почти стоп."
+      ],
+      "avatarHint": {
+        "gesture": "count",
+        "energy": 1
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "rest_hands_off",
+      "name": "Rest",
+      "nameRu": "Отдых",
+      "descriptionRu": "Hands off: ничего не трогать, дышать, ждать следующего блока. Игрушки можно оставить (пробка/клетка), без стимуляции.",
+      "category": "stroke",
+      "modes": [
+        "stroke",
+        "anal",
+        "chastity"
+      ],
+      "intensity": 1,
+      "hands": "none",
+      "bodyFocus": [
+        "mixed"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [],
+      "cuesRu": [
+        "Руки прочь.",
+        "Дыши.",
+        "Не касайся до сигнала."
+      ],
+      "avatarHint": {
+        "gesture": "stop_hands",
+        "energy": 1
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "oral_shallow",
+      "name": "Oral shallow",
+      "nameRu": "Орал · мелко",
+      "descriptionRu": "Мелкий ход дилдо во рту под бит. Губы и язык, без глубины. Нужен dildo.",
+      "category": "oral",
+      "modes": ["oral"],
+      "intensity": 3,
+      "hands": "one",
+      "bodyFocus": ["mixed"],
+      "requiresToys": ["dildo"],
+      "incompatibleWith": ["oral_deep", "oral_hold"],
+      "cuesRu": [
+        "Дилдо во рту — мелкий ход.",
+        "Каждая доля = короткий толчок губами.",
+        "Глотку не форсируй."
+      ],
+      "avatarHint": {
+        "gesture": "tease",
+        "energy": 2
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "oral_deep",
+      "name": "Oral deep",
+      "nameRu": "Орал · глубже",
+      "descriptionRu": "Глубже на сильной доле, между — пауза и дыхание. Нужен dildo.",
+      "category": "oral",
+      "modes": ["oral"],
+      "intensity": 4,
+      "hands": "one",
+      "bodyFocus": ["mixed"],
+      "requiresToys": ["dildo"],
+      "incompatibleWith": ["oral_shallow", "oral_hold"],
+      "cuesRu": [
+        "На акцент — глубже.",
+        "Между долями — пауза и воздух.",
+        "Не геройствуй: контроль важнее глубины."
+      ],
+      "avatarHint": {
+        "gesture": "look_down",
+        "energy": 3
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "oral_hold",
+      "name": "Oral hold",
+      "nameRu": "Орал · удержание",
+      "descriptionRu": "Держи глубину на месте под бит: давление, не ход. Нужен dildo.",
+      "category": "oral",
+      "modes": ["oral"],
+      "intensity": 4,
+      "hands": "one",
+      "bodyFocus": ["mixed"],
+      "requiresToys": ["dildo"],
+      "incompatibleWith": ["oral_shallow", "oral_deep"],
+      "cuesRu": [
+        "Зафиксируй глубину.",
+        "Держи давление в такт — без качания.",
+        "Дыши носом, не срывайся."
+      ],
+      "avatarHint": {
+        "gesture": "stop_hands",
+        "energy": 2
+      },
+      "enabled": true,
+      "drive": "beat"
+    },
+    {
+      "id": "finale_roulette",
+      "name": "Finale roulette",
+      "nameRu": "Финал · рулетка",
+      "descriptionRu": "Дойди до грани и нажми «НА ГРАНИ». Рулетка решит: кончить, руин или отказ — по твоим шансам сессии.",
+      "category": "stroke",
+      "modes": [
+        "stroke",
+        "anal",
+        "chastity",
+        "onahole",
+        "cbt",
+        "oral",
+        "prone"
+      ],
+      "intensity": 5,
+      "hands": "full",
+      "bodyFocus": [
+        "mixed"
+      ],
+      "requiresToys": [],
+      "incompatibleWith": [],
+      "cuesRu": [
+        "Дойди до грани.",
+        "Нажми «НА ГРАНИ».",
+        "Смотри на рулетку — исход по шансам."
+      ],
+      "avatarHint": {
+        "gesture": "smirk",
+        "energy": 4
+      },
+      "enabled": true,
+      "drive": "beat"
+    }
+  ]
+}

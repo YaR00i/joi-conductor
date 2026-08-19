@@ -1,0 +1,76 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  installLocalStorageMock,
+  resetLocalStorage,
+} from "../test/localStorageMock";
+import {
+  BRIEFABLE_NAV_IDS,
+  SECTION_BRIEFINGS,
+  SECTION_BRIEFINGS_STORAGE_KEY,
+  defaultSectionBriefingsState,
+  isBriefableNav,
+  loadSectionBriefingsState,
+  markSectionBriefingCompleted,
+  markSectionBriefingDismissed,
+  reopenAllSectionBriefings,
+  reopenSectionBriefing,
+  sectionBriefingCopy,
+  shouldShowSectionBriefing,
+} from "./sectionBriefings";
+
+installLocalStorageMock();
+
+beforeEach(() => {
+  resetLocalStorage();
+});
+
+describe("sectionBriefings", () => {
+  it("defaults to pending for every briefable section", () => {
+    expect(loadSectionBriefingsState()).toEqual(defaultSectionBriefingsState());
+    for (const id of BRIEFABLE_NAV_IDS) {
+      expect(shouldShowSectionBriefing(id)).toBe(true);
+    }
+  });
+
+  it("excludes Ember play and editor", () => {
+    expect(isBriefableNav("ember")).toBe(false);
+    expect(isBriefableNav("ember_editor")).toBe(false);
+    expect(isBriefableNav("roulette")).toBe(true);
+    expect(BRIEFABLE_NAV_IDS).not.toContain("ember");
+    expect(BRIEFABLE_NAV_IDS).not.toContain("ember_editor");
+  });
+
+  it("hides after completed or dismissed", () => {
+    markSectionBriefingCompleted("shop");
+    expect(shouldShowSectionBriefing("shop")).toBe(false);
+    expect(shouldShowSectionBriefing("diary")).toBe(true);
+
+    markSectionBriefingDismissed("diary");
+    expect(shouldShowSectionBriefing("diary")).toBe(false);
+  });
+
+  it("reopenAll clears dismissals", () => {
+    markSectionBriefingDismissed("stats");
+    reopenAllSectionBriefings();
+    expect(shouldShowSectionBriefing("stats")).toBe(true);
+  });
+
+  it("reopenSection resets one id", () => {
+    markSectionBriefingCompleted("favorites");
+    reopenSectionBriefing("favorites");
+    expect(shouldShowSectionBriefing("favorites")).toBe(true);
+  });
+
+  it("tolerates corrupt JSON", () => {
+    localStorage.setItem(SECTION_BRIEFINGS_STORAGE_KEY, "{not-json");
+    expect(loadSectionBriefingsState()).toEqual({ byId: {} });
+  });
+
+  it("covers all briefable ids with copy", () => {
+    expect(SECTION_BRIEFINGS).toHaveLength(BRIEFABLE_NAV_IDS.length);
+    for (const id of BRIEFABLE_NAV_IDS) {
+      expect(sectionBriefingCopy(id).id).toBe(id);
+      expect(sectionBriefingCopy(id).titleRu.length).toBeGreaterThan(0);
+    }
+  });
+});

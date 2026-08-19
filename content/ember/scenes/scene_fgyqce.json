@@ -1,0 +1,45 @@
+{
+  "id": "scene_fgyqce",
+  "nameRu": "Новая сцена",
+  "startStepId": "start",
+  "defaultBgArtId": "49bd31e4-b1e2-495d-b57d-eb01994be362",
+  "steps": [
+    {
+      "id": "start",
+      "type": "dialogue",
+      "speaker": "hu_tao",
+      "portraitKey": "neutral",
+      "nameRu": "hu_tao",
+      "textRu": "Новая сцена…",
+      "bgArtId": "49bd31e4-b1e2-495d-b57d-eb01994be362",
+      "actors": [
+        {
+          "id": "main",
+          "speaker": "hu_tao",
+          "portraitKey": "neutral",
+          "x": 28,
+          "y": 96,
+          "floorY": 96,
+          "scale": 1.65,
+          "z": 1,
+          "lockY": true
+        }
+      ],
+      "next": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  "editorLayout": {
+    "start": {
+      "x": 40,
+      "y": 80
+    },
+    "end": {
+      "x": 320,
+      "y": 80
+    }
+  }
+}

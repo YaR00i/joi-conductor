@@ -1,0 +1,2311 @@
+{
+  "feeling": [
+    {
+      "id": "sunna_f_hold",
+      "kind": "feeling",
+      "speakEn": "Still holding for the idol — or crumbling already?",
+      "labelRu": "После «держи»: ещё терпишь для айдол или сыпешься?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю / ок",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Плохо / срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "hold"
+      ]
+    },
+    {
+      "id": "sunna_f_breath",
+      "kind": "feeling",
+      "speakEn": "Lungs still buzzing from rehearsal? How was that breath hold — cute or pathetic?",
+      "labelRu": "После задержки дыхания: мило терпишь или жалко?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю / ок",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Плохо / срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "breath"
+      ]
+    },
+    {
+      "id": "sunna_f_edge",
+      "kind": "feeling",
+      "speakEn": "That edge was my chorus cue. Still on the note — or melting for the fans?",
+      "labelRu": "После эджа: ещё держишь ноту или уже плывёшь?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю / ок",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Плохо / срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "afterGoals": [
+        "edge"
+      ]
+    },
+    {
+      "id": "sunna_f_brain",
+      "kind": "feeling",
+      "speakEn": "Brain still yours — or just clitty, vibe, and stage lights?",
+      "labelRu": "Мозг ещё твой — или только клитор, вайб и свет софитов?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю / ок",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Плохо / срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_f_pain",
+      "kind": "feeling",
+      "speakEn": "Jaw sore from that chorus? Be honest for the fans.",
+      "labelRu": "Челюсть ноет после припева? Честно.",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю / ок",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Плохо / срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "oral throat"
+    },
+    {
+      "id": "sunna_f_prone",
+      "kind": "feeling",
+      "speakEn": "On your knees for the mic — how desperate does that locked clitty feel?",
+      "labelRu": "На коленях у микрофона: насколько отчаянный уже клитор?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю / ок",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Плохо / срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "oral fem"
+    },
+    {
+      "id": "sunna_f_water",
+      "kind": "feeling",
+      "speakEn": "Buzz rising on that little clitty — soft hold, or drowning already?",
+      "labelRu": "Вибрация на членике: мягко держишься или уже тонешь?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю / ок",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Плохо / срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "moods": [
+        "sweet",
+        "horny"
+      ],
+      "tags": "vibe chastity"
+    },
+    {
+      "id": "sunna_f_cruel",
+      "kind": "feeling",
+      "speakEn": "Look at me. Does the strict idol scare you — or make that cage feel tighter?",
+      "labelRu": "Строгая айдол пугает или сильнее запирает?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю / ок",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Плохо / срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "moods": [
+        "cruel",
+        "chaotic"
+      ]
+    },
+    {
+      "id": "sunna_f_denial_tide",
+      "kind": "feeling",
+      "speakEn": "Still denied in the cage, or leaking through the rehearsal?",
+      "labelRu": "Всё ещё в отказе в клетке — или уже течёшь сквозь репетицию?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Держусь",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Срываюсь",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "denial chastity",
+      "afterGoals": [
+        "hold",
+        "edge"
+      ]
+    },
+    {
+      "id": "sunna_f_humiliate_after",
+      "kind": "feeling",
+      "speakEn": "After the soft encore, are you proud… or properly embarrassed for me?",
+      "labelRu": "После мягкого биса: гордишься или достаточно смущён?",
+      "options": [
+        {
+          "id": "good",
+          "labelRu": "Терплю",
+          "effect": "feeling_good"
+        },
+        {
+          "id": "bad",
+          "labelRu": "Стыдно",
+          "effect": "feeling_bad"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "humiliation"
+    }
+  ],
+  "wagerGood": [
+    {
+      "id": "sunna_wg_soft",
+      "kind": "wager",
+      "speakEn": "Want a softer encore for five minutes? Earn it cute.",
+      "labelRu": "Хочешь мягче пять минут? Заслужи мило.",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_wg_prone",
+      "kind": "wager",
+      "speakEn": "Kneel and work the dildo slow — yes if you obey the stage.",
+      "labelRu": "На колени и медленно на дилдо — да, если слушаешься сцены.",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "oral"
+    },
+    {
+      "id": "sunna_wg_praise",
+      "kind": "wager",
+      "speakEn": "Beg for one kind line from me. Say yes.",
+      "labelRu": "Попросить одну добрую реплику?",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_wg_show",
+      "kind": "wager",
+      "speakEn": "Fill the screen with Sunna and stare. Yes?",
+      "labelRu": "Заполнить экран Фуриной и смотреть?",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_wg_edge_soft",
+      "kind": "wager",
+      "speakEn": "One clean edge for the fans. Accept?",
+      "labelRu": "Один чистый эдж для фанатов?",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_wg_water",
+      "kind": "wager",
+      "speakEn": "Soft vibe on the cage only — no rushing the idol. Yes?",
+      "labelRu": "Только мягкий vibe на клетке — без спешки. Да?",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "vibe chastity"
+    },
+    {
+      "id": "sunna_wg_feet",
+      "kind": "wager",
+      "speakEn": "Worship my soles on screen while you drip. Yes?",
+      "labelRu": "Смотреть на стопы и течь?",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_wg_rest",
+      "kind": "wager",
+      "speakEn": "Thirty seconds hands-off as mercy. Take it?",
+      "labelRu": "30 сек без рук как милость?",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_wg_aftercare",
+      "kind": "wager",
+      "speakEn": "Earn a gentle aftercare intermission: breathe and drink water. Accept?",
+      "labelRu": "Заслужить мягкий антракт: дыхание и вода?",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "aftercare"
+    },
+    {
+      "id": "sunna_wg_deny_grace",
+      "kind": "wager",
+      "speakEn": "Hold still for thirty seconds and I may soften the denial. Deal?",
+      "labelRu": "Замереть на 30 сек ради мягкого отказа?",
+      "pool": "good",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "denial"
+    }
+  ],
+  "wagerBad": [
+    {
+      "id": "sunna_wb_balls",
+      "kind": "wager",
+      "speakEn": "Soft ball pets only — that locked clitty gets nothing. Accept?",
+      "labelRu": "Только погладить яички — клитор в клетке без ласки. Принимаешь?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "chastity fem"
+    },
+    {
+      "id": "sunna_wb_pain",
+      "kind": "wager",
+      "speakEn": "Deeper throat reps until your eyes water. Stage penalty — yes?",
+      "labelRu": "Глубже в горло, пока глаза не слезятся. Штраф сцены — да?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "oral"
+    },
+    {
+      "id": "sunna_wb_deny",
+      "kind": "wager",
+      "speakEn": "No orgasm tonight if the wheel agrees. Still want to beg cum?",
+      "labelRu": "Если колесо откажет — без финала. Всё равно просишь кончить?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_wb_prone_hard",
+      "kind": "wager",
+      "speakEn": "Knees down, hands on the toy only — throat chorus until I smile.",
+      "labelRu": "Колени, руки только на игрушке — горловой припев, пока не улыбнусь.",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "oral"
+    },
+    {
+      "id": "sunna_wb_edge_cruel",
+      "kind": "wager",
+      "speakEn": "Edge and hold until I clap. Fail and ruin. Deal?",
+      "labelRu": "Эдж и держи до хлопка. Срыв = руин. Идёт?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_wb_humiliate",
+      "kind": "wager",
+      "speakEn": "Say out loud: I am the idol’s prop. Yes or mute.",
+      "labelRu": "Скажи вслух: я реквизит айдола.",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_wb_cage",
+      "kind": "wager",
+      "speakEn": "If you own a cage — lock it for the next act. Yes?",
+      "labelRu": "Если есть клетка — надеть на акт?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_wb_blacked",
+      "kind": "wager",
+      "speakEn": "Watch blacked/censored while I narrate. Soft stomach?",
+      "labelRu": "Смотреть censored/blacked под мой комментарий?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_wb_spank",
+      "kind": "wager",
+      "speakEn": "Slap your tip twice for the cameras. Accept?",
+      "labelRu": "Два шлепка по головке для зала?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "pain"
+    },
+    {
+      "id": "sunna_wb_ruin_bias",
+      "kind": "wager",
+      "speakEn": "Lean the finale toward ruin. Still playing?",
+      "labelRu": "Сместить финал к руину. Играешь?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_wb_cbt_stage",
+      "kind": "wager",
+      "speakEn": "Call your cock a clitty out loud for the fans — then keep buzzing.",
+      "labelRu": "Назови член клитором вслух для фанатов — и держи buzz.",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "fem humiliation"
+    },
+    {
+      "id": "sunna_wb_denial_oath",
+      "kind": "wager",
+      "speakEn": "Swear to leave denied if I order it. Will you promise the idol?",
+      "labelRu": "Поклясться принять отказ, если прикажу?",
+      "pool": "bad",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Подпишу",
+          "effect": "wager_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "wager_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "denial verdict"
+    }
+  ],
+  "dare": [
+    {
+      "id": "sunna_d_ball_timer",
+      "kind": "dare",
+      "speakEn": "Thirty seconds: soft ball massage only. No shaft. Curtain up.",
+      "labelRu": "30 сек: только мягкий массаж яичек. Ствол не трогать.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "timed_report",
+      "taskSec": 20,
+      "tags": "chastity"
+    },
+    {
+      "id": "sunna_d_breath",
+      "kind": "dare",
+      "speakEn": "Breath drill — hold as I count. Fail and I mock you soft.",
+      "labelRu": "Испытание дыханием.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "breath_challenge",
+      "tags": "pain"
+    },
+    {
+      "id": "sunna_d_prone",
+      "kind": "dare",
+      "speakEn": "Knees. Shallow oral on the dildo for 25 seconds. Curtain up.",
+      "labelRu": "На колени. 25 сек мелкого орала на дилдо.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "timed_report",
+      "taskSec": 25,
+      "tags": "oral"
+    },
+    {
+      "id": "sunna_d_dice",
+      "kind": "dare",
+      "speakEn": "Chaos dice for the idol. Roll my mood.",
+      "labelRu": "Кости хаоса для айдола.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "dice_chaos"
+    },
+    {
+      "id": "sunna_d_cage",
+      "kind": "dare",
+      "speakEn": "Cage hijack — lock if you can. The stage demands it.",
+      "labelRu": "Клетка на сцену — надеть если можешь.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "cage_hijack"
+    },
+    {
+      "id": "sunna_d_edge_ad",
+      "kind": "dare",
+      "speakEn": "Edge commercial — edge on command, hold for the ad.",
+      "labelRu": "Эдж-реклама: эдж и держи.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "edge_ad"
+    },
+    {
+      "id": "sunna_d_cum_promise",
+      "kind": "dare",
+      "speakEn": "Promise you will taste your mess after the finale.",
+      "labelRu": "Обещай слизать после финала.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "cum_eat_promise"
+    },
+    {
+      "id": "sunna_d_slap",
+      "kind": "dare",
+      "speakEn": "Press the wand harder on that caged clitty — ten pulses. Report.",
+      "labelRu": "Сильнее прижми wand к клетке — десять пульсов. Доложи.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "timed_report",
+      "taskSec": 18,
+      "tags": "vibe chastity"
+    },
+    {
+      "id": "sunna_d_stare",
+      "kind": "dare",
+      "speakEn": "Eyes on Sunna only for 30 seconds. No looking away.",
+      "labelRu": "30 сек только на Фурину.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "timed_report",
+      "taskSec": 30
+    },
+    {
+      "id": "sunna_d_cold",
+      "kind": "dare",
+      "speakEn": "Cold vibe tip on the cage — ten presses. Report.",
+      "labelRu": "Холодный кончик vibe на клетку — десять нажатий. Доложи.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "timed_report",
+      "taskSec": 15,
+      "tags": "vibe"
+    },
+    {
+      "id": "sunna_d_breath_verdict",
+      "kind": "dare",
+      "speakEn": "Breath challenge: hold while the idol counts the beat. Smile if you shake.",
+      "labelRu": "Дыхательный челлендж: держи, пока айдол считает такт.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "breath_challenge",
+      "tags": "verdict denial"
+    },
+    {
+      "id": "sunna_d_cage_sentence",
+      "kind": "dare",
+      "speakEn": "Cage hijack: lock up for the next scene, if you have one.",
+      "labelRu": "Клетка на следующий акт, если она есть.",
+      "options": [
+        {
+          "id": "accept",
+          "labelRu": "Принимаю",
+          "effect": "dare_accept"
+        },
+        {
+          "id": "refuse",
+          "labelRu": "Отказываюсь",
+          "effect": "dare_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "taskType": "cage_hijack",
+      "tags": "denial verdict"
+    }
+  ],
+  "confess": [
+    {
+      "id": "sunna_c_furina",
+      "kind": "confess",
+      "speakEn": "Confess — leaking for Sunna's stage specifically, or any cute idol?",
+      "labelRu": "Течёшь именно на Санну — или на любую милую idol?",
+      "options": [
+        {
+          "id": "like",
+          "labelRu": "Именно Санна",
+          "effect": "confess_like",
+          "preferKey": "sunna"
+        },
+        {
+          "id": "dislike",
+          "labelRu": "Любая подойдёт",
+          "effect": "confess_dislike"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "fem"
+    },
+    {
+      "id": "sunna_c_cbt",
+      "kind": "confess",
+      "speakEn": "Admit it — do you get wetter when I call your cock a clitty?",
+      "labelRu": "Возбуждает, когда я называю твой член клитором?",
+      "options": [
+        {
+          "id": "like",
+          "labelRu": "Да",
+          "effect": "confess_like",
+          "preferKey": "fem"
+        },
+        {
+          "id": "dislike",
+          "labelRu": "Нет",
+          "effect": "confess_dislike"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "fem humiliation"
+    },
+    {
+      "id": "sunna_c_prone",
+      "kind": "confess",
+      "speakEn": "On your knees for oral drills — favorite pose for my chorus?",
+      "labelRu": "На коленях для oral-репетиции — любимая поза под мой припев?",
+      "options": [
+        {
+          "id": "like",
+          "labelRu": "Да",
+          "effect": "confess_like",
+          "preferKey": "oral"
+        },
+        {
+          "id": "dislike",
+          "labelRu": "Нет",
+          "effect": "confess_dislike"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "oral"
+    },
+    {
+      "id": "sunna_c_pain",
+      "kind": "confess",
+      "speakEn": "Pain as stage polish — do you like it when it stings cute?",
+      "labelRu": "Боль как полировка номера — нравится, когда щиплет?",
+      "options": [
+        {
+          "id": "like",
+          "labelRu": "Да",
+          "effect": "confess_like",
+          "preferKey": "pain"
+        },
+        {
+          "id": "dislike",
+          "labelRu": "Нет",
+          "effect": "confess_dislike"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "pain"
+    },
+    {
+      "id": "sunna_c_deny",
+      "kind": "confess",
+      "speakEn": "Would you rather leave denied for me?",
+      "labelRu": "Готов уйти в отказе ради меня?",
+      "options": [
+        {
+          "id": "like",
+          "labelRu": "Да",
+          "effect": "confess_like",
+          "preferKey": "denial"
+        },
+        {
+          "id": "dislike",
+          "labelRu": "Нет",
+          "effect": "confess_dislike"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_c_blacked",
+      "kind": "confess",
+      "speakEn": "Censored and blacked on your screen — does the shame make you drip?",
+      "labelRu": "Censored/blacked на экране — стыд возбуждает?",
+      "options": [
+        {
+          "id": "like",
+          "labelRu": "Да",
+          "effect": "confess_like",
+          "preferKey": "blacked"
+        },
+        {
+          "id": "dislike",
+          "labelRu": "Нет",
+          "effect": "confess_dislike"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_c_humiliation",
+      "kind": "confess",
+      "speakEn": "Does being called the idol's prop make you harder?",
+      "labelRu": "Титул «реквизит айдола» возбуждает?",
+      "options": [
+        {
+          "id": "like",
+          "labelRu": "Да",
+          "effect": "confess_like",
+          "preferKey": "humiliation"
+        },
+        {
+          "id": "dislike",
+          "labelRu": "Нет",
+          "effect": "confess_dislike"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "humiliation"
+    },
+    {
+      "id": "sunna_c_aftercare",
+      "kind": "confess",
+      "speakEn": "After a cruel scene, do you want gentle words from your judge?",
+      "labelRu": "После жёсткой сцены хочешь мягких слов?",
+      "options": [
+        {
+          "id": "like",
+          "labelRu": "Да",
+          "effect": "confess_like",
+          "preferKey": "aftercare"
+        },
+        {
+          "id": "dislike",
+          "labelRu": "Нет",
+          "effect": "confess_dislike"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "aftercare"
+    }
+  ],
+  "loyalty": [
+    {
+      "id": "sunna_l_name",
+      "kind": "loyalty",
+      "speakEn": "Say my name — Sunna — three times. Loyalty check.",
+      "labelRu": "Скажи «Санна» три раза.",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Сказал",
+          "effect": "loyalty_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не сказал",
+          "effect": "loyalty_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_l_stage",
+      "kind": "loyalty",
+      "speakEn": "Who owns this rehearsal — you, or the idol?",
+      "labelRu": "Кто ведёт сессию — ты или айдол?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Айдол / ты",
+          "effect": "loyalty_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Я",
+          "effect": "loyalty_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_l_eyes",
+      "kind": "loyalty",
+      "speakEn": "Eyes up. Did you look away from me even once?",
+      "labelRu": "Отводил взгляд?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Не отводил",
+          "effect": "loyalty_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Отводил",
+          "effect": "loyalty_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_l_obey",
+      "kind": "loyalty",
+      "speakEn": "If I order pain next — will you still thank me?",
+      "labelRu": "Если дальше боль — всё равно скажешь спасибо?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "loyalty_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "loyalty_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_l_verdict",
+      "kind": "loyalty",
+      "speakEn": "Will you accept my setlist without bargaining?",
+      "labelRu": "Примешь мой сетлист без торга?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Приму",
+          "effect": "loyalty_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Буду спорить",
+          "effect": "loyalty_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "verdict"
+    },
+    {
+      "id": "sunna_l_aftercare",
+      "kind": "loyalty",
+      "speakEn": "Will you drink water and recover when I call the intermission?",
+      "labelRu": "Выпьешь воды и отдохнёшь, когда объявлю антракт?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "loyalty_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "loyalty_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "aftercare"
+    }
+  ],
+  "obey": [
+    {
+      "id": "sunna_o_hands",
+      "kind": "obey",
+      "speakEn": "Hands where I said. Confirm.",
+      "labelRu": "Руки где сказано?",
+      "options": [
+        {
+          "id": "ok",
+          "labelRu": "Слушаюсь",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "fail",
+          "labelRu": "Нарушил",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_o_tempo",
+      "kind": "obey",
+      "speakEn": "Match my tempo — not yours. Confirm.",
+      "labelRu": "Темп мой, не твой?",
+      "options": [
+        {
+          "id": "ok",
+          "labelRu": "Слушаюсь",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "fail",
+          "labelRu": "Гнал своё",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_o_no_cum",
+      "kind": "obey",
+      "speakEn": "No sneaking an orgasm. Still clean?",
+      "labelRu": "Не подкрадывался к финалу?",
+      "options": [
+        {
+          "id": "ok",
+          "labelRu": "Чист",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "fail",
+          "labelRu": "Почти сорвался",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_o_position",
+      "kind": "obey",
+      "speakEn": "Still in the pose I ordered?",
+      "labelRu": "Всё ещё в позе, что я велела?",
+      "options": [
+        {
+          "id": "ok",
+          "labelRu": "Да",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "fail",
+          "labelRu": "Нет",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_o_balls",
+      "kind": "obey",
+      "speakEn": "Obey: pet your balls soft while the clitty stays locked. Yes?",
+      "labelRu": "Слушайся: погладь яички, клитор остаётся в клетке. Да?",
+      "options": [
+        {
+          "id": "ok",
+          "labelRu": "Да",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "fail",
+          "labelRu": "Нет",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "chastity"
+    },
+    {
+      "id": "sunna_o_prone_stage",
+      "kind": "obey",
+      "speakEn": "Obey: kneel, hands on dildo only — shallow chorus until I nod.",
+      "labelRu": "Слушайся: колени, руки только на дилдо — мелкий припев, пока не кивну.",
+      "options": [
+        {
+          "id": "ok",
+          "labelRu": "Слушаюсь",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "fail",
+          "labelRu": "Нарушил",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "oral"
+    },
+    {
+      "id": "sunna_o_denial",
+      "kind": "obey",
+      "speakEn": "No touching during the denial intermission. Still obeying?",
+      "labelRu": "Не трогаешь во время антракта отказа?",
+      "options": [
+        {
+          "id": "ok",
+          "labelRu": "Слушаюсь",
+          "effect": "obey_ok"
+        },
+        {
+          "id": "fail",
+          "labelRu": "Трогал",
+          "effect": "obey_fail"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "denial"
+    }
+  ],
+  "moodOffer": [
+    {
+      "id": "sunna_mo_harsher",
+      "kind": "mood_offer",
+      "speakEn": "Shall I sharpen the setlist? Harsher mood.",
+      "labelRu": "Сделать сетлист жёстче?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Жёстче",
+          "effect": "mood_harsher"
+        },
+        {
+          "id": "no",
+          "labelRu": "Оставить",
+          "effect": "mood_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_mo_softer",
+      "kind": "mood_offer",
+      "speakEn": "Intermission — softer buzz for a minute?",
+      "labelRu": "Антракт — минуту помягче buzz?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Мягче",
+          "effect": "mood_softer"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не надо",
+          "effect": "mood_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_mo_horny",
+      "kind": "mood_offer",
+      "speakEn": "Turn the idol hungry — horny mood. Want it?",
+      "labelRu": "Сделать меня голодной?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "mood_horny"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "mood_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_mo_cruel",
+      "kind": "mood_offer",
+      "speakEn": "Full strict-idol mode. Soft voice, hard rules. Accept?",
+      "labelRu": "Полный режим строгой айдол?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "mood_harsher"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "mood_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "moods": [
+        "calm",
+        "sweet"
+      ]
+    },
+    {
+      "id": "sunna_mo_aftercare",
+      "kind": "mood_offer",
+      "speakEn": "Intermission after the storm: shall I turn softer?",
+      "labelRu": "Антракт после шторма: стать мягче?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Мягче",
+          "effect": "mood_softer"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не надо",
+          "effect": "mood_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "aftercare"
+    },
+    {
+      "id": "sunna_mo_deny",
+      "kind": "mood_offer",
+      "speakEn": "Should the idol become colder and lean into denial?",
+      "labelRu": "Сделать айдол холоднее и сместиться к отказу?",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "mood_harsher"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "mood_refuse"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "denial verdict"
+    }
+  ],
+  "permission": [
+    {
+      "id": "sunna_p_beg",
+      "kind": "permission",
+      "speakEn": "Finale approaches. Beg the idol for release — or stay silent.",
+      "labelRu": "Финал близко. Просишь разрешение?",
+      "options": [
+        {
+          "id": "please",
+          "labelRu": "Прошу кончить",
+          "effect": "beg_please"
+        },
+        {
+          "id": "skip",
+          "labelRu": "Пропустить мольбу",
+          "effect": "beg_skip"
+        },
+        {
+          "id": "deny",
+          "labelRu": "Хочу отказ",
+          "effect": "beg_deny_want"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_p_stage",
+      "kind": "permission",
+      "speakEn": "Curtain call. Do you deserve cum under my lights?",
+      "labelRu": "Заслуживаешь кончить под мой свет?",
+      "options": [
+        {
+          "id": "please",
+          "labelRu": "Да, прошу",
+          "effect": "beg_please"
+        },
+        {
+          "id": "skip",
+          "labelRu": "Молчу",
+          "effect": "beg_skip"
+        },
+        {
+          "id": "deny",
+          "labelRu": "Оставь в отказе",
+          "effect": "beg_deny_want"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_p_verdict",
+      "kind": "permission",
+      "speakEn": "Give your closing plea to the idol: release, silence, or denial.",
+      "labelRu": "Последняя мольба мне: финал, молчание или отказ?",
+      "options": [
+        {
+          "id": "please",
+          "labelRu": "Прошу финал",
+          "effect": "beg_please"
+        },
+        {
+          "id": "skip",
+          "labelRu": "Молчу",
+          "effect": "beg_skip"
+        },
+        {
+          "id": "deny",
+          "labelRu": "Прошу отказ",
+          "effect": "beg_deny_want"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "verdict"
+    },
+    {
+      "id": "sunna_p_aftercare",
+      "kind": "permission",
+      "speakEn": "Ask politely for a water-break before the final curtain.",
+      "labelRu": "Вежливо попросить воды перед финальным занавесом?",
+      "options": [
+        {
+          "id": "please",
+          "labelRu": "Прошу",
+          "effect": "beg_please"
+        },
+        {
+          "id": "skip",
+          "labelRu": "Молчу",
+          "effect": "beg_skip"
+        },
+        {
+          "id": "deny",
+          "labelRu": "Лучше отказ",
+          "effect": "beg_deny_want"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "aftercare"
+    }
+  ],
+  "finaleBias": [
+    {
+      "id": "sunna_fb_want",
+      "kind": "finale_bias",
+      "speakEn": "What does the accused want — cum, ruin, or denial?",
+      "labelRu": "Чего хочешь на финале: cum / ruin / deny?",
+      "options": [
+        {
+          "id": "cum",
+          "labelRu": "Кончить",
+          "effect": "finale_want_cum"
+        },
+        {
+          "id": "ruin",
+          "labelRu": "Руинить",
+          "effect": "finale_want_ruin"
+        },
+        {
+          "id": "deny",
+          "labelRu": "Отказ",
+          "effect": "finale_want_deny"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_fb_stage",
+      "kind": "finale_bias",
+      "speakEn": "The stage hears cute pleas. Pick your preferred finish.",
+      "labelRu": "Выбери желаемый финал для сцены.",
+      "options": [
+        {
+          "id": "cum",
+          "labelRu": "Cum",
+          "effect": "finale_want_cum"
+        },
+        {
+          "id": "ruin",
+          "labelRu": "Ruin",
+          "effect": "finale_want_ruin"
+        },
+        {
+          "id": "deny",
+          "labelRu": "Deny",
+          "effect": "finale_want_deny"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_fb_tide",
+      "kind": "finale_bias",
+      "speakEn": "Choose the encore's final verdict: release, ruin, or denial.",
+      "labelRu": "Выбери вердикт энкора: отпуск, руин или отказ.",
+      "options": [
+        {
+          "id": "cum",
+          "labelRu": "Финал",
+          "effect": "finale_want_cum"
+        },
+        {
+          "id": "ruin",
+          "labelRu": "Руин",
+          "effect": "finale_want_ruin"
+        },
+        {
+          "id": "deny",
+          "labelRu": "Отказ",
+          "effect": "finale_want_deny"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "verdict"
+    },
+    {
+      "id": "sunna_fb_humiliate",
+      "kind": "finale_bias",
+      "speakEn": "For the final encore, do you request mercy, ruin, or denial?",
+      "labelRu": "Для финального биса: милость, руин или отказ?",
+      "options": [
+        {
+          "id": "cum",
+          "labelRu": "Милость",
+          "effect": "finale_want_cum"
+        },
+        {
+          "id": "ruin",
+          "labelRu": "Руин",
+          "effect": "finale_want_ruin"
+        },
+        {
+          "id": "deny",
+          "labelRu": "Отказ",
+          "effect": "finale_want_deny"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "humiliation"
+    }
+  ],
+  "choice": [
+    {
+      "id": "sunna_ch_speed",
+      "kind": "choice",
+      "speakEn": "Faster curtain — extend the act?",
+      "labelRu": "Продлить акт (быстрее к финалу по времени)?",
+      "choiceAction": "extend_sec",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Быстрее",
+          "effect": "choice_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Медленнее",
+          "effect": "choice_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_ch_edge",
+      "kind": "choice",
+      "speakEn": "Edge tax. Want me to spin how many edges I add to your quota?",
+      "labelRu": "Крутить рулетку «сколько эджей я тебе добавлю»?",
+      "choiceAction": "extra_edges",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "choice_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "choice_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_ch_toy",
+      "kind": "choice",
+      "speakEn": "Longer hold for the idol?",
+      "labelRu": "Дольше держать для айдола?",
+      "choiceAction": "hold_sec",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "choice_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "choice_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_ch_media",
+      "kind": "choice",
+      "speakEn": "Tip-only tease for the fans?",
+      "labelRu": "Только головка — тизер для зала?",
+      "choiceAction": "tip_sec",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "choice_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "choice_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_ch_breath_stage",
+      "kind": "choice",
+      "speakEn": "Add a breath-hold between acts for the idol?",
+      "labelRu": "Добавить задержку дыхания между актами?",
+      "choiceAction": "breath_hold",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "choice_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "choice_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "verdict"
+    },
+    {
+      "id": "sunna_ch_ruin_tide",
+      "kind": "choice",
+      "speakEn": "Call one deliberate ruined edge from the buzz?",
+      "labelRu": "Один осознанный ruined edge от вибрации?",
+      "choiceAction": "ruin_now",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Да",
+          "effect": "choice_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Нет",
+          "effect": "choice_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "denial verdict"
+    }
+  ],
+  "equip": [
+    {
+      "id": "sunna_eq_plug",
+      "kind": "equip",
+      "speakEn": "Insert the plug for the next scene. Ready?",
+      "labelRu": "Вставить пробку на сцену?",
+      "toyId": "vibrating_plug",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Надел",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не сейчас",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_eq_cage",
+      "kind": "equip",
+      "speakEn": "Cage for the Hydro stage. Lock it.",
+      "labelRu": "Клетка для айдола — надеть?",
+      "toyId": "chastity_cage",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Надел",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не сейчас",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_eq_wand",
+      "kind": "equip",
+      "speakEn": "Wand on stage — pressed to the cage. Equip?",
+      "labelRu": "Wand на сцену?",
+      "toyId": "wand",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Взял",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не сейчас",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_eq_vibe_bullet",
+      "kind": "equip",
+      "speakEn": "Bullet vibe on the clitty — soft and mean. Equip?",
+      "labelRu": "Вибропуля к клитору? Как wand, только компактнее.",
+      "toyId": "vibe_bullet",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Взял",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не сейчас",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ]
+    },
+    {
+      "id": "sunna_eq_dildo",
+      "kind": "equip",
+      "speakEn": "Medium dildo — throat practice, or worn for a soft grind. Equip?",
+      "labelRu": "Средний дилдо — для горла или worn в попке (grind). Экип?",
+      "toyId": "dildo_medium_vibe",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Готов",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не сейчас",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "oral"
+    },
+    {
+      "id": "sunna_eq_ring",
+      "kind": "equip",
+      "speakEn": "Cock ring as a cute stage prop for the next number. Equip?",
+      "labelRu": "Кольцо как реквизит для следующего акта?",
+      "toyId": "cock_ring",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Надел",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не сейчас",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "denial"
+    },
+    {
+      "id": "sunna_eq_ball_stretcher",
+      "kind": "equip",
+      "speakEn": "Soft ball ring for pretty pets — clitty stays caged. Equip?",
+      "labelRu": "Мягкое кольцо на яйца для поглаживаний — клитор в клетке. Экип?",
+      "toyId": "ball_stretcher",
+      "options": [
+        {
+          "id": "yes",
+          "labelRu": "Надел",
+          "effect": "equip_yes"
+        },
+        {
+          "id": "no",
+          "labelRu": "Не сейчас",
+          "effect": "equip_no"
+        },
+        {
+          "id": "mute",
+          "labelRu": "Не отвечу",
+          "effect": "mute"
+        }
+      ],
+      "tags": "chastity fem"
+    }
+  ]
+}
