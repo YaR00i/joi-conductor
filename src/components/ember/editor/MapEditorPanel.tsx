@@ -1,4 +1,6 @@
 import {
+  Suspense,
+  lazy,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -22,6 +24,12 @@ import {
   createEmberSceneGroup,
   duplicateEmberSceneGroup,
   EditorCore,
+  DEFAULT_EDITOR_SELECTION_FILTER,
+  EDITOR_VIEWPORT_SELECTION_KINDS,
+  advanceEditorPickCycle,
+  filterEditorSelectionStack,
+  includeRegionInViewportPick,
+  normalizeEditorSelectionFilter,
   EditorSceneState,
   emberWorldObjectRefKey,
   emberSceneGroupObjectKeys,
@@ -29,6 +37,7 @@ import {
   getEmberInspectorComponentSchema,
   listEmberWorldObjects,
   mapWithoutHiddenWorldObjects,
+  normalizeEmberSceneHierarchy,
   patchEmberWorldObjectLocalTransform,
   patchEmberWorldObjectTransform,
   removeEmberWorldObject,
@@ -37,7 +46,10 @@ import {
   renameEmberSceneGroup,
   rotateEmberWorldObjectsAroundPivot,
   rotateEmberSceneGroupTransforms,
+  scaleEmberSceneGroupTransforms,
+  scaleEmberWorldObjectsAroundPivot,
   setEmberSceneGroupParent,
+  setEmberWorldObjectsElevation,
   setEmberSpriteAssetComponentPresence,
   setEmberTileAssetComponentPresence,
   setEmberVoxelAssetComponentPresence,
@@ -45,20 +57,18 @@ import {
   translateEmberWorldObjects,
   translateEmberSceneGroupTransforms,
   type EditorDocumentChangeSource,
+  type EditorPickCycleState,
+  type EditorSelectionFilter,
+  type EditorViewportSelectionKind,
   type EmberInspectorFieldEdit,
   type EmberVoxelOverrideComponentType,
   type EmberOptionalComponentType,
   type EmberWorldObject,
+  type EmberWorldObjectRef,
   type EmberWorldTransformPatch,
   type EmberWorldTransformSpace,
 } from "../../../game/editor";
-import {
-  paintMapToCanvas,
-  writeEmberJson,
-  type EmberMap,
-  type EmberPack,
-} from "../../../game";
-import { paintMapGeometryToCanvas } from "../../../game/tile/mapUtils";
+import { writeEmberJson } from "../../../game/content/io";
 import {
   resolveEmissiveLightRange,
   resolveEmissiveStrength,
@@ -66,26 +76,27 @@ import {
 import {
   createEditorThreePreview,
   type EditorPick,
+  type EditorAssetPlacementPreview,
   type EditorThreePreview,
   type EditorTransformCommit,
+  type EditorTransformPreview,
   type EditorTransformTarget,
   type PlacePreviewMark,
 } from "../../../game/three/editorThreePreview";
 import { blockStoryHeight, elevFromWorldY, elevStoryWorldSpan } from "../../../game/tile/extruded";
-import {
-  VoxelSculptPanel,
-  type VoxelSculptSession,
-} from "./VoxelSculptPanel";
+import type { VoxelSculptSession } from "./VoxelSculptPanel";
 import {
   normalizePixelSprite,
   serializePixelSprite,
 } from "../../../game/content/pixelSprite";
 import type {
   EmberLightSource,
+  EmberMap,
   EmberColliderModifier,
   EmberMapLight,
   EmberMapRegion,
   EmberSpawnTable,
+  EmberPack,
   EmberStage,
   EmberTileset,
   EmberTilesetTile,
@@ -104,6 +115,8 @@ import {
   ensureMapLayers,
   heightVoxelsAt,
   listLanternSources,
+  previewLanternSourceMove,
+  removeLanternSource,
   mapViewModeFromArrow,
   mapViewModeLabelRu,
   rampDirDelta,
@@ -146,8 +159,13 @@ import {
   type MapLibPayload,
 } from "./MapLibraryTray";
 import {
+  checkMapLibraryPlacement,
+  resolveMapLibraryPlacementTarget,
+  type MapLibraryPlacementMode,
+  type MapLibraryPlacementTarget,
+} from "./mapLibraryPlacement";
+import {
   pairTeleportRegions,
-  primaryRegionAtTile,
   replaceRegion,
 } from "./MapRegionEditor";
 import { makeRegionAt } from "./mapRegionHelpers";
@@ -158,6 +176,49 @@ import {
   appendBlankTile,
   appendClonedTile,
 } from "./tileCreateHelpers";
+
+const LazyVoxelSculptPanel = lazy(() =>
+  import("./VoxelSculptPanel").then((module) => ({
+    default: module.VoxelSculptPanel,
+  })),
+);
+
+const MAP_SELECTION_FILTER_STORAGE_KEY = "ember-map-selection-filter-v1";
+
+const VIEWPORT_SELECTION_LABEL: Record<
+  EditorViewportSelectionKind,
+  string
+> = {
+  voxel: "Воксели",
+  sprite: "Спрайты",
+  light: "Свет",
+  region: "Зоны",
+  tile: "Блоки",
+};
+
+type ViewportMapSelection = Extract<
+  MapSelection,
+  { kind: EditorViewportSelectionKind }
+>;
+
+function isViewportMapSelection(
+  selection: MapSelection,
+): selection is ViewportMapSelection {
+  return EDITOR_VIEWPORT_SELECTION_KINDS.includes(
+    selection.kind as EditorViewportSelectionKind,
+  );
+}
+
+function initialMapSelectionFilter(): EditorSelectionFilter {
+  try {
+    const stored = sessionStorage.getItem(MAP_SELECTION_FILTER_STORAGE_KEY);
+    return stored
+      ? normalizeEditorSelectionFilter(JSON.parse(stored))
+      : { ...DEFAULT_EDITOR_SELECTION_FILTER };
+  } catch {
+    return { ...DEFAULT_EDITOR_SELECTION_FILTER };
+  }
+}
 
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
@@ -207,6 +268,42 @@ function mapSelectionEquals(left: MapSelection, right: MapSelection): boolean {
     return left.payload === right.payload;
   }
   return left.kind === right.kind;
+}
+
+function mapSelectionKey(selection: MapSelection): string {
+  if (selection.kind === "tile") {
+    return `tile:${selection.tx}:${selection.ty}:${selection.elev ?? ""}`;
+  }
+  if (selection.kind === "lib") {
+    return `lib:${JSON.stringify(selection.payload)}`;
+  }
+  if (selection.kind === "globalLight") return "globalLight";
+  return `${selection.kind}:${selection.id}`;
+}
+
+function mapSelectionShortLabel(selection: MapSelection): string {
+  switch (selection.kind) {
+    case "voxel":
+      return `Воксель ${selection.id}`;
+    case "sprite":
+      return `Спрайт ${selection.id}`;
+    case "light":
+      return `Свет ${selection.id}`;
+    case "region":
+      return `Зона ${selection.id}`;
+    case "tile":
+      return `Тайл ${selection.tx},${selection.ty}${selection.elev == null ? "" : ` Z${selection.elev}`}`;
+    case "group":
+      return `Группа ${selection.id}`;
+    case "lib":
+      return "Ассет библиотеки";
+    case "globalLight":
+      return "Свет карты";
+    default: {
+      const exhaustive: never = selection;
+      return exhaustive;
+    }
+  }
 }
 
 type Tool =
@@ -307,7 +404,7 @@ const TOOLS: Array<{
   {
     id: "select",
     labelRu: "Выбор",
-    hint: "Клик — объект / тайл → гизмо · G — перенос · R — поворот",
+    hint: "Клик — объект / тайл → гизмо · G — перенос · R — поворот · S — масштаб",
     glyph: "V",
   },
   {
@@ -494,6 +591,7 @@ function cloneMap(map: EmberMap): EmberMap {
     lights: map.lights?.map((l) => ({ ...l })),
     sprites: map.sprites?.map((s) => ({
       ...s,
+      scale: s.scale ? { ...s.scale } : undefined,
       componentStates: s.componentStates ? { ...s.componentStates } : undefined,
       collider: s.collider ? { ...s.collider } : undefined,
     })),
@@ -504,7 +602,10 @@ function cloneMap(map: EmberMap): EmberMap {
         : undefined,
       collider: modifier.collider ? { ...modifier.collider } : undefined,
     })),
-    voxelProps: map.voxelProps?.map((p) => ({ ...p })),
+    voxelProps: map.voxelProps?.map((p) => ({
+      ...p,
+      scale: p.scale ? { ...p.scale } : undefined,
+    })),
     layers: map.layers.map((l) => ({ ...l, data: [...l.data] })),
     regions: map.regions.map((r) => ({ ...r })),
     sceneHierarchy: map.sceneHierarchy
@@ -587,7 +688,9 @@ function selectionTransformTarget(
           z: (p.y + 0.5) * ts,
         },
         rotationY: ((((p.rot ?? 0) % 4) + 4) % 4) * (Math.PI / 2),
+        scale: object.transform.scale,
         allowRotate: true,
+        allowScale: true,
       };
     }
     case "sprite": {
@@ -606,6 +709,8 @@ function selectionTransformTarget(
           z: (p.y + 0.5) * ts,
         },
         allowRotate: false,
+        scale: object.transform.scale,
+        allowScale: true,
       };
     }
     case "light": {
@@ -614,7 +719,8 @@ function selectionTransformTarget(
         (s) => s.id === sel.id,
       );
       if (!lamp) return null;
-      const floorY = tileSurfaceElev(map, lamp.x, lamp.y) * storyH;
+      const floorY =
+        (lamp.elev ?? tileSurfaceElev(map, lamp.x, lamp.y)) * storyH;
       const heightTiles = Math.max(0.2, Math.min(3, lamp.params.lampHeight));
       return {
         kind: "light",
@@ -627,6 +733,7 @@ function selectionTransformTarget(
           z: (lamp.y + 0.5) * ts,
         },
         allowRotate: false,
+        allowScale: false,
       };
     }
     case "tile": {
@@ -645,6 +752,7 @@ function selectionTransformTarget(
           z: (sel.ty + 0.5) * ts,
         },
         allowRotate: false,
+        allowScale: false,
       };
     }
     case "group": {
@@ -662,9 +770,28 @@ function selectionTransformTarget(
           (((group.rotationQuarterTurns ?? 0) % 4) + 4) % 4 *
           (Math.PI / 2),
         allowRotate: true,
+        scale: { x: 1, y: 1, z: 1 },
+        allowScale: true,
       };
     }
-    case "region":
+    case "region": {
+      const region = map.regions.find((candidate) => candidate.id === sel.id);
+      if (!region) return null;
+      const elev = tileSurfaceElev(map, region.x, region.y);
+      return {
+        kind: "region",
+        id: region.id,
+        position: {
+          x: (region.x + region.w / 2) * ts,
+          y: elev * storyH,
+          z: (region.y + region.h / 2) * ts,
+        },
+        scale: { x: region.w, y: region.h, z: 1 },
+        allowRotate: false,
+        allowScale: true,
+        scaleAxes: { x: true, y: true, z: false },
+      };
+    }
     case "lib":
     case "globalLight":
       return null;
@@ -673,6 +800,217 @@ function selectionTransformTarget(
       return _n;
     }
   }
+}
+
+function multiSelectionWorldObjects(
+  selections: readonly MapSelection[],
+  map: EmberMap,
+): EmberWorldObject[] {
+  if (
+    selections.some(
+      (selection) =>
+        selection.kind === "group" ||
+        selection.kind === "tile" ||
+        selection.kind === "lib" ||
+        selection.kind === "globalLight",
+    )
+  ) {
+    return [];
+  }
+  const byKey = new Map<string, EmberWorldObject>();
+  for (const selection of selections) {
+    const ref = mapSelectionToWorldObjectRef(selection);
+    if (!ref || ref.kind === "tile") continue;
+    const object = getEmberWorldObject(map, ref);
+    if (object) byKey.set(object.key, object);
+  }
+  return [...byKey.values()];
+}
+
+function worldObjectTransformPivot(object: EmberWorldObject) {
+  if (object.source.kind === "region") {
+    const region = object.source.value;
+    return {
+      x: region.x + (region.w - 1) / 2,
+      y: region.y + (region.h - 1) / 2,
+      z: object.transform.resolvedZ,
+    };
+  }
+  return {
+    x: object.transform.position.x,
+    y: object.transform.position.y,
+    z: object.transform.resolvedZ,
+  };
+}
+
+function multiSelectionTransformTarget(
+  selections: readonly MapSelection[],
+  map: EmberMap,
+): EditorTransformTarget | null {
+  const objects = multiSelectionWorldObjects(selections, map);
+  if (objects.length < 2) return null;
+  const points = objects.map(worldObjectTransformPivot);
+  const pivot = {
+    x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
+    y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
+    z: points.reduce((sum, point) => sum + point.z, 0) / points.length,
+  };
+  const ts = map.tileSize;
+  return {
+    kind: "selection",
+    position: {
+      x: (pivot.x + 0.5) * ts,
+      y: pivot.z * blockStoryHeight(ts),
+      z: (pivot.y + 0.5) * ts,
+    },
+    scale: { x: 1, y: 1, z: 1 },
+    allowRotate: false,
+    allowScale: true,
+  };
+}
+
+/** Builds a disposable map pose for the gizmo without touching history/save. */
+function mapWithTransformPreview(
+  map: EmberMap,
+  preview: EditorTransformPreview,
+  selections: readonly MapSelection[],
+  tileset?: EmberTileset,
+  sprites?: EmberPack["sprites"],
+): EmberMap | null {
+  const ts = map.tileSize;
+  const storyH = blockStoryHeight(ts);
+  const targetX = preview.position.x / ts - 0.5;
+  const targetY = preview.position.z / ts - 0.5;
+  const targetZ = clampElevation(elevFromWorldY(preview.position.y, storyH));
+  const rotation =
+    ((Math.round(preview.rotationY / (Math.PI / 2)) % 4) + 4) % 4;
+
+  if (preview.kind === "selection") {
+    const objects = multiSelectionWorldObjects(selections, map);
+    if (objects.length < 2) return null;
+    const points = objects.map(worldObjectTransformPivot);
+    const pivot = {
+      x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
+      y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
+      z: points.reduce((sum, point) => sum + point.z, 0) / points.length,
+    };
+    if (preview.mode === "scale") {
+      return scaleEmberWorldObjectsAroundPivot(
+        map,
+        objects.map((object) => object.ref),
+        pivot,
+        preview.scale,
+      );
+    }
+    return translateEmberWorldObjects(
+      map,
+      objects.map((object) => object.ref),
+      Math.round(targetX - pivot.x),
+      Math.round(targetY - pivot.y),
+    );
+  }
+
+  if (preview.kind === "group" && preview.id) {
+    const group = map.sceneHierarchy?.groups.find(
+      (candidate) => candidate.id === preview.id,
+    );
+    if (!group) return null;
+    const keys = new Set(
+      emberSceneGroupObjectKeys(map.sceneHierarchy, group.id),
+    );
+    const refs = listEmberWorldObjects(map)
+      .filter((object) => keys.has(object.key))
+      .map((object) => object.ref);
+    if (preview.mode === "scale") {
+      const scaled = scaleEmberWorldObjectsAroundPivot(
+        map,
+        refs,
+        group.pivot,
+        preview.scale,
+      );
+      return scaleEmberSceneGroupTransforms(
+        scaled,
+        group.id,
+        preview.scale,
+      );
+    }
+    if (preview.mode === "rotate") {
+      const current =
+        (((group.rotationQuarterTurns ?? 0) % 4) + 4) % 4;
+      const delta = ((rotation - current) % 4 + 4) % 4;
+      const rotated = rotateEmberWorldObjectsAroundPivot(
+        map,
+        refs,
+        group.pivot,
+        delta,
+      );
+      return rotateEmberSceneGroupTransforms(rotated, group.id, delta);
+    }
+    const dx = Math.round(targetX - group.pivot.x);
+    const dy = Math.round(targetY - group.pivot.y);
+    const moved = translateEmberWorldObjects(map, refs, dx, dy);
+    return translateEmberSceneGroupTransforms(moved, group.id, dx, dy);
+  }
+
+  if (
+    preview.mode === "scale" &&
+    preview.id &&
+    (preview.kind === "voxel" ||
+      preview.kind === "sprite" ||
+      preview.kind === "region")
+  ) {
+    return patchEmberWorldObjectTransform(
+      map,
+      { kind: preview.kind, id: preview.id },
+      {
+        scaleX: preview.scale.x,
+        scaleY: preview.scale.y,
+        ...(preview.kind !== "region" ? { scaleZ: preview.scale.z } : {}),
+      },
+    );
+  }
+
+  if (!preview.id || preview.kind === "tile") return null;
+  if (preview.kind === "voxel") {
+    return patchEmberWorldObjectTransform(
+      map,
+      { kind: "voxel", id: preview.id },
+      preview.mode === "rotate"
+        ? { rotationQuarterTurns: rotation }
+        : { x: targetX, y: targetY, z: targetZ },
+    );
+  }
+  if (preview.kind === "light") {
+    if (!tileset) return null;
+    return previewLanternSourceMove(
+      map,
+      tileset,
+      sprites,
+      preview.id,
+      targetX,
+      targetY,
+    );
+  }
+  if (preview.kind === "sprite") {
+    return patchEmberWorldObjectTransform(
+      map,
+      { kind: "sprite", id: preview.id },
+      { x: targetX, y: targetY },
+    );
+  }
+  if (preview.kind === "region") {
+    const region = map.regions.find((candidate) => candidate.id === preview.id);
+    if (!region) return null;
+    return patchEmberWorldObjectTransform(
+      map,
+      { kind: "region", id: preview.id },
+      {
+        x: preview.position.x / ts - region.w / 2,
+        y: preview.position.z / ts - region.h / 2,
+      },
+    );
+  }
+  return null;
 }
 
 const TOOL_HOTKEYS: Record<string, Tool> = {
@@ -729,7 +1067,7 @@ function mapWithObjectGrab(map: EmberMap, grab: ObjectGrab | null): EmberMap {
     return patchEmberWorldObjectTransform(
       map,
       { kind: "sprite", id: grab.id },
-      { x, y },
+      { x, y, z: tileSurfaceElev(map, x, y) },
     );
   }
   return patchEmberWorldObjectTransform(
@@ -822,16 +1160,16 @@ export function MapEditorPanel({
     () => undefined,
   );
   const transformDraggingRef = useRef(false);
+  const transformLivePreviewRef = useRef<EditorTransformPreview | null>(null);
   const transformPreviewRef = useRef(false);
+  const transformMapPreviewRafRef = useRef(0);
+  const [transformMapPreview, setTransformMapPreview] =
+    useState<EmberMap | null>(null);
   const syncThreeOverlaysRef = useRef<() => void>(() => undefined);
   const clearPlacePreviewRef = useRef<() => void>(() => undefined);
   const updatePlacePreviewRef = useRef<(next: PlacePreviewMark | null) => void>(
     () => undefined,
   );
-  /** Unlit geometry bake (static); light pass composites onto base. */
-  const geomCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  /** Full map paint lives here; visible canvas blits + selection overlay. */
-  const baseCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const painting = useRef(false);
   const eraseStrokeSaved = useRef(false);
   const eraseLastKey = useRef<string | null>(null);
@@ -921,6 +1259,16 @@ export function MapEditorPanel({
     selectionService.getState,
   );
   const selection = selectionState.primary;
+  const selectionItemsRef = useRef<readonly MapSelection[]>([]);
+  selectionItemsRef.current = selectionState.items;
+  const [selectionFilter, setSelectionFilter] =
+    useState<EditorSelectionFilter>(initialMapSelectionFilter);
+  const selectionFilterRef = useRef(selectionFilter);
+  selectionFilterRef.current = selectionFilter;
+  const pickCycleRef = useRef<EditorPickCycleState | null>(null);
+  const [hoverSelectionStack, setHoverSelectionStack] = useState<
+    readonly MapSelection[]
+  >([]);
   const setSelection = useCallback(
     (
       next:
@@ -936,6 +1284,31 @@ export function MapEditorPanel({
     },
     [selectionService],
   );
+  const toggleSelectionFilter = useCallback(
+    (kind: EditorViewportSelectionKind) => {
+      setSelectionFilter((current) => ({
+        ...current,
+        [kind]: !current[kind],
+      }));
+    },
+    [],
+  );
+  const enableAllSelectionFilters = useCallback(() => {
+    setSelectionFilter({ ...DEFAULT_EDITOR_SELECTION_FILTER });
+  }, []);
+
+  useEffect(() => {
+    pickCycleRef.current = null;
+    setHoverSelectionStack([]);
+    try {
+      sessionStorage.setItem(
+        MAP_SELECTION_FILTER_STORAGE_KEY,
+        JSON.stringify(selectionFilter),
+      );
+    } catch {
+      // Session persistence is optional (private contexts may reject storage).
+    }
+  }, [selectionFilter]);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   /** Hover-preview region from teleport list (camera + blink). */
   const [previewRegionId, setPreviewRegionId] = useState<string | null>(null);
@@ -979,15 +1352,6 @@ export function MapEditorPanel({
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSavedRef = useRef(onSaved);
   onSavedRef.current = onSaved;
-  /** Keep the cursor-anchored map point after wheel zoom resizes the canvas. */
-  const zoomAnchorRef = useRef<{
-    mx: number;
-    my: number;
-    contentX: number;
-    contentY: number;
-    from: number;
-    to: number;
-  } | null>(null);
   const [brushElev, setBrushElev] = useState(1);
   const brushElevRef = useRef(brushElev);
   brushElevRef.current = brushElev;
@@ -1018,8 +1382,16 @@ export function MapEditorPanel({
   const libRegionDraftRef = useRef<EmberMapRegion | null>(null);
   libRegionDraftRef.current = libRegionDraft;
   const [libDragActive, setLibDragActive] = useState(false);
-  const [libHoverTile, setLibHoverTile] = useState<TilePos | null>(null);
-  const libHoverRef = useRef<TilePos | null>(null);
+  const [libHoverTile, setLibHoverTile] =
+    useState<MapLibraryPlacementTarget | null>(null);
+  const libHoverRef = useRef<MapLibraryPlacementTarget | null>(null);
+  const [libraryPlacementMode, setLibraryPlacementMode] =
+    useState<MapLibraryPlacementMode>("surface");
+  const libraryPlacementModeRef = useRef(libraryPlacementMode);
+  libraryPlacementModeRef.current = libraryPlacementMode;
+  const [serialLibraryPlacement, setSerialLibraryPlacement] = useState(true);
+  const serialLibraryPlacementRef = useRef(serialLibraryPlacement);
+  serialLibraryPlacementRef.current = serialLibraryPlacement;
   const hoverPickRef = useRef<EditorPick | null>(null);
   const libSelectedRef = useRef<MapLibPayload | null>(null);
   libSelectedRef.current = libSelected;
@@ -1083,10 +1455,21 @@ export function MapEditorPanel({
       ? listLanternSources(mapRef.current, ts, pack.sprites)
       : [];
     const sel = selectionRef.current;
-    const lampMark =
+    const baseLampMark =
       sel?.kind === "light"
         ? (lamps.find((l) => l.id === sel.id) ?? null)
         : null;
+    const liveTransform = transformLivePreviewRef.current;
+    const lampMark =
+      baseLampMark &&
+      liveTransform?.kind === "light" &&
+      liveTransform.id === baseLampMark.id
+        ? {
+            ...baseLampMark,
+            x: liveTransform.position.x / mapRef.current.tileSize - 0.5,
+            y: liveTransform.position.z / mapRef.current.tileSize - 0.5,
+          }
+        : baseLampMark;
     const previewId = previewRegionIdRef.current;
     const regionId = previewId ?? selectedRegionIdRef.current;
     const regionMark = regionOutline(regionId);
@@ -1103,6 +1486,9 @@ export function MapEditorPanel({
     three.setOverlayMarks({
       hover: transformDraggingRef.current ? null : hoverPickRef.current,
       selected: selectionToPick(sel, lamps, mapRef.current.regions),
+      selectedMany: selectionItemsRef.current
+        .map((item) => selectionToPick(item, lamps, mapRef.current.regions))
+        .filter((pick): pick is EditorPick => pick != null),
       selectTiles: dragCells(dragSelRef.current),
       libTile: lib ? { tx: lib.x, ty: lib.y } : null,
       placePreview: placePreviewRef.current,
@@ -1122,15 +1508,89 @@ export function MapEditorPanel({
           }
         : null,
     });
+    const pendingPayload = libSelectedRef.current;
+    const pendingTile = libHoverRef.current;
+    let assetPreview: EditorAssetPlacementPreview | null = null;
+    if (pendingPayload && pendingTile && pendingPayload.kind !== "tile") {
+      const placement = checkMapLibraryPlacement(
+        pendingPayload,
+        pendingTile,
+        mapRef.current,
+        pack,
+        ts,
+      );
+      const elev = pendingTile.elev;
+      if (pendingPayload.kind === "sprite") {
+        assetPreview = {
+          kind: "sprite",
+          assetId: pendingPayload.spriteId,
+          tx: pendingTile.x,
+          ty: pendingTile.y,
+          elev,
+          valid: placement.valid,
+        };
+      } else if (pendingPayload.kind === "voxel") {
+        assetPreview = {
+          kind: "voxel",
+          assetId: pendingPayload.modelId,
+          tx: pendingTile.x,
+          ty: pendingTile.y,
+          elev,
+          valid: placement.valid,
+        };
+      } else if (pendingPayload.kind === "light") {
+        const source = lightSourceFromPreset(
+          mapRef.current,
+          pack,
+          pendingPayload.presetId,
+          pendingTile.x,
+          pendingTile.y,
+        );
+        const defaults = resolveMapLight(mapRef.current);
+        assetPreview = {
+          kind: "light",
+          assetId: pendingPayload.presetId,
+          tx: pendingTile.x,
+          ty: pendingTile.y,
+          elev,
+          valid: placement.valid,
+          color: source.lampColor ?? defaults.lampColor,
+          rangeTiles: source.lampRange ?? defaults.lampRange,
+        };
+      } else {
+        const draft = libRegionDraftRef.current;
+        assetPreview = {
+          kind: "region",
+          assetId: pendingPayload.regionKind,
+          tx: pendingTile.x,
+          ty: pendingTile.y,
+          elev,
+          valid: placement.valid,
+          width: Math.max(1, draft?.w ?? 1),
+          height: Math.max(1, draft?.h ?? 1),
+        };
+      }
+    }
+    three.setAssetPlacementPreview(assetPreview);
     const grab = objectGrabRef.current;
     const selectedRef = mapSelectionToWorldObjectRef(sel);
     const selectedKey =
       selectedRef && selectedRef.kind !== "tile"
         ? emberWorldObjectRefKey(selectedRef)
         : null;
+    const selectedTransformKeys = selectionItemsRef.current.flatMap((item) => {
+      if (item.kind === "group") {
+        return emberSceneGroupObjectKeys(mapRef.current.sceneHierarchy, item.id);
+      }
+      const ref = mapSelectionToWorldObjectRef(item);
+      return ref && ref.kind !== "tile" ? [emberWorldObjectRefKey(ref)] : [];
+    });
     const transformBlocked = Boolean(
       (selectedKey &&
         (sceneState.isHidden(selectedKey) || sceneState.isLocked(selectedKey))) ||
+        selectedTransformKeys.some(
+          (key) => sceneState.isHidden(key) || sceneState.isLocked(key),
+        ) ||
         (sel?.kind === "group" &&
           emberSceneGroupObjectKeys(mapRef.current.sceneHierarchy, sel.id).some(
             (key) => sceneState.isHidden(key) || sceneState.isLocked(key),
@@ -1139,12 +1599,17 @@ export function MapEditorPanel({
     three.setTransformTarget(
       grab || transformBlocked
         ? null
-        : selectionTransformTarget(
-            sel,
-            mapRef.current,
-            ts,
-            pack.sprites,
-          ),
+        : selectionItemsRef.current.length > 1
+          ? multiSelectionTransformTarget(
+              selectionItemsRef.current,
+              mapRef.current,
+            )
+          : selectionTransformTarget(
+              sel,
+              mapRef.current,
+              ts,
+              pack.sprites,
+            ),
     );
     three.setDebugOverlays({
       showCollision,
@@ -1157,8 +1622,7 @@ export function MapEditorPanel({
   }, [
     dragCells,
     regionOutline,
-    pack.tilesets,
-    pack.sprites,
+    pack,
     showCollision,
     showElevation,
     showRegions,
@@ -1238,13 +1702,17 @@ export function MapEditorPanel({
         setObjectGrab(null);
         return;
       }
+      if (libSelectedRef.current) {
+        setLibSelected(null);
+        setLibHoverTile(null);
+        setSelection((current) =>
+          current?.kind === "lib" ? null : current,
+        );
+        return;
+      }
       if (selectionRef.current || selectedRegionIdRef.current) {
         setSelection(null);
         setSelectedRegionId(null);
-        return;
-      }
-      if (libSelectedRef.current) {
-        setLibSelected(null);
         return;
       }
       setDockPanel(null);
@@ -1315,6 +1783,31 @@ export function MapEditorPanel({
   toolRef.current = tool;
 
   const tileset: EmberTileset | undefined = pack.tilesets[map.tilesetId];
+  const libPlacementCheck =
+    libSelected && libHoverTile
+      ? checkMapLibraryPlacement(
+          libSelected,
+          libHoverTile,
+          map,
+          pack,
+          tileset,
+        )
+      : null;
+
+  useEffect(() => {
+    if (!libSelectedRef.current) return;
+    setLibHoverTile((current) => {
+      if (!current) return current;
+      if (libraryPlacementMode === "surface") return null;
+      return resolveMapLibraryPlacementTarget(
+        mapRef.current,
+        libraryPlacementMode,
+        current,
+        null,
+        brushElevRef.current,
+      );
+    });
+  }, [brushElev, libraryPlacementMode]);
   const selectedTile = tileset?.tiles.find((t) => t.id === tileId);
 
   const lanternSources = useMemo(
@@ -1354,6 +1847,10 @@ export function MapEditorPanel({
         }),
       ),
     [map.sceneHierarchy, selectionState.items],
+  );
+  const selectedSceneObjects = useMemo(
+    () => sceneObjects.filter((object) => selectedObjectKeys.has(object.key)),
+    [sceneObjects, selectedObjectKeys],
   );
   const selectedSceneGroup =
     selection?.kind === "group"
@@ -1546,118 +2043,15 @@ export function MapEditorPanel({
     }
   }, [scale, tileset, pack.sprites]);
 
-  /** Committed map + live G/R grab preview (visual only until click). */
+  /** Committed map + live gizmo/grab preview (visual only until commit). */
   const displayMap = useMemo(
     () => {
-      const preview = mapWithObjectGrab(map, objectGrab);
+      const preview =
+        transformMapPreview ?? mapWithObjectGrab(map, objectGrab);
       return mapWithoutHiddenWorldObjects(preview, hiddenObjectKeys);
     },
-    [hiddenObjectKeys, map, objectGrab],
+    [hiddenObjectKeys, map, objectGrab, transformMapPreview],
   );
-
-  // Unlit geometry fingerprint — omit map.light / map.lights so lamp edits
-  // only rerun the dynamic light pass. Props are separate so moving a voxel
-  // does not rebake the 2D layout canvas or remesh terrain.
-  const mapTerrainKey = useMemo(
-    () =>
-      JSON.stringify({
-        id: displayMap.id,
-        width: displayMap.width,
-        height: displayMap.height,
-        tileSize: displayMap.tileSize,
-        tilesetId: displayMap.tilesetId,
-        layers: displayMap.layers,
-        scale,
-        viewMode,
-      }),
-    [
-      displayMap.id,
-      displayMap.width,
-      displayMap.height,
-      displayMap.tileSize,
-      displayMap.tilesetId,
-      displayMap.layers,
-      scale,
-      viewMode,
-    ],
-  );
-
-  const mapPropsKey = useMemo(
-    () =>
-      JSON.stringify({
-        sprites: displayMap.sprites,
-        voxelProps: displayMap.voxelProps,
-        regions: displayMap.regions,
-      }),
-    [displayMap.sprites, displayMap.voxelProps, displayMap.regions],
-  );
-
-  const mapLightKey = useMemo(
-    () =>
-      JSON.stringify({ light: displayMap.light, lights: displayMap.lights }),
-    [displayMap.light, displayMap.lights],
-  );
-
-  // Static geometry bake (top) or full side composite.
-  useEffect(() => {
-    if (!tileset) return;
-    if (!geomCanvasRef.current) {
-      geomCanvasRef.current = document.createElement("canvas");
-    }
-    const geom = geomCanvasRef.current;
-    const gctx = geom.getContext("2d");
-    if (!gctx) return;
-    gctx.imageSmoothingEnabled = false;
-    const m = ensureMapLayers(displayMap);
-    const paintOpts = {
-      // 2D bake is off-screen for layout; visual overlays live in Three.
-      showCollision: false,
-      showRegions: false,
-      showElevation: false,
-      scale,
-      viewMode,
-      sprites: pack.sprites,
-    };
-    if (viewMode === "top") {
-      paintMapGeometryToCanvas(gctx, m, tileset, paintOpts);
-    } else {
-      paintMapToCanvas(gctx, m, tileset, paintOpts);
-    }
-    const anchor = zoomAnchorRef.current;
-    const wrap = canvasWrapRef.current;
-    if (anchor && wrap && anchor.to === scale) {
-      zoomAnchorRef.current = null;
-      const ratio = anchor.to / anchor.from;
-      wrap.scrollLeft = anchor.contentX * ratio - anchor.mx;
-      wrap.scrollTop = anchor.contentY * ratio - anchor.my;
-    }
-    // mapTerrainKey encodes terrain layers + view layout.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional fingerprint
-  }, [mapTerrainKey, tileset, pack.sprites]);
-
-  // Dynamic light pass: blit cached geom, then overlay lamps.
-  // Top view: geom canvas kept for picking size; visual light is Three.js.
-  useEffect(() => {
-    if (!tileset) return;
-    const geom = geomCanvasRef.current;
-    if (!geom || geom.width < 1) return;
-    if (!baseCanvasRef.current) {
-      baseCanvasRef.current = document.createElement("canvas");
-    }
-    const base = baseCanvasRef.current;
-    const bctx = base.getContext("2d");
-    if (!bctx) return;
-    bctx.imageSmoothingEnabled = false;
-    if (base.width !== geom.width || base.height !== geom.height) {
-      base.width = geom.width;
-      base.height = geom.height;
-    }
-    bctx.clearRect(0, 0, base.width, base.height);
-    // Keep geom size for layout; visual map is Three.js in every view mode.
-    bctx.drawImage(geom, 0, 0);
-    blitBaseAndOverlay();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional fingerprints
-  }, [mapTerrainKey, mapLightKey, tileset, pack.sprites, blitBaseAndOverlay]);
 
   // Three.js isometric viewport — fills the wrap (not a scrolled 2D bake).
   useEffect(() => {
@@ -1680,13 +2074,46 @@ export function MapEditorPanel({
         });
         threePreviewRef.current.onTransformDragging((dragging) => {
           transformDraggingRef.current = dragging;
+          if (!dragging) {
+            if (transformMapPreviewRafRef.current) {
+              cancelAnimationFrame(transformMapPreviewRafRef.current);
+              transformMapPreviewRafRef.current = 0;
+            }
+            setTransformMapPreview(null);
+          }
           if (dragging) {
             hoverPickRef.current = null;
             syncThreeOverlaysRef.current();
           }
         });
-        threePreviewRef.current.onTransformPreview((pos) => {
-          if (!pos) {
+        threePreviewRef.current.onTransformPreview((preview) => {
+          transformLivePreviewRef.current = preview;
+          if (transformMapPreviewRafRef.current) {
+            cancelAnimationFrame(transformMapPreviewRafRef.current);
+            transformMapPreviewRafRef.current = 0;
+          }
+          if (!preview) {
+            setTransformMapPreview(null);
+            if (transformPreviewRef.current) {
+              transformPreviewRef.current = false;
+              clearPlacePreviewRef.current();
+            }
+            syncThreeOverlaysRef.current();
+            return;
+          }
+          transformMapPreviewRafRef.current = requestAnimationFrame(() => {
+            transformMapPreviewRafRef.current = 0;
+            setTransformMapPreview(
+              mapWithTransformPreview(
+                mapRef.current,
+                preview,
+                selectionItemsRef.current,
+                tileset,
+                pack.sprites,
+              ),
+            );
+          });
+          if (preview.mode !== "translate") {
             if (transformPreviewRef.current) {
               transformPreviewRef.current = false;
               clearPlacePreviewRef.current();
@@ -1694,18 +2121,28 @@ export function MapEditorPanel({
             }
             return;
           }
+          if (preview.kind !== "tile") {
+            // Props/lights/groups preview their actual temporary map pose.
+            // A second tile marker beneath them makes the floor look selected.
+            transformPreviewRef.current = false;
+            clearPlacePreviewRef.current();
+            syncThreeOverlaysRef.current();
+            return;
+          }
           const m = mapRef.current;
           const ts = m.tileSize;
           const storyH = blockStoryHeight(ts);
           const tx = Math.max(
             0,
-            Math.min(m.width - 1, Math.floor(pos.x / ts)),
+            Math.min(m.width - 1, Math.floor(preview.position.x / ts)),
           );
           const ty = Math.max(
             0,
-            Math.min(m.height - 1, Math.floor(pos.z / ts)),
+            Math.min(m.height - 1, Math.floor(preview.position.z / ts)),
           );
-          const elev = clampElevation(elevFromWorldY(pos.y, storyH));
+          const elev = clampElevation(
+            elevFromWorldY(preview.position.y, storyH),
+          );
           transformPreviewRef.current = true;
           updatePlacePreviewRef.current({ tx, ty, elev, mode: "place" });
           syncThreeOverlaysRef.current();
@@ -1733,9 +2170,6 @@ export function MapEditorPanel({
     return () => ro.disconnect();
   }, [
     viewMode,
-    mapTerrainKey,
-    mapPropsKey,
-    mapLightKey,
     tileset,
     pack,
     displayMap,
@@ -1751,6 +2185,10 @@ export function MapEditorPanel({
 
   useEffect(() => {
     return () => {
+      if (transformMapPreviewRafRef.current) {
+        cancelAnimationFrame(transformMapPreviewRafRef.current);
+        transformMapPreviewRafRef.current = 0;
+      }
       threePreviewRef.current?.dispose();
       threePreviewRef.current = null;
     };
@@ -1804,8 +2242,11 @@ export function MapEditorPanel({
   }, [
     dragSel,
     libHoverTile,
+    libSelected,
+    libRegionDraft,
     objectGrab,
     selection,
+    selectionState.revision,
     selectedRegionId,
     previewRegionId,
     dockPanel,
@@ -1892,12 +2333,24 @@ export function MapEditorPanel({
       }
       const current = mapRef.current;
       pushHistory(current, `Удалить ${editable.length} объектов`);
-      publishMap(
-        removeEmberWorldObjects(
-          current,
-          editable.map((object) => object.ref),
-        ),
+      const refs = editable.map((object) => object.ref);
+      const lightRefs = refs.filter(
+        (ref): ref is Extract<EmberWorldObjectRef, { kind: "light" }> =>
+          ref.kind === "light",
       );
+      let next = removeEmberWorldObjects(
+        current,
+        refs.filter((ref) => ref.kind !== "light"),
+      );
+      if (tileset) {
+        for (const ref of lightRefs) {
+          next = removeLanternSource(next, tileset, pack.sprites, ref.id);
+        }
+        next = normalizeEmberSceneHierarchy(next);
+      } else if (lightRefs.length > 0) {
+        next = removeEmberWorldObjects(next, lightRefs);
+      }
+      publishMap(next);
       selectionService.clear();
       onSaved(
         editable.length === objects.length
@@ -1905,7 +2358,78 @@ export function MapEditorPanel({
           : `Удалено ${editable.length}; заблокированные пропущены.`,
       );
     },
-    [onSaved, publishMap, pushHistory, sceneState, selectionService],
+    [
+      onSaved,
+      pack.sprites,
+      publishMap,
+      pushHistory,
+      sceneState,
+      selectionService,
+      tileset,
+    ],
+  );
+
+  const setWorldSelectionElevation = useCallback(
+    (elevation: number | "floor") => {
+      const editable = selectedSceneObjects.filter(
+        (object) =>
+          (object.kind === "voxel" || object.kind === "sprite") &&
+          !sceneState.isLocked(object.key),
+      );
+      if (editable.length === 0) {
+        onSaved("В выборе нет доступных вокселей или спрайтов с Transform Z.");
+        return;
+      }
+      const current = mapRef.current;
+      const next = setEmberWorldObjectsElevation(
+        current,
+        editable.map((object) => object.ref),
+        elevation,
+      );
+      if (next === current) {
+        onSaved(
+          elevation === "floor"
+            ? "Объекты уже привязаны к поверхности."
+            : `У объектов уже установлен Z${elevation}.`,
+        );
+        return;
+      }
+      pushHistory(
+        current,
+        elevation === "floor"
+          ? `Drop to Floor · ${editable.length}`
+          : `Установить Z${elevation} · ${editable.length}`,
+      );
+      publishMap(next);
+      onSaved(
+        elevation === "floor"
+          ? `К поверхности привязано: ${editable.length}`
+          : `Z${elevation} установлен для ${editable.length} объектов`,
+      );
+    },
+    [onSaved, publishMap, pushHistory, sceneState, selectedSceneObjects],
+  );
+
+  const setWorldSelectionLocked = useCallback(
+    (locked: boolean) => {
+      sceneState.setLockedMany(
+        selectedSceneObjects.map((object) => object.key),
+        locked,
+      );
+      if (locked) setObjectGrab(null);
+    },
+    [sceneState, selectedSceneObjects],
+  );
+
+  const setWorldSelectionHidden = useCallback(
+    (hidden: boolean) => {
+      sceneState.setHiddenMany(
+        selectedSceneObjects.map((object) => object.key),
+        hidden,
+      );
+      if (hidden) setObjectGrab(null);
+    },
+    [sceneState, selectedSceneObjects],
   );
 
   const sceneObjectsForGroup = useCallback(
@@ -1958,6 +2482,31 @@ export function MapEditorPanel({
           quarterTurns,
         );
       publishMap(rotateEmberSceneGroupTransforms(rotated, id, quarterTurns));
+    },
+    [onSaved, publishMap, pushHistory, sceneObjectsForGroup, sceneState],
+  );
+
+  const scaleSceneGroup = useCallback(
+    (id: string, scale: { x: number; y: number; z: number }) => {
+      const objects = sceneObjectsForGroup(id);
+      if (objects.length === 0) return;
+      if (objects.some((object) => sceneState.isLocked(object.key))) {
+        onSaved("Группа содержит заблокированные объекты. Transform отменён.");
+        return;
+      }
+      const current = mapRef.current;
+      const group = current.sceneHierarchy?.groups.find(
+        (candidate) => candidate.id === id,
+      );
+      if (!group) return;
+      pushHistory(current, `Масштабировать ${group.name}`);
+      const scaled = scaleEmberWorldObjectsAroundPivot(
+        current,
+        objects.map((object) => object.ref),
+        group.pivot,
+        scale,
+      );
+      publishMap(scaleEmberSceneGroupTransforms(scaled, id, scale));
     },
     [onSaved, publishMap, pushHistory, sceneObjectsForGroup, sceneState],
   );
@@ -2499,7 +3048,11 @@ export function MapEditorPanel({
   const selectLibItem = useCallback(
     (payload: MapLibPayload | null) => {
       setLibSelected(payload);
-      if (!payload) return;
+      if (!payload) {
+        setLibHoverTile(null);
+        setSelection((cur) => (cur?.kind === "lib" ? null : cur));
+        return;
+      }
       setSelection({ kind: "lib", payload });
       if (payload.kind === "region") {
         setLibRegionDraft((cur) => {
@@ -2566,8 +3119,24 @@ export function MapEditorPanel({
   );
 
   const placeLibraryAt = useCallback(
-    (payload: MapLibPayload, tile: TilePos) => {
+    (payload: MapLibPayload, tile: MapLibraryPlacementTarget) => {
       const m = mapRef.current;
+      const placement = checkMapLibraryPlacement(
+        payload,
+        tile,
+        m,
+        pack,
+        tileset,
+      );
+      if (!placement.valid) {
+        onSaved(placement.reason);
+        return;
+      }
+      const finishPlacement = () => {
+        if (serialLibraryPlacementRef.current) return;
+        setLibSelected(null);
+        setLibHoverTile(null);
+      };
       switch (payload.kind) {
         case "sprite": {
           if (!pack.sprites[payload.spriteId]) {
@@ -2576,19 +3145,20 @@ export function MapEditorPanel({
           }
           pushHistory(m, "Поставить спрайт");
           const next = cloneMap(m);
-          let list = [...(next.sprites ?? [])];
-          list = list.filter((p) => !(p.x === tile.x && p.y === tile.y));
+          const list = [...(next.sprites ?? [])];
           const placeId = `sp_${tile.x}_${tile.y}_${Date.now().toString(36)}`;
           list.push({
             id: placeId,
             spriteId: payload.spriteId,
             x: tile.x,
             y: tile.y,
+            elev: tile.elev,
           });
           next.sprites = list;
           publishMap(next);
           setStampSpriteId(payload.spriteId);
           setSelection({ kind: "sprite", id: placeId });
+          finishPlacement();
           onSaved(`Спрайт «${payload.spriteId}» поставлен`);
           return;
         }
@@ -2600,20 +3170,20 @@ export function MapEditorPanel({
           }
           pushHistory(m, "Поставить воксельный объект");
           const next = cloneMap(m);
-          let list = [...(next.voxelProps ?? [])];
-          list = list.filter((p) => !(p.x === tile.x && p.y === tile.y));
+          const list = [...(next.voxelProps ?? [])];
           const placeId = `vx_${tile.x}_${tile.y}_${Date.now().toString(36)}`;
           list.push({
             id: placeId,
             modelId: payload.modelId,
             x: tile.x,
             y: tile.y,
-            elev: tileSurfaceElev(next, tile.x, tile.y),
+            elev: tile.elev,
             ...voxelPlacementModifiersFromModel(model),
           });
           next.voxelProps = list;
           publishMap(next);
           setSelection({ kind: "voxel", id: placeId });
+          finishPlacement();
           onSaved(`Воксель «${payload.modelId}» поставлен`);
           return;
         }
@@ -2634,6 +3204,7 @@ export function MapEditorPanel({
           publishMap(next);
           setSelection({ kind: "light", id: entry.id });
           setTool("lightpick");
+          finishPlacement();
           return;
         }
         case "region": {
@@ -2665,6 +3236,7 @@ export function MapEditorPanel({
           setShowRegions(true);
           setSelection({ kind: "region", id: region.id });
           focusRegion(region);
+          finishPlacement();
           onSaved(
             `Зона «${payload.regionKind}» поставлена · ${region.id}`,
           );
@@ -2710,16 +3282,23 @@ export function MapEditorPanel({
                 next,
                 tile.x,
                 tile.y,
-                brushElev,
+                Math.round(tile.elev),
                 payload.tileId,
               );
             }
           } else {
-            setElevTileId(next, tile.x, tile.y, brushElev, payload.tileId);
+            setElevTileId(
+              next,
+              tile.x,
+              tile.y,
+              Math.round(tile.elev),
+              payload.tileId,
+            );
           }
           publishMap(next);
           setTileId(payload.tileId);
           setSelection({ kind: "tile", tx: tile.x, ty: tile.y });
+          finishPlacement();
           if (
             tool === "select" ||
             tool === "collision" ||
@@ -2868,15 +3447,26 @@ export function MapEditorPanel({
   const deleteLightSource = useCallback(
     (id: string) => {
       if (isSceneObjectLocked("light", id)) return;
-      pushHistory(mapRef.current, "Удалить источник света");
-      const next = removeEmberWorldObject(mapRef.current, {
-        kind: "light",
-        id,
-      });
+      const current = mapRef.current;
+      const removed = tileset
+        ? removeLanternSource(current, tileset, pack.sprites, id)
+        : removeEmberWorldObject(current, { kind: "light", id });
+      if (removed === current) return;
+      const next = normalizeEmberSceneHierarchy(removed);
+      pushHistory(current, "Удалить источник света");
       publishMap(next);
       setSelectedLightId(null);
+      onSaved("Источник света удалён.");
     },
-    [isSceneObjectLocked, publishMap, pushHistory, setSelectedLightId],
+    [
+      isSceneObjectLocked,
+      onSaved,
+      pack.sprites,
+      publishMap,
+      pushHistory,
+      setSelectedLightId,
+      tileset,
+    ],
   );
 
   const clearLightSourceOverrides = useCallback(
@@ -2947,6 +3537,32 @@ export function MapEditorPanel({
       );
     },
     [clientToCanvas],
+  );
+
+  /** Shared library target for surface snap, vertical drop and locked grid. */
+  const clientToLibraryPlacementTarget = useCallback(
+    (clientX: number, clientY: number): MapLibraryPlacementTarget | null => {
+      const point = clientToCanvas(clientX, clientY);
+      if (!point) return null;
+      const surface =
+        threePreviewRef.current?.pickSurfaceTarget(point.sx, point.sy) ?? null;
+      const tile = clientToTile(clientX, clientY);
+      const payload = libSelectedRef.current;
+      const mode =
+        payload?.kind === "light" || payload?.kind === "region"
+          ? "floor"
+          : libraryPlacementModeRef.current;
+      return resolveMapLibraryPlacementTarget(
+        mapRef.current,
+        mode,
+        tile,
+        surface
+          ? { x: surface.tx, y: surface.ty, elev: surface.elev }
+          : null,
+        brushElevRef.current,
+      );
+    },
+    [clientToCanvas, clientToTile],
   );
 
   /** Erase target: the block the ray hits (any elev), not the lock plane. */
@@ -3031,13 +3647,17 @@ export function MapEditorPanel({
       }
       e.preventDefault();
       e.dataTransfer.dropEffect = "copy";
-      const tile = clientToTile(e.clientX, e.clientY);
+      const tile = clientToLibraryPlacementTarget(e.clientX, e.clientY);
       setLibHoverTile((prev) => {
-        if (prev?.x === tile?.x && prev?.y === tile?.y) return prev;
+        if (
+          prev?.x === tile?.x &&
+          prev?.y === tile?.y &&
+          prev?.elev === tile?.elev
+        ) return prev;
         return tile;
       });
     },
-    [clientToTile],
+    [clientToLibraryPlacementTarget],
   );
 
   const onLibDropCanvas = useCallback(
@@ -3051,13 +3671,13 @@ export function MapEditorPanel({
         e.dataTransfer.getData(MAP_LIB_MIME) ||
         e.dataTransfer.getData("text/plain");
       const payload = parseMapLibPayload(raw);
-      const tile = clientToTile(e.clientX, e.clientY);
+      const tile = clientToLibraryPlacementTarget(e.clientX, e.clientY);
       setLibHoverTile(null);
       setLibDragActive(false);
       if (!payload || !tile) return;
       placeLibraryAt(payload, tile);
     },
-    [clientToTile, placeLibraryAt],
+    [clientToLibraryPlacementTarget, placeLibraryAt],
   );
 
   const onLibDragLeaveCanvas = useCallback((e: ReactDragEvent) => {
@@ -3073,8 +3693,12 @@ export function MapEditorPanel({
     (clientX: number, clientY: number): EditorPick | null => {
       const pt = clientToCanvas(clientX, clientY);
       if (!pt) return null;
-      const hit = threePreviewRef.current?.pickObject(pt.sx, pt.sy) ?? null;
+      const three = threePreviewRef.current;
+      const hit = three?.pickObject(pt.sx, pt.sy) ?? null;
       if (hit && (hit.kind === "sprite" || hit.kind === "voxel")) return hit;
+      // A live Three viewport has pixel/geometry-accurate picking. Only use
+      // the legacy 2D AABB when WebGL preview is unavailable.
+      if (three) return null;
       const spr = canvasPixelToSpritePlacement(
         ensureMapLayers(mapRef.current),
         pt.sx,
@@ -3086,6 +3710,116 @@ export function MapEditorPanel({
       return spr ? { kind: "sprite", id: spr.id } : null;
     },
     [clientToCanvas, scale, viewMode, pack.sprites],
+  );
+
+  const clientToSelectionStack = useCallback(
+    (clientX: number, clientY: number): MapSelection[] => {
+      const pt = clientToCanvas(clientX, clientY);
+      if (!pt) return [];
+      const picks =
+        threePreviewRef.current?.pickObjectStack(pt.sx, pt.sy) ?? [];
+      const selections: MapSelection[] = picks.map((pick) =>
+        pick.kind === "tile"
+          ? { kind: "tile", tx: pick.tx, ty: pick.ty, elev: pick.elev }
+          : { kind: pick.kind, id: pick.id },
+      );
+      const tilePick = picks.find(
+        (pick): pick is Extract<EditorPick, { kind: "tile" }> =>
+          pick.kind === "tile",
+      );
+      const fallbackTile = tilePick
+        ? { x: tilePick.tx, y: tilePick.ty }
+        : clientToTile(clientX, clientY);
+      if (fallbackTile) {
+        const lights = (tileset
+          ? listLanternSources(mapRef.current, tileset, pack.sprites)
+          : []
+        ).filter(
+          (light) =>
+            light.x === fallbackTile.x &&
+            light.y === fallbackTile.y &&
+            !sceneState.isHidden(`light:${light.id}`),
+        );
+        const tileIndex = selections.findIndex((item) => item.kind === "tile");
+        const insertAt = tileIndex < 0 ? selections.length : tileIndex;
+        selections.splice(
+          insertAt,
+          0,
+          ...lights.map<MapSelection>((light) => ({
+            kind: "light",
+            id: light.id,
+          })),
+        );
+        const regions = mapRef.current.regions
+          .filter(
+            (region) =>
+              includeRegionInViewportPick(region.kind) &&
+              fallbackTile.x >= region.x &&
+              fallbackTile.y >= region.y &&
+              fallbackTile.x < region.x + Math.max(1, region.w) &&
+              fallbackTile.y < region.y + Math.max(1, region.h) &&
+              !sceneState.isHidden(`region:${region.id}`),
+          )
+          .sort((left, right) => left.w * left.h - right.w * right.h);
+        const afterTile = selections.findIndex((item) => item.kind === "tile");
+        selections.splice(
+          afterTile < 0 ? selections.length : afterTile + 1,
+          0,
+          ...regions.map<MapSelection>((region) => ({
+            kind: "region",
+            id: region.id,
+          })),
+        );
+      }
+      const unique = selections.filter(
+        (selection, index, all) =>
+          all.findIndex((candidate) =>
+            mapSelectionEquals(candidate, selection),
+          ) === index,
+      );
+      return filterEditorSelectionStack(
+        unique.filter(isViewportMapSelection),
+        selectionFilterRef.current,
+        (selection) =>
+          selection.kind !== "tile" &&
+          sceneState.isLocked(`${selection.kind}:${selection.id}`),
+      );
+    },
+    [clientToCanvas, clientToTile, pack.sprites, sceneState, tileset],
+  );
+
+  const selectFromPointerStack = useCallback(
+    (
+      stack: readonly MapSelection[],
+      clientX: number,
+      clientY: number,
+      toggle: boolean,
+    ) => {
+      const signature = stack.map(mapSelectionKey).join("|");
+      const cycle = advanceEditorPickCycle(
+        pickCycleRef.current,
+        signature,
+        clientX,
+        clientY,
+        stack.length,
+      );
+      pickCycleRef.current = cycle.state;
+      const next = stack[cycle.index];
+      if (!next) {
+        if (!toggle) selectionService.clear();
+        setSelectedRegionId(null);
+        return;
+      }
+      selectionService.select(next, toggle ? "toggle" : "replace");
+      const primary = selectionService.getPrimary();
+      setSelectedRegionId(
+        primary?.kind === "region" ? primary.id : null,
+      );
+      if (primary?.kind === "tile" && primary.elev != null) {
+        setBrushElev(primary.elev);
+      }
+    },
+    [selectionService],
   );
 
   const removeSpritePlacement = useCallback(
@@ -3286,7 +4020,7 @@ export function MapEditorPanel({
   );
 
   const patchSpritePlacement = useCallback(
-    (placeId: string, patch: { x?: number; y?: number }) => {
+    (placeId: string, patch: { x?: number; y?: number; elev?: number }) => {
       if (isSceneObjectLocked("sprite", placeId)) return;
       const m = mapRef.current;
       if (!getEmberWorldObject(m, { kind: "sprite", id: placeId })) return;
@@ -3303,6 +4037,7 @@ export function MapEditorPanel({
             patch.y != null
               ? Math.max(0, Math.min(m.height - 1, patch.y | 0))
               : undefined,
+          z: patch.elev,
         },
       );
       publishMap(next);
@@ -3345,7 +4080,11 @@ export function MapEditorPanel({
         } else if (grab.kind === "light") {
           moveLightSource(grab.id, dest.x, dest.y);
         } else {
-          patchSpritePlacement(grab.id, { x: dest.x, y: dest.y });
+          patchSpritePlacement(grab.id, {
+            x: dest.x,
+            y: dest.y,
+            elev: tileSurfaceElev(mapRef.current, dest.x, dest.y),
+          });
         }
         setObjectGrab(null);
         return;
@@ -3368,7 +4107,8 @@ export function MapEditorPanel({
       commit.id &&
       (commit.kind === "voxel" ||
         commit.kind === "sprite" ||
-        commit.kind === "light") &&
+        commit.kind === "light" ||
+        commit.kind === "region") &&
       isSceneObjectLocked(commit.kind, commit.id)
     ) {
       return;
@@ -3393,10 +4133,92 @@ export function MapEditorPanel({
       );
     };
 
+    if (commit.kind === "selection") {
+      const objects = multiSelectionWorldObjects(
+        selectionItemsRef.current,
+        m,
+      );
+      if (objects.length < 2) return;
+      const points = objects.map(worldObjectTransformPivot);
+      const pivot = {
+        x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
+        y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
+        z: points.reduce((sum, point) => sum + point.z, 0) / points.length,
+      };
+      if (commit.mode === "scale") {
+        pushHistory(m, `Масштабировать ${objects.length} объектов`);
+        publishMap(
+          scaleEmberWorldObjectsAroundPivot(
+            m,
+            objects.map((object) => object.ref),
+            pivot,
+            commit.scale,
+          ),
+        );
+        return;
+      }
+      const targetX = commit.position.x / ts - 0.5;
+      const targetY = commit.position.z / ts - 0.5;
+      const dx = Math.round(targetX - pivot.x);
+      const dy = Math.round(targetY - pivot.y);
+      if (!dx && !dy) return;
+      pushHistory(m, `Переместить ${objects.length} объектов`);
+      publishMap(
+        translateEmberWorldObjects(
+          m,
+          objects.map((object) => object.ref),
+          dx,
+          dy,
+        ),
+      );
+      return;
+    }
+
+    if (
+      commit.mode === "scale" &&
+      commit.id &&
+      (commit.kind === "voxel" ||
+        commit.kind === "sprite" ||
+        commit.kind === "region")
+    ) {
+      const ref: EmberWorldObjectRef = { kind: commit.kind, id: commit.id };
+      const currentObject = getEmberWorldObject(m, ref);
+      if (!currentObject) return;
+      const scaleZ = commit.kind === "region" ? 1 : commit.scale.z;
+      if (
+        Math.abs(currentObject.transform.scale.x - commit.scale.x) < 1e-4 &&
+        Math.abs(currentObject.transform.scale.y - commit.scale.y) < 1e-4 &&
+        Math.abs(currentObject.transform.scale.z - scaleZ) < 1e-4
+      ) {
+        resync({ kind: commit.kind, id: commit.id });
+        return;
+      }
+      pushHistory(m, "Масштабировать объект");
+      publishMap(
+        patchEmberWorldObjectTransform(m, ref, {
+          scaleX: commit.scale.x,
+          scaleY: commit.scale.y,
+          ...(commit.kind !== "region" ? { scaleZ: commit.scale.z } : {}),
+        }),
+      );
+      setSelection({ kind: commit.kind, id: commit.id });
+      return;
+    }
+
     if (commit.kind === "group" && commit.id) {
       const group = m.sceneHierarchy?.groups.find((candidate) => candidate.id === commit.id);
       if (!group) return;
-      if (commit.mode === "rotate") {
+      if (commit.mode === "scale") {
+        if (
+          Math.abs(commit.scale.x - 1) < 1e-4 &&
+          Math.abs(commit.scale.y - 1) < 1e-4 &&
+          Math.abs(commit.scale.z - 1) < 1e-4
+        ) {
+          resync({ kind: "group", id: group.id });
+        } else {
+          scaleSceneGroup(group.id, commit.scale);
+        }
+      } else if (commit.mode === "rotate") {
         const currentRotation =
           (((group.rotationQuarterTurns ?? 0) % 4) + 4) % 4;
         const delta = ((rot - currentRotation) % 4 + 4) % 4;
@@ -3435,11 +4257,12 @@ export function MapEditorPanel({
     if (commit.kind === "sprite" && commit.id) {
       const p = m.sprites?.find((x) => x.id === commit.id);
       if (!p) return;
-      if (p.x === tx && p.y === ty) {
+      const curElev = p.elev ?? tileSurfaceElev(m, p.x, p.y);
+      if (p.x === tx && p.y === ty && curElev === elev) {
         resync({ kind: "sprite", id: commit.id });
         return;
       }
-      patchSpritePlacement(commit.id, { x: tx, y: ty });
+      patchSpritePlacement(commit.id, { x: tx, y: ty, elev });
       return;
     }
     if (commit.kind === "light" && commit.id) {
@@ -3453,6 +4276,26 @@ export function MapEditorPanel({
         return;
       }
       moveLightSource(commit.id, tx, ty);
+      return;
+    }
+    if (commit.kind === "region" && commit.id) {
+      const region = m.regions.find((candidate) => candidate.id === commit.id);
+      if (!region) return;
+      const x = Math.round(commit.position.x / ts - region.w / 2);
+      const y = Math.round(commit.position.z / ts - region.h / 2);
+      if (region.x === x && region.y === y) {
+        resync({ kind: "region", id: commit.id });
+        return;
+      }
+      pushHistory(m, "Переместить регион");
+      publishMap(
+        patchEmberWorldObjectTransform(
+          m,
+          { kind: "region", id: commit.id },
+          { x, y },
+        ),
+      );
+      setSelection({ kind: "region", id: commit.id });
       return;
     }
     if (commit.kind === "tile" && commit.tx != null && commit.ty != null) {
@@ -3729,21 +4572,56 @@ export function MapEditorPanel({
       if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         const sel = selectionRef.current;
         const three = threePreviewRef.current;
+        if (e.code === "Delete" || e.code === "Backspace") {
+          if (selectedSceneObjects.length > 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            deleteWorldSelection(selectedSceneObjects);
+            return;
+          }
+          // Implicit glow sources are selectable in the viewport but are not
+          // regular Outliner objects until they get an authored override.
+          if (sel?.kind === "light") {
+            e.preventDefault();
+            e.stopPropagation();
+            deleteLightSource(sel.id);
+            return;
+          }
+        }
         const gizmoSel =
           sel?.kind === "voxel" ||
           sel?.kind === "sprite" ||
           sel?.kind === "light" ||
-          sel?.kind === "tile";
+          sel?.kind === "tile" ||
+          sel?.kind === "region" ||
+          sel?.kind === "group";
         if (gizmoSel && e.code === "KeyG") {
           e.preventDefault();
           setObjectGrab(null);
           three?.setTransformMode("translate");
           return;
         }
-        if (gizmoSel && e.code === "KeyR" && sel?.kind === "voxel") {
+        if (
+          gizmoSel &&
+          e.code === "KeyR" &&
+          (sel?.kind === "voxel" || sel?.kind === "group")
+        ) {
           e.preventDefault();
           setObjectGrab(null);
           three?.setTransformMode("rotate");
+          return;
+        }
+        if (
+          e.code === "KeyS" &&
+          (selectionItemsRef.current.length > 1 ||
+            sel?.kind === "voxel" ||
+            sel?.kind === "sprite" ||
+            sel?.kind === "region" ||
+            sel?.kind === "group")
+        ) {
+          e.preventDefault();
+          setObjectGrab(null);
+          three?.setTransformMode("scale");
           return;
         }
         // Selected tile: [ ] move top story up/down (Minecraft column nudge).
@@ -3832,6 +4710,9 @@ export function MapEditorPanel({
     publishMap,
     pushHistory,
     setSelection,
+    deleteLightSource,
+    deleteWorldSelection,
+    selectedSceneObjects,
   ]);
 
   const paintTileCell = (
@@ -4121,6 +5002,9 @@ export function MapEditorPanel({
       // While dragging the transform gizmo, keep mouse-hover off — snap
       // destination is shown via placePreview instead.
       if (transformDraggingRef.current) {
+        setHoverSelectionStack((current) =>
+          current.length === 0 ? current : [],
+        );
         if (hoverPickRef.current) {
           hoverPickRef.current = null;
           syncThreeOverlays();
@@ -4141,18 +5025,56 @@ export function MapEditorPanel({
           syncThreeOverlays();
         }
         setWallHoverTile(null);
+        setLibHoverTile(null);
+        setHoverSelectionStack((current) =>
+          current.length === 0 ? current : [],
+        );
         clearPlacePreview();
         return;
       }
-      const pt = clientToCanvas(e.clientX, e.clientY);
-      const pick = pt
-        ? (threePreviewRef.current?.pickObject(pt.sx, pt.sy) ?? null)
-        : null;
+      if (libSelectedRef.current) {
+        const pendingTile = clientToLibraryPlacementTarget(
+          e.clientX,
+          e.clientY,
+        );
+        setLibHoverTile((prev) =>
+          prev?.x === pendingTile?.x &&
+          prev?.y === pendingTile?.y &&
+          prev?.elev === pendingTile?.elev
+            ? prev
+            : pendingTile,
+        );
+      }
+      const activeTool = toolRef.current;
+      let pick: EditorPick | null = null;
+      if (activeTool === "select") {
+        const stack = clientToSelectionStack(e.clientX, e.clientY);
+        setHoverSelectionStack((current) => {
+          const currentKey = current.map(mapSelectionKey).join("|");
+          const nextKey = stack.map(mapSelectionKey).join("|");
+          return currentKey === nextKey ? current : stack;
+        });
+        const lamps = tileset
+          ? listLanternSources(mapRef.current, tileset, pack.sprites)
+          : [];
+        pick = selectionToPick(
+          stack[0] ?? null,
+          lamps,
+          mapRef.current.regions,
+        );
+      } else {
+        setHoverSelectionStack((current) =>
+          current.length === 0 ? current : [],
+        );
+        const pt = clientToCanvas(e.clientX, e.clientY);
+        pick = pt
+          ? (threePreviewRef.current?.pickObject(pt.sx, pt.sy) ?? null)
+          : null;
+      }
       if (!picksEqual(hoverPickRef.current, pick)) {
         hoverPickRef.current = pick;
         syncThreeOverlays();
       }
-      const activeTool = toolRef.current;
       const showPlaceGhost =
         !objectGrabRef.current &&
         !transformDraggingRef.current &&
@@ -4205,9 +5127,11 @@ export function MapEditorPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     clientToTile,
+    clientToLibraryPlacementTarget,
     clientToPlaceTarget,
     clientToBreakTarget,
     clientToCanvas,
+    clientToSelectionStack,
     eraseBreakTarget,
     layer,
     tileId,
@@ -4880,6 +5804,44 @@ export function MapEditorPanel({
                       />
                     </svg>
                   </button>
+                  <button
+                    type="button"
+                    className="ember-map-iconbtn"
+                    title="Перезапечь полные статические тени до максимальной границы мерцающего света"
+                    aria-label="Пересчитать статические тени"
+                    onClick={() =>
+                      threePreviewRef.current?.rebuildStaticShadows()
+                    }
+                  >
+                    <svg
+                      className="ember-map-iconbtn__svg"
+                      viewBox="0 0 16 16"
+                      aria-hidden
+                    >
+                      <path
+                        d="M12.7 5.8A5 5 0 1 0 13 9"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.35"
+                        strokeLinecap="round"
+                      />
+                      <path
+                        d="m10.1 3.2 2.8 2.7 1.1-3.7"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.35"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M8 5.2v5.6M5.2 8h5.6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.15"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
                 </div>
                 <span
                   className={`ember-map-autosave is-${saveState}`}
@@ -4958,6 +5920,47 @@ export function MapEditorPanel({
                         </button>
                       ))}
                     </div>
+
+                    {tool === "select" ? (
+                      <div className="ember-map-panel__block">
+                        <div className="ember-map-selection-filter__head">
+                          <h4 className="ember-map-panel__sub">
+                            Фильтр выбора
+                          </h4>
+                          <button
+                            type="button"
+                            className="ghost ember-map-selection-filter__all"
+                            onClick={enableAllSelectionFilters}
+                            disabled={EDITOR_VIEWPORT_SELECTION_KINDS.every(
+                              (kind) => selectionFilter[kind],
+                            )}
+                          >
+                            Все
+                          </button>
+                        </div>
+                        <div
+                          className="ember-chip-row"
+                          role="group"
+                          aria-label="Типы объектов для выбора на карте"
+                        >
+                          {EDITOR_VIEWPORT_SELECTION_KINDS.map((kind) => (
+                            <button
+                              key={kind}
+                              type="button"
+                              className={`ember-chip ember-chip--sm ${selectionFilter[kind] ? "is-active" : ""}`}
+                              aria-pressed={selectionFilter[kind]}
+                              onClick={() => toggleSelectionFilter(kind)}
+                            >
+                              {VIEWPORT_SELECTION_LABEL[kind]}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="muted ember-hint">
+                          Выключенный тип не перехватывает клик. Lock-объекты
+                          выбираются только через Иерархию.
+                        </p>
+                      </div>
+                    ) : null}
 
                     <div className="ember-map-panel__block">
                       <h4 className="ember-map-panel__sub">Слой</h4>
@@ -5183,6 +6186,18 @@ export function MapEditorPanel({
                     pack={pack}
                     onPackChange={onPackChange}
                     onSaved={onSaved}
+                    playProfile={map.playProfile}
+                    onCommitPlayProfile={(profile) => {
+                      const next = cloneMap(mapRef.current);
+                      next.playProfile = profile;
+                      publishMap(next);
+                    }}
+                    autoAttack={map.autoAttack}
+                    onCommitAutoAttack={(enabled) => {
+                      const next = cloneMap(mapRef.current);
+                      next.autoAttack = enabled;
+                      publishMap(next);
+                    }}
                     onCommitGlobal={(light: EmberMapLight) => {
                       const next = cloneMap(mapRef.current);
                       next.light = light;
@@ -5200,6 +6215,8 @@ export function MapEditorPanel({
                 {dockPanel === "light" && tileset ? (
                   <MapLightPanel
                     pack={pack}
+                    map={map}
+                    tileset={tileset}
                     globalLight={globalLight}
                     sources={lanternSources}
                     selected={selectedLantern}
@@ -5395,8 +6412,11 @@ export function MapEditorPanel({
                 // Let TransformControls own the click when a handle is hit.
                 if (
                   e.button === 0 &&
-                  threePreviewRef.current?.isTransformBusy()
+                  (transformDraggingRef.current ||
+                    threePreviewRef.current?.isTransformBusy())
                 ) {
+                  e.preventDefault();
+                  e.stopPropagation();
                   return;
                 }
                 if (e.button === 0 && objectGrabRef.current) {
@@ -5424,11 +6444,46 @@ export function MapEditorPanel({
 
                 if (e.button !== 0) return;
 
-                // Select props / lights before paint tools (opens right inspector).
-                const hitProp = clientToProp(e.clientX, e.clientY);
-                if (hitProp?.kind === "sprite" || hitProp?.kind === "voxel") {
+                // Active library asset owns LMB: show/commit the same target
+                // even when another prop is already present on the cell.
+                if (libSelectedRef.current) {
+                  const pendingTile = clientToLibraryPlacementTarget(
+                    e.clientX,
+                    e.clientY,
+                  );
+                  if (!pendingTile) return;
                   e.preventDefault();
-                  setSelection({ kind: hitProp.kind, id: hitProp.id });
+                  placeLibraryAt(libSelectedRef.current, pendingTile);
+                  return;
+                }
+
+                const pointerStack = clientToSelectionStack(
+                  e.clientX,
+                  e.clientY,
+                );
+                if (toolRef.current === "select") {
+                  e.preventDefault();
+                  selectFromPointerStack(
+                    pointerStack,
+                    e.clientX,
+                    e.clientY,
+                    e.ctrlKey || e.metaKey,
+                  );
+                  return;
+                }
+
+                // Other tools keep the legacy convenience: clicking visible
+                // prop ink opens that prop instead of painting through it.
+                const directProp = pointerStack.find(
+                  (candidate) =>
+                    candidate.kind === "sprite" || candidate.kind === "voxel",
+                );
+                if (
+                  directProp?.kind === "sprite" ||
+                  directProp?.kind === "voxel"
+                ) {
+                  e.preventDefault();
+                  setSelection(directProp);
                   return;
                 }
 
@@ -5466,13 +6521,6 @@ export function MapEditorPanel({
                   }
                 }
 
-                // Click-to-place from library selection (DnD fallback).
-                if (libSelectedRef.current) {
-                  e.preventDefault();
-                  placeLibraryAt(libSelectedRef.current, tile);
-                  return;
-                }
-
                 if (toolRef.current === "lightpick" && tileset) {
                   e.preventDefault();
                   pushHistory(mapRef.current);
@@ -5504,35 +6552,11 @@ export function MapEditorPanel({
                   return;
                 }
 
-                if (e.shiftKey || toolRef.current === "select") {
+                if (e.shiftKey) {
                   e.preventDefault();
-                  const canvasPt = clientToCanvas(e.clientX, e.clientY);
-                  const storyPick = canvasPt
-                    ? (threePreviewRef.current?.pickObject(
-                        canvasPt.sx,
-                        canvasPt.sy,
-                      ) ?? null)
-                    : null;
-                  // Prefer voxel / zone on the cell (Shift forces bare tile).
-                  if (!e.shiftKey) {
-                    const vx = (mapRef.current.voxelProps ?? []).find(
-                      (p) => p.x === tile.x && p.y === tile.y,
-                    );
-                    if (vx) {
-                      setSelection({ kind: "voxel", id: vx.id });
-                      return;
-                    }
-                    const zone = primaryRegionAtTile(
-                      mapRef.current,
-                      tile.x,
-                      tile.y,
-                    );
-                    if (zone) {
-                      setSelectedRegionId(zone.id);
-                      setSelection({ kind: "region", id: zone.id });
-                      return;
-                    }
-                  }
+                  const storyPick = pointerStack.find(
+                    (candidate) => candidate.kind === "tile",
+                  );
                   const elev =
                     storyPick?.kind === "tile" && storyPick.elev != null
                       ? storyPick.elev
@@ -5638,13 +6662,18 @@ export function MapEditorPanel({
               </p>
             ) : libSelected ? (
               <p className="muted ember-hint ember-ed-map__drag-hint">
-                Библиотека: клик по клетке — поставить · ПКМ / Esc — снять выбор
+                {libPlacementCheck && !libPlacementCheck.valid
+                  ? `Нельзя поставить: ${libPlacementCheck.reason}`
+                  : "Библиотека: зелёный ghost — клик для установки · ПКМ / Esc — отмена"}
               </p>
             ) : tool === "select" ? (
               <p className="muted ember-hint ember-ed-map__drag-hint">
-                Выбор (V): клик — объект или тайл · G — перенос · R — поворот · [
-                ] — Z тайла · B — кисть · F — заливка · Esc — снять · ПКМ орбита ·
-                СКМ пан
+                {hoverSelectionStack.length > 1
+                  ? `Под курсором: ${hoverSelectionStack
+                      .slice(0, 4)
+                      .map(mapSelectionShortLabel)
+                      .join(" → ")}${hoverSelectionStack.length > 4 ? ` · ещё ${hoverSelectionStack.length - 4}` : ""}. Повторный клик — следующий · Ctrl+клик — добавить/убрать.`
+                  : "Выбор (V): клик — объект или тайл · Ctrl+клик — мультивыбор · G — перенос · R — поворот · Esc — снять"}
               </p>
             ) : tool === "lightpick" ? (
               <p className="muted ember-hint ember-ed-map__drag-hint">
@@ -5669,7 +6698,9 @@ export function MapEditorPanel({
               </p>
             )}
 
-            {tool === "collision" ||
+            {libSelected ||
+            tool === "select" ||
+            tool === "collision" ||
             tool === "elevation" ||
             tool === "sprite" ||
             tool === "paint" ||
@@ -5680,7 +6711,107 @@ export function MapEditorPanel({
                 onMouseDown={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
               >
-                {tool === "collision" ? (
+                {libSelected ? (
+                  <>
+                    <div className="ember-map-selection-hud__head">
+                      <p className="ember-ed-map__tool-hud-title">
+                        Установка · {libSelected.kind}
+                      </p>
+                      <button
+                        type="button"
+                        className={`ember-chip ember-chip--sm ${serialLibraryPlacement ? "is-active" : ""}`}
+                        aria-pressed={serialLibraryPlacement}
+                        title="Оставлять ассет в руке после установки"
+                        onClick={() =>
+                          setSerialLibraryPlacement((current) => !current)
+                        }
+                      >
+                        Серийно
+                      </button>
+                    </div>
+                    <div
+                      className="ember-chip-row"
+                      role="group"
+                      aria-label="Привязка устанавливаемого ассета"
+                    >
+                      {(
+                        [
+                          ["surface", "К поверхности"],
+                          ["floor", "Drop to Floor"],
+                          ["grid", `Сетка Z${brushElev}`],
+                        ] as const
+                      ).map(([mode, label]) => {
+                        const floorOnly =
+                          libSelected.kind === "light" ||
+                          libSelected.kind === "region";
+                        const active = floorOnly
+                          ? mode === "floor"
+                          : libraryPlacementMode === mode;
+                        return (
+                          <button
+                            key={mode}
+                            type="button"
+                            className={`ember-chip ember-chip--sm ${active ? "is-active" : ""}`}
+                            aria-pressed={active}
+                            disabled={floorOnly && mode !== "floor"}
+                            onClick={() => setLibraryPlacementMode(mode)}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p
+                      className={`ember-ed-map__tool-hud-hint ${libPlacementCheck?.valid === false ? "is-invalid" : ""}`}
+                    >
+                      {libHoverTile
+                        ? `${libHoverTile.x}, ${libHoverTile.y} · Z${Number(libHoverTile.elev.toFixed(2))}${libPlacementCheck?.valid === false ? ` · ${libPlacementCheck.reason}` : " · можно поставить"}`
+                        : "Наведи ассет на карту · Esc/ПКМ — отмена"}
+                    </p>
+                  </>
+                ) : null}
+
+                {!libSelected && tool === "select" ? (
+                  <>
+                    <div className="ember-map-selection-hud__head">
+                      <p className="ember-ed-map__tool-hud-title">
+                        Выбор · {selectionState.items.length}
+                      </p>
+                      {selectionState.items.length > 0 ? (
+                        <button
+                          type="button"
+                          className="ghost ember-map-selection-hud__clear"
+                          onClick={() => selectionService.clear()}
+                        >
+                          Снять
+                        </button>
+                      ) : null}
+                    </div>
+                    <div
+                      className="ember-chip-row ember-map-selection-hud__filters"
+                      role="group"
+                      aria-label="Быстрый фильтр выбора"
+                    >
+                      {EDITOR_VIEWPORT_SELECTION_KINDS.map((kind) => (
+                        <button
+                          key={kind}
+                          type="button"
+                          className={`ember-chip ember-chip--sm ${selectionFilter[kind] ? "is-active" : ""}`}
+                          aria-pressed={selectionFilter[kind]}
+                          title={`Выбирать: ${VIEWPORT_SELECTION_LABEL[kind]}`}
+                          onClick={() => toggleSelectionFilter(kind)}
+                        >
+                          {VIEWPORT_SELECTION_LABEL[kind]}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="muted ember-ed-map__tool-hud-hint">
+                      Повторный клик — следующий под курсором · Ctrl — добавить
+                    </p>
+                  </>
+                ) : null}
+
+                {!libSelected && tool === "collision" ? (
                   <>
                     <p className="ember-ed-map__tool-hud-title">
                       Высота стены
@@ -5745,7 +6876,7 @@ export function MapEditorPanel({
                   </>
                 ) : null}
 
-                {tool === "elevation" ? (
+                {!libSelected && tool === "elevation" ? (
                   <>
                     <p className="ember-ed-map__tool-hud-title">
                       Плоскость Z{brushElev}
@@ -5777,7 +6908,7 @@ export function MapEditorPanel({
                   </>
                 ) : null}
 
-                {tool === "paint" || tool === "fill" ? (
+                {!libSelected && (tool === "paint" || tool === "fill") ? (
                   <>
                     <p className="ember-ed-map__tool-hud-title">
                       Слой · Z{brushElev}
@@ -5819,7 +6950,7 @@ export function MapEditorPanel({
                   </>
                 ) : null}
 
-                {tool === "sprite" ? (
+                {!libSelected && tool === "sprite" ? (
                   <>
                     <p className="ember-ed-map__tool-hud-title">Спрайт</p>
                     <p className="ember-ed-map__tool-hud-value">
@@ -5833,7 +6964,7 @@ export function MapEditorPanel({
                   </>
                 ) : null}
 
-                {tool === "lightpick" ? (
+                {!libSelected && tool === "lightpick" ? (
                   <>
                     <p className="ember-ed-map__tool-hud-title">Свет</p>
                     <p className="muted ember-ed-map__tool-hud-hint">
@@ -5850,6 +6981,34 @@ export function MapEditorPanel({
           {selection ? (
             <MapObjectInspector
               selection={selection}
+              selectionItems={selectionState.items}
+              onSetSelectionPrimary={(item) =>
+                selectionService.select(item, "add")
+              }
+              onToggleSelection={(item) =>
+                selectionService.select(item, "toggle")
+              }
+              onClearSelection={() => selectionService.clear()}
+              multiWorldObjects={selectedSceneObjects}
+              multiAllLocked={
+                selectedSceneObjects.length > 0 &&
+                selectedSceneObjects.every((object) =>
+                  sceneState.isLocked(object.key),
+                )
+              }
+              multiAllHidden={
+                selectedSceneObjects.length > 0 &&
+                selectedSceneObjects.every((object) =>
+                  sceneState.isHidden(object.key),
+                )
+              }
+              onSetMultiElevation={(elevation) =>
+                setWorldSelectionElevation(elevation)
+              }
+              onDropMultiToFloor={() => setWorldSelectionElevation("floor")}
+              onSetMultiLocked={setWorldSelectionLocked}
+              onSetMultiHidden={setWorldSelectionHidden}
+              onDeleteMulti={() => deleteWorldSelection(selectedSceneObjects)}
               locked={selectedObjectLocked}
               hidden={selectedObjectHidden}
               onToggleLocked={
@@ -5879,6 +7038,7 @@ export function MapEditorPanel({
               onDuplicateGroup={duplicateSceneGroup}
               onTranslateGroup={translateSceneGroup}
               onRotateGroup={rotateSceneGroup}
+              onScaleGroup={scaleSceneGroup}
               onSelectGroupMembers={(id) => {
                 const objects = sceneObjectsForGroup(id);
                 replaceWorldSelection(objects, objects.at(-1) ?? null);
@@ -5923,6 +7083,11 @@ export function MapEditorPanel({
               onCommitGlobal={(light) => {
                 const next = cloneMap(mapRef.current);
                 next.light = light;
+                publishMap(next);
+              }}
+              onCommitPlayProfile={(profile) => {
+                const next = cloneMap(mapRef.current);
+                next.playProfile = profile;
                 publishMap(next);
               }}
               onResetGlobal={() => {
@@ -6025,28 +7190,36 @@ export function MapEditorPanel({
 
       {voxelSculptSession && onPackChange ? (
         <div className="ember-voxel-sculpt-overlay">
-          <VoxelSculptPanel
-            pack={{
-              ...pack,
-              voxelModels: pack.voxelModels ?? {},
-            }}
-            modelId={
-              voxelSculptSession.mode === "placementVariant"
-                ? voxelSculptSession.sourceModelId
-                : voxelSculptFocusId ??
-                  (libSelected?.kind === "voxel"
-                    ? libSelected.modelId
-                    : null)
+          <Suspense
+            fallback={
+              <div className="ember-ed-card" aria-busy="true">
+                Загрузка редактора вокселей…
+              </div>
             }
-            session={voxelSculptSession}
-            onPackChange={onPackChange}
-            onClose={() => {
-              setVoxelSculptSession(null);
-              setVoxelSculptFocusId(null);
-            }}
-            onSaved={onSaved}
-            onSavedVariant={onSavedVoxelVariant}
-          />
+          >
+            <LazyVoxelSculptPanel
+              pack={{
+                ...pack,
+                voxelModels: pack.voxelModels ?? {},
+              }}
+              modelId={
+                voxelSculptSession.mode === "placementVariant"
+                  ? voxelSculptSession.sourceModelId
+                  : voxelSculptFocusId ??
+                    (libSelected?.kind === "voxel"
+                      ? libSelected.modelId
+                      : null)
+              }
+              session={voxelSculptSession}
+              onPackChange={onPackChange}
+              onClose={() => {
+                setVoxelSculptSession(null);
+                setVoxelSculptFocusId(null);
+              }}
+              onSaved={onSaved}
+              onSavedVariant={onSavedVoxelVariant}
+            />
+          </Suspense>
         </div>
       ) : null}
     </div>

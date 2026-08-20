@@ -19,8 +19,11 @@ import {
   cageRemainingMs,
   loadCageLock,
 } from "../lib/cageTimer";
-import type { ContentUnlockLists } from "../lib/contentUnlocks";
-import { isModeUnlocked } from "../lib/contentUnlocks";
+import {
+  isModeUnlocked,
+  type ContentUnlockLists,
+} from "../lib/contentUnlocks";
+import { onWd14RuntimeProgress } from "../lib/wd14Tagger";
 import {
   categoryLabelRu,
   ensureDailyContractBoard,
@@ -52,6 +55,7 @@ import {
 import { notifyDenialQuestChanged } from "./DenialQuestPill";
 import { MODE_LABELS, PARAM_LABELS } from "../lib/labels";
 import type { MediaSettings } from "../lib/media";
+import { MEDIA_TYPE_CATALOG } from "../lib/contentCatalog";
 import type { PlaylistPreloadStatus } from "../lib/mediaPreload";
 import { listMistressPresets, type SessionPreset } from "../lib/presets";
 import type { SessionMode, SessionParams, ToyDef } from "../lib/types";
@@ -122,7 +126,7 @@ export type RouletteHubPanelsProps = {
   wd14Status?: { backend: string; online: boolean; detail: string } | null;
   /** Live tag progress while auto-tagging runs. */
   tagProgress?: { done: number; total: number } | null;
-  onStartWd14?: () => void;
+  onStartWd14?: () => void | Promise<unknown>;
   onRefreshWd14?: () => void;
   onToyOwned: (toyId: string, owned: boolean) => void;
   /** Active contract seed (for Tasks hub CTAs) */
@@ -860,6 +864,14 @@ function MediaPanel({
     () => rangeWheelItems(3, 60, 1, (n) => `${n}с`),
     [],
   );
+  const mediaTypeItems = useMemo<WheelItem<MediaSettings["mediaTypeId"]>[]>(
+    () =>
+      MEDIA_TYPE_CATALOG.map((m) => ({
+        value: m.id,
+        label: m.labelRu,
+      })),
+    [],
+  );
 
   return (
     <div className="roulette-hub__panel">
@@ -871,6 +883,14 @@ function MediaPanel({
           value={media.source}
           itemWidth={100}
           onChange={(source) => onMedia({ ...media, source })}
+        />
+        <WheelPicker
+          label="Тип контента"
+          hint="Фото, гифки, видео — тот же фильтр, что на колесе рулетки."
+          items={mediaTypeItems}
+          value={media.mediaTypeId}
+          itemWidth={128}
+          onChange={(mediaTypeId) => onMedia({ ...media, mediaTypeId })}
         />
         <div className="hub-wheels__row">
           {media.source === "gelbooru" ? (
@@ -1588,10 +1608,15 @@ function Wd14Panel({
   wd14Status?: { backend: string; online: boolean; detail: string } | null;
   tagProgress?: { done: number; total: number } | null;
   autoTagOnImport: boolean;
-  onStartWd14?: () => void;
+  onStartWd14?: () => void | Promise<unknown>;
   onRefreshWd14?: () => void;
   onToggleAutoTag: (v: boolean) => void;
 }) {
+  const [runtime, setRuntime] = useState<{
+    phase: string;
+    pct: number;
+  } | null>(null);
+  const [starting, setStarting] = useState(false);
   const backend = wd14Status?.backend ?? "none";
   const online = Boolean(wd14Status?.online);
   const tone = online
@@ -1599,10 +1624,22 @@ function Wd14Panel({
     : backend === "none"
       ? "is-offline"
       : "is-offline";
-  const pct =
+  const tagPct =
     tagProgress && tagProgress.total > 0
       ? Math.round((tagProgress.done / tagProgress.total) * 100)
       : 0;
+  const installing = starting || (runtime !== null && runtime.pct < 100);
+
+  useEffect(() => {
+    return onWd14RuntimeProgress((p) => {
+      setRuntime({ phase: p.phase, pct: p.pct });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (online) setRuntime(null);
+  }, [online]);
+
   return (
     <div className={`hub-wd14 ${tone}`}>
       <div className="hub-wd14__row">
@@ -1623,14 +1660,25 @@ function Wd14Panel({
           <span>при импорте</span>
         </label>
       </div>
+      {runtime && !online ? (
+        <div className="hub-wd14__progress" aria-live="polite">
+          <div
+            className="hub-wd14__progress-bar"
+            style={{ width: `${Math.max(0, Math.min(100, runtime.pct))}%` }}
+          />
+          <span className="hub-wd14__progress-text">
+            {runtime.phase} ({runtime.pct}%)
+          </span>
+        </div>
+      ) : null}
       {tagProgress ? (
         <div className="hub-wd14__progress" aria-live="polite">
           <div
             className="hub-wd14__progress-bar"
-            style={{ width: `${pct}%` }}
+            style={{ width: `${tagPct}%` }}
           />
           <span className="hub-wd14__progress-text">
-            Тегирование {tagProgress.done}/{tagProgress.total} ({pct}%)
+            Тегирование {tagProgress.done}/{tagProgress.total} ({tagPct}%)
           </span>
         </div>
       ) : null}
@@ -1638,19 +1686,22 @@ function Wd14Panel({
         <button
           type="button"
           className="hub-ember-btn hub-ember-btn--sm"
-          disabled={!onStartWd14}
+          disabled={!onStartWd14 || installing}
           onClick={() => {
             void primeUiAudio();
             playUiClick();
-            onStartWd14?.();
+            setStarting(true);
+            void Promise.resolve(onStartWd14?.()).finally(() => {
+              setStarting(false);
+            });
           }}
         >
-          Запустить сервер
+          {installing ? "Ставлю среду…" : "Запустить сервер"}
         </button>
         <button
           type="button"
           className="hub-ember-btn hub-ember-btn--sm"
-          disabled={!onRefreshWd14}
+          disabled={!onRefreshWd14 || installing}
           onClick={() => {
             void primeUiAudio();
             playUiClick();
@@ -1662,10 +1713,8 @@ function Wd14Panel({
       </div>
       {!online ? (
         <p className="hub-wd14__hint">
-          Положи модель в{" "}
-          <code>scripts/wd14-models/</code> и поставь зависимости — см.{" "}
-          <code>docs/WD14_TAGGER.md</code>. Без сервера локальные файлы
-          получают теги из имени файла.
+          Первый старт сам ставит Python-среду и onnx (~440 МБ) в данные
+          приложения. Без сервера локальные файлы получают теги из имени файла.
         </p>
       ) : null}
     </div>

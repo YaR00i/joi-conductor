@@ -166,6 +166,9 @@ export type EmberWorldTransformPatch = Readonly<{
   y?: number;
   z?: number | null;
   rotationQuarterTurns?: number;
+  scaleX?: number;
+  scaleY?: number;
+  scaleZ?: number;
 }>;
 
 export type EmberWorldTransformSpace = "world" | "local";

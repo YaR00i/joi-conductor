@@ -1,34 +1,70 @@
 import {
+  Component,
+  Suspense,
+  lazy,
   useCallback,
   useEffect,
   useRef,
   useState,
+  type ErrorInfo,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from "react";
-import {
-  ArtsEditorPanel,
-  type LibNavigateFocus,
-  type LibNavigateTab,
+import type {
+  LibNavigateFocus,
+  LibNavigateTab,
 } from "../components/ember/editor/ArtsEditorPanel";
-import { MapEditorPanel } from "../components/ember/editor/MapEditorPanel";
-import { SceneEditorPanel } from "../components/ember/editor/SceneEditorPanel";
-import { SpriteEditorPanel } from "../components/ember/editor/SpriteEditorPanel";
-import { TileEditorPanel } from "../components/ember/editor/TileEditorPanel";
-import { VoxelSculptPanel } from "../components/ember/editor/VoxelSculptPanel";
 import {
   clearAllLocalOverrides,
+  listLocalOverrides,
+  writeEmberJson,
+} from "../game/content/io";
+import {
   createEmptyScene,
   createEventForScene,
-  listLocalOverrides,
-  loadEmberPack,
   syncEventStageLinks,
+} from "../game/content/sceneFactory";
+import {
+  loadEmberPack,
   upsertEvent,
   upsertScene,
-  validatePack,
-  writeEmberJson,
-  type EmberPack,
-  type ValidationIssue,
-} from "../game";
+} from "../game/content/loadPack";
+import { validatePack } from "../game/content/validate";
+import type {
+  EmberPack,
+  ValidationIssue,
+} from "../game/content/types";
+
+const LazyMapEditorPanel = lazy(() =>
+  import("../components/ember/editor/MapEditorPanel").then((module) => ({
+    default: module.MapEditorPanel,
+  })),
+);
+const LazyTileEditorPanel = lazy(() =>
+  import("../components/ember/editor/TileEditorPanel").then((module) => ({
+    default: module.TileEditorPanel,
+  })),
+);
+const LazySpriteEditorPanel = lazy(() =>
+  import("../components/ember/editor/SpriteEditorPanel").then((module) => ({
+    default: module.SpriteEditorPanel,
+  })),
+);
+const LazyVoxelSculptPanel = lazy(() =>
+  import("../components/ember/editor/VoxelSculptPanel").then((module) => ({
+    default: module.VoxelSculptPanel,
+  })),
+);
+const LazySceneEditorPanel = lazy(() =>
+  import("../components/ember/editor/SceneEditorPanel").then((module) => ({
+    default: module.SceneEditorPanel,
+  })),
+);
+const LazyArtsEditorPanel = lazy(() =>
+  import("../components/ember/editor/ArtsEditorPanel").then((module) => ({
+    default: module.ArtsEditorPanel,
+  })),
+);
 import type {
   EmberArt,
   EmberEvent,
@@ -132,6 +168,44 @@ function tabMeta(tab: Tab): { group: string; label: string } {
   return { group: "", label: tab };
 }
 
+function EditorPanelFallback({ tab }: { tab: Tab }) {
+  return (
+    <div className="ember-ed-card" aria-busy="true" aria-live="polite">
+      <p className="muted">Загрузка: {tabMeta(tab).label}…</p>
+    </div>
+  );
+}
+
+class EditorPanelBoundary extends Component<
+  { children: ReactNode; tab: Tab },
+  { error: Error | null }
+> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Ember editor tab failed to load", error, info.componentStack);
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div className="ember-ed-card ember-validate ember-validate--error">
+        <h3 className="ember-ed-card__title">
+          Не удалось загрузить: {tabMeta(this.props.tab).label}
+        </h3>
+        <p>{this.state.error.message}</p>
+        <button type="button" onClick={() => window.location.reload()}>
+          Перезапустить редактор
+        </button>
+      </div>
+    );
+  }
+}
+
 export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
   const [pack, setPack] = useState<EmberPack | null>(null);
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
@@ -142,6 +216,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
   const [overrides, setOverrides] = useState<string[]>([]);
   const [sceneId, setSceneId] = useState<string | null>(null);
   const [activeTilesetId, setActiveTilesetId] = useState<string | null>(null);
+  const [activeMapId, setActiveMapId] = useState<string | null>(null);
   const [spriteFocusId, setSpriteFocusId] = useState<string | null>(null);
   const [tileFocusId, setTileFocusId] = useState<number | null>(null);
   const [voxelFocusId, setVoxelFocusId] = useState<string | null>(null);
@@ -157,6 +232,16 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
       setSceneId((prev) => {
         if (prev && p.scenes[prev]) return prev;
         return Object.keys(p.scenes)[0] ?? null;
+      });
+      setActiveMapId((prev) => {
+        if (prev && p.maps[prev]) return prev;
+        const fromStage = p.stages[p.meta.defaultStageId]?.mapId;
+        if (fromStage && p.maps[fromStage]) return fromStage;
+        return Object.keys(p.maps)[0] ?? null;
+      });
+      setActiveTilesetId((prev) => {
+        if (prev && p.tilesets[prev]) return prev;
+        return Object.keys(p.tilesets)[0] ?? null;
       });
       setStatus("Пак загружен");
     } catch (err) {
@@ -236,7 +321,9 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
     };
   }, [openMenu]);
 
-  const mapId = pack ? Object.keys(pack.maps)[0] : null;
+  const mapId =
+    (activeMapId && pack?.maps[activeMapId] ? activeMapId : null) ??
+    (pack ? Object.keys(pack.maps)[0] : null);
   const tilesetId =
     (activeTilesetId && pack?.tilesets[activeTilesetId]
       ? activeTilesetId
@@ -399,6 +486,45 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
             /
           </span>
           <strong>{current.label}</strong>
+          {tab === "maps" && pack && Object.keys(pack.maps).length > 1 ? (
+            <label className="ember-menubar__pick">
+              <span className="muted">Карта</span>
+              <select
+                aria-label="Карта"
+                value={mapId ?? ""}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setActiveMapId(id);
+                  const tilesetIdForMap = pack.maps[id]?.tilesetId;
+                  if (tilesetIdForMap && pack.tilesets[tilesetIdForMap]) {
+                    setActiveTilesetId(tilesetIdForMap);
+                  }
+                }}
+              >
+                {Object.values(pack.maps).map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nameRu ?? m.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {tab === "tiles" && pack && Object.keys(pack.tilesets).length > 1 ? (
+            <label className="ember-menubar__pick">
+              <span className="muted">Тайлсет</span>
+              <select
+                aria-label="Тайлсет"
+                value={tilesetId ?? ""}
+                onChange={(e) => setActiveTilesetId(e.target.value)}
+              >
+                {Object.values(pack.tilesets).map((ts) => (
+                  <option key={ts.id} value={ts.id}>
+                    {ts.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           {status ? (
             <span className="ember-menubar__status muted" title={status}>
               · {status}
@@ -444,9 +570,11 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
           {!pack ? (
             <p className="muted">Загрузка…</p>
           ) : (
-            <>
+            <EditorPanelBoundary key={tab} tab={tab}>
+              <Suspense fallback={<EditorPanelFallback tab={tab} />}>
               {tab === "maps" && mapId && pack.maps[mapId] ? (
-                <MapEditorPanel
+                <LazyMapEditorPanel
+                  key={mapId}
                   pack={{
                     ...pack,
                     voxelModels: pack.voxelModels ?? {},
@@ -484,7 +612,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
               ) : null}
 
               {tab === "tiles" && tilesetId && pack.tilesets[tilesetId] ? (
-                <TileEditorPanel
+                <LazyTileEditorPanel
                   pack={pack}
                   tileset={pack.tilesets[tilesetId]}
                   favorites={pack.paletteFavorites ?? []}
@@ -513,7 +641,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
               ) : null}
 
               {tab === "sprites" ? (
-                <SpriteEditorPanel
+                <LazySpriteEditorPanel
                   pack={pack}
                   initialSpriteId={spriteFocusId}
                   onChangePack={(next) => {
@@ -528,7 +656,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
               ) : null}
 
               {tab === "voxels" ? (
-                <VoxelSculptPanel
+                <LazyVoxelSculptPanel
                   pack={{
                     ...pack,
                     voxelModels: pack.voxelModels ?? {},
@@ -558,7 +686,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
 
               {tab === "scenes" ? (
                 sceneId && pack.scenes[sceneId] ? (
-                  <SceneEditorPanel
+                  <LazySceneEditorPanel
                     pack={pack}
                     scene={pack.scenes[sceneId]}
                     sceneId={sceneId}
@@ -607,7 +735,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
               ) : null}
 
               {tab === "library" ? (
-                <ArtsEditorPanel
+                <LazyArtsEditorPanel
                   pack={pack}
                   onNavigate={navigateFromLibrary}
                   onChange={(arts: EmberArt[]) => {
@@ -645,7 +773,8 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
                   )}
                 </div>
               ) : null}
-            </>
+              </Suspense>
+            </EditorPanelBoundary>
           )}
         </div>
       </div>

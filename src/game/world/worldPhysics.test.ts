@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  advanceWorldFall,
   blockSpanAtElev,
   bodyHasClearance,
   bodyVerticalSpan,
@@ -40,5 +41,50 @@ describe("unified world physics", () => {
   it("does not block movement with triggers or disabled colliders", () => {
     expect(blockSpanAtElev(1, resolveWorldCollider({ isTrigger: true }))).toBeNull();
     expect(blockSpanAtElev(1, resolveWorldCollider({ enabled: false }))).toBeNull();
+  });
+});
+
+describe("vertical fall integration", () => {
+  it("falls gradually with acceleration and lands exactly on support", () => {
+    let state = { feetElev: 3, velocity: 0, grounded: true };
+    state = advanceWorldFall(state, 0, 0.1);
+    expect(state.feetElev).toBeCloseTo(2.94);
+    expect(state.velocity).toBeCloseTo(-1.2);
+    expect(state.grounded).toBe(false);
+
+    const firstDrop = 3 - state.feetElev;
+    const next = advanceWorldFall(state, 0, 0.1);
+    expect(state.feetElev - next.feetElev).toBeGreaterThan(firstDrop);
+
+    state = next;
+    for (let i = 0; i < 120 && !state.grounded; i++) {
+      state = advanceWorldFall(state, 0, 1 / 60);
+    }
+    expect(state).toEqual({ feetElev: 0, velocity: 0, grounded: true });
+  });
+
+  it("is stable across 30 and 120 fps", () => {
+    const simulate = (fps: number) => {
+      let state = { feetElev: 4, velocity: 0, grounded: true };
+      for (let i = 0; i < Math.round(fps * 0.4); i++) {
+        state = advanceWorldFall(state, 0, 1 / fps);
+      }
+      return state;
+    };
+
+    const at30 = simulate(30);
+    const at120 = simulate(120);
+    expect(at30.feetElev).toBeCloseTo(at120.feetElev, 1);
+    expect(at30.velocity).toBeCloseTo(at120.velocity, 1);
+  });
+
+  it("snaps upward support changes instead of sinking into stairs", () => {
+    expect(
+      advanceWorldFall(
+        { feetElev: 0, velocity: -2, grounded: false },
+        0.25,
+        1 / 60,
+      ),
+    ).toEqual({ feetElev: 0.25, velocity: 0, grounded: true });
   });
 });

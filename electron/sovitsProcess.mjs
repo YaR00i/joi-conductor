@@ -1,6 +1,7 @@
 /**
  * Manage GPT-SoVITS api_v2.py as a child process of the Electron app.
  */
+import { app } from "electron";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -9,7 +10,13 @@ import {
   killPortListeners,
   killProcessTree,
 } from "../scripts/process-utils.mjs";
+import { venvPythonPath } from "./qwenEnv.mjs";
 import { pingSovits } from "./sovits.mjs";
+import {
+  pretrainedLooksReady,
+  sovitsRepoDir,
+  sovitsVenvDir,
+} from "./sovitsPaths.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_HOST = "127.0.0.1";
@@ -29,14 +36,24 @@ function userHome() {
   return process.env.USERPROFILE || process.env.HOME || "";
 }
 
+function userDataDir() {
+  try {
+    return app.getPath("userData");
+  } catch {
+    return "";
+  }
+}
+
 /**
  * @param {string} [overrideRoot]
  */
 export function findSovitsRoot(overrideRoot = "") {
   const home = userHome();
+  const ud = userDataDir();
   const candidates = [
     overrideRoot,
     process.env.GPT_SOVITS_ROOT || "",
+    ud ? sovitsRepoDir(ud) : "",
     path.join(home, "Projects", "GPT-SoVITS"),
     path.join(home, "Developer", "GPT-SoVITS"),
     path.resolve(__dirname, "..", "..", "GPT-SoVITS"),
@@ -55,9 +72,12 @@ export function findSovitsRoot(overrideRoot = "") {
  */
 export function findSovitsPython(overridePython = "") {
   const home = userHome();
+  const ud = userDataDir();
+  const managedVenv = ud ? venvPythonPath(sovitsVenvDir(ud)) : "";
   const candidates = [
     overridePython,
     process.env.GPT_SOVITS_PYTHON || "",
+    managedVenv,
     path.join(home, "miniconda3", "envs", "GPTSoVits", "python.exe"),
     path.join(home, "anaconda3", "envs", "GPTSoVits", "python.exe"),
     path.join(home, "miniconda3", "envs", "GPTSoVits", "bin", "python"),
@@ -108,9 +128,11 @@ export async function getSovitsProcessStatus(opts = {}) {
     detail = "онлайн · управляется приложением";
   else if (ping.online) detail = "онлайн · внешний процесс";
   else if (!installPath)
-    detail = "GPT-SoVITS не найден (ожидается ~/Projects/GPT-SoVITS)";
+    detail = "GPT-SoVITS не найден — вкладка «ИИ ресурсы» → скачать";
   else if (!pythonPath)
-    detail = "Python env GPTSoVits не найден (miniconda3/envs/GPTSoVits)";
+    detail = "Нет Python для SoVITS — вкладка «ИИ ресурсы» → скачать";
+  else if (installPath && !pretrainedLooksReady(installPath))
+    detail = "репо есть, нет pretrained — снова «скачать» у GPT-SoVITS";
   else detail = "офлайн";
 
   return {
@@ -154,12 +176,12 @@ export async function startSovitsProcess(opts = {}) {
   const python = findSovitsPython(opts.pythonPath || "");
   if (!rootDir) {
     throw new Error(
-      "Не найден GPT-SoVITS (api_v2.py). Клонируй в ~/Projects/GPT-SoVITS",
+      "Не найден GPT-SoVITS (api_v2.py). Скачай стек во вкладке «ИИ ресурсы».",
     );
   }
   if (!python) {
     throw new Error(
-      "Не найден Python env GPTSoVits. Ожидается miniconda3\\envs\\GPTSoVits\\python.exe",
+      "Не найден Python для SoVITS. Скачай стек во вкладке «ИИ ресурсы».",
     );
   }
 

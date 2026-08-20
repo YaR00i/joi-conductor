@@ -32,6 +32,8 @@ export interface BeatBarProps {
   hitSeq?: number;
   patternLabel?: string;
   timeLabel?: string;
+  /** Upcoming block name — shown so the next handoff is visible. */
+  nextLabel?: string | null;
 }
 
 interface BallView {
@@ -66,6 +68,7 @@ export function BeatBar({
   hitSeq = 0,
   patternLabel,
   timeLabel,
+  nextLabel = null,
 }: BeatBarProps) {
   const [balls, setBalls] = useState<BallView[]>([]);
   const [flash, setFlash] = useState(false);
@@ -369,6 +372,7 @@ export function BeatBar({
       </div>
       <div className="beat-bar__meta">
         <span>{patternLabel ?? "—"}</span>
+        {nextLabel ? <span className="beat-bar__next">{nextLabel}</span> : null}
         <span>{timeLabel ?? "00:00"}</span>
       </div>
     </div>

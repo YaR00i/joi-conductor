@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { getActiveSaveSlot } from "../lib/saveSlots";
+import { DoodleGame } from "./doodle/DoodleGame";
 import { PuzzleGame } from "./puzzle/PuzzleGame";
 import { PuzzleTaskEditor } from "./puzzle/PuzzleTaskEditor";
 import { RunnerGame } from "./runner/RunnerGame";
@@ -8,7 +9,7 @@ interface Props {
   onReward: (cinders: number) => void;
 }
 
-type View = "catalog" | "puzzle" | "tasks" | "runner";
+type View = "catalog" | "puzzle" | "tasks" | "runner" | "doodle";
 
 export function MinigamesPage({ onReward }: Props) {
   const [view, setView] = useState<View>("catalog");
@@ -25,6 +26,13 @@ export function MinigamesPage({ onReward }: Props) {
     return (
       <div className="page page--minigames">
         <RunnerGame onReward={onReward} onExit={() => setView("catalog")} />
+      </div>
+    );
+  }
+  if (view === "doodle") {
+    return (
+      <div className="page page--minigames">
+        <DoodleGame onReward={onReward} onExit={() => setView("catalog")} />
       </div>
     );
   }
@@ -71,6 +79,22 @@ export function MinigamesPage({ onReward }: Props) {
             Гонка с воротами-множителями: веди толпу через плюсы и иксы,
             выполняй задания огненных врат и перемалывай встречные толпы.
             Красные врата и проигранные схватки режут награду, босс ждёт у финиша.
+          </div>
+          <div className="minigame-card__cta">Играть →</div>
+        </button>
+
+        <button
+          type="button"
+          className="minigame-card"
+          onClick={() => setView("doodle")}
+        >
+          <div className="minigame-card__icon" aria-hidden>🦘</div>
+          <div className="minigame-card__title">Прыжки уголька</div>
+          <div className="minigame-card__desc muted">
+            Дудл-джамп: уголёк скачет сам, ты ведёшь его по платформам. Пружины
+            подбрасывают выше, хрупкий камень осыпается, а огненные платформы
+            дают задания: успех — Угольки и рывок, провал — штраф, туман и удар
+            стимула. Упал — подъём окончен.
           </div>
           <div className="minigame-card__cta">Играть →</div>
         </button>

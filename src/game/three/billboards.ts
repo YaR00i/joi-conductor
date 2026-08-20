@@ -8,13 +8,14 @@ import {
   spriteHasVisual,
   spriteTotalHeight,
 } from "../content/pixelSprite";
-import type { EmberPixelSprite } from "../content/types";
+import type { EmberPixelSprite, EmberTransformScale } from "../content/types";
 import {
   hasEmissiveInk,
   resolveEmissiveBloomRgb,
   resolveEmissiveGlowStrength,
 } from "../tile/emissivePaint";
 import { parseHexRgb } from "../tile/mapUtils";
+import { resolveEmberTransformScale } from "../world/worldTransform";
 
 const texCache = new Map<string, THREE.CanvasTexture>();
 const _faceDir = new THREE.Vector3();
@@ -224,28 +225,51 @@ export function createPixelBillboard(
   return makeYawBillboard(tex, worldW, worldW * aspect);
 }
 
+/** Apply authored Ember X/Y-ground + Z-up scale without compounding updates. */
+export function applySpritePlacementScale(
+  obj: THREE.Object3D,
+  authoredScale: Partial<EmberTransformScale> | undefined,
+): void {
+  const stored = obj.userData.emberBillboardBaseScale as
+    | { x: number; y: number; z: number }
+    | undefined;
+  const base = stored ?? { x: obj.scale.x, y: obj.scale.y, z: obj.scale.z };
+  if (!stored) obj.userData.emberBillboardBaseScale = { ...base };
+  const scale = resolveEmberTransformScale(authoredScale);
+  obj.scale.set(base.x * scale.x, base.y * scale.z, base.z * scale.y);
+}
+
 /** Keep upright: only yaw toward camera on the horizontal plane. */
 export function faceCameraYawOnly(
   obj: THREE.Object3D,
   camera: THREE.Camera,
-): void {
+): boolean {
   _faceDir.set(
     camera.position.x - obj.position.x,
     0,
     camera.position.z - obj.position.z,
   );
-  if (_faceDir.lengthSq() < 1e-8) return;
-  obj.rotation.set(0, Math.atan2(_faceDir.x, _faceDir.z), 0);
+  if (_faceDir.lengthSq() < 1e-8) return false;
+  const yaw = Math.atan2(_faceDir.x, _faceDir.z);
+  const delta = Math.atan2(
+    Math.sin(yaw - obj.rotation.y),
+    Math.cos(yaw - obj.rotation.y),
+  );
+  if (Math.abs(delta) < 1e-6) return false;
+  obj.rotation.set(0, yaw, 0);
+  return true;
 }
 
-/** Update every marked yaw-billboard under a root (or the object itself). */
+/** Update every marked yaw-billboard. Returns true when a pose changed. */
 export function updateYawBillboards(
   root: THREE.Object3D,
   camera: THREE.Camera,
-): void {
+): boolean {
+  let changed = false;
   root.traverse((o) => {
-    if (o.userData.yawBillboard) faceCameraYawOnly(o, camera);
+    if (o.userData.yawBillboard && faceCameraYawOnly(o, camera)) changed = true;
   });
+  return changed;
 }
 
 export function hexColorOr(hex: string | undefined, fallback: string): string {

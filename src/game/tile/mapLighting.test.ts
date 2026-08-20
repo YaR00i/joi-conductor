@@ -6,7 +6,14 @@ import {
   litSurfacesToFloorGlow,
 } from "./mapLighting";
 import type { LanternSource } from "./mapUtils";
-import { createEmptyMap, ensureMapLayers, layerData } from "./mapUtils";
+import {
+  createEmptyMap,
+  ensureMapLayers,
+  layerData,
+  listLanternSources,
+  previewLanternSourceMove,
+  removeLanternSource,
+} from "./mapUtils";
 
 const tileset: EmberTileset = {
   id: "test",
@@ -17,6 +24,16 @@ const tileset: EmberTileset = {
     { id: 1, name: "floor", color: "#808080" },
     { id: 2, name: "wall", color: "#404040", solid: true, defaultHeight: 1 },
     { id: 3, name: "stair_n", color: "#706050", stair: "n" },
+  ],
+};
+
+const glowTileset: EmberTileset = {
+  ...tileset,
+  columns: 4,
+  tileCount: 4,
+  tiles: [
+    ...tileset.tiles,
+    { id: 4, name: "lantern", color: "#ffaa44", glow: true },
   ],
 };
 
@@ -94,6 +111,77 @@ function openYard(): EmberMap {
 }
 
 describe("mapLighting surfaces + light pass", () => {
+  it("removes standalone lights without leaving a tombstone", () => {
+    const map = openYard();
+    map.lights = [{ id: "placed", x: 4, y: 4, enabled: true }];
+
+    const removed = removeLanternSource(map, tileset, undefined, "placed");
+    expect(removed.lights).toBeUndefined();
+    expect(listLanternSources(removed, tileset)).toEqual([]);
+  });
+
+  it("mutes an implicit glow source instead of letting it reappear", () => {
+    const map = openYard();
+    setCell(map, "decor", 4, 4, 4);
+    const source = listLanternSources(map, glowTileset)[0]!;
+    expect(source.kind).toBe("implicit");
+
+    const removed = removeLanternSource(
+      map,
+      glowTileset,
+      undefined,
+      source.id,
+    );
+    expect(removed.lights).toEqual([
+      { id: "mute_4_4", x: 4, y: 4, enabled: false },
+    ]);
+    expect(listLanternSources(removed, glowTileset)).toEqual([]);
+  });
+
+  it("deleting an override on a glow cell removes the light, while reset can restore it", () => {
+    const map = openYard();
+    setCell(map, "decor", 4, 4, 4);
+    map.lights = [{ id: "override", x: 4, y: 4, enabled: true, lampRange: 3 }];
+
+    const removed = removeLanternSource(
+      map,
+      glowTileset,
+      undefined,
+      "override",
+    );
+    expect(removed.lights).toEqual([
+      { id: "override", x: 4, y: 4, enabled: false },
+    ]);
+    expect(listLanternSources(removed, glowTileset)).toEqual([]);
+
+    const reset = { ...removed, lights: undefined };
+    expect(listLanternSources(reset, glowTileset)).toHaveLength(1);
+  });
+
+  it("materializes an implicit lantern at its live gizmo preview position", () => {
+    const map = openYard();
+    setCell(map, "decor", 4, 4, 4);
+    const source = listLanternSources(map, glowTileset)[0]!;
+
+    const preview = previewLanternSourceMove(
+      map,
+      glowTileset,
+      undefined,
+      source.id,
+      5.25,
+      6.5,
+    );
+    const previewSources = listLanternSources(preview, glowTileset);
+    expect(previewSources).toHaveLength(1);
+    expect(previewSources[0]).toMatchObject({
+      id: source.id,
+      x: 5.25,
+      y: 6.5,
+      hasOverride: true,
+    });
+    expect(map.lights).toBeUndefined();
+  });
+
   it("z2 lamp lights z2 floors/faces/treads, soft-tops z1↔z2, skips z0", () => {
     const map = openYard();
     // z2 platform; wall north of lamp so south floor IS the lamp cell.

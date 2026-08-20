@@ -22,7 +22,7 @@ import {
 } from "three";
 
 const MARKER = "Ember voxel light snap";
-const CACHE_TAG = "ember-voxel-light-snap-v7";
+const CACHE_TAG = "ember-voxel-light-snap-v11";
 const INCLUDE_LIGHTS = "#include <lights_fragment_begin>";
 const INCLUDE_WORLDPOS = "#include <worldpos_vertex>";
 
@@ -125,21 +125,36 @@ const FRAG_SNAP_AFTER_NORMAL_LEGACY = `
 `;
 
 const SHADOW_WORLD_WITH_BIAS = (biasExpr: string) =>
-  `emberShadowWorld + inverseTransformDirection( geometryNormal, viewMatrix ) * ( ${biasExpr} + emberVoxelSize * 0.35 )`;
+  `emberShadowWorld + inverseTransformDirection( geometryNormal, viewMatrix ) * ( ${biasExpr} + emberVoxelSize * 0.2 )`;
+
+function dirShadowCoord(index: string): string {
+  const shadow = `directionalLightShadows[ ${index} ]`;
+  const towardLight = `inverseTransformDirection( directionalLights[ ${index} ].direction, viewMatrix )`;
+  const biased = `emberShadowWorld + ${towardLight} * ( ${shadow}.shadowNormalBias + emberVoxelSize * 0.15 )`;
+  const snapped = `( directionalShadowMatrix[ ${index} ] * vec4( ${biased}, 1.0 ) )`;
+  return `( emberVoxelLightSnap > 0.5 ? ${snapped} : vDirectionalShadowCoord[ ${index} ] )`;
+}
+
+function dirShadowSample(index: string): string {
+  const shadow = `directionalLightShadows[ ${index} ]`;
+  const coord = dirShadowCoord(index);
+  return `getShadow( directionalShadowMap[ ${index} ], ${shadow}.shadowMapSize, ${shadow}.shadowIntensity, ${shadow}.shadowBias, ${shadow}.shadowRadius, ${coord} )`;
+}
 
 /**
- * Sample shadows at the snapped XZ world point (not interpolated vertex coords).
- * Re-apply the same normalBias the stock vertex path uses.
+ * One cached sun map. Extra directional loop indices (if any) must not light
+ * or shadow. Keep this as a single sample so editor and play both compile
+ * with NUM_DIR_LIGHT_SHADOWS == 1.
  */
+export function combineDirCascadeShadowExpr(): string {
+  return `( UNROLLED_LOOP_INDEX == 0 ? ${dirShadowSample("0")} : 1.0 )`;
+}
+
 function patchDirShadowSamples(chunk: string): string {
   const from =
     "getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowIntensity, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] )";
   if (!chunk.includes(from)) return chunk;
-  const biased = SHADOW_WORLD_WITH_BIAS(
-    "directionalLightShadows[ i ].shadowNormalBias",
-  );
-  const to = `getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowIntensity, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, emberVoxelLightSnap > 0.5 ? ( directionalShadowMatrix[ i ] * vec4( ${biased}, 1.0 ) ) : vDirectionalShadowCoord[ i ] )`;
-  return chunk.replaceAll(from, to);
+  return chunk.replaceAll(from, combineDirCascadeShadowExpr());
 }
 
 function patchPointShadowSamples(chunk: string): string {

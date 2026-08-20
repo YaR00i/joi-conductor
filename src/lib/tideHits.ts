@@ -1,4 +1,6 @@
-/** Tide CBT/plapping hit counters (auto accents + fail confess). */
+/** Tide CBT/plapping hit counters (honor accents / mic peaks + fail confess). */
+
+import type { TideHitVerifyMode } from "./tideHitVerify";
 
 export const TIDE_HIT_FUNCTION_IDS = [
   "cbt_light",
@@ -88,11 +90,18 @@ export function tideHitCounterLabelRu(hits: number, target: number): string {
   return `${hits} / ${target}`;
 }
 
-export function tideHitProgressHintRu(functionId?: string | null): string {
-  if (
-    functionId === "plapping_cage" ||
-    functionId === "plapping_cage_heavy"
-  ) {
+export function tideHitProgressHintRu(
+  functionId?: string | null,
+  mode?: TideHitVerifyMode,
+): string {
+  const plapping =
+    functionId === "plapping_cage" || functionId === "plapping_cage_heavy";
+  if (mode === "mic") {
+    return plapping
+      ? "микрофон — шлепок должен быть слышен"
+      : "микрофон — удар должен быть слышен";
+  }
+  if (plapping) {
     return "считаю акценты — шлепки дилдо по яйцам";
   }
   return "считаю сильные акценты — удары";

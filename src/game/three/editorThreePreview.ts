@@ -10,6 +10,7 @@ import type {
   EmberTileset,
   EmberVoxelModel,
 } from "../content/types";
+import { resolveMapPlayProfile } from "../content/playProfile";
 import { clampElevation, MAX_ELEVATION, MIN_ELEVATION } from "../content/types";
 import { elevTileIdAt } from "../tile/elevGroundLayers";
 import { blockStoryHeight, elevFromWorldY, elevStoryWorldSpan } from "../tile/extruded";
@@ -34,6 +35,7 @@ import { buildVoxelSceneMesh } from "../voxel/voxelSceneMesh";
 import { voxelGridSize } from "../voxel/voxelModel";
 import { applyVoxelPlacementTransform } from "../voxel/voxelPlacement";
 import {
+  applySpritePlacementScale,
   createPixelBillboard,
   disposeYawBillboard,
   hexColorOr,
@@ -43,6 +45,7 @@ import {
   clearDebugOverlayRoot,
   createDebugOverlayRoot,
   rebuildEditorDebugOverlays,
+  updateEditorDebugBillboards,
   type EditorDebugOverlayFlags,
 } from "./editorDebugOverlays";
 import { getEmberEnvMap } from "./envMap";
@@ -50,13 +53,17 @@ import {
   createEditorTransformGizmo,
   type EditorTransformCommit,
   type EditorTransformGizmo,
+  type EditorTransformMode,
+  type EditorTransformPreview,
   type EditorTransformTarget,
 } from "./editorTransformGizmo";
 import { createMapAtmosphere } from "./mapAtmosphere";
 import { createPostFx, type EmberPostFx } from "./postFx";
 import {
-  lanternShadowShare,
+  applyMapLightBudget,
+  lanternVisibleShare,
   resolveEmberRenderBudget,
+  resolvePlayProfileBudget,
 } from "./renderBudget";
 import {
   addLampRangeRing,
@@ -91,11 +98,19 @@ import {
 } from "./emissiveAnimTick";
 import { tickTorchFlicker } from "./torchFlickerTick";
 import {
+  beginStaticPointShadowBake,
+  cachePointLightShadows,
+  invalidatePointLightShadows,
+} from "./dynamicShadowPolicy";
+import {
   collectPlanarReflectMaterials,
   estimatePlanarFloorY,
 } from "./planarReflectMaterial";
 import { setEmberVoxelLightSnap } from "./voxelLightSnap";
-import { buildVoxelMesh, disposeVoxelMesh } from "./voxelMesh";
+import {
+  createChunkedVoxelTerrain,
+  type ChunkedVoxelTerrain,
+} from "./voxelTerrainChunks";
 import {
   collectWaterMaterials,
   ensureWaterShoreAttributes,
@@ -112,6 +127,16 @@ import {
   createInteractiveOutline,
   type InteractiveOutlineHandle,
 } from "./interactiveOutline";
+import {
+  createEmberFrameProfiler,
+  type EmberProfilerExtras,
+} from "./emberFrameProfiler";
+import {
+  createEditorVoxelInstanceBatch,
+  type EditorVoxelInstanceBatch,
+  type ResolvedEditorVoxelPlacement,
+} from "./editorVoxelInstancing";
+import { createEditorReflectionScheduler } from "./editorReflectionScheduler";
 import {
   emissivePlacementSeed,
   hasEmissiveInk,
@@ -145,6 +170,8 @@ export type EditorOverlayMarks = {
   hover?: EditorPick | null;
   /** Persistent selection outline (click-selected object). */
   selected?: EditorPick | null;
+  /** Secondary members of a multi-selection. */
+  selectedMany?: ReadonlyArray<EditorPick> | null;
   /** Active paint / fill drag cells. */
   selectTiles?: ReadonlyArray<{ tx: number; ty: number }> | null;
   /** Library drag-over / click-place preview tile. */
@@ -186,6 +213,45 @@ export type EditorThreeLayout = {
   scale: number;
 };
 
+/** Real asset ghost shown before a library placement is committed. */
+export type EditorAssetPlacementPreview =
+  | {
+      kind: "sprite";
+      assetId: string;
+      tx: number;
+      ty: number;
+      elev: number;
+      valid: boolean;
+    }
+  | {
+      kind: "voxel";
+      assetId: string;
+      tx: number;
+      ty: number;
+      elev: number;
+      valid: boolean;
+    }
+  | {
+      kind: "light";
+      assetId: string;
+      tx: number;
+      ty: number;
+      elev: number;
+      valid: boolean;
+      color: string;
+      rangeTiles: number;
+    }
+  | {
+      kind: "region";
+      assetId: string;
+      tx: number;
+      ty: number;
+      elev: number;
+      valid: boolean;
+      width: number;
+      height: number;
+    };
+
 export type EditorThreePreview = {
   setMap: (
     map: EmberMap,
@@ -208,6 +274,8 @@ export type EditorThreePreview = {
     sy: number,
     lockedElev: number,
   ) => PlacePreviewMark | null;
+  /** Exact terrain-face target without forcing the editor's locked Z plane. */
+  pickSurfaceTarget: (sx: number, sy: number) => PlacePreviewMark | null;
   /**
    * Minecraft break target: the block under the cursor (hit story), not the
    * locked place-plane / adjacent empty cell.
@@ -215,8 +283,14 @@ export type EditorThreePreview = {
   pickBreakTarget: (sx: number, sy: number) => PlacePreviewMark | null;
   /** Raycast props first, then terrain tile. */
   pickObject: (sx: number, sy: number) => EditorPick | null;
+  /** Front-to-back, de-duplicated hits for precise/cycling selection. */
+  pickObjectStack: (sx: number, sy: number) => EditorPick[];
   /** 3D edge-glow overlays (hover / selection / lib / region). */
   setOverlayMarks: (marks: EditorOverlayMarks) => void;
+  /** Real translucent library asset at the pending commit position. */
+  setAssetPlacementPreview: (
+    preview: EditorAssetPlacementPreview | null,
+  ) => void;
   /** Collision / elevation / regions debug layers (toolbar toggles). */
   setDebugOverlays: (flags: EditorDebugOverlayFlags) => void;
   /**
@@ -230,6 +304,8 @@ export type EditorThreePreview = {
    * Atmosphere stays under setAtmospherePreview.
    */
   setLookPreview: (visible: boolean) => void;
+  /** Force a complete static PointLight cube-map bake. */
+  rebuildStaticShadows: () => void;
   /** Pan orbit target to a map tile (world center of cell). */
   focusTile: (tx: number, ty: number) => void;
   projectTile: (
@@ -239,24 +315,28 @@ export type EditorThreePreview = {
   ) => { px: number; py: number; ts: number } | null;
   /** Overlay canvas that receives pointer events (above WebGL). */
   setTransformPointerDom: (el: HTMLElement | null) => void;
-  /** Blender-like move/rotate gizmo for the current selection. */
+  /** Blender-like move/rotate/scale gizmo for the current selection. */
   setTransformTarget: (target: EditorTransformTarget | null) => void;
-  setTransformMode: (mode: "translate" | "rotate") => void;
-  getTransformMode: () => "translate" | "rotate";
+  setTransformMode: (mode: EditorTransformMode) => void;
+  getTransformMode: () => EditorTransformMode;
   isTransformBusy: () => boolean;
   onTransformCommit: (
     cb: ((commit: EditorTransformCommit) => void) | null,
   ) => void;
   onTransformDragging: (cb: ((dragging: boolean) => void) | null) => void;
   onTransformPreview: (
-    cb: ((pos: { x: number; y: number; z: number } | null) => void) | null,
+    cb: ((preview: EditorTransformPreview | null) => void) | null,
   ) => void;
   isTransformDragging: () => boolean;
   dispose: () => void;
   domElement: HTMLCanvasElement;
 };
 
-export type { EditorTransformCommit, EditorTransformTarget };
+export type {
+  EditorTransformCommit,
+  EditorTransformPreview,
+  EditorTransformTarget,
+};
 
 function clearLightRoot(root: THREE.Object3D): void {
   while (root.children.length) {
@@ -279,7 +359,7 @@ function clearLightRoot(root: THREE.Object3D): void {
 }
 
 /** Cheap fingerprint of pack assets referenced by map props / lamps. */
-function packAssetsSignature(
+export function packAssetsSignature(
   m: EmberMap,
   pack: EmberPack | undefined,
 ): string {
@@ -319,8 +399,27 @@ function packAssetsSignature(
       hashArr(model.emissive, n) ^
       hashArr(model.shine, n) ^
       hashArr(model.transparency, n);
+    const settings = JSON.stringify({
+      sizeBlocks: model.sizeBlocks,
+      heightVoxels: model.heightVoxels,
+      palette: model.palette,
+      material: model.material,
+      directLightScale: model.directLightScale,
+      componentStates: model.componentStates,
+      emissiveCastsLight: model.emissiveCastsLight,
+      emissiveLightRange: model.emissiveLightRange,
+      emissiveLightShadows: model.emissiveLightShadows,
+      emissiveLightOrigin: model.emissiveLightOrigin,
+      emissiveLightOffset: model.emissiveLightOffset,
+      emissiveStrength: model.emissiveStrength,
+      emissiveTorchFlicker: model.emissiveTorchFlicker,
+      emissiveLanternFlicker: model.emissiveLanternFlicker,
+      emissiveSuppressHostShadow: model.emissiveSuppressHostShadow,
+      physical: model.physical,
+      collider: model.collider,
+    });
     modelParts.push(
-      `${id}:${n}:${h}:${model.directLightScale ?? ""}:${model.emissiveCastsLight ? 1 : 0}:${model.emissiveStrength ?? ""}:${model.emissiveLightRange ?? ""}:${model.physical === false ? 0 : 1}`,
+      `${id}:${n}:${h}:${settings}`,
     );
   }
   const spriteParts: string[] = [];
@@ -365,12 +464,18 @@ export function createEditorThreePreview(
   renderer.setPixelRatio(1);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.BasicShadowMap;
+  // Editor geometry and authored lights are static between explicit edits.
+  // Re-render cube shadows only when setMap/applyLook marks them dirty.
+  renderer.shadowMap.autoUpdate = false;
   renderer.domElement.style.display = "block";
   renderer.domElement.style.imageRendering = "pixelated";
   renderer.domElement.style.width = "100%";
   renderer.domElement.style.height = "100%";
   parent.innerHTML = "";
   parent.appendChild(renderer.domElement);
+  const profiler = createEmberFrameProfiler(renderer, "EDITOR", () =>
+    requestRender(),
+  );
 
   const post: EmberPostFx = createPostFx(renderer, scene, camera, 64, 64);
   const atmosphere = createMapAtmosphere(scene);
@@ -381,12 +486,19 @@ export function createEditorThreePreview(
   );
 
   let mapGroup: THREE.Group | null = null;
+  let terrainChunks: ChunkedVoxelTerrain | null = null;
   const lightRoot = new THREE.Group();
   const propRoot = new THREE.Group();
+  const placementGhostRoot = new THREE.Group();
   const outlineRoot = createOutlineRoot();
   const debugRoot = createDebugOverlayRoot();
+  // Authoring-only overlays must never leak into the world reflection texture.
+  placementGhostRoot.userData.emberSkipWaterReflect = true;
+  outlineRoot.userData.emberSkipWaterReflect = true;
+  debugRoot.userData.emberSkipWaterReflect = true;
   scene.add(lightRoot);
   scene.add(propRoot);
+  scene.add(placementGhostRoot);
   scene.add(outlineRoot);
   scene.add(debugRoot);
 
@@ -403,6 +515,7 @@ export function createEditorThreePreview(
   const overlayMarks: {
     hover: EditorPick | null;
     selected: EditorPick | null;
+    selectedMany: EditorPick[];
     selectTiles: { tx: number; ty: number }[];
     libTile: { tx: number; ty: number } | null;
     placePreview: PlacePreviewMark | null;
@@ -414,6 +527,7 @@ export function createEditorThreePreview(
   } = {
     hover: null,
     selected: null,
+    selectedMany: [],
     selectTiles: [],
     libTile: null,
     placePreview: null,
@@ -431,6 +545,7 @@ export function createEditorThreePreview(
   const workPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   const hit = new THREE.Vector3();
   const faceNormal = new THREE.Vector3();
+  const billboardAlphaCache = new WeakMap<object, ImageData>();
   let raf = 0;
   let needsFrame = false;
   let atmosAnim = false;
@@ -441,9 +556,12 @@ export function createEditorThreePreview(
   let emissiveMats: THREE.Material[] = [];
   let waterMats: THREE.Material[] = [];
   let waterReflect: WaterPlanarReflection | null = null;
+  const reflectionScheduler = createEditorReflectionScheduler(100);
   let modelOutlines: InteractiveOutlineHandle[] = [];
+  let voxelInstanceBatches: EditorVoxelInstanceBatch[] = [];
   let emissiveLights: THREE.PointLight[] = [];
   let lanternLights: THREE.PointLight[] = [];
+  let staticPointShadowBakePending = false;
   let emissiveAnimAcc = 0;
   let atmospherePreview = true;
   let lookPreview = true;
@@ -462,6 +580,145 @@ export function createEditorThreePreview(
   let lastAtmosSig = "";
   let lastOverlaySig = "";
   let outlinesNeedRebuild = false;
+  let assetPlacementPreview: EditorAssetPlacementPreview | null = null;
+  let assetPlacementPreviewKey = "";
+
+  const clearAssetPlacementPreview = () => {
+    clearObjectRoot(placementGhostRoot);
+    assetPlacementPreviewKey = "";
+  };
+
+  const stylePlacementGhost = (root: THREE.Object3D, valid: boolean) => {
+    const tint = new THREE.Color(valid ? 0x70e6a0 : 0xff665c);
+    root.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh)) return;
+      obj.castShadow = false;
+      obj.receiveShadow = false;
+      obj.renderOrder = 32;
+      const materials = Array.isArray(obj.material)
+        ? obj.material
+        : [obj.material];
+      for (const material of materials) {
+        material.transparent = true;
+        material.opacity = Math.min(material.opacity, valid ? 0.62 : 0.48);
+        material.depthWrite = false;
+        const colored = material as THREE.Material & {
+          color?: THREE.Color;
+          emissive?: THREE.Color;
+        };
+        colored.color?.lerp(tint, valid ? 0.2 : 0.48);
+        colored.emissive?.lerp(tint, valid ? 0.12 : 0.35);
+        material.needsUpdate = true;
+      }
+    });
+  };
+
+  const updateAssetPlacementPreview = () => {
+    const preview = assetPlacementPreview;
+    if (!preview || !map || !lastPack) {
+      clearAssetPlacementPreview();
+      return;
+    }
+    const shapeKey =
+      preview.kind === "region"
+        ? `${preview.width}x${preview.height}`
+        : preview.kind === "light"
+          ? `${preview.color}:${preview.rangeTiles}`
+          : "";
+    const key = `${preview.kind}:${preview.assetId}:${preview.valid}:${shapeKey}`;
+    if (key !== assetPlacementPreviewKey) {
+      clearAssetPlacementPreview();
+      assetPlacementPreviewKey = key;
+      if (preview.kind === "sprite") {
+        const sprite = lastPack.sprites?.[preview.assetId];
+        if (sprite) {
+          const ghost = createPixelBillboard(
+            sprite,
+            hexColorOr(sprite.color, "#c8a878"),
+            map.tileSize * 0.95,
+          );
+          placementGhostRoot.add(ghost);
+          stylePlacementGhost(ghost, preview.valid);
+        }
+      } else if (preview.kind === "voxel") {
+        const model = lastPack.voxelModels?.[preview.assetId];
+        if (model) {
+          const built = buildVoxelModelMesh(model, map.tileSize, {
+            directLightScale: model.directLightScale,
+            suppressCastShadow: true,
+          });
+          placementGhostRoot.add(built.group);
+          stylePlacementGhost(built.group, preview.valid);
+        }
+      } else if (preview.kind === "light") {
+        const marker = new THREE.Mesh(
+          new THREE.OctahedronGeometry(Math.max(1.8, map.tileSize * 0.13)),
+          new THREE.MeshBasicMaterial({ color: preview.color }),
+        );
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(
+            Math.max(map.tileSize * 0.2, preview.rangeTiles * map.tileSize - 0.35),
+            Math.max(map.tileSize * 0.2, preview.rangeTiles * map.tileSize),
+            64,
+          ),
+          new THREE.MeshBasicMaterial({
+            color: preview.color,
+            side: THREE.DoubleSide,
+          }),
+        );
+        ring.rotation.x = -Math.PI / 2;
+        placementGhostRoot.add(marker, ring);
+        stylePlacementGhost(placementGhostRoot, preview.valid);
+      } else {
+        const width = Math.max(1, preview.width) * map.tileSize;
+        const depth = Math.max(1, preview.height) * map.tileSize;
+        const box = new THREE.Mesh(
+          new THREE.BoxGeometry(width, Math.max(1, map.tileSize * 0.08), depth),
+          new THREE.MeshBasicMaterial({ color: 0xffb45c }),
+        );
+        placementGhostRoot.add(box);
+        stylePlacementGhost(box, preview.valid);
+      }
+    }
+
+    const storyH = blockStoryHeight(map.tileSize);
+    if (preview.kind === "voxel") {
+      const model = lastPack.voxelModels?.[preview.assetId];
+      const group = placementGhostRoot.children[0];
+      if (model && group instanceof THREE.Group) {
+        applyVoxelPlacementTransform(
+          group,
+          {
+            x: preview.tx,
+            y: preview.ty,
+            elev: preview.elev,
+          },
+          model,
+          map.tileSize,
+          preview.elev,
+        );
+      }
+    } else if (preview.kind === "sprite") {
+      const ghost = placementGhostRoot.children[0];
+      ghost?.position.set(
+        (preview.tx + 0.5) * map.tileSize,
+        preview.elev * storyH + map.tileSize * 0.45,
+        (preview.ty + 0.5) * map.tileSize,
+      );
+    } else if (preview.kind === "light") {
+      const cx = (preview.tx + 0.5) * map.tileSize;
+      const cz = (preview.ty + 0.5) * map.tileSize;
+      const y = preview.elev * storyH + map.tileSize * 0.55;
+      placementGhostRoot.children[0]?.position.set(cx, y, cz);
+      placementGhostRoot.children[1]?.position.set(cx, y - map.tileSize * 0.5, cz);
+    } else {
+      placementGhostRoot.children[0]?.position.set(
+        (preview.tx + preview.width * 0.5) * map.tileSize,
+        preview.elev * storyH + 0.8,
+        (preview.ty + preview.height * 0.5) * map.tileSize,
+      );
+    }
+  };
 
   const terrainSignature = (m: EmberMap, tilesetId: string) =>
     JSON.stringify({
@@ -516,21 +773,34 @@ export function createEditorThreePreview(
       }
     }
     for (const p of m.voxelProps ?? []) {
+      if (voxelInstanceBatches.some((batch) => batch.ids.has(p.id))) continue;
       const obj = byPick.get(`voxel:${p.id}`);
       const model = models[p.modelId];
       if (!(obj instanceof THREE.Group) || !model) continue;
       const elev = p.elev ?? tileSurfaceElev(m, p.x, p.y);
       applyVoxelPlacementTransform(obj, p, model, m.tileSize, elev);
     }
+    for (const batch of voxelInstanceBatches) {
+      const placements: ResolvedEditorVoxelPlacement[] = [];
+      for (const p of m.voxelProps ?? []) {
+        if (!batch.ids.has(p.id)) continue;
+        placements.push({
+          placement: p,
+          elev: p.elev ?? tileSurfaceElev(m, p.x, p.y),
+        });
+      }
+      batch.sync(placements);
+    }
     for (const p of m.sprites ?? []) {
       const obj = byPick.get(`sprite:${p.id}`);
       if (!obj) continue;
-      const elev = tileSurfaceElev(m, p.x, p.y);
+      const elev = p.elev ?? tileSurfaceElev(m, p.x, p.y);
       obj.position.set(
         (p.x + 0.5) * m.tileSize,
         elev * blockStoryHeight(m.tileSize) + m.tileSize * 0.45,
         (p.y + 0.5) * m.tileSize,
       );
+      applySpritePlacementScale(obj, p.scale);
     }
     for (const r of m.regions ?? []) {
       if (r.kind !== "chest") continue;
@@ -625,14 +895,21 @@ export function createEditorThreePreview(
         mapWidth: lastMapW,
         mapDepth: lastMapD,
       });
+      const lightCaps = applyMapLightBudget(renderBudget, lastLightCfg);
+      const explore = resolvePlayProfileBudget(
+        resolveMapPlayProfile(map),
+      ).allowHorde === false;
       lanternLights = addThreeLanternLights(lightRoot, {
         map,
         light: lastLightCfg,
         center: lastLightCenter,
         tileset: lastTileset,
         sprites: lastPack?.sprites,
-        maxLamps: Math.ceil(renderBudget.maxPointLights / 2),
-        maxShadows: lanternShadowShare(renderBudget),
+        maxLamps: lanternVisibleShare(lightCaps, {
+          authoredLights: lastLightCfg.maxPointLights != null,
+          explore,
+        }),
+        maxShadows: lightCaps.maxPointLights,
         shadows: true,
         shadowMapSize: renderBudget.pointShadowMapSize,
       });
@@ -644,18 +921,22 @@ export function createEditorThreePreview(
         {
           maxLights: Math.max(
             0,
-            renderBudget.maxPointLights - lanternLights.length,
+            lightCaps.maxPointLights - lanternLights.length,
           ),
           voxelModels: lastPack?.voxelModels,
           voxelScenes: lastPack?.voxelScenes,
-          maxShadows: Math.max(
-            0,
-            renderBudget.maxPointShadows -
-              lanternLights.filter((light) => light.castShadow).length,
-          ),
+          maxShadows: resolvePlayProfileBudget(
+            resolveMapPlayProfile(map),
+          ).emissiveShadows
+            ? lightCaps.maxPointLights
+            : 0,
           shadowMapSize: renderBudget.pointShadowMapSize,
         },
       );
+      // Editor geometry is static between edits, so radius flicker can reuse
+      // the same cube depth while the light cutoff changes in the main pass.
+      cachePointLightShadows(lightRoot);
+      staticPointShadowBakePending = true;
     } else {
       post.setBloom({ strength: 0, threshold: 1, radius: 0 });
       // Neutral grade; vignette still follows atmosphere toggle.
@@ -677,6 +958,7 @@ export function createEditorThreePreview(
       (lanternLights.length > 0 &&
         (lastLightCfg?.torchFlicker ?? 0) > 0.01);
     renderer.shadowMap.needsUpdate = true;
+    reflectionScheduler.markSceneDirty();
     return true;
   };
 
@@ -735,11 +1017,15 @@ export function createEditorThreePreview(
       addLampRangeRing(outlineRoot, map, overlayMarks.lampRange);
     }
 
-    const drawPick = (pick: EditorPick | null, tone: OutlineTone) => {
+    const drawPick = (
+      pick: EditorPick | null,
+      tone: OutlineTone,
+      opacityMul = 1,
+    ) => {
       if (!pick) return;
       if (pick.kind === "sprite" || pick.kind === "voxel") {
         const obj = findPropByPick(propRoot, pick);
-        if (obj) addObjectBoundaryOutline(outlineRoot, obj, tone);
+        if (obj) addObjectBoundaryOutline(outlineRoot, obj, tone, opacityMul);
         return;
       }
       const covered =
@@ -749,10 +1035,19 @@ export function createEditorThreePreview(
           (c) => c.tx === pick.tx && c.ty === pick.ty,
         );
       if (!covered) {
-        tileBatch([{ tx: pick.tx, ty: pick.ty, elev: pick.elev }], tone);
+        tileBatch(
+          [{ tx: pick.tx, ty: pick.ty, elev: pick.elev }],
+          tone,
+          opacityMul,
+        );
       }
     };
 
+    for (const pick of overlayMarks.selectedMany) {
+      if (!picksMatch(pick, overlayMarks.selected)) {
+        drawPick(pick, "select", 0.62);
+      }
+    }
     drawPick(overlayMarks.selected, "select");
     // Hover on top so it reads over the persistent selection.
     if (
@@ -763,29 +1058,107 @@ export function createEditorThreePreview(
     }
   };
 
+  const profilerExtras = (): EmberProfilerExtras => {
+    const terrain = terrainChunks?.getStreamingStats();
+    let activeLights = 0;
+    let shadowLights = 0;
+    lightRoot.traverse((object) => {
+      const light = object as THREE.Light;
+      if (!light.isLight || !light.visible) return;
+      activeLights += 1;
+      if (light.castShadow) shadowLights += 1;
+    });
+    const renderableCount = (root: THREE.Object3D | null): number => {
+      let count = 0;
+      root?.traverse((object) => {
+        if (
+          object.visible &&
+          (object instanceof THREE.Mesh ||
+            object instanceof THREE.Line ||
+            object instanceof THREE.Sprite)
+        ) {
+          count += 1;
+        }
+      });
+      return count;
+    };
+    let instanceCount = 0;
+    propRoot.traverse((object) => {
+      if (object instanceof THREE.InstancedMesh) {
+        instanceCount += object.count;
+      }
+    });
+    const reflection = reflectionScheduler.snapshot(performance.now());
+    return {
+      chunks: terrain
+        ? {
+            loaded: terrain.loadedChunks,
+            desired: terrain.desiredChunks,
+            pending: terrain.pendingChunks,
+            total: terrain.totalChunks,
+          }
+        : undefined,
+      workers: terrain
+        ? { active: terrain.workerCount, jobs: terrain.workerJobs }
+        : undefined,
+      lights: { active: activeLights, shadows: shadowLights },
+      renderables: {
+        terrain: renderableCount(mapGroup),
+        props: renderableCount(propRoot),
+        overlays:
+          renderableCount(outlineRoot) + renderableCount(debugRoot),
+        instances: instanceCount,
+      },
+      reflection: {
+        updated: reflection.updatedThisFrame,
+        ageMs: reflection.ageMs,
+      },
+    };
+  };
+
   const renderOnce = () => {
     if (disposed) return;
-    applyCamera();
-    updateYawBillboards(propRoot, camera);
-    // Billboard AABBs move with yaw — refresh object frames each paint.
-    const hoverObj =
-      overlayMarks.hover?.kind === "sprite" ||
-      overlayMarks.hover?.kind === "voxel";
-    const selObj =
-      overlayMarks.selected?.kind === "sprite" ||
-      overlayMarks.selected?.kind === "voxel";
-    const pulsing =
-      overlayMarks.pulseRegion &&
-      (overlayMarks.regionTiles.length > 0 || Boolean(overlayMarks.regionBounds));
-    if (hoverObj || selObj || pulsing || outlinesNeedRebuild) {
-      rebuildOutlines();
-      outlinesNeedRebuild = false;
+    const pointBake = staticPointShadowBakePending
+      ? beginStaticPointShadowBake(lightRoot)
+      : null;
+    if (pointBake) staticPointShadowBakePending = false;
+    try {
+      profiler.beginFrame();
+      reflectionScheduler.beginFrame();
+      applyCamera();
+      reflectionScheduler.trackCamera(camera);
+      updateYawBillboards(propRoot, camera);
+      updateYawBillboards(placementGhostRoot, camera);
+      // Billboard AABBs move with yaw — refresh object frames each paint.
+      const hoverObj =
+        overlayMarks.hover?.kind === "sprite" ||
+        overlayMarks.hover?.kind === "voxel";
+      const selObj =
+        overlayMarks.selected?.kind === "sprite" ||
+        overlayMarks.selected?.kind === "voxel";
+      const pulsing =
+        overlayMarks.pulseRegion &&
+        (overlayMarks.regionTiles.length > 0 ||
+          Boolean(overlayMarks.regionBounds));
+      if (hoverObj || selObj || pulsing || outlinesNeedRebuild) {
+        rebuildOutlines();
+        outlinesNeedRebuild = false;
+      }
+      // Planar water / metal floor mirror (lights dimmed via intensity).
+      profiler.beginGpu();
+      const reflectNow = performance.now();
+      if (waterReflect && reflectionScheduler.shouldRender(reflectNow)) {
+        waterReflect.render(renderer, scene, camera);
+        reflectionScheduler.markRendered(reflectNow);
+      }
+      post.render();
+      profiler.endGpu();
+      profiler.endFrame(
+        profiler.isVisible() ? profilerExtras() : undefined,
+      );
+    } finally {
+      pointBake?.restore();
     }
-    // Planar water / metal floor mirror (lights dimmed via intensity).
-    if (waterReflect) {
-      waterReflect.render(renderer, scene, camera);
-    }
-    post.render();
   };
 
   const rebuildEmissiveMats = () => {
@@ -829,6 +1202,7 @@ export function createEditorThreePreview(
     );
     waterReflect.setResolution(res.width, res.height);
     waterReflect.bindMaterials(allReflect);
+    reflectionScheduler.markSceneDirty();
   };
 
   const pumpFrame = (now: number) => {
@@ -839,7 +1213,10 @@ export function createEditorThreePreview(
     const dt = Math.min(0.05, (now - lastFrameMs) / 1000);
     lastFrameMs = now;
     animTime += dt;
-    if (atmosAnim) atmosphere.tick(dt, animTime, camera);
+    if (atmosAnim) {
+      atmosphere.tick(dt, animTime, camera);
+      reflectionScheduler.markAnimationDirty();
+    }
     let torchChanged = false;
     if (lanternLights.length && lastLightCfg) {
       torchChanged = tickTorchFlicker(lanternLights, {
@@ -872,6 +1249,7 @@ export function createEditorThreePreview(
     ) {
       emissiveAnimAcc += dt;
     }
+    if (torchChanged) reflectionScheduler.markAnimationDirty();
     const pulsing =
       overlayMarks.pulseRegion &&
       (overlayMarks.regionTiles.length > 0 || Boolean(overlayMarks.regionBounds));
@@ -892,7 +1270,8 @@ export function createEditorThreePreview(
       pulsing ||
       emissiveDue ||
       waterAnim ||
-      modelOutlineAnim
+      modelOutlineAnim ||
+      profiler.isVisible()
     ) {
       needsFrame = false;
       renderOnce();
@@ -903,6 +1282,7 @@ export function createEditorThreePreview(
       emissiveAnim ||
       waterAnim ||
       modelOutlineAnim ||
+      profiler.isVisible() ||
       needsFrame
     ) {
       raf = requestAnimationFrame(pumpFrame);
@@ -933,6 +1313,8 @@ export function createEditorThreePreview(
     if (disposed) return;
     contextLost = false;
     lastFrameMs = performance.now();
+    invalidatePointLightShadows(lightRoot);
+    staticPointShadowBakePending = true;
     renderer.shadowMap.needsUpdate = true;
     scene.traverse((obj) => {
       if (!(obj instanceof THREE.Mesh || obj instanceof THREE.Sprite)) return;
@@ -968,12 +1350,13 @@ export function createEditorThreePreview(
     for (const o of modelOutlines) o.dispose();
     modelOutlines = [];
     modelOutlineAnim = false;
+    voxelInstanceBatches = [];
     clearObjectRoot(propRoot);
     const sprites = pack?.sprites ?? {};
     for (const p of m.sprites ?? []) {
       const def = sprites[p.spriteId];
       if (!def) continue;
-      const elev = tileSurfaceElev(m, p.x, p.y);
+      const elev = p.elev ?? tileSurfaceElev(m, p.x, p.y);
       const bill = createPixelBillboard(
         def,
         hexColorOr(def.color, "#c8a878"),
@@ -984,6 +1367,7 @@ export function createEditorThreePreview(
         elev * blockStoryHeight(m.tileSize) + m.tileSize * 0.45,
         (p.y + 0.5) * m.tileSize,
       );
+      applySpritePlacementScale(bill, p.scale);
       const n = normalizePixelSprite(def);
       if (n.emissivePixels && hasEmissiveInk(n.emissivePixels)) {
         const mat = bill.material as THREE.MeshBasicMaterial;
@@ -1007,14 +1391,52 @@ export function createEditorThreePreview(
     }
 
     const models = pack?.voxelModels ?? {};
+    const voxelBuckets = new Map<string, typeof m.voxelProps>();
     for (const p of m.voxelProps ?? []) {
       const model: EmberVoxelModel | undefined = models[p.modelId];
       if (!model) continue;
-      const elev = p.elev ?? tileSurfaceElev(m, p.x, p.y);
+      const directLightScale = p.directLightScale ?? model.directLightScale ?? "";
       const suppressHostShadow =
         p.emissiveSuppressHostShadow !== undefined
           ? p.emissiveSuppressHostShadow
           : model.emissiveSuppressHostShadow === true;
+      const key = `${p.modelId}:dls=${directLightScale}:shadow=${suppressHostShadow}`;
+      const bucket = voxelBuckets.get(key) ?? [];
+      bucket.push(p);
+      voxelBuckets.set(key, bucket);
+    }
+    for (const placements of voxelBuckets.values()) {
+      if (!placements?.length) continue;
+      const first = placements[0]!;
+      const model: EmberVoxelModel | undefined = models[first.modelId];
+      if (!model) continue;
+      const suppressHostShadow =
+        first.emissiveSuppressHostShadow !== undefined
+          ? first.emissiveSuppressHostShadow
+          : model.emissiveSuppressHostShadow === true;
+      if (placements.length > 1) {
+        const resolved = placements.map((placement) => ({
+          placement,
+          elev: placement.elev ?? tileSurfaceElev(m, placement.x, placement.y),
+        }));
+        const batch = createEditorVoxelInstanceBatch(
+          model,
+          m.tileSize,
+          resolved,
+          {
+            directLightScale:
+              first.directLightScale ?? model.directLightScale,
+            suppressCastShadow: suppressHostShadow,
+          },
+        );
+        if (batch) {
+          voxelInstanceBatches.push(batch);
+          propRoot.add(batch.root);
+          continue;
+        }
+      }
+      const p = first;
+      const elev = p.elev ?? tileSurfaceElev(m, p.x, p.y);
       const built = buildVoxelModelMesh(model, m.tileSize, {
         directLightScale: p.directLightScale ?? model.directLightScale,
         suppressCastShadow: suppressHostShadow,
@@ -1139,6 +1561,57 @@ export function createEditorThreePreview(
     return null;
   };
 
+  const billboardHitHasInk = (intersection: THREE.Intersection): boolean => {
+    const obj = intersection.object;
+    if (!(obj instanceof THREE.Mesh) || !obj.userData.yawBillboard) return true;
+    const material = Array.isArray(obj.material)
+      ? obj.material[0]
+      : obj.material;
+    const map =
+      material instanceof THREE.MeshBasicMaterial ? material.map : null;
+    const image = map?.image as HTMLCanvasElement | undefined;
+    if (!map || !image || !intersection.uv || !image.getContext) return true;
+    let pixels = billboardAlphaCache.get(image);
+    if (!pixels) {
+      const ctx = image.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return true;
+      pixels = ctx.getImageData(0, 0, image.width, image.height);
+      billboardAlphaCache.set(image, pixels);
+    }
+    const uv = intersection.uv.clone();
+    map.transformUv(uv);
+    const px = Math.max(0, Math.min(pixels.width - 1, Math.floor(uv.x * pixels.width)));
+    const py = Math.max(0, Math.min(pixels.height - 1, Math.floor(uv.y * pixels.height)));
+    return (pixels.data[(py * pixels.width + px) * 4 + 3] ?? 0) >= 96;
+  };
+
+  const pickObjectStackAt = (sx: number, sy: number): EditorPick[] => {
+    if (!map) return [];
+    applyCamera();
+    updateEditorDebugBillboards(debugRoot, camera);
+    updateYawBillboards(propRoot, camera);
+    ndc.x = (sx / viewW) * 2 - 1;
+    ndc.y = -(sy / viewH) * 2 + 1;
+    raycaster.setFromCamera(ndc, camera);
+    const picks: EditorPick[] = [];
+    const pushUnique = (pick: EditorPick | null) => {
+      if (!pick || picks.some((candidate) => picksMatch(candidate, pick))) return;
+      picks.push(pick);
+    };
+    for (const intersection of raycaster.intersectObject(propRoot, true)) {
+      if (!billboardHitHasInk(intersection)) continue;
+      pushUnique(findPickRoot(intersection.object, intersection.instanceId));
+    }
+    const story = pickBreakTargetAt(sx, sy);
+    if (story) {
+      pushUnique({ kind: "tile", tx: story.tx, ty: story.ty, elev: story.elev });
+    } else {
+      const tile = pickTileAt(sx, sy);
+      if (tile) pushUnique({ kind: "tile", tx: tile.tx, ty: tile.ty });
+    }
+    return picks;
+  };
+
   /**
    * Resolve a paint target like Minecraft:
    * 1) Prefer face adjacency when the ray hits terrain (top → above, side → neighbor).
@@ -1148,10 +1621,11 @@ export function createEditorThreePreview(
   const pickPlaceTargetAt = (
     sx: number,
     sy: number,
-    lockedElevRaw: number,
+    lockedElevRaw: number | null,
   ): PlacePreviewMark | null => {
     if (!map) return null;
-    const lockedElev = clampElevation(lockedElevRaw);
+    const surfaceMode = lockedElevRaw == null;
+    const lockedElev = clampElevation(lockedElevRaw ?? 0);
     const ts = map.tileSize;
     const storyH = blockStoryHeight(ts);
     applyCamera();
@@ -1173,6 +1647,7 @@ export function createEditorThreePreview(
         const p = hitInfo.point;
         let tx = Math.floor(p.x / ts);
         let ty = Math.floor(p.z / ts);
+        const hitStory = clampElevation(elevFromWorldY(p.y, storyH));
         // Side face → step into the adjacent cell (Minecraft attach).
         if (Math.abs(faceNormal.y) < 0.55) {
           if (Math.abs(faceNormal.x) >= Math.abs(faceNormal.z)) {
@@ -1182,8 +1657,7 @@ export function createEditorThreePreview(
           }
         } else if (faceNormal.y > 0.55) {
           // Top face: if lock matches this story, place on top (Minecraft +1).
-          const hitStory = clampElevation(elevFromWorldY(p.y, storyH));
-          if (lockedElev === hitStory) {
+          if (surfaceMode || lockedElev === hitStory) {
             const above = clampElevation(hitStory + 1);
             if (inBounds(tx, ty)) {
               return { tx, ty, elev: above };
@@ -1193,9 +1667,24 @@ export function createEditorThreePreview(
           // Bottom face → cell below in XY stays; elev still locked.
         }
         if (inBounds(tx, ty)) {
-          return { tx, ty, elev: lockedElev };
+          return {
+            tx,
+            ty,
+            elev: surfaceMode ? hitStory : lockedElev,
+          };
         }
       }
+    }
+
+    if (surfaceMode) {
+      const tile = pickTileAt(sx, sy);
+      return tile
+        ? {
+            tx: tile.tx,
+            ty: tile.ty,
+            elev: tileSurfaceElev(map, tile.tx, tile.ty),
+          }
+        : null;
     }
 
     // Locked height plane — top of the locked elev story (matches props/water).
@@ -1350,7 +1839,8 @@ export function createEditorThreePreview(
         d: map.height * map.tileSize,
       });
 
-      const terrainDirty = terrainSig !== lastTerrainSig;
+      const tilesetDirty = tileset !== lastTileset;
+      const terrainDirty = terrainSig !== lastTerrainSig || tilesetDirty;
       const propsStructDirty = propsStructSig !== lastPropsStructSig;
       const propsPoseDirty = propsPoseSig !== lastPropsPoseSig;
       const lightDirty = lightSig !== lastLightSig;
@@ -1365,21 +1855,37 @@ export function createEditorThreePreview(
         hasPlacements && propRoot.children.length === 0;
 
       if (terrainDirty) {
-        if (mapGroup) {
-          scene.remove(mapGroup);
-          disposeVoxelMesh(mapGroup);
-          mapGroup = null;
+        if (!terrainChunks) {
+          terrainChunks = createChunkedVoxelTerrain(map, tileset, {
+            deferInitial: true,
+            // Trigger/flicker tiles have no player state in the map editor.
+            // Sharing their materials collapses thousands of per-cell meshes.
+            perCellEmissiveMaterials: false,
+          });
+          mapGroup = terrainChunks.group;
+          scene.add(mapGroup);
         }
-        const built = buildVoxelMesh(map, tileset);
-        mapGroup = built.group;
-        scene.add(mapGroup);
-        lastLightCenter = built.center.clone();
+        terrainChunks.scheduleUpdate(map, tileset, (complete) => {
+          invalidatePointLightShadows(lightRoot);
+          staticPointShadowBakePending = true;
+          renderer.shadowMap.needsUpdate = true;
+          reflectionScheduler.markSceneDirty();
+          outlinesNeedRebuild = true;
+          if (complete && terrainChunks) {
+            lastLightCenter = terrainChunks.center.clone();
+            rebuildEmissiveMats();
+            rebuildWaterMats();
+            applyLookPreview();
+          }
+          requestRender();
+        });
+        lastLightCenter = terrainChunks.center.clone();
 
         const mapKey = `${map.id}:${map.width}x${map.height}:${map.tileSize}`;
         const viewChanged = lastViewMode !== layout.viewMode;
         const mapIdentityChanged = lastMapKey !== mapKey;
         if (!camReady || mapIdentityChanged) {
-          target.copy(built.center);
+          target.copy(terrainChunks.center);
           zoomDist = THREE.MathUtils.clamp(
             Math.max(map.width, map.height) * map.tileSize * 0.7,
             90,
@@ -1399,9 +1905,11 @@ export function createEditorThreePreview(
       }
 
       lastTileset = tileset;
+      if (lastPack !== pack) assetPlacementPreviewKey = "";
       lastPack = pack;
       lastMapW = map.width * map.tileSize;
       lastMapD = map.height * map.tileSize;
+      updateAssetPlacementPreview();
       const lightCfg = resolveMapLight(map);
       lastLightCfg = lightCfg;
       lastAtmosphere = lightCfg.atmosphere;
@@ -1430,6 +1938,20 @@ export function createEditorThreePreview(
         lastPropsPoseSig = propsPoseSig;
       } else {
         lastPackAssetsSig = packAssetsSig;
+      }
+
+      if (
+        terrainDirty ||
+        propsStructDirty ||
+        propsPoseDirty ||
+        packAssetsDirty ||
+        propsMissing ||
+        lightDirty
+      ) {
+        invalidatePointLightShadows(lightRoot);
+        staticPointShadowBakePending = true;
+        renderer.shadowMap.needsUpdate = true;
+        reflectionScheduler.markSceneDirty();
       }
 
       // Fill/lantern lights depend on terrain + lamp list + prop *structure*
@@ -1521,39 +2043,26 @@ export function createEditorThreePreview(
     pickPlaceTarget(sx, sy, lockedElev) {
       return pickPlaceTargetAt(sx, sy, lockedElev);
     },
+    pickSurfaceTarget(sx, sy) {
+      return pickPlaceTargetAt(sx, sy, null);
+    },
     pickBreakTarget(sx, sy) {
       return pickBreakTargetAt(sx, sy);
     },
     pickObject(sx, sy) {
-      if (!map) return null;
-      applyCamera();
-      updateYawBillboards(propRoot, camera);
-      ndc.x = (sx / viewW) * 2 - 1;
-      ndc.y = -(sy / viewH) * 2 + 1;
-      raycaster.setFromCamera(ndc, camera);
-      const propHits = raycaster.intersectObject(propRoot, true);
-      if (propHits[0]) {
-        const pick = findPickRoot(propHits[0].object);
-        if (pick) return pick;
-      }
-      // Prefer the occupied story the ray hits (middle blocks in a column).
-      const story = pickBreakTargetAt(sx, sy);
-      if (story) {
-        return {
-          kind: "tile" as const,
-          tx: story.tx,
-          ty: story.ty,
-          elev: story.elev,
-        };
-      }
-      // Empty ground only — never invent a story cube in a vacant neighbor.
-      const tile = pickTileAt(sx, sy);
-      if (!tile) return null;
-      return { kind: "tile", tx: tile.tx, ty: tile.ty };
+      return pickObjectStackAt(sx, sy)[0] ?? null;
+    },
+    pickObjectStack(sx, sy) {
+      return pickObjectStackAt(sx, sy);
     },
     setOverlayMarks(marks) {
       if (marks.hover !== undefined) overlayMarks.hover = marks.hover;
       if (marks.selected !== undefined) overlayMarks.selected = marks.selected;
+      if (marks.selectedMany !== undefined) {
+        overlayMarks.selectedMany = marks.selectedMany
+          ? marks.selectedMany.map((pick) => ({ ...pick }))
+          : [];
+      }
       if (marks.selectTiles !== undefined) {
         overlayMarks.selectTiles = marks.selectTiles
           ? marks.selectTiles.map((c) => ({ tx: c.tx, ty: c.ty }))
@@ -1595,6 +2104,11 @@ export function createEditorThreePreview(
       outlinesNeedRebuild = true;
       requestRender();
     },
+    setAssetPlacementPreview(preview) {
+      assetPlacementPreview = preview ? { ...preview } : null;
+      updateAssetPlacementPreview();
+      requestRender();
+    },
     setDebugOverlays(flags) {
       if (
         debugFlags.showCollision === flags.showCollision &&
@@ -1622,6 +2136,13 @@ export function createEditorThreePreview(
       if (lookPreview === visible) return;
       lookPreview = visible;
       applyLookPreview();
+      requestRender();
+    },
+    rebuildStaticShadows() {
+      invalidatePointLightShadows(lightRoot);
+      staticPointShadowBakePending = true;
+      renderer.shadowMap.needsUpdate = true;
+      reflectionScheduler.markSceneDirty();
       requestRender();
     },
     focusTile(tx, ty) {
@@ -1682,19 +2203,24 @@ export function createEditorThreePreview(
       if (raf) cancelAnimationFrame(raf);
       raf = 0;
       transformGizmo.dispose();
+      profiler.dispose();
       post.dispose();
       atmosphere.dispose();
       if (mapGroup) {
         scene.remove(mapGroup);
-        disposeVoxelMesh(mapGroup);
+        terrainChunks?.dispose();
+        terrainChunks = null;
+        mapGroup = null;
       }
       clearLightRoot(lightRoot);
       for (const o of modelOutlines) o.dispose();
       modelOutlines = [];
       modelOutlineAnim = false;
+      voxelInstanceBatches = [];
       waterReflect?.dispose();
       waterReflect = null;
       clearObjectRoot(propRoot);
+      clearAssetPlacementPreview();
       clearOutlineRoot(outlineRoot);
       clearDebugOverlayRoot(debugRoot);
       renderer.domElement.removeEventListener(

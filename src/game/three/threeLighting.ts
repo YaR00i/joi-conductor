@@ -5,6 +5,8 @@
  * Three AmbientLight uses the color as the light itself, so we remap:
  * fill stays readable; ambientAlpha deepens night; lamps scale with lampPower.
  * Global shadows come from the key DirectionalLight (sun/moon).
+ * Play and editor both use one map-wide cached ortho; local PointLights add
+ * light on top of the baked umbra. Do not fit a follow volume to the player.
  *
  * Per-lamp params mirror canvas flood (`lampStrengthAtDist`):
  * - lampRange → outer rim cutoff in tiles → PointLight.distance
@@ -23,10 +25,12 @@ import {
   type ResolvedLanternParams,
   type ResolvedMapLight,
 } from "../tile/mapUtils";
+import { MAP_POINT_LIGHTS_MAX } from "../tile/lightLimits";
+import { applyDirectionalShadowBias } from "./dynamicShadowPolicy";
 
 export const THREE_MAX_LAMPS = 32;
-/** Strongest N lamps cast cube shadows (occlusion through walls). */
-export const THREE_MAX_LAMP_SHADOWS = 6;
+/** Every authored lamp can keep a baked cube; dynamic updates stay pooled. */
+export const THREE_MAX_LAMP_SHADOWS = MAP_POINT_LIGHTS_MAX;
 
 /**
  * Pack core/mid fractions of cutoff into PointLight.decay for the toon
@@ -65,6 +69,13 @@ export type ThreeLightBuildOpts = {
   shadowMapSize?: number;
   tileset: Parameters<typeof listLanternSources>[1];
   sprites?: Parameters<typeof listLanternSources>[2];
+  /** Optional tile-space runtime window for local lamp streaming. */
+  sourceBounds?: { x0: number; y0: number; x1: number; y1: number };
+  /**
+   * When set, cube-shadow slots go to lamps nearest this world-space point
+   * (explore street lanterns). Default ranks by authored strength.
+   */
+  shadowFocus?: THREE.Vector3;
 };
 
 export type FillLightOpts = {
@@ -109,13 +120,9 @@ function configureDirectionalShadow(
   mapSize: number,
 ): void {
   key.castShadow = true;
-  const res = Math.max(1024, Math.min(4096, mapSize));
+  const res = Math.max(128, Math.min(1024, mapSize));
   key.shadow.mapSize.set(res, res);
-  // World unit ≈ 1 voxel. Avoid large negative bias (peter-panning / gaps).
-  key.shadow.bias = -0.00005;
-  key.shadow.normalBias = 0.28;
-  // Hard cartoon umbra (no soft PCF blur).
-  key.shadow.radius = 0;
+  applyDirectionalShadowBias(key);
   // Tight ortho → more texels per world unit → fewer stair-step umbras.
   const half = Math.max(40, span * 0.52 + 16);
   const cam = key.shadow.camera;
@@ -261,7 +268,16 @@ export function addThreeLanternLights(
     ),
   );
   const lampShadowMap = Math.max(128, opts.shadowMapSize ?? 1024);
-  const lamps = listLanternSources(map, tileset, sprites);
+  const allLamps = listLanternSources(map, tileset, sprites);
+  const lamps = opts.sourceBounds
+    ? allLamps.filter(
+        (lamp) =>
+          lamp.x >= opts.sourceBounds!.x0 &&
+          lamp.y >= opts.sourceBounds!.y0 &&
+          lamp.x < opts.sourceBounds!.x1 &&
+          lamp.y < opts.sourceBounds!.y1,
+      )
+    : allLamps;
   const storyH = WALL_HEIGHT;
   const ts = map.tileSize;
   const outLights: THREE.PointLight[] = [];
@@ -270,16 +286,21 @@ export function addThreeLanternLights(
     pl.castShadow = true;
     pl.shadow.mapSize.set(mapSize, mapSize);
     // Seal umbra fully — any intensity < 1 lets disc rings bleed past walls.
-    pl.shadow.bias = -0.00035;
-    pl.shadow.normalBias = Math.max(0.06, ts * 0.01);
-    pl.shadow.camera.near = Math.max(0.35, ts * 0.05);
-    pl.shadow.camera.far = Math.max(pl.distance * 1.05, ts * 2);
+    pl.shadow.bias = -0.0002;
+    // A tile-relative 0.01 normalBias was larger than a voxel on common maps,
+    // detaching or fully erasing self-shadow on small lamp props.
+    pl.shadow.normalBias = Math.max(0.035, Math.min(0.1, ts * 0.005));
+    pl.shadow.camera.near = Math.max(0.08, Math.min(0.25, ts * 0.0125));
+    // Bake static occluders beyond the largest torch rim. The live cutoff can
+    // breathe inside this fixed volume without rebuilding six cube faces.
+    pl.shadow.camera.far = Math.max(pl.distance * 1.5, ts * 2);
     pl.shadow.camera.updateProjectionMatrix();
     pl.shadow.radius = 0; // hard umbra with BasicShadowMap
     pl.shadow.intensity = 1;
   };
 
   const addLamp = (
+    sourceId: string,
     params: ResolvedLanternParams,
     x: number,
     floorY: number,
@@ -299,6 +320,7 @@ export function addThreeLanternLights(
     const pl = new THREE.PointLight(color, intensity, distance, decay);
     pl.position.set(x, lightY, z);
     const lampUd: Record<string, unknown> = {
+      sourceId,
       rangeTiles: params.lampRange,
       discCoreTiles: params.lampDiscCore,
       discMidTiles: params.lampDiscMid,
@@ -314,6 +336,7 @@ export function addThreeLanternLights(
       seed,
     };
     pl.userData.emberLamp = lampUd;
+    pl.userData.emberShadowRequested = shadows;
     if (withShadow) enableLampShadow(pl, lampShadowMap);
     root.add(pl);
     outLights.push(pl);
@@ -340,37 +363,29 @@ export function addThreeLanternLights(
     }
   };
 
-  if (lamps.length === 0) {
-    addLamp(
-      {
-        lampColor: light.lampColor,
-        lampFaceColor: light.lampFaceColor,
-        lampRange: light.lampRange,
-        lampDiscCore: light.lampDiscCore,
-        lampDiscMid: light.lampDiscMid,
-        lampHeight: light.lampHeight,
-        lampShowCore: light.lampShowCore,
-        lampStrength0: light.lampStrength0,
-        lampStrengthFalloff: light.lampStrengthFalloff,
-        lampTorchFlicker: light.lampTorchFlicker,
-      },
-      opts.center.x,
-      0,
-      opts.center.z,
-      shadows && maxShadows > 0,
-      0x51f1c3e,
-    );
-    return outLights;
-  }
+  // No authored/implicit sources means no local PointLight. Older builds
+  // spawned a synthetic lamp at map center here; it was absent from map data,
+  // impossible to select and appeared immediately after deleting the last
+  // real source.
+  if (allLamps.length === 0) return outLights;
 
-  // Strongest lamps first get the scarce shadow slots.
-  const ranked = [...lamps].sort(
-    (a, b) => b.params.lampStrength0 - a.params.lampStrength0,
-  );
+  // Strongest lamps first get the scarce shadow slots, unless explore
+  // streaming asked for nearest-to-player street cubes.
+  const ranked = [...lamps].sort((a, b) => {
+    if (opts.shadowFocus) {
+      const focus = opts.shadowFocus;
+      const ax = (a.x + 0.5) * ts - focus.x;
+      const az = (a.y + 0.5) * ts - focus.z;
+      const bx = (b.x + 0.5) * ts - focus.x;
+      const bz = (b.y + 0.5) * ts - focus.z;
+      return ax * ax + az * az - (bx * bx + bz * bz);
+    }
+    return b.params.lampStrength0 - a.params.lampStrength0;
+  });
 
   let shadowSlots = shadows ? maxShadows : 0;
   for (const lamp of ranked.slice(0, maxLamps)) {
-    const elev = tileSurfaceElev(map, lamp.x, lamp.y);
+    const elev = lamp.elev ?? tileSurfaceElev(map, lamp.x, lamp.y);
     const withShadow = shadowSlots > 0;
     if (withShadow) shadowSlots -= 1;
     const floorY = elev * storyH;
@@ -378,6 +393,7 @@ export function addThreeLanternLights(
       ((lamp.x * 73856093) ^ (lamp.y * 19349663) ^ lamp.id.length * 83492791) |
       0;
     addLamp(
+      lamp.id,
       lamp.params,
       (lamp.x + 0.5) * ts,
       floorY,

@@ -32,6 +32,8 @@ const REGION_COLOR: Record<string, number> = {
   teleport: 0xe0a0ff,
   camera_bound: 0x88c8ff,
   trigger: 0x88aaff,
+  npc_idle: 0x9ad4ff,
+  npc_wander: 0x7ec8e8,
 };
 
 /** Shared sprite materials for wall-height digits (not disposed per rebuild). */
@@ -77,6 +79,7 @@ export function clearDebugOverlayRoot(root: THREE.Object3D): void {
     root.remove(c);
     disposeTree(c);
   }
+  root.userData.editorDebugBillboardsDirty = true;
 }
 
 function pushBoxEdges(
@@ -382,6 +385,87 @@ function getHeightLabelMaterial(text: string): THREE.SpriteMaterial {
   return mat;
 }
 
+type DebugBillboard = Readonly<{
+  text: string;
+  position: THREE.Vector3;
+  size: number;
+}>;
+
+function addBillboardLabels(
+  root: THREE.Object3D,
+  name: string,
+  labels: readonly DebugBillboard[],
+): void {
+  const buckets = new Map<string, DebugBillboard[]>();
+  for (const label of labels) {
+    const bucket = buckets.get(label.text);
+    if (bucket) bucket.push(label);
+    else buckets.set(label.text, [label]);
+  }
+  for (const [text, bucket] of buckets) {
+    const spriteMat = getHeightLabelMaterial(text);
+    const material = new THREE.MeshBasicMaterial({
+      map: spriteMat.map,
+      color: spriteMat.color,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+      side: THREE.DoubleSide,
+    });
+    const instances = new THREE.InstancedMesh(
+      new THREE.PlaneGeometry(1, 1),
+      material,
+      bucket.length,
+    );
+    instances.name = `${name}:${text}`;
+    instances.renderOrder = 29;
+    instances.frustumCulled = false;
+    instances.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    instances.userData.editorDebugBillboards = bucket;
+    root.add(instances);
+  }
+  root.userData.editorDebugBillboardsDirty = true;
+}
+
+const _billboardMatrix = new THREE.Matrix4();
+const _billboardScale = new THREE.Vector3();
+
+/** Reorient batched debug labels only when the editor camera actually moves. */
+export function updateEditorDebugBillboards(
+  root: THREE.Object3D,
+  camera: THREE.Camera,
+): void {
+  const last = root.userData.editorDebugBillboardQuaternion as
+    | THREE.Quaternion
+    | undefined;
+  const dirty = root.userData.editorDebugBillboardsDirty === true;
+  if (!dirty && last?.angleTo(camera.quaternion) === 0) return;
+  if (last) last.copy(camera.quaternion);
+  else root.userData.editorDebugBillboardQuaternion = camera.quaternion.clone();
+  root.userData.editorDebugBillboardsDirty = false;
+  root.traverse((object) => {
+    if (!(object instanceof THREE.InstancedMesh)) return;
+    const labels = object.userData.editorDebugBillboards as
+      | DebugBillboard[]
+      | undefined;
+    if (!labels) return;
+    for (let index = 0; index < labels.length; index++) {
+      const label = labels[index]!;
+      _billboardScale.set(label.size, label.size, 1);
+      _billboardMatrix.compose(
+        label.position,
+        camera.quaternion,
+        _billboardScale,
+      );
+      object.setMatrixAt(index, _billboardMatrix);
+    }
+    object.instanceMatrix.needsUpdate = true;
+    object.computeBoundingBox();
+    object.computeBoundingSphere();
+  });
+}
+
 function addWallHeightLabels(
   root: THREE.Object3D,
   map: EmberMap,
@@ -390,28 +474,22 @@ function addWallHeightLabels(
   if (cells.length === 0) return;
   const ts = map.tileSize;
   const storyH = blockStoryHeight(ts);
-  const labels = new THREE.Group();
-  labels.name = "wallHeightLabels";
-  labels.renderOrder = 28;
-
+  const labels: DebugBillboard[] = [];
   for (const c of cells) {
     const text = wallHeightLabelText(c.voxH);
-    const mat = getHeightLabelMaterial(text);
-    const sprite = new THREE.Sprite(mat);
     const topY = tileSurfaceElev(map, c.tx, c.ty) * storyH + 2.2;
-    // Center of the top face — one digit per cell, no corner pile-up.
-    sprite.position.set(
-      (c.tx + 0.5) * ts,
-      topY,
-      (c.ty + 0.5) * ts,
-    );
     const s = ts * (text.length > 2 ? 0.48 : 0.42);
-    sprite.scale.set(s, s, 1);
-    sprite.frustumCulled = false;
-    sprite.renderOrder = 28;
-    labels.add(sprite);
+    labels.push({
+      text,
+      position: new THREE.Vector3(
+        (c.tx + 0.5) * ts,
+        topY,
+        (c.ty + 0.5) * ts,
+      ),
+      size: s,
+    });
   }
-  root.add(labels);
+  addBillboardLabels(root, "wallHeightLabels", labels);
 }
 
 type SemanticMarker = {
@@ -460,25 +538,20 @@ function addSemanticLabels(
   if (markers.length === 0) return;
   const ts = map.tileSize;
   const storyH = blockStoryHeight(ts);
-  const labels = new THREE.Group();
-  labels.name = "semanticTileLabels";
-  labels.renderOrder = 29;
-
+  const labels: DebugBillboard[] = [];
   for (const marker of markers) {
-    const mat = getHeightLabelMaterial(marker.label);
-    const sprite = new THREE.Sprite(mat);
-    sprite.position.set(
-      (marker.tx + 0.5) * ts,
-      tileSurfaceElev(map, marker.tx, marker.ty) * storyH + 2.65,
-      (marker.ty + 0.5) * ts,
-    );
     const s = ts * (marker.label.length > 1 ? 0.5 : 0.42);
-    sprite.scale.set(s, s, 1);
-    sprite.frustumCulled = false;
-    sprite.renderOrder = 29;
-    labels.add(sprite);
+    labels.push({
+      text: marker.label,
+      position: new THREE.Vector3(
+        (marker.tx + 0.5) * ts,
+        tileSurfaceElev(map, marker.tx, marker.ty) * storyH + 2.65,
+        (marker.ty + 0.5) * ts,
+      ),
+      size: s,
+    });
   }
-  root.add(labels);
+  addBillboardLabels(root, "semanticTileLabels", labels);
 }
 
 function addRegionRectEdges(

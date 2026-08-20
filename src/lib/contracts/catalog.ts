@@ -302,7 +302,7 @@ export const CONTRACT_CATALOG: ContractDef[] = [
     nameRu: "Fap Roulette · таймер",
     briefRu: "Минуты на рулетке",
     instructionRu:
-      "faproulette.co: {minutes} минут крути рулетку и дрочи по выпавшим картинкам. Нельзя залипать на одном кадре дольше 2 минут — новый Roll. Без оргазма. Таймер на виду.",
+      "Открой faproulette.co в браузере. {minutes} минут: Roll → читай инструкцию кадра → дрочи по картинке. Нельзя залипать на одном кадре дольше 2 минут — новый бросок. Оргазм / руин = провал. Таймер на виду.",
     difficulty: 1,
     durationHintMin: 30,
     rewardMin: 10,
@@ -381,6 +381,66 @@ export const CONTRACT_CATALOG: ContractDef[] = [
     biasHints: ["media", "stroke", "cei"],
     kind: "finish_debrief",
     finishDebriefPreset: "faproulette",
+  },
+  {
+    id: "media_hypnotube_timer",
+    category: "media",
+    nameRu: "Hypnotube · таймер",
+    briefRu: "Ролик на сайте, не в приложении",
+    instructionRu:
+      "Открой hypnotube.com (или зеркало). Выбери одно hypno/JOI-видео. {minutes} минут смотри и дрочи по инструкции ролика. Пауза = руки прочь. Оргазм / руин = провал. Потом доложи, сколько эджей удержал.",
+    difficulty: 2,
+    durationHintMin: 30,
+    rewardMin: 12,
+    rewardMax: 22,
+    rolls: { minutes: [10, 15, 20] },
+    biasHints: ["media", "stroke"],
+    requireActivityDebrief: true,
+  },
+  {
+    id: "media_hypnotube_loop",
+    category: "media",
+    nameRu: "Hypnotube · петля",
+    briefRu: "Один ролик {n} раз",
+    instructionRu:
+      "hypnotube.com: одно видео. Прокрути его {n} раз подряд (или {minutes} мин, что позже). Каждый проход — полный follow голосовых команд, без перемотки «скучных» кусков. Финиш с ролика игнорируй. Оргазм = провал.",
+    difficulty: 2,
+    durationHintMin: 35,
+    rewardMin: 14,
+    rewardMax: 24,
+    rolls: { n: [2, 3, 4], minutes: [12, 18, 24] },
+    biasHints: ["media", "stroke"],
+    requireActivityDebrief: true,
+  },
+  {
+    id: "media_joi_site_follow",
+    category: "media",
+    nameRu: "JOI-сайт · следовать",
+    briefRu: "Голос с сайта — закон",
+    instructionRu:
+      "Открой JOI на hypnotube / joi.how / похожем сайте (не плейлист в приложении). {minutes} минут делай ровно то, что говорит голос: темп, hands-off, край. Если велит кончить — только эдж, финиш запрещён. Оргазм = провал.",
+    difficulty: 2,
+    durationHintMin: 30,
+    rewardMin: 12,
+    rewardMax: 22,
+    rolls: { minutes: [12, 18, 25] },
+    biasHints: ["media", "stroke", "edge"],
+    requireActivityDebrief: true,
+  },
+  {
+    id: "media_joi_site_finish",
+    category: "media",
+    nameRu: "JOI-сайт · право финала",
+    briefRu: "Отыграл ролик — можно кончить",
+    instructionRu:
+      "Полный JOI-ролик на hypnotube / joi.how до титров, без перемотки финала. Честно следуй голосу. После — «Доложить финал»: как кончил. Награда от нуля до бонуса — по ответам.",
+    difficulty: 2,
+    durationHintMin: 35,
+    rewardMin: 12,
+    rewardMax: 22,
+    biasHints: ["media", "stroke"],
+    kind: "finish_debrief",
+    finishDebriefPreset: "choice",
   },
 
   // —— CBT ——
@@ -752,6 +812,21 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   },
 
   // —— Body ——
+  {
+    id: "body_daily_exercise",
+    category: "body",
+    nameRu: "Зарядка дня",
+    briefRu: "Приседания / отжимания",
+    instructionRu:
+      "Не сессия Conductor. Сделай {n} приседаний и {taps} отжиманий (или планка {sec} сек вместо отжиманий). Считай вслух. Между подходами — дыхание, не дрочка. Оргазм = провал.",
+    difficulty: 1,
+    durationHintMin: 15,
+    rewardMin: 8,
+    rewardMax: 16,
+    rolls: { n: [20, 30, 40], taps: [10, 15, 20], sec: [40, 60, 90] },
+    biasHints: ["body"],
+    requireActivityDebrief: true,
+  },
   {
     id: "body_nipples_x3",
     category: "body",
@@ -1163,6 +1238,24 @@ for (const def of CONTRACT_CATALOG) {
   ) {
     def.durationLimitMin = def.durationHintMin;
   }
+}
+
+/** Daily habits: exercise / cage / plug. Forced onto the 5-contract board. */
+export const HABIT_CONTRACT_IDS: ReadonlySet<string> = new Set([
+  "body_daily_exercise",
+  "role_brat_pushups",
+  "anal_workout_plug",
+  "anal_walk_plug",
+  "anal_plug_hours",
+  "chastity_locked_hours",
+]);
+
+export function isHabitContractId(
+  defId: string,
+  clonedFrom?: string,
+): boolean {
+  if (HABIT_CONTRACT_IDS.has(defId)) return true;
+  return Boolean(clonedFrom && HABIT_CONTRACT_IDS.has(clonedFrom));
 }
 
 export function getContractDef(id: string): ContractDef | undefined {

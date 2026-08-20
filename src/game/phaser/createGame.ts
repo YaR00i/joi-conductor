@@ -60,6 +60,8 @@ export function createEmberPhaserGame(opts: CreateEmberGameOpts): EmberGameApi {
   const scene = () => game.scene.getScene("ArenaScene") as ArenaScene | null;
 
   return {
+    ready: Promise.resolve(),
+    lockLook: () => undefined,
     pause: () => scene()?.pauseLogic(),
     resume: () => scene()?.resumeLogic(),
     applyLoot: (itemId: string) => scene()?.applyLoot(itemId),

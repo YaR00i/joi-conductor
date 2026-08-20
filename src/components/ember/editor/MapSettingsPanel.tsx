@@ -12,15 +12,23 @@ import {
   looksFileFromPresets,
   newLookPresetId,
   normalizeLookPreset,
-  writeEmberJson,
-  type EmberLookPreset,
-  type EmberPack,
-} from "../../../game";
-import type { EmberMapLight } from "../../../game/content/types";
+} from "../../../game/content/lookPresets";
+import { writeEmberJson } from "../../../game/content/io";
+import type {
+  EmberLookPreset,
+  EmberMapLight,
+  EmberMapPlayProfile,
+  EmberPack,
+} from "../../../game/content/types";
+import {
+  resolveMapAutoAttack,
+  resolveMapPlayProfile,
+} from "../../../game/content/playProfile";
 import {
   DEFAULT_MAP_ATMOSPHERE,
   DEFAULT_MAP_GRADE,
   DEFAULT_MAP_LIGHT,
+  omitUnsetLightBudget,
   type ResolvedMapAtmosphere,
   type ResolvedMapGrade,
   type ResolvedMapLight,
@@ -30,6 +38,10 @@ type Props = {
   globalLight: ResolvedMapLight;
   onCommitGlobal: (light: EmberMapLight) => void;
   onResetGlobal: () => void;
+  playProfile?: EmberMapPlayProfile;
+  onCommitPlayProfile?: (profile: EmberMapPlayProfile) => void;
+  autoAttack?: boolean;
+  onCommitAutoAttack?: (enabled: boolean) => void;
   pack?: EmberPack;
   onPackChange?: (pack: EmberPack) => void;
   onSaved?: (msg: string) => void;
@@ -43,6 +55,10 @@ export function MapSettingsPanel({
   globalLight,
   onCommitGlobal,
   onResetGlobal,
+  playProfile,
+  onCommitPlayProfile,
+  autoAttack,
+  onCommitAutoAttack,
   pack,
   onPackChange,
   onSaved,
@@ -71,10 +87,10 @@ export function MapSettingsPanel({
     const next = { ...draftRef.current, ...partial };
     draftRef.current = next;
     setDraft(next);
-    onCommitGlobal(next);
+    onCommitGlobal(omitUnsetLightBudget(next));
   };
 
-  const flushGlobal = () => onCommitGlobal({ ...draftRef.current });
+  const flushGlobal = () => onCommitGlobal(omitUnsetLightBudget(draftRef.current));
 
   const onGlobalRange =
     (key: keyof ResolvedMapLight) => (e: ChangeEvent<HTMLInputElement>) => {
@@ -102,8 +118,8 @@ export function MapSettingsPanel({
       patchGlobal({ atmosphere });
     };
 
-  const flushGrade = () => onCommitGlobal({ ...draftRef.current });
-  const flushAtmos = () => onCommitGlobal({ ...draftRef.current });
+  const flushGrade = () => onCommitGlobal(omitUnsetLightBudget(draftRef.current));
+  const flushAtmos = () => onCommitGlobal(omitUnsetLightBudget(draftRef.current));
 
   const applyLook = (preset: EmberLookPreset, msg?: string) => {
     onCommitGlobal(applyLookPresetToLight(draftRef.current, preset));
@@ -183,6 +199,11 @@ export function MapSettingsPanel({
   };
 
   const atm = draft.atmosphere;
+  const resolvedProfile = resolveMapPlayProfile({ playProfile });
+  const resolvedAutoAttack = resolveMapAutoAttack({
+    playProfile,
+    autoAttack,
+  });
 
   return (
     <div className="ember-map-settings">
@@ -212,6 +233,58 @@ export function MapSettingsPanel({
       <p className="muted ember-hint">
         Ночь, солнце, картинка и атмосфера всей сцены. Фонари — вкладка «Свет».
       </p>
+
+      {onCommitPlayProfile ? (
+        <section className="ember-map-settings__section">
+          <div className="ember-map-settings__section-head">
+            <h4>Режим игры</h4>
+          </div>
+          <p className="muted ember-hint">
+            Арена — бой и толпа. Исследование — деревня, свет, мало NPC.
+          </p>
+          <div
+            className="ember-map-settings__presets"
+            role="group"
+            aria-label="Режим карты"
+          >
+            <button
+              type="button"
+              className={`ghost ember-chip--sm${resolvedProfile === "arena" ? " is-active" : ""}`}
+              aria-pressed={resolvedProfile === "arena"}
+              onClick={() => onCommitPlayProfile("arena")}
+            >
+              Арена
+            </button>
+            <button
+              type="button"
+              className={`ghost ember-chip--sm${resolvedProfile === "explore" ? " is-active" : ""}`}
+              aria-pressed={resolvedProfile === "explore"}
+              onClick={() => onCommitPlayProfile("explore")}
+            >
+              Исследование
+            </button>
+          </div>
+          {onCommitAutoAttack ? (
+            <>
+              <label className="ember-map-settings__field ember-map-settings__field--full">
+                <span>Автоатака оружием</span>
+                <input
+                  type="checkbox"
+                  checked={resolvedAutoAttack}
+                  onChange={(event) =>
+                    onCommitAutoAttack(event.target.checked)
+                  }
+                />
+                <strong>{resolvedAutoAttack ? "вкл" : "выкл"}</strong>
+              </label>
+              <p className="muted ember-hint">
+                Если выключено, выстрел или удар выполняется вручную по ЛКМ.
+                Для «Исследования» автоатака по умолчанию выключена.
+              </p>
+            </>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="ember-map-settings__section">
         <div className="ember-map-settings__section-head">

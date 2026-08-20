@@ -1,23 +1,27 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { FavMasonryMedia } from "../components/FavMasonryMedia";
+import { FavTagChip } from "../components/FavTagChip";
 import type { NavId } from "../components/SideNav";
 import { TastePassportPanel } from "../components/TastePassportPanel";
 import { TagTypePickerModal } from "../components/TagTypePickerModal";
+import {
+  tagPurchaseStatus,
+  type ContentUnlockLists,
+} from "../lib/contentUnlocks";
 import { buildFavoriteTasteProfile } from "../lib/favoriteTagTaste";
+import type { MediaItem } from "../lib/media";
 import {
   collectFavoriteTagStats,
-  favoriteMatchesTagFilter,
+  filterFavoriteMetadata,
   listFavoriteMetadata,
-  listFavoriteRecordsPaged,
+  listFavoriteRecordsByIds,
   removeFavorite,
   revokeFavoriteMedia,
+  type FavoriteKindFilter,
   type FavoriteMetadata,
   type FavoriteRecord,
 } from "../lib/mediaFavorites";
-import type { MediaItem } from "../lib/media";
-import {
-  buildTastePassportView,
-  favoritesTasteLoopCtas,
-} from "../lib/tasteLoopDisplay";
+import { setShopFocusTag } from "../lib/shopFocus";
 import {
   getTagType,
   groupTagsByType,
@@ -27,12 +31,18 @@ import {
   type TagTypeId,
   type TagTypeMap,
 } from "../lib/tagTypes";
+import {
+  buildTastePassportView,
+  favoritesTasteLoopCtas,
+} from "../lib/tasteLoopDisplay";
 import { playUiClick, playUiConfirm, primeUiAudio } from "../lib/uiSound";
+import { emptyWallet } from "../lib/wallet";
 
 interface FavoritesPageProps {
   /** Called after add/remove so App can refresh counts / playlist */
   onFavoritesChanged: () => void;
   onNavigate?: (id: NavId) => void;
+  unlocks?: ContentUnlockLists;
 }
 
 type FavView = {
@@ -42,6 +52,36 @@ type FavView = {
 
 const TAG_CHIP_LIMIT = 48;
 const FAVORITES_PAGE_SIZE = 36;
+
+function favColumnCountForWidth(width: number): number {
+  if (width <= 700) return 1;
+  if (width <= 1100) return 2;
+  return 3;
+}
+
+/** Left-to-right, then down: 1 2 3 / 4 5 6, packed in columns so heights don't leave holes. */
+function splitIntoColumns<T>(items: T[], columnCount: number): T[][] {
+  const count = Math.max(1, columnCount);
+  const cols: T[][] = Array.from({ length: count }, () => []);
+  items.forEach((item, index) => {
+    cols[index % count]!.push(item);
+  });
+  return cols;
+}
+
+function useFavColumnCount(): number {
+  const [count, setCount] = useState(() =>
+    favColumnCountForWidth(window.innerWidth),
+  );
+  useEffect(() => {
+    function onResize() {
+      setCount(favColumnCountForWidth(window.innerWidth));
+    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return count;
+}
 
 function isFullscreenActive(): boolean {
   return Boolean(document.fullscreenElement);
@@ -62,16 +102,18 @@ function disposeVideoElement(video: HTMLVideoElement | null | undefined): void {
 export function FavoritesPage({
   onFavoritesChanged,
   onNavigate,
+  unlocks = { ...emptyWallet().unlocks, pendingShopTags: [] },
 }: FavoritesPageProps) {
   const [views, setViews] = useState<FavView[]>([]);
   const [loading, setLoading] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [viewerId, setViewerId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [kindFilter, setKindFilter] = useState<FavoriteKindFilter>("all");
   const [favoriteMetadata, setFavoriteMetadata] = useState<FavoriteMetadata[]>([]);
+  const [enterIds, setEnterIds] = useState<string[]>([]);
   const [showAllTags, setShowAllTags] = useState(false);
   const [tagsExpanded, setTagsExpanded] = useState(false);
   const [editTag, setEditTag] = useState<string | null>(null);
@@ -84,6 +126,7 @@ export function FavoritesPage({
   const viewerVideoRef = useRef<HTMLVideoElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const loadingRef = useRef(false);
+  const loadGenRef = useRef(0);
   const viewsRef = useRef<FavView[]>([]);
   viewsRef.current = views;
 
@@ -136,13 +179,36 @@ export function FavoritesPage({
     return () => window.removeEventListener("focus", onFocus);
   }, []);
 
-  const filtered = useMemo(
+  const matchedMetadata = useMemo(
     () =>
-      views.filter((v) =>
-        favoriteMatchesTagFilter(v.record.tags, selectedTags, search),
-      ),
-    [views, selectedTags, search],
+      filterFavoriteMetadata(favoriteMetadata, {
+        selectedTags,
+        search,
+        kind: kindFilter,
+      }),
+    [favoriteMetadata, selectedTags, search, kindFilter],
   );
+
+  const matchedIds = useMemo(
+    () => matchedMetadata.map((row) => row.id),
+    [matchedMetadata],
+  );
+  const matchedIdsRef = useRef<string[]>([]);
+  matchedIdsRef.current = matchedIds;
+
+  const filtered = views;
+  const hasActiveFilter =
+    kindFilter !== "all" || selectedTags.length > 0 || Boolean(search.trim());
+  const columnCount = useFavColumnCount();
+  const masonryColumns = useMemo(
+    () => splitIntoColumns(filtered, columnCount),
+    [filtered, columnCount],
+  );
+  const enterIndexById = useMemo(() => {
+    const map = new Map<string, number>();
+    enterIds.forEach((id, index) => map.set(id, index));
+    return map;
+  }, [enterIds]);
 
   const viewerIndex = useMemo(
     () => (viewerId ? filtered.findIndex((v) => v.record.id === viewerId) : -1),
@@ -157,28 +223,43 @@ export function FavoritesPage({
   }
 
   const loadPage = useCallback(async (reset = false): Promise<void> => {
-    if (loadingRef.current) return;
+    if (loadingRef.current && !reset) return;
+    const gen = reset ? loadGenRef.current + 1 : loadGenRef.current;
+    loadGenRef.current = gen;
     loadingRef.current = true;
     setLoading(true);
     setError(null);
     try {
-      const offset = reset ? 0 : views.length;
-      const { rows, total } = await listFavoriteRecordsPaged({
-        offset,
-        limit: FAVORITES_PAGE_SIZE,
+      const ids = matchedIdsRef.current;
+      const offset = reset ? 0 : viewsRef.current.length;
+      if (!reset && offset >= ids.length) {
+        return;
+      }
+      const pageIds = ids.slice(offset, offset + FAVORITES_PAGE_SIZE);
+      const rows = await listFavoriteRecordsByIds(pageIds);
+      const byId = new Map(rows.map((record) => [record.id, record]));
+      const next: FavView[] = pageIds.flatMap((id) => {
+        const record = byId.get(id);
+        if (!record) return [];
+        return [
+          {
+            record,
+            item: {
+              id: record.id,
+              url: URL.createObjectURL(record.blob),
+              kind: record.kind,
+              source: "favorites" as const,
+              tags: record.tags,
+              gelbooruId: record.gelbooruId,
+            },
+          },
+        ];
       });
-      const next: FavView[] = rows.map((record) => ({
-        record,
-        item: {
-          id: record.id,
-          url: URL.createObjectURL(record.blob),
-          kind: record.kind,
-          source: "favorites" as const,
-          tags: record.tags,
-          gelbooruId: record.gelbooruId,
-        },
-      }));
-      setTotalCount(total);
+      if (gen !== loadGenRef.current) {
+        revokeViews(next);
+        return;
+      }
+      setEnterIds(next.map((view) => view.record.id));
       setViews((prev) => {
         if (reset) {
           revokeViews(prev);
@@ -188,14 +269,17 @@ export function FavoritesPage({
         return [...prev, ...next.filter((v) => !have.has(v.record.id))];
       });
     } catch (err) {
+      if (gen !== loadGenRef.current) return;
       setError(
         err instanceof Error ? err.message : "Не удалось загрузить избранное",
       );
     } finally {
-      loadingRef.current = false;
-      setLoading(false);
+      if (gen === loadGenRef.current) {
+        loadingRef.current = false;
+        setLoading(false);
+      }
     }
-  }, [views.length]);
+  }, []);
 
   const refreshFavoriteMetadata = useCallback(async (): Promise<void> => {
     setFavoriteMetadata(await listFavoriteMetadata());
@@ -206,15 +290,16 @@ export function FavoritesPage({
   }
 
   useEffect(() => {
-    void loadPage(true);
     void refreshFavoriteMetadata();
-    // initial page only
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshFavoriteMetadata]);
 
   useEffect(() => {
+    void loadPage(true);
+  }, [loadPage, kindFilter, search, selectedTags, favoriteMetadata]);
+
+  useEffect(() => {
     const node = loadMoreRef.current;
-    if (!node || views.length >= totalCount) return;
+    if (!node || views.length >= matchedIds.length) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) void loadPage(false);
@@ -223,7 +308,14 @@ export function FavoritesPage({
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [loadPage, totalCount, views.length]);
+  }, [loadPage, matchedIds.length, views.length]);
+
+  useEffect(() => {
+    if (enterIds.length === 0) return;
+    const ms = enterIds.length * 32 + 520;
+    const timer = window.setTimeout(() => setEnterIds([]), ms);
+    return () => window.clearTimeout(timer);
+  }, [enterIds]);
 
   useEffect(() => {
     return () => {
@@ -411,7 +503,6 @@ export function FavoritesPage({
         revokeViews(gone);
         return prev.filter((v) => v.record.id !== id);
       });
-      setTotalCount((n) => Math.max(0, n - 1));
       await refreshFavoriteMetadata();
       if (viewerId === id) {
         setViewerId(
@@ -480,10 +571,8 @@ export function FavoritesPage({
         </div>
         <div className="favorites-page__actions">
           <span className="favorites-page__count">
-            {search.trim() || selectedTags.length > 0
-              ? `${filtered.length} найдено · `
-              : ""}
-            {views.length} / {totalCount} загружено
+            {hasActiveFilter ? `${matchedIds.length} найдено · ` : ""}
+            {views.length} / {matchedIds.length} загружено
           </span>
           <button
             type="button"
@@ -503,9 +592,35 @@ export function FavoritesPage({
         />
       ) : null}
 
-      {views.length > 0 ? (
+      {favoriteMetadata.length > 0 ? (
         <div className="favorites-page__filters">
           <div className="favorites-page__search-row">
+            <div className="favorites-page__kind" role="group" aria-label="Тип медиа">
+              {(
+                [
+                  ["all", "Все"],
+                  ["image", "Картинки"],
+                  ["gif", "Гифки"],
+                  ["video", "Видео"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`favorites-page__kind-btn${
+                    kindFilter === id ? " is-active" : ""
+                  }`}
+                  aria-pressed={kindFilter === id}
+                  onClick={() => {
+                    void primeUiAudio();
+                    playUiClick();
+                    setKindFilter(id);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <input
               className="favorites-page__search"
               type="search"
@@ -531,13 +646,14 @@ export function FavoritesPage({
                 </span>
               </button>
             ) : null}
-            {selectedTags.length > 0 || search.trim() ? (
+            {hasActiveFilter ? (
               <button
                 type="button"
                 className="favorites-page__clear"
                 onClick={() => {
                   setSelectedTags([]);
                   setSearch("");
+                  setKindFilter("all");
                 }}
               >
                 Сбросить фильтр
@@ -567,41 +683,25 @@ export function FavoritesPage({
                         (t) => t.toLowerCase() === tag.toLowerCase(),
                       );
                       return (
-                        <span
+                        <FavTagChip
                           key={tag}
-                          className={`fav-tag fav-tag--with-gear${
-                            active ? " is-active" : ""
-                          }`}
-                        >
-                          <button
-                            type="button"
-                            className="fav-tag__main"
-                            onClick={() => toggleTag(tag)}
-                            title={`${count} шт.`}
-                          >
-                            {tag}
-                          </button>
-                          <span className="fav-tag__slot">
-                            <span className="fav-tag__n" aria-hidden>
-                              {count}
-                            </span>
-                            <button
-                              type="button"
-                              className="fav-tag__gear"
-                              title="Настройки тега"
-                              aria-label={`Настройки тега ${tag}`}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                void primeUiAudio();
-                                playUiClick();
-                                setEditTag(tag);
-                              }}
-                            >
-                              ⚙
-                            </button>
-                          </span>
-                        </span>
+                          tag={tag}
+                          count={count}
+                          active={active}
+                          purchase={tagPurchaseStatus(tag, unlocks)}
+                          onToggle={() => toggleTag(tag)}
+                          onEdit={() => {
+                            void primeUiAudio();
+                            playUiClick();
+                            setEditTag(tag);
+                          }}
+                          onBuy={() => {
+                            void primeUiAudio();
+                            playUiClick();
+                            setShopFocusTag(tag);
+                            onNavigate?.("shop");
+                          }}
+                        />
                       );
                     })}
                   </div>
@@ -630,9 +730,9 @@ export function FavoritesPage({
 
       {error ? <p className="favorites-page__err">{error}</p> : null}
 
-      {loading && views.length === 0 ? (
+      {loading && views.length === 0 && favoriteMetadata.length === 0 ? (
         <p className="favorites-page__empty">Загрузка…</p>
-      ) : views.length === 0 ? (
+      ) : favoriteMetadata.length === 0 ? (
         <div className="favorites-page__empty">
           <p>Пока пусто</p>
           <p className="favorites-page__hint">
@@ -640,74 +740,81 @@ export function FavoritesPage({
             начнёт смещать рулетку и магазин.
           </p>
         </div>
-      ) : filtered.length === 0 ? (
+      ) : matchedIds.length === 0 ? (
         <div className="favorites-page__empty">
           <p>Ничего не найдено</p>
           <p className="favorites-page__hint">
             Сними теги или измени поиск.
           </p>
         </div>
+      ) : loading && views.length === 0 ? (
+        <p className="favorites-page__empty">Загрузка…</p>
       ) : (
-        <div className="fav-masonry">
-          {filtered.map(({ record, item }) => (
-            <article key={record.id} className="fav-masonry__card">
-              <button
-                type="button"
-                className="fav-masonry__open"
-                onClick={() => setViewerId(record.id)}
-                title="Открыть на весь экран"
-                aria-label="Открыть на весь экран"
-              >
-                {item.kind === "video" ? (
-                  <video
-                    className="fav-masonry__media"
-                    src={item.url}
-                    muted
-                    loop
-                    playsInline
-                    preload="metadata"
-                  />
-                ) : (
-                  <img
-                    className="fav-masonry__media"
-                    src={item.url}
-                    alt={item.tags ?? ""}
-                    loading="lazy"
-                    draggable={false}
-                  />
-                )}
-                <span className="fav-masonry__glow" aria-hidden />
-              </button>
-              <div className="fav-masonry__bar">
-                <span className="fav-masonry__kind">
-                  {item.kind === "video"
-                    ? "видео"
-                    : item.kind === "gif"
-                      ? "gif"
-                      : "фото"}
-                  {record.gelbooruId ? ` · #${record.gelbooruId}` : ""}
-                </span>
-                <button
-                  type="button"
-                  className="fav-masonry__del"
-                  disabled={busyId === record.id}
-                  title="Удалить из избранного"
-                  onClick={() => void handleDelete(record.id)}
-                >
-                  {busyId === record.id ? "…" : "Удалить"}
-                </button>
+        <div className="fav-masonry-wrap">
+          <div className="fav-masonry">
+            {masonryColumns.map((column, colIndex) => (
+              <div key={colIndex} className="fav-masonry__col">
+                {column.map(({ record, item }) => {
+                  const enterI = enterIndexById.get(record.id);
+                  return (
+                  <article
+                    key={record.id}
+                    className={
+                      "fav-masonry__card" +
+                      (enterI != null ? " is-enter" : "")
+                    }
+                    style={
+                      enterI != null
+                        ? ({ "--fav-enter-i": enterI } as CSSProperties)
+                        : undefined
+                    }
+                  >
+                    <button
+                      type="button"
+                      className="fav-masonry__open"
+                      onClick={() => setViewerId(record.id)}
+                      title="Открыть на весь экран"
+                      aria-label="Открыть на весь экран"
+                    >
+                      <FavMasonryMedia item={item} />
+                      <span className="fav-masonry__glow" aria-hidden />
+                    </button>
+                    <div className="fav-masonry__bar">
+                      <span className="fav-masonry__kind">
+                        {item.kind === "video"
+                          ? "видео"
+                          : item.kind === "gif"
+                            ? "gif"
+                            : "фото"}
+                        {record.gelbooruId ? ` · #${record.gelbooruId}` : ""}
+                      </span>
+                      <button
+                        type="button"
+                        className="fav-masonry__del"
+                        disabled={busyId === record.id}
+                        title="Удалить из избранного"
+                        onClick={() => void handleDelete(record.id)}
+                      >
+                        {busyId === record.id ? "…" : "Удалить"}
+                      </button>
+                    </div>
+                  </article>
+                  );
+                })}
               </div>
-            </article>
-          ))}
-          {views.length < totalCount ? (
+            ))}
+          </div>
+          {views.length < matchedIds.length ? (
             <div ref={loadMoreRef} className="fav-masonry__sentinel">
               {loading
                 ? "Подгружаю…"
-                : `Показано ${views.length} из ${totalCount}`}
+                : `Показано ${views.length} из ${matchedIds.length}`}
             </div>
           ) : (
             <div className="fav-masonry__count">
-              {totalCount > 0 ? `Все ${totalCount} загружены` : ""}
+              {matchedIds.length > 0
+                ? `Все ${matchedIds.length} загружены`
+                : ""}
             </div>
           )}
         </div>

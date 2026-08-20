@@ -1,12 +1,9 @@
 import { useRef, useState, type ReactNode } from "react";
-import { DeviceSettingsPanel } from "../components/DeviceSettingsPanel";
-import { LlmControlPanel } from "../components/LlmControlPanel";
-import { RouletteSettingsPanel } from "../components/RouletteSettingsPanel";
+import { BrainPanel } from "../components/BrainPanel";
+import { GameplayPanel } from "../components/GameplayPanel";
 import { SettingsSection } from "../components/SettingsSection";
 import { SettingsTabs, type SettingsTab } from "../components/SettingsTabs";
-import { TagTypesSettingsPanel } from "../components/TagTypesSettingsPanel";
 import { TtsSettingsPanel } from "../components/TtsSettingsPanel";
-import { VoiceSetupWizard } from "../components/VoiceSetupWizard";
 import { functions, patterns } from "../lib/catalog";
 import type { ContentUnlockLists } from "../lib/contentUnlocks";
 import { GOAL_LABELS } from "../lib/labels";
@@ -164,9 +161,8 @@ export function SettingsPage({
           <p className="today__eyebrow">Система</p>
           <h1 className="today__title">Настройки</h1>
           <p className="today__sub">
-            Ключи Gelbooru, пулы рулетки, игрушка (Device Bridge), голос / TTS /
-            LLM. Игровой план — на Рулетке. Разделы сворачиваются кликом по
-            заголовку.
+            ИИ пишет реплики. Голос их произносит. Gelbooru, геймплей и отладка
+            — отдельные вкладки.
           </p>
         </div>
         <div className="today__cta">
@@ -193,10 +189,11 @@ export function SettingsPage({
 
       <SettingsTabs
         tabs={[
-          { id: "profile", label: "Профиль", hint: "Слоты, бэкапы, сброс" },
-          { id: "voice", label: "Голос", hint: "TTS, LLM, озвучка" },
-          { id: "media", label: "Медиа", hint: "Gelbooru, ключи" },
-          { id: "gameplay", label: "Геймплей", hint: "Рулетка, теги, игрушки" },
+          { id: "profile", label: "Профиль", hint: "Слоты и бэкапы" },
+          { id: "brain", label: "ИИ ресурсы", hint: "LLM · TTS веса · что говорит" },
+          { id: "voice", label: "Голос", hint: "озвучка · как звучит" },
+          { id: "media", label: "Медиа", hint: "Ключи Gelbooru" },
+          { id: "gameplay", label: "Геймплей", hint: "Рулетка, игрушка, CBT" },
           { id: "debug", label: "Отладка", hint: "Очередь блоков" },
         ] satisfies SettingsTab[]}
       >
@@ -207,7 +204,7 @@ export function SettingsPage({
           title="Сохранения"
           wide
           className="settings-page__saves"
-          sub="Два слота прогресса. Ключи Gelbooru, голос и пулы рулетки общие. Переключение перезагружает приложение."
+          sub="Живой — настоящий прогресс. Песочница — всё открыто для тестов (редактор очереди сессии только здесь). Ключи Gelbooru, голос и рулетка общие. Смена слота перезагружает окно."
         >
           <div className="save-slots" role="group" aria-label="Слот сохранения">
             {(["live", "sandbox"] as const).map((id) => {
@@ -337,115 +334,32 @@ export function SettingsPage({
         </SettingsSection>
         </div>
 
+        {/* ===== ИИ ресурсы ===== */}
+        <div className="settings-tab__panel">
+        <SettingsSection
+          id="brain"
+          title="ИИ ресурсы"
+          wide
+          sub="Модели на диске: скачать, выбрать, удалить. Как звучит — вкладка «Голос»."
+        >
+          <BrainPanel
+            voice={voice}
+            onVoice={onVoice}
+            voiceStatus={voiceStatus}
+            onTestVoice={onTestVoice}
+          />
+        </SettingsSection>
+        </div>
+
         {/* ===== Голос ===== */}
         <div className="settings-tab__panel">
         <SettingsSection
           id="voice"
           title={`Голос · ${getActiveMistress().displayNameRu}`}
           wide
-          sub="Templates из bible или Local LLM (Ollama). Текст пишет LLM/шаблоны; звук — отдельная озвучка (TTS)."
+          sub="Движки со стартом и настройками. Веса Piper/Qwen — вкладка «ИИ ресурсы»."
         >
-          <SettingsSection
-            id="voice-wizard"
-            title="Мастер · быстрый старт"
-            wide
-            className="settings-section--nested"
-            defaultOpen={false}
-          >
-            <VoiceSetupWizard voice={voice} onVoice={onVoice} tts={tts} />
-          </SettingsSection>
-
-          <div
-            className="card card--wide settings-section is-open settings-section--nested"
-            aria-label="Озвучка · TTS"
-          >
-            <div className="settings-section__toggle">
-              <h2 className="card__title settings-section__title">
-                Озвучка · GPT-SoVITS / Qwen3-TTS / нейро
-              </h2>
-            </div>
-            <div className="settings-section__body">
-              <TtsSettingsPanel voice={voice} onVoice={onVoice} tts={tts} />
-            </div>
-          </div>
-
-          <SettingsSection
-            id="voice-llm"
-            title="Текст · Templates / Local LLM"
-            wide
-            className="settings-section--nested"
-            defaultOpen={false}
-          >
-            <p className="voice-howto">
-              Проверка чата — только режим Local LLM. Озвучка настраивается
-              блоком выше.
-            </p>
-            <div className="today__fields">
-              <Field
-                label="Режим голоса"
-                hint="Сначала Local LLM — потом выбор модели"
-              >
-                <select
-                  value={voice.mode}
-                  onChange={(e) =>
-                    onVoice({
-                      ...voice,
-                      mode: e.target.value === "llm" ? "llm" : "template",
-                    })
-                  }
-                >
-                  <option value="template">Templates (bible)</option>
-                  <option value="llm">Local LLM</option>
-                </select>
-              </Field>
-            </div>
-            <LlmControlPanel
-              model={voice.model}
-              enabled={voice.mode === "llm"}
-              autoStart={voice.autoStartOllama}
-              onModelChange={(model) => onVoice({ ...voice, model })}
-              onAutoStartChange={(autoStartOllama) =>
-                onVoice({ ...voice, autoStartOllama })
-              }
-            />
-            <div className="today__fields">
-              <Field label="Endpoint" hint="По умолчанию прокси /api/ollama/…">
-                <input
-                  value={voice.endpoint}
-                  onChange={(e) =>
-                    onVoice({ ...voice, endpoint: e.target.value })
-                  }
-                  disabled={voice.mode !== "llm"}
-                />
-              </Field>
-              <Field label="Модель" hint="Или кликни в списке выше">
-                <input
-                  value={voice.model}
-                  onChange={(e) => onVoice({ ...voice, model: e.target.value })}
-                />
-              </Field>
-              <Num
-                label="Таймаут LLM (мс)"
-                hint="После — fallback templates"
-                value={voice.timeoutMs}
-                min={1000}
-                max={20000}
-                onChange={(v) => onVoice({ ...voice, timeoutMs: v })}
-              />
-            </div>
-            <div className="today__actions">
-              <button
-                type="button"
-                disabled={voice.mode !== "llm"}
-                onClick={onTestVoice}
-              >
-                Проверить чат
-              </button>
-              {voiceStatus ? (
-                <span className="voice-status">{voiceStatus}</span>
-              ) : null}
-            </div>
-          </SettingsSection>
+          <TtsSettingsPanel voice={voice} onVoice={onVoice} tts={tts} />
         </SettingsSection>
         </div>
 
@@ -510,31 +424,16 @@ export function SettingsPage({
         {/* ===== Геймплей ===== */}
         <div className="settings-tab__panel">
         <SettingsSection
-          id="roulette"
-          title="Настройки рулетки"
+          id="gameplay"
+          title="Геймплей"
           wide
-          className="settings-page__roulette"
-          defaultOpen={true}
+          sub="Рулетка, типы тегов, проверка CBT/plapping и игрушка."
         >
-          <RouletteSettingsPanel
-            embedded
-            hideEmbeddedTitle
+          <GameplayPanel
             settings={rouletteSettings}
             onChange={setRouletteSettings}
             unlocks={unlocks}
           />
-        </SettingsSection>
-
-        <TagTypesSettingsPanel unlocks={unlocks} />
-
-        <SettingsSection
-          id="device"
-          title="Игрушка · Device Bridge"
-          wide
-          defaultOpen={false}
-          sub="Mock без железа, Lovense Game Mode или Buttplug/Intiface. Один API интенсивности для сессии."
-        >
-          <DeviceSettingsPanel />
         </SettingsSection>
         </div>
 
@@ -590,36 +489,5 @@ function Field({
       <span className="field__hint">{hint}</span>
       {children}
     </label>
-  );
-}
-
-function Num({
-  label,
-  hint,
-  value,
-  onChange,
-  step = 1,
-  min,
-  max,
-}: {
-  label: string;
-  hint: string;
-  value: number;
-  onChange: (v: number) => void;
-  step?: number;
-  min?: number;
-  max?: number;
-}) {
-  return (
-    <Field label={label} hint={hint}>
-      <input
-        type="number"
-        value={value}
-        step={step}
-        min={min}
-        max={max}
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
-    </Field>
   );
 }

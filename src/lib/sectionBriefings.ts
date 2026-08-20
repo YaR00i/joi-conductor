@@ -37,6 +37,7 @@ export type SectionBriefingsState = {
 export const BRIEFABLE_NAV_IDS: readonly BriefableNavId[] = [
   "roulette",
   "session",
+  "chat",
   "shop",
   "contracts",
   "diary",
@@ -67,6 +68,18 @@ export const SECTION_BRIEFINGS: ReadonlyArray<SectionBriefingCopy> = [
       "Во время сессии здесь бит, инструкции, подтверждения и медиа. Следи за панелью квестов и отвечай на запросы Госпожи — отмена и пауза тоже здесь.",
     hintRu: "Сессия стартует с Рулетки. Пока live — другие разделы лучше не трогать без нужды.",
     ctas: [{ labelRu: "К рулетке", nav: "roulette", primary: true }],
+  },
+  {
+    id: "chat",
+    eyebrowRu: "Раздел · Чат",
+    titleRu: "Разговор вне зала",
+    leadRu:
+      "Свободный чат с госпожой. Soul Memory пишет психологию, отношения, эпизоды и дневник. Очередь сессии сюда не ходит — сессия по-прежнему из библии и блоков.",
+    hintRu: "Селфи и голосовой звонок — позже. Пока можно писать и, если голос включён, слушать ответы.",
+    ctas: [
+      { labelRu: "К сессии", nav: "session" },
+      { labelRu: "К рулетке", nav: "roulette", primary: true },
+    ],
   },
   {
     id: "shop",
@@ -141,9 +154,9 @@ export const SECTION_BRIEFINGS: ReadonlyArray<SectionBriefingCopy> = [
   {
     id: "settings",
     eyebrowRu: "Раздел · Настройки",
-    titleRu: "Слоты и голос",
+    titleRu: "Слоты, ИИ и голос",
     leadRu:
-      "Сейвы, медиа (Gelbooru), голос/TTS, бэкап прогресса. Слот «Песочница» — тренировка без прогресса основного сейва.",
+      "Сейвы, медиа (Gelbooru), ИИ-ресурсы, озвучка, бэкап прогресса. Слот «Песочница» — тренировка без прогресса основного сейва.",
     hintRu: "«Вечерний маршрут» и подсказки разделов можно снова открыть отсюда.",
     ctas: [{ labelRu: "К рулетке", nav: "roulette", primary: true }],
   },

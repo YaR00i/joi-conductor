@@ -3,6 +3,7 @@ import {
   MEDIA_META_TAGS,
   MEDIA_TYPE_CATALOG,
   PERSON_CONTENT_TAGS,
+  type ContentMediaTypeId,
 } from "./contentCatalog";
 import { resolveFetishTagPick } from "./fetishTiers";
 import type { MediaKind } from "./media";
@@ -192,6 +193,7 @@ export type ComposedContentQuery = {
   tagsLabelRu: string;
   /** Empty = allow all kinds */
   mediaKinds: MediaKind[];
+  mediaTypeId: ContentMediaTypeId;
 };
 
 /**
@@ -218,6 +220,16 @@ export function composeContentQuery(
     typeof picks.media_type?.payload?.mediaQueryTags === "string"
       ? (picks.media_type.payload.mediaQueryTags as string).trim()
       : "";
+
+  const mediaTypeIdRaw = picks.media_type?.payload?.mediaTypeId;
+  const mediaTypeId: ContentMediaTypeId =
+    mediaTypeIdRaw === "photo" ||
+    mediaTypeIdRaw === "gifs" ||
+    mediaTypeIdRaw === "video" ||
+    mediaTypeIdRaw === "photo_gifs" ||
+    mediaTypeIdRaw === "all"
+      ? mediaTypeIdRaw
+      : "all";
 
   const mediaKindsRaw = picks.media_type?.payload?.mediaKinds;
   const mediaKinds: MediaKind[] = Array.isArray(mediaKindsRaw)
@@ -248,5 +260,6 @@ export function composeContentQuery(
     tags,
     tagsLabelRu: labelParts.length > 0 ? labelParts.join(" · ") : "Контент",
     mediaKinds,
+    mediaTypeId,
   };
 }

@@ -232,6 +232,33 @@ export default defineConfig({
       "@": "/src",
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          const normalized = id.replace(/\\/g, "/");
+          if (!normalized.includes("/node_modules/")) return undefined;
+          if (normalized.includes("/node_modules/three/")) {
+            return "vendor-three";
+          }
+          if (
+            normalized.includes("/node_modules/@xyflow/") ||
+            normalized.includes("/node_modules/d3-")
+          ) {
+            return "vendor-graph";
+          }
+          if (
+            normalized.includes("/node_modules/react/") ||
+            normalized.includes("/node_modules/react-dom/") ||
+            normalized.includes("/node_modules/scheduler/")
+          ) {
+            return "vendor-react";
+          }
+          return undefined;
+        },
+      },
+    },
+  },
   server: {
     host: "127.0.0.1",
     port: 5173,
@@ -251,6 +278,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/ollama/, ""),
       },
+      "/api/ollama-hub": {
+        target: "https://ollama.com",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/ollama-hub/, ""),
+      },
     },
   },
   preview: {
@@ -262,6 +294,11 @@ export default defineConfig({
         target: "http://127.0.0.1:11434",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/ollama/, ""),
+      },
+      "/api/ollama-hub": {
+        target: "https://ollama.com",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/ollama-hub/, ""),
       },
     },
   },

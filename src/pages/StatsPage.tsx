@@ -11,9 +11,11 @@ import {
 } from "../lib/diaryStats";
 import { loadDiaryEntries } from "../lib/sessionDiary";
 import { playUiNav, primeUiAudio } from "../lib/uiSound";
+import { ContractJournalPage } from "./ContractJournalPage";
 
 type Props = {
   revision?: number;
+  journalRevision?: number;
   onNavigate?: (id: NavId) => void;
 };
 
@@ -31,7 +33,11 @@ const RANGES: { id: StatsRange; label: string }[] = [
   { id: "all", label: "Всё" },
 ];
 
-export function StatsPage({ revision = 0, onNavigate }: Props) {
+export function StatsPage({
+  revision = 0,
+  journalRevision = 0,
+  onNavigate,
+}: Props) {
   const [range, setRange] = useState<StatsRange>("30d");
   const entries = useMemo(() => loadDiaryEntries(), [revision]);
   const stats = useMemo(() => buildDiaryStats(entries, range), [entries, range]);
@@ -77,32 +83,38 @@ export function StatsPage({ revision = 0, onNavigate }: Props) {
       </header>
 
       {empty ? (
-        <div className="stats-page__empty">
-          <p>Пока нет сессий в выбранном периоде.</p>
-          <p className="stats-page__empty-hint">
-            Заверши сессию — она попадёт в дневник и сюда.
-          </p>
-          {onNavigate ? (
-            <div className="page-empty-ctas">
-              <button
-                type="button"
-                className="page-empty-cta"
-                onClick={() => go("session")}
-              >
-                К сессии
-              </button>
-              <button
-                type="button"
-                className="page-empty-cta page-empty-cta--ghost"
-                onClick={() => go("roulette")}
-              >
-                К рулетке
-              </button>
-            </div>
-          ) : null}
+        <div className="stats-page__body">
+          <div className="stats-page__empty">
+            <p>Пока нет сессий в выбранном периоде.</p>
+            <p className="stats-page__empty-hint">
+              Заверши сессию — она попадёт в дневник и сюда.
+            </p>
+            {onNavigate ? (
+              <div className="page-empty-ctas">
+                <button
+                  type="button"
+                  className="page-empty-cta"
+                  onClick={() => go("session")}
+                >
+                  К сессии
+                </button>
+                <button
+                  type="button"
+                  className="page-empty-cta page-empty-cta--ghost"
+                  onClick={() => go("roulette")}
+                >
+                  К рулетке
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <aside className="stats-page__journal">
+            <ContractJournalPage revision={journalRevision} variant="embed" />
+          </aside>
         </div>
       ) : (
-        <>
+        <div className="stats-page__body">
+        <div className="stats-page__main">
           <section className="stats-kpis" aria-label="Сводка">
             <Kpi
               label="Сессии"
@@ -318,7 +330,11 @@ export function StatsPage({ revision = 0, onNavigate }: Props) {
             />
             <DayTable days={days} />
           </div>
-        </>
+        </div>
+          <aside className="stats-page__journal">
+            <ContractJournalPage revision={journalRevision} variant="embed" />
+          </aside>
+        </div>
       )}
     </div>
   );

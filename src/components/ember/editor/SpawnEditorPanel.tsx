@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
-import { writeEmberJson, type EmberPack } from "../../../game";
-import type { EmberSpawnTable } from "../../../game/content/types";
+import { writeEmberJson } from "../../../game/content/io";
+import type {
+  EmberPack,
+  EmberSpawnTable,
+} from "../../../game/content/types";
 
 type Props = {
   pack: EmberPack;

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, ipcMain, session, shell } from "electron";
 import {
   copyFileSync,
   existsSync,
@@ -18,19 +18,33 @@ import {
   listOllamaModels,
   ollamaVersion,
   pullOllamaModel,
+  deleteOllamaModel,
   startOllamaServe,
   stopManagedOllama,
   stopOllamaOnQuit,
 } from "./ollama.mjs";
+import { fetchOllamaSearchHtml } from "./ollamaSearch.mjs";
 import { EDGE_RU_VOICES, synthesizeEdgeTts } from "./tts.mjs";
 import {
   getPiperStatus,
   installPiper,
+  uninstallPiper,
   PIPER_VOICES,
   synthesizePiperTts,
 } from "./piper.mjs";
 import { pingSovits, synthesizeSovitsTts } from "./sovits.mjs";
 import { getQwenStatus, synthesizeQwenTts } from "./qwen.mjs";
+import {
+  getQwenInstallStatus,
+  installQwenTtsModel,
+  uninstallQwenModel,
+} from "./qwenInstall.mjs";
+import {
+  getQwenProcessStatus,
+  startQwenProcess,
+  stopQwenOnQuit,
+  stopQwenProcess,
+} from "./qwenProcess.mjs";
 import {
   getWd14ProcessStatus,
   startWd14Process,
@@ -44,7 +58,25 @@ import {
   stopSovitsOnQuit,
   stopSovitsProcess,
 } from "./sovitsProcess.mjs";
+import {
+  getSovitsInstallStatus,
+  installSovitsRuntime,
+  uninstallSovitsRuntime,
+} from "./sovitsInstall.mjs";
 import { playWavOnHost, stopHostAudio } from "./audioOut.mjs";
+import {
+  applyCursorClip,
+  reapplyCursorClip,
+  releaseCursorClip,
+  stopCursorGrab,
+  warpCursorToWindow,
+} from "./cursorClip.mjs";
+import {
+  pickVoiceRefSource,
+  showVoiceRefFolder,
+  statVoiceRef,
+  writeVoiceRefWav,
+} from "./voiceRef.mjs";
 import {
   deviceConnect,
   deviceDisconnect,
@@ -86,6 +118,16 @@ function iconPath() {
   return png;
 }
 
+/** Safe re-register so a stale/double load cannot skip later channels. */
+function handleIpc(channel, listener) {
+  try {
+    ipcMain.removeHandler(channel);
+  } catch {
+    // first registration
+  }
+  ipcMain.handle(channel, listener);
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -106,6 +148,8 @@ function createWindow() {
       sandbox: false,
     },
   });
+
+  mainWindow.setMenu(null);
 
   mainWindow.once("ready-to-show", () => {
     mainWindow?.webContents.setAudioMuted(false);
@@ -138,6 +182,18 @@ function createWindow() {
   };
   mainWindow.on("enter-full-screen", sendFullscreen);
   mainWindow.on("leave-full-screen", sendFullscreen);
+  mainWindow.on("blur", () => {
+    releaseCursorClip();
+  });
+  mainWindow.on("minimize", () => {
+    releaseCursorClip();
+  });
+  mainWindow.on("focus", () => {
+    reapplyCursorClip();
+  });
+  mainWindow.on("closed", () => {
+    releaseCursorClip();
+  });
 
   // F11 → Electron fullscreen (hides taskbar) + notify renderer to hide titlebar.
   mainWindow.webContents.on("before-input-event", (event, input) => {
@@ -148,6 +204,18 @@ function createWindow() {
   });
 
   void mainWindow.loadURL(startUrl);
+}
+
+function allowMicrophoneCapture() {
+  const ses = session.defaultSession;
+  const allow = (permission) =>
+    permission === "media" ||
+    permission === "audioCapture" ||
+    permission === "mediaKeySystem";
+  ses.setPermissionRequestHandler((_wc, permission, callback) => {
+    callback(allow(permission));
+  });
+  ses.setPermissionCheckHandler((_wc, permission) => allow(permission));
 }
 
 ipcMain.on("window:minimize", () => mainWindow?.minimize());
@@ -167,6 +235,14 @@ ipcMain.handle("window:toggle-fullscreen", () => {
 ipcMain.handle("window:is-fullscreen", () =>
   Boolean(mainWindow?.isFullScreen()),
 );
+handleIpc("cursor:clip", () => {
+  if (!mainWindow) return { ok: false };
+  return applyCursorClip(mainWindow);
+});
+handleIpc("cursor:unclip", () => releaseCursorClip());
+ipcMain.on("cursor:warp-center", () => {
+  warpCursorToWindow(mainWindow);
+});
 
 ipcMain.handle("shell:open-external", async (_e, url) => {
   if (typeof url !== "string" || !/^https?:\/\//i.test(url)) {
@@ -352,8 +428,15 @@ ipcMain.handle("ollama:status", async (_e, preferredModel) => {
   return { ...status, version };
 });
 
-ipcMain.handle("ollama:start", async (_e, preferredModel) => {
-  await startOllamaServe();
+ipcMain.handle("ollama:start", async (event, preferredModel) => {
+  await startOllamaServe((p) => {
+    event.sender.send("ollama:pull-progress", {
+      model: "ollama",
+      line: p.detail ? `${p.phase} · ${p.detail}` : p.phase,
+      phase: p.phase,
+      pct: p.pct,
+    });
+  });
   return getOllamaStatus(
     typeof preferredModel === "string" ? preferredModel : "",
   );
@@ -366,15 +449,34 @@ ipcMain.handle("ollama:stop", async () => {
 
 ipcMain.handle("ollama:models", async () => listOllamaModels());
 
+ipcMain.handle("ollama:search-html", async (_e, query) => {
+  return fetchOllamaSearchHtml(typeof query === "string" ? query : "");
+});
+
 ipcMain.handle("ollama:pull", async (event, model) => {
   if (typeof model !== "string" || !model.trim()) {
     throw new Error("Укажи имя модели");
   }
   const name = model.trim();
-  await pullOllamaModel(name, (line) => {
-    event.sender.send("ollama:pull-progress", { model: name, line });
+  await pullOllamaModel(name, (payload) => {
+    const line =
+      typeof payload === "string" ? payload : payload.line || payload.phase || "";
+    event.sender.send("ollama:pull-progress", {
+      model: name,
+      line,
+      phase: typeof payload === "object" ? payload.phase : undefined,
+      pct: typeof payload === "object" ? payload.pct : undefined,
+    });
   });
   return getOllamaStatus(name);
+});
+
+ipcMain.handle("ollama:delete", async (_e, model) => {
+  if (typeof model !== "string" || !model.trim()) {
+    throw new Error("Укажи имя модели");
+  }
+  await deleteOllamaModel(model.trim());
+  return getOllamaStatus();
 });
 
 ipcMain.handle("tts:voices", async () => {
@@ -385,13 +487,35 @@ ipcMain.handle("tts:voices", async () => {
   };
 });
 
-ipcMain.handle("tts:piper-status", async () => getPiperStatus());
+ipcMain.handle("tts:voice-ref-show", async (_e, relPath) => {
+  return showVoiceRefFolder(root, String(relPath ?? ""));
+});
 
-ipcMain.handle("tts:piper-install", async (event) => {
+ipcMain.handle("tts:voice-ref-stat", async (_e, relPath) => {
+  return statVoiceRef(root, String(relPath ?? ""));
+});
+
+ipcMain.handle("tts:voice-ref-pick", async () => {
+  return pickVoiceRefSource(mainWindow);
+});
+
+ipcMain.handle("tts:voice-ref-write", async (_e, payload) => {
+  return writeVoiceRefWav(
+    root,
+    String(payload?.destRel ?? ""),
+    String(payload?.wavBase64 ?? ""),
+  );
+});
+
+handleIpc("tts:piper-status", async () => getPiperStatus());
+
+handleIpc("tts:piper-install", async (event) => {
   return installPiper((p) => {
     event.sender.send("tts:piper-progress", p);
   });
 });
+
+handleIpc("tts:piper-uninstall", async () => uninstallPiper());
 
 ipcMain.handle("tts:sovits-status", async (_e, payload) => {
   const opts =
@@ -416,18 +540,58 @@ ipcMain.handle("tts:sovits-stop", async (_e, payload) => {
   return { stopped, ...(await getSovitsProcessStatus(opts)) };
 });
 
+handleIpc("tts:sovits-install-status", async () => getSovitsInstallStatus());
+
+handleIpc("tts:sovits-install", async (event) => {
+  return installSovitsRuntime((p) => {
+    event.sender.send("tts:sovits-install-progress", p);
+  });
+});
+
+handleIpc("tts:sovits-uninstall", async () => {
+  stopSovitsProcess({ forcePort: true });
+  return uninstallSovitsRuntime();
+});
+
 ipcMain.handle("tts:stop", async () => {
   stopHostAudio();
   return { ok: true };
 });
 
-ipcMain.handle("tts:qwen-status", async (_e, payload) => {
+handleIpc("tts:qwen-status", async (_e, payload) => {
   const opts =
     payload && typeof payload === "object"
       ? payload
       : { baseUrl: typeof payload === "string" ? payload : "" };
-  const baseUrl = String(opts.baseUrl || "").trim();
-  return getQwenStatus(baseUrl);
+  return getQwenProcessStatus(opts);
+});
+
+handleIpc("tts:qwen-start", async (_e, payload) => {
+  const opts = payload && typeof payload === "object" ? payload : {};
+  await startQwenProcess(opts);
+  return getQwenProcessStatus(opts);
+});
+
+handleIpc("tts:qwen-stop", async (_e, payload) => {
+  const opts = payload && typeof payload === "object" ? payload : {};
+  const stopped = stopQwenProcess({ ...opts, forcePort: true });
+  return { stopped, ...(await getQwenProcessStatus(opts)) };
+});
+
+handleIpc("tts:qwen-install-status", async () => getQwenInstallStatus());
+
+handleIpc("tts:qwen-install", async (event, payload) => {
+  const target =
+    payload && typeof payload === "object" ? payload.target : payload;
+  return installQwenTtsModel(String(target || "custom_voice"), (p) => {
+    event.sender.send("tts:qwen-install-progress", p);
+  });
+});
+
+handleIpc("tts:qwen-uninstall", async (_e, payload) => {
+  const target =
+    payload && typeof payload === "object" ? payload.target : payload;
+  return uninstallQwenModel(String(target || "custom_voice"));
 });
 
 // ---- WD14 tagger (auto-tagging local images) ----
@@ -439,9 +603,11 @@ ipcMain.handle("media:wd14-status", async (_e, payload) => {
   return getWd14ProcessStatus(opts);
 });
 
-ipcMain.handle("media:wd14-start", async (_e, payload) => {
+ipcMain.handle("media:wd14-start", async (event, payload) => {
   const opts = payload && typeof payload === "object" ? payload : {};
-  await startWd14Process(opts);
+  await startWd14Process(opts, (p) => {
+    event.sender.send("media:wd14-progress", p);
+  });
   return getWd14ProcessStatus(opts);
 });
 
@@ -480,9 +646,15 @@ ipcMain.handle("tts:speak", async (_e, payload) => {
   stopHostAudio();
 
   const provider = payload.provider ?? "auto";
+  const volume =
+    typeof payload.volume === "number" && Number.isFinite(payload.volume)
+      ? Math.max(0, Math.min(2, payload.volume))
+      : 1;
 
   const trySovits = async () => {
-    let ref = String(payload.refAudioPath ?? "").trim();
+    let ref = String(
+      payload.sovitsRefPath ?? payload.refAudioPath ?? "",
+    ).trim();
     if (ref && !path.isAbsolute(ref)) {
       ref = path.resolve(root, ref);
     }
@@ -490,7 +662,7 @@ ipcMain.handle("tts:speak", async (_e, payload) => {
       text: payload.text,
       baseUrl: payload.sovitsUrl,
       refAudioPath: ref,
-      promptText: payload.promptText ?? "",
+      promptText: payload.sovitsPromptText ?? payload.promptText ?? "",
       promptLang: payload.promptLang ?? "en",
       textLang: payload.textLang ?? "en",
       emotion: payload.emotion,
@@ -499,8 +671,12 @@ ipcMain.handle("tts:speak", async (_e, payload) => {
   };
   const tryEdge = async () => synthesizeEdgeTts(payload);
   const tryPiper = async () => synthesizePiperTts(payload);
-  const tryQwen = async () =>
-    synthesizeQwenTts({
+  const tryQwen = async () => {
+    let ref = String(payload.qwenRefPath ?? payload.refAudioPath ?? "").trim();
+    if (ref && !path.isAbsolute(ref)) {
+      ref = path.resolve(root, ref);
+    }
+    return synthesizeQwenTts({
       text: payload.text,
       baseUrl: payload.qwenUrl,
       model: payload.qwenModel,
@@ -508,21 +684,27 @@ ipcMain.handle("tts:speak", async (_e, payload) => {
       apiKey: payload.qwenApiKey,
       emotion: payload.emotion,
       rate: payload.rate,
+      language: payload.textLang || "en",
+      refAudio: ref,
+      refText: payload.qwenPromptText ?? payload.promptText ?? "",
     });
+  };
 
   let result;
   if (provider === "sovits") result = await trySovits();
-  else if (provider === "qwen") result = await tryQwen();
+  else if (provider === "qwen" || provider === "qwen-cpu") result = await tryQwen();
   else if (provider === "edge") result = await tryEdge();
   else if (provider === "piper") result = await tryPiper();
   else {
-    const refGuess = String(payload.refAudioPath ?? "").trim();
-    const refAbs = refGuess
-      ? path.isAbsolute(refGuess)
-        ? refGuess
-        : path.resolve(root, refGuess)
+    const sovitsGuess = String(
+      payload.sovitsRefPath ?? payload.refAudioPath ?? "",
+    ).trim();
+    const sovitsAbs = sovitsGuess
+      ? path.isAbsolute(sovitsGuess)
+        ? sovitsGuess
+        : path.resolve(root, sovitsGuess)
       : "";
-    if (refAbs && existsSync(refAbs)) {
+    if (sovitsAbs && existsSync(sovitsAbs)) {
       const st = await pingSovits(payload.sovitsUrl);
       if (st.online) {
         try {
@@ -570,10 +752,6 @@ ipcMain.handle("tts:speak", async (_e, payload) => {
   }
 
   const wav = Buffer.from(result.base64, "base64");
-  const volume =
-    typeof payload.volume === "number" && Number.isFinite(payload.volume)
-      ? Math.max(0, Math.min(2, payload.volume))
-      : 1;
   const host = await playWavOnHost(wav, { volume });
   return {
     ...result,
@@ -583,6 +761,7 @@ ipcMain.handle("tts:speak", async (_e, payload) => {
 });
 
 app.whenReady().then(() => {
+  allowMicrophoneCapture();
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -598,9 +777,11 @@ ipcMain.handle("device:set-intensity", async (_e, intensity, level) =>
 );
 
 app.on("before-quit", () => {
+  stopCursorGrab();
   deviceStopOnQuit();
   stopOllamaOnQuit();
   stopSovitsOnQuit();
+  stopQwenOnQuit();
   stopWd14OnQuit();
 });
 
@@ -608,6 +789,7 @@ app.on("window-all-closed", () => {
   deviceStopOnQuit();
   stopOllamaOnQuit();
   stopSovitsOnQuit();
+  stopQwenOnQuit();
   stopWd14OnQuit();
   if (process.platform !== "darwin") app.quit();
 });

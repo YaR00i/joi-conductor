@@ -4,6 +4,7 @@ import {
   type ContractInstance,
   type DailyContractBoard,
 } from "./contracts/dailyBoard";
+import { isHabitContractId } from "./contracts/catalog";
 import {
   dynamicTagShopItem,
   isShopOwned,
@@ -52,7 +53,9 @@ export function listOpenContractsToday(
   return board.contracts
     .filter((c) => c.status === "open" && nowMs <= c.deadlineMs)
     .sort((a, b) => {
-      // Prefer higher reward first for a short brief list
+      const ah = isHabitContractId(a.defId) ? 0 : 1;
+      const bh = isHabitContractId(b.defId) ? 0 : 1;
+      if (ah !== bh) return ah - bh;
       if (b.reward !== a.reward) return b.reward - a.reward;
       return a.titleRu.localeCompare(b.titleRu, "ru");
     });

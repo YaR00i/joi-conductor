@@ -77,22 +77,22 @@ type SectionId =
   | "escalate"
   | "custom";
 
-const SECTIONS: { id: SectionId; labelRu: string }[] = [
-  { id: "steps", labelRu: "Шаги рулетки" },
-  { id: "mood", labelRu: "Настроение" },
-  { id: "mode", labelRu: "Режим" },
-  { id: "duration", labelRu: "Длительность" },
-  { id: "edges", labelRu: "Эджи" },
-  { id: "ruins", labelRu: "Руины" },
-  { id: "finaleOdds", labelRu: "Шансы финала" },
-  { id: "bpm", labelRu: "Темп" },
-  { id: "finish", labelRu: "Куда кончить" },
-  { id: "cumplay", labelRu: "Cumplay" },
-  { id: "fetish", labelRu: "Фетиши" },
-  { id: "character", labelRu: "Архетип" },
-  { id: "media_type", labelRu: "Тип контента" },
-  { id: "escalate", labelRu: "Эскалации" },
-  { id: "custom", labelRu: "Свой фетиш" },
+const SECTIONS: { id: SectionId; labelRu: string; hintRu: string }[] = [
+  { id: "steps", labelRu: "Шаги", hintRu: "какие колёса крутятся" },
+  { id: "mood", labelRu: "Настроение", hintRu: "тон сессии" },
+  { id: "mode", labelRu: "Режим", hintRu: "stroke / CBT / oral…" },
+  { id: "duration", labelRu: "Длительность", hintRu: "минуты сессии" },
+  { id: "edges", labelRu: "Эджи", hintRu: "сколько эджей" },
+  { id: "ruins", labelRu: "Руины", hintRu: "сколько руинов" },
+  { id: "finaleOdds", labelRu: "Финал", hintRu: "шансы cum / ruin" },
+  { id: "bpm", labelRu: "Темп", hintRu: "диапазон BPM" },
+  { id: "finish", labelRu: "Куда", hintRu: "куда кончить" },
+  { id: "cumplay", labelRu: "Cumplay", hintRu: "после финала" },
+  { id: "fetish", labelRu: "Фетиши", hintRu: "теги сцены" },
+  { id: "character", labelRu: "Архетип", hintRu: "кто на картинке" },
+  { id: "media_type", labelRu: "Тип", hintRu: "фото / гиф / видео" },
+  { id: "escalate", labelRu: "Эскалации", hintRu: "сектор «→ жёстче»" },
+  { id: "custom", labelRu: "Свой", hintRu: "добавить фетиш" },
 ];
 
 function CheckMark({ on }: { on: boolean }) {
@@ -655,26 +655,7 @@ export function RouletteSettingsPanel({
     <div
       className={`roulette-set ${showPanel ? "is-open" : ""}${embedded ? " roulette-set--embedded" : ""}`}
     >
-      {embedded ? (
-        hideEmbeddedTitle ? (
-          savedFlash ? (
-            <div className="roulette-set__bar">
-              <span className="roulette-set__saved" aria-live="polite">
-                Сохранено
-              </span>
-            </div>
-          ) : null
-        ) : (
-          <div className="roulette-set__bar">
-            <h3 className="roulette-set__embedded-title">Настройки рулетки</h3>
-            {savedFlash ? (
-              <span className="roulette-set__saved" aria-live="polite">
-                Сохранено
-              </span>
-            ) : null}
-          </div>
-        )
-      ) : (
+      {embedded ? null : (
         <div className="roulette-set__bar">
           <button
             type="button"
@@ -700,25 +681,50 @@ export function RouletteSettingsPanel({
 
       {showPanel ? (
         <div className="roulette-set__panel">
-          <p className="roulette-set__lead">
-            Включи/выключи сектора колёс, эскалации и свои теги. Сохраняется
-            локально и сразу влияет на «Пусть Госпожа решает».
-          </p>
+          {embedded || hideEmbeddedTitle ? null : (
+            <p className="roulette-set__lead">
+              Включи/выключи сектора колёс, эскалации и свои теги. Сохраняется
+              локально и сразу влияет на «Пусть Госпожа решает».
+            </p>
+          )}
 
-          <div className="roulette-set__tabs" role="tablist">
+          <div
+            className={
+              embedded ? "brain-seg brain-seg--wrap" : "roulette-set__tabs"
+            }
+            role="tablist"
+            aria-label="Колесо рулетки"
+          >
             {SECTIONS.map((s) => (
               <button
                 key={s.id}
                 type="button"
                 role="tab"
                 aria-selected={section === s.id}
-                className={`roulette-set__tab ${section === s.id ? "is-active" : ""}`}
+                title={s.hintRu}
+                className={
+                  embedded
+                    ? "brain-seg__btn" + (section === s.id ? " is-on" : "")
+                    : `roulette-set__tab ${section === s.id ? "is-active" : ""}`
+                }
                 onClick={() => setSection(s.id)}
               >
                 {s.labelRu}
               </button>
             ))}
           </div>
+
+          {embedded ? (
+            <h3 className="brain-panel__h">
+              {SECTIONS.find((s) => s.id === section)?.labelRu ?? section}
+              {savedFlash ? (
+                <span className="brain-dot brain-dot--ok" aria-live="polite">
+                  {" "}
+                  · сохранено
+                </span>
+              ) : null}
+            </h3>
+          ) : null}
 
           <div className="roulette-set__body">
             {rouletteBias.summaryRu ? (
@@ -1417,8 +1423,12 @@ export function RouletteSettingsPanel({
           </div>
 
           <div className="roulette-set__footer">
-            <button type="button" className="btn-ghost" onClick={resetAll}>
-              Сбросить к стандартным
+            <button
+              type="button"
+              className={embedded ? "brain-act" : "btn-ghost"}
+              onClick={resetAll}
+            >
+              сброс к стандартным
             </button>
           </div>
         </div>

@@ -262,3 +262,11 @@ export async function synthesizePiperTts(opts) {
     engine: "piper",
   };
 }
+
+export async function uninstallPiper() {
+  const root = piperRoot();
+  if (existsSync(root)) {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+  return getPiperStatus();
+}

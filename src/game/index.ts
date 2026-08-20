@@ -33,6 +33,7 @@ export type {
   EmberMap,
   EmberMapGrade,
   EmberMapLight,
+  EmberMapPlayProfile,
   EmberPack,
   EmberScene,
   EmberSceneGroup,

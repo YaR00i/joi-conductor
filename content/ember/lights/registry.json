@@ -12,6 +12,19 @@
       "lampShowCore": true,
       "lampStrength0": 0.62,
       "lampStrengthFalloff": 0.45
+    },
+    {
+      "id": "lamp_village_street",
+      "nameRu": "Уличный фонарь деревни",
+      "lampColor": "#ffb056",
+      "lampFaceColor": "#ff9030",
+      "lampRange": 7,
+      "lampDiscCore": 2,
+      "lampDiscMid": 4,
+      "lampHeight": 1.7,
+      "lampShowCore": true,
+      "lampStrength0": 0.72,
+      "lampStrengthFalloff": 0.42
     }
   ]
 }

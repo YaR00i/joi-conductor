@@ -38,6 +38,12 @@ export type TagProgress = {
   currentItem?: string;
 };
 
+export type Wd14RuntimeProgress = {
+  phase: string;
+  pct: number;
+  detail?: string;
+};
+
 export type TagOptions = {
   baseUrl?: string;
   generalThreshold?: number;
@@ -89,6 +95,14 @@ export async function getWd14Status(
       detail: err instanceof Error ? err.message : "ошибка статуса",
     };
   }
+}
+
+export function onWd14RuntimeProgress(
+  cb: (payload: Wd14RuntimeProgress) => void,
+): () => void {
+  const api = window.joiDesktop?.media;
+  if (!api?.onWd14Progress) return () => undefined;
+  return api.onWd14Progress(cb);
 }
 
 /** Start the Python server (best-effort; throws on missing python/model). */

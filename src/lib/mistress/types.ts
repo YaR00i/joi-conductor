@@ -102,12 +102,17 @@ export type MistressPack = {
   play: MistressPlayBias;
   fx: MistressSessionFx;
   voice: {
-    /** Project-relative or absolute SoVITS reference wav */
+    /** Project-relative or absolute GPT-SoVITS wav (4–10 s) */
     sovitsRefPath: string;
-    /** Exact transcript of the reference clip */
+    /** Exact transcript of the SoVITS clip */
     sovitsPromptText: string;
     sovitsPromptLang?: "ru" | "zh" | "en" | "ja";
     sovitsTextLang?: "ru" | "zh" | "en" | "ja" | "ko";
+    /** Qwen Base clone wav (~3 s). Falls back to sovitsRefPath only in old packs. */
+    qwenRefPath?: string;
+    /** Transcript of the Qwen clip (ref_text) */
+    qwenPromptText?: string;
+    qwenPromptLang?: "ru" | "zh" | "en" | "ja";
     /** Default SoVITS / TTS rate for this mistress (user can override). */
     ttsRate?: number;
     /** Default TTS pitch for this mistress (user can override). */

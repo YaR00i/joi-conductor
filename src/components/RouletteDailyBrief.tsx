@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   cageIsActive,
   cageRemainingMs,
@@ -6,11 +7,13 @@ import {
 } from "../lib/cageTimer";
 import {
   categoryLabelRu,
+  contractBrief,
   ensureDailyContractBoard,
   formatCountdown,
   msUntilDeadline,
   type ContractInstance,
 } from "../lib/contracts/dailyBoard";
+import { isHabitContractId } from "../lib/contracts/catalog";
 import { isMediaDrillContract } from "../lib/contracts/mediaDrill";
 import {
   isSessionSeedableContract,
@@ -317,6 +320,35 @@ export function RouletteDailyBrief({
   );
 }
 
+type DailyPopBox = {
+  left: number;
+  width: number;
+  maxHeight: number;
+  top?: number;
+  bottom?: number;
+};
+
+function dailyPopBoxForRow(row: HTMLElement): DailyPopBox {
+  const r = row.getBoundingClientRect();
+  const margin = 10;
+  const width = Math.min(r.width, window.innerWidth - margin * 2);
+  const left = Math.min(
+    Math.max(margin, r.left),
+    Math.max(margin, window.innerWidth - width - margin),
+  );
+  const below = window.innerHeight - r.bottom - margin;
+  const above = r.top - margin;
+  if (below >= 132 || below >= above) {
+    return { top: r.bottom + 6, left, width, maxHeight: Math.max(88, below) };
+  }
+  return {
+    bottom: window.innerHeight - r.top + 6,
+    left,
+    width,
+    maxHeight: Math.max(88, above),
+  };
+}
+
 function ContractBriefRow({
   contract,
   seeded,
@@ -333,10 +365,49 @@ function ContractBriefRow({
   const drill = isMediaDrillContract(contract);
   const seedable = !drill && isSessionSeedableContract(contract);
   const verifyMode = contractVerificationMode(contract);
+  const brief = contractBrief(contract.defId);
+  const rowRef = useRef<HTMLLIElement>(null);
+  const [popOpen, setPopOpen] = useState(false);
+  const [popBox, setPopBox] = useState<DailyPopBox | null>(null);
+  const popId = `daily-pop-${contract.instanceId}`;
+
+  const updatePopBox = () => {
+    const row = rowRef.current;
+    if (!row) return;
+    setPopBox(dailyPopBoxForRow(row));
+  };
+
+  const openPop = () => {
+    updatePopBox();
+    setPopOpen(true);
+  };
+
+  useLayoutEffect(() => {
+    if (!popOpen) return;
+    updatePopBox();
+    const onMove = () => updatePopBox();
+    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    return () => {
+      window.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
+  }, [popOpen]);
 
   return (
     <li
+      ref={rowRef}
       className={`roulette-daily__row${seeded ? " is-seeded" : ""}`}
+      tabIndex={0}
+      aria-describedby={popOpen ? popId : undefined}
+      onMouseEnter={openPop}
+      onMouseLeave={() => setPopOpen(false)}
+      onFocus={openPop}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          setPopOpen(false);
+        }
+      }}
     >
       <div className="roulette-daily__row-main">
         <span className="roulette-daily__cat">
@@ -349,9 +420,17 @@ function ContractBriefRow({
           {contractVerificationBadgeRu(verifyMode)}
         </span>
         <span className="roulette-daily__title">{contract.titleRu}</span>
+        {isHabitContractId(contract.defId) ? (
+          <span className="roulette-daily__habit">привычка</span>
+        ) : null}
         <span className="roulette-daily__reward">+{contract.reward}</span>
       </div>
       <div className="roulette-daily__row-actions">
+        {brief ? (
+          <span className="roulette-daily__brief" title={brief}>
+            {brief}
+          </span>
+        ) : null}
         {seeded ? (
           <span className="roulette-daily__hint">
             {contractVerificationPathHintRu(verifyMode, { seeded: true })}
@@ -388,6 +467,34 @@ function ContractBriefRow({
           </span>
         )}
       </div>
+      {popOpen && popBox
+        ? createPortal(
+            <div
+              id={popId}
+              className="roulette-daily__pop"
+              role="tooltip"
+              style={{
+                left: popBox.left,
+                width: popBox.width,
+                maxHeight: popBox.maxHeight,
+                top: popBox.top,
+                bottom: popBox.bottom,
+              }}
+            >
+              <p className="roulette-daily__pop-kicker">
+                {categoryLabelRu(contract.category)}
+                {isHabitContractId(contract.defId) ? " · привычка" : ""}
+                {" · "}
+                {contractVerificationBadgeRu(verifyMode)}
+                {" · +"}
+                {contract.reward}
+              </p>
+              <strong>{contract.titleRu}</strong>
+              <p className="roulette-daily__pop-body">{contract.bodyRu}</p>
+            </div>,
+            document.body,
+          )
+        : null}
     </li>
   );
 }

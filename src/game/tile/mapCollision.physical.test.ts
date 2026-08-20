@@ -123,6 +123,45 @@ describe("voxel model physicality", () => {
     );
   });
 
+  it("uses the authored voxel Transform scale for the physical footprint", () => {
+    const model = solidCube("scaled-crate");
+    const map = openYard();
+    const ts = map.tileSize;
+    const y = 4 * ts + ts / 2;
+    const probeX = 4 * ts + ts + 6;
+    const models = { "scaled-crate": model };
+    map.voxelProps = [
+      { id: "p", modelId: "scaled-crate", x: 4, y: 4, elev: 0 },
+    ];
+    expect(
+      circleHitsSolid(
+        map,
+        tileset,
+        probeX,
+        y,
+        R,
+        0,
+        undefined,
+        "top",
+        models,
+      ),
+    ).toBe(false);
+    map.voxelProps[0]!.scale = { x: 2, y: 1, z: 1 };
+    expect(
+      circleHitsSolid(
+        map,
+        tileset,
+        probeX,
+        y,
+        R,
+        0,
+        undefined,
+        "top",
+        models,
+      ),
+    ).toBe(true);
+  });
+
   it("zone chest with non-physical model stays walk-through", () => {
     const model = solidCube("chest", false);
     const map = openYard();
@@ -246,6 +285,44 @@ describe("sprite and tile instance collider overrides", () => {
         R,
         0,
         { banner: sprite("banner", false) },
+      ),
+    ).toBe(true);
+  });
+
+  it("uses the authored sprite Z for vertical collision clearance", () => {
+    const map = openYard();
+    map.sprites = [
+      {
+        id: "bridge-sign",
+        spriteId: "banner",
+        x: 4,
+        y: 4,
+        elev: 2,
+        componentStates: { collider: true },
+      },
+    ];
+    const ts = map.tileSize;
+    const sprites = { banner: sprite("banner", false) };
+    expect(
+      circleHitsSolid(
+        map,
+        tileset,
+        4 * ts + ts / 2,
+        4 * ts + ts / 2,
+        R,
+        0,
+        sprites,
+      ),
+    ).toBe(false);
+    expect(
+      circleHitsSolid(
+        map,
+        tileset,
+        4 * ts + ts / 2,
+        4 * ts + ts / 2,
+        R,
+        2,
+        sprites,
       ),
     ).toBe(true);
   });

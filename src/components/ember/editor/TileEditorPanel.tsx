@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { writeEmberJson, type EmberPack } from "../../../game";
+import { writeEmberJson } from "../../../game/content/io";
 import type {
   EmberEmissiveAnim,
   EmberEmissiveTriggerWhen,
   EmberMaterialKind,
+  EmberPack,
   EmberTilePreset,
   EmberTileset,
   EmberTilesetTile,

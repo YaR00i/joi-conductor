@@ -1,4 +1,8 @@
 import type { EmberPack, ValidationIssue } from "./types";
+import {
+  autoAttackValidationMessage,
+  playProfileValidationMessage,
+} from "./playProfile";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
@@ -286,6 +290,26 @@ export function validatePack(pack: EmberPack): ValidationIssue[] {
 
   for (const map of Object.values(pack.maps)) {
     const mapBase = `maps/${map.id}`;
+    const playProfileIssue = playProfileValidationMessage(
+      (map as { playProfile?: unknown }).playProfile,
+    );
+    if (playProfileIssue) {
+      issues.push({
+        level: "error",
+        path: `${mapBase}.playProfile`,
+        message: playProfileIssue,
+      });
+    }
+    const autoAttackIssue = autoAttackValidationMessage(
+      (map as { autoAttack?: unknown }).autoAttack,
+    );
+    if (autoAttackIssue) {
+      issues.push({
+        level: "error",
+        path: `${mapBase}.autoAttack`,
+        message: autoAttackIssue,
+      });
+    }
     if (!pack.tilesets[map.tilesetId]) {
       issues.push({
         level: "error",
@@ -382,6 +406,31 @@ export function validatePack(pack: EmberPack): ValidationIssue[] {
             min: 0.05,
             max: 30,
           });
+        }
+      }
+      if (r.kind === "npc_idle" || r.kind === "npc_wander") {
+        if (!r.spriteId) {
+          issues.push({
+            level: "warn",
+            path: `${mapBase}.regions.${r.id}.spriteId`,
+            message: "NPC-зоне нужен spriteId",
+          });
+        } else if (!pack.sprites[r.spriteId]) {
+          issues.push({
+            level: "error",
+            path: `${mapBase}.regions.${r.id}.spriteId`,
+            message: `Спрайт «${r.spriteId}» отсутствует`,
+          });
+        }
+        if (r.wanderRegionId) {
+          const wander = map.regions.find((o) => o.id === r.wanderRegionId);
+          if (!wander) {
+            issues.push({
+              level: "error",
+              path: `${mapBase}.regions.${r.id}.wanderRegionId`,
+              message: `Регион «${r.wanderRegionId}» не найден`,
+            });
+          }
         }
       }
       if (r.kind !== "teleport") continue;

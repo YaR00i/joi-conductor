@@ -28,6 +28,10 @@ import {
   type ZoneVoxelPose,
 } from "../voxel/voxelPhysical";
 import {
+  EMBER_TRANSFORM_SCALE_MAX,
+  resolveEmberTransformScale,
+} from "../world/worldTransform";
+import {
   emissiveCellSeed,
   emissivePlacementSeed,
   emissiveProximityAmount,
@@ -40,7 +44,14 @@ import {
   stampEmissiveBloomField,
   tileEmissiveAlpha,
 } from "./emissivePaint";
-import { MAP_LIGHT_RANGE_MAX } from "./lightLimits";
+import {
+  MAP_DYNAMIC_POINT_SHADOWS_MAX,
+  MAP_DYNAMIC_SHADOW_SCALE_MAX,
+  MAP_DYNAMIC_SHADOW_SCALE_MIN,
+  MAP_LIGHT_RANGE_MAX,
+  MAP_POINT_LIGHTS_MAX,
+  MAP_POINT_SHADOWS_MAX,
+} from "./lightLimits";
 import type { EmberEmissiveTriggerWhen } from "../content/types";
 import {
   blockStoryHeight,
@@ -678,7 +689,7 @@ function zoneVoxelPoseForCollision(
  * Map voxel props + zone-placed models that should collide.
  * Non-physical models are omitted (walk-through).
  */
-function physicalVoxelPropPlacements(
+function buildPhysicalVoxelPropPlacements(
   map: EmberMap,
   voxelModels?: EmberVoxelModelLib,
   voxelScenes?: EmberVoxelSceneLib,
@@ -828,11 +839,144 @@ type VoxelPropFootprint = {
   rot: number;
   sx: number;
   sz: number;
-  voxelWorld: number;
+  voxelWorldX: number;
+  voxelWorldZ: number;
+  verticalScale: number;
   baseElev: number;
   topElev: number;
   solidVoxH: number;
 };
+
+type CollisionBounds = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+};
+
+type IndexedCollisionItem<T> = {
+  value: T;
+  index: number;
+};
+
+type CollisionSpatialIndex<T> = {
+  items: IndexedCollisionItem<T>[];
+  buckets: Map<number, IndexedCollisionItem<T>[]>;
+  marks: Uint32Array;
+  stamp: number;
+  width: number;
+  height: number;
+  tileSize: number;
+};
+
+function buildCollisionSpatialIndex<T>(
+  map: EmberMap,
+  values: T[],
+  boundsOf: (value: T) => CollisionBounds | null,
+): CollisionSpatialIndex<T> {
+  const items = values.map((value, index) => ({ value, index }));
+  const buckets = new Map<number, IndexedCollisionItem<T>[]>();
+  const ts = Math.max(1, map.tileSize);
+  for (const item of items) {
+    const bounds = boundsOf(item.value);
+    if (!bounds) continue;
+    const minTx = Math.max(0, Math.floor(bounds.left / ts));
+    const maxTx = Math.min(map.width - 1, Math.floor(bounds.right / ts));
+    const minTy = Math.max(0, Math.floor(bounds.top / ts));
+    const maxTy = Math.min(map.height - 1, Math.floor(bounds.bottom / ts));
+    if (minTx > maxTx || minTy > maxTy) continue;
+    for (let ty = minTy; ty <= maxTy; ty++) {
+      for (let tx = minTx; tx <= maxTx; tx++) {
+        const key = tx + ty * map.width;
+        const bucket = buckets.get(key);
+        if (bucket) bucket.push(item);
+        else buckets.set(key, [item]);
+      }
+    }
+  }
+  return {
+    items,
+    buckets,
+    marks: new Uint32Array(items.length),
+    stamp: 0,
+    width: map.width,
+    height: map.height,
+    tileSize: map.tileSize,
+  };
+}
+
+/** Visit each candidate overlapping the queried tile buckets at most once. */
+function visitCollisionCandidates<T>(
+  index: CollisionSpatialIndex<T>,
+  bounds: CollisionBounds,
+  visitor: (value: T) => boolean | void,
+): boolean {
+  let stamp = (index.stamp + 1) >>> 0;
+  if (stamp === 0) {
+    index.marks.fill(0);
+    stamp = 1;
+  }
+  index.stamp = stamp;
+  const ts = Math.max(1, index.tileSize);
+  const minTx = Math.max(0, Math.floor(bounds.left / ts));
+  const maxTx = Math.min(index.width - 1, Math.floor(bounds.right / ts));
+  const minTy = Math.max(0, Math.floor(bounds.top / ts));
+  const maxTy = Math.min(index.height - 1, Math.floor(bounds.bottom / ts));
+  if (minTx > maxTx || minTy > maxTy) return false;
+  for (let ty = minTy; ty <= maxTy; ty++) {
+    for (let tx = minTx; tx <= maxTx; tx++) {
+      const bucket = index.buckets.get(tx + ty * index.width);
+      if (!bucket) continue;
+      for (const item of bucket) {
+        if (index.marks[item.index] === stamp) continue;
+        index.marks[item.index] = stamp;
+        if (visitor(item.value) === true) return true;
+      }
+    }
+  }
+  return false;
+}
+
+type VoxelCollisionCandidate = {
+  place: EmberVoxelPlacement;
+};
+
+type SpriteCollisionCandidate = {
+  place: EmberSpritePlacement;
+};
+
+type MapCollisionSpatialCache = {
+  voxelPropsRef?: EmberMap["voxelProps"];
+  regionsRef?: EmberMap["regions"];
+  voxelModelsRef?: EmberVoxelModelLib;
+  voxelScenesRef?: EmberVoxelSceneLib;
+  voxel?: CollisionSpatialIndex<VoxelCollisionCandidate>;
+  spritesRef?: EmberMap["sprites"];
+  spriteLibRef?: EmberSpriteLib;
+  sprite?: CollisionSpatialIndex<SpriteCollisionCandidate>;
+  width: number;
+  height: number;
+  tileSize: number;
+};
+
+const mapCollisionSpatialCache = new WeakMap<EmberMap, MapCollisionSpatialCache>();
+
+function collisionSpatialCacheFor(map: EmberMap): MapCollisionSpatialCache {
+  const hit = mapCollisionSpatialCache.get(map);
+  if (
+    hit &&
+    hit.width === map.width &&
+    hit.height === map.height &&
+    hit.tileSize === map.tileSize
+  ) return hit;
+  const next: MapCollisionSpatialCache = {
+    width: map.width,
+    height: map.height,
+    tileSize: map.tileSize,
+  };
+  mapCollisionSpatialCache.set(map, next);
+  return next;
+}
 
 function voxelPropFootprint(
   map: EmberMap,
@@ -845,8 +989,11 @@ function voxelPropFootprint(
   const ts = map.tileSize;
   const vw = ts / VOXELS_PER_BLOCK;
   const rot = voxelPropRot(place.rot);
-  const fw = (rot % 2 === 0 ? sx : sz) * vw;
-  const fd = (rot % 2 === 0 ? sz : sx) * vw;
+  const scale = resolveEmberTransformScale(place.scale);
+  const localW = sx * vw * scale.x;
+  const localD = sz * vw * scale.y;
+  const fw = rot % 2 === 0 ? localW : localD;
+  const fd = rot % 2 === 0 ? localD : localW;
   const cx = place.x * ts + (sx * vw) * 0.5;
   const cy = place.y * ts + (sz * vw) * 0.5;
   const baseElev = place.elev ?? tileSurfaceElev(map, place.x, place.y);
@@ -858,11 +1005,68 @@ function voxelPropFootprint(
     rot,
     sx,
     sz,
-    voxelWorld: vw,
+    voxelWorldX: vw * scale.x,
+    voxelWorldZ: vw * scale.y,
+    verticalScale: scale.z,
     baseElev,
-    topElev: baseElev + voxelsToElevStories(map, solidVoxH),
+    topElev:
+      baseElev + voxelsToElevStories(map, solidVoxH * scale.z),
     solidVoxH,
   };
+}
+
+/**
+ * Broad-phase bounds include every legal horizontal scale. This keeps direct
+ * inspector mutations correct even before the editor publishes a new map
+ * object; the exact live footprint is still tested in the narrow phase.
+ */
+function voxelPropBroadPhaseBounds(
+  map: EmberMap,
+  place: EmberVoxelPlacement,
+  model: EmberVoxelModel,
+): CollisionBounds {
+  const { sx, sz } = voxelGridSize(model);
+  const vw = map.tileSize / VOXELS_PER_BLOCK;
+  const cx = place.x * map.tileSize + (sx * vw) * 0.5;
+  const cy = place.y * map.tileSize + (sz * vw) * 0.5;
+  const half = Math.max(sx, sz) * vw * EMBER_TRANSFORM_SCALE_MAX * 0.5;
+  return {
+    left: cx - half,
+    top: cy - half,
+    right: cx + half,
+    bottom: cy + half,
+  };
+}
+
+function voxelCollisionSpatialIndex(
+  map: EmberMap,
+  voxelModels: EmberVoxelModelLib,
+  voxelScenes?: EmberVoxelSceneLib,
+): CollisionSpatialIndex<VoxelCollisionCandidate> {
+  const cache = collisionSpatialCacheFor(map);
+  if (
+    cache.voxel &&
+    cache.voxelPropsRef === map.voxelProps &&
+    cache.regionsRef === map.regions &&
+    cache.voxelModelsRef === voxelModels &&
+    cache.voxelScenesRef === voxelScenes
+  ) return cache.voxel;
+
+  const values = buildPhysicalVoxelPropPlacements(
+    map,
+    voxelModels,
+    voxelScenes,
+  ).map((place) => ({ place }));
+  const index = buildCollisionSpatialIndex(map, values, ({ place }) => {
+    const model = voxelModels[place.modelId];
+    return model ? voxelPropBroadPhaseBounds(map, place, model) : null;
+  });
+  cache.voxelPropsRef = map.voxelProps;
+  cache.regionsRef = map.regions;
+  cache.voxelModelsRef = voxelModels;
+  cache.voxelScenesRef = voxelScenes;
+  cache.voxel = index;
+  return index;
 }
 
 function voxelPropLocalAtWorld(
@@ -870,8 +1074,8 @@ function voxelPropLocalAtWorld(
   x: number,
   y: number,
 ): { x: number; z: number } {
-  const w = fp.sx * fp.voxelWorld;
-  const d = fp.sz * fp.voxelWorld;
+  const w = fp.sx * fp.voxelWorldX;
+  const d = fp.sz * fp.voxelWorldZ;
   const dx = x - (fp.left + fp.right) * 0.5;
   const dz = y - (fp.top + fp.bottom) * 0.5;
   // Inverse of Three.js Yaw (group.rotation.y = rot * π/2):
@@ -881,8 +1085,8 @@ function voxelPropLocalAtWorld(
   const angle = fp.rot * (Math.PI / 2);
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
-  const localX = (dx * cos - dz * sin + w * 0.5) / fp.voxelWorld;
-  const localZ = (dx * sin + dz * cos + d * 0.5) / fp.voxelWorld;
+  const localX = (dx * cos - dz * sin + w * 0.5) / fp.voxelWorldX;
+  const localZ = (dx * sin + dz * cos + d * 0.5) / fp.voxelWorldZ;
   return { x: localX, z: localZ };
 }
 
@@ -915,7 +1119,24 @@ function voxelPropColumnTopElev(
 ): number | null {
   const h = voxelPropColumnHeightAtWorld(model, fp, x, y);
   if (h <= 0) return null;
-  return fp.baseElev + voxelsToElevStories(map, h);
+  return fp.baseElev + voxelsToElevStories(map, h * fp.verticalScale);
+}
+
+function ellipseOverlapsAabb(
+  cx: number,
+  cz: number,
+  radiusX: number,
+  radiusZ: number,
+  left: number,
+  top: number,
+  right: number,
+  bottom: number,
+): boolean {
+  const nearestX = Math.max(left, Math.min(right, cx));
+  const nearestZ = Math.max(top, Math.min(bottom, cz));
+  const dx = (cx - nearestX) / Math.max(1e-6, radiusX);
+  const dz = (cz - nearestZ) / Math.max(1e-6, radiusZ);
+  return dx * dx + dz * dz <= 1;
 }
 
 function pointInFootprint(
@@ -939,16 +1160,20 @@ function autoStepSurfacesAt(
   const wallTop = shortWallTopElev(map, tx, ty);
   if (wallTop != null) out.push(wallTop);
   if (!voxelModels) return out;
-  const places = physicalVoxelPropPlacements(map, voxelModels, voxelScenes);
-  for (const place of places) {
-    const model = voxelModels[place.modelId];
-    if (!model) continue;
-    const fp = voxelPropFootprint(map, place, model);
-    if (!fp || fp.solidVoxH <= 0) continue;
-    if (!pointInFootprint(x, y, fp)) continue;
-    const surface = voxelPropColumnTopElev(map, model, fp, x, y);
-    if (surface != null) out.push(surface);
-  }
+  const index = voxelCollisionSpatialIndex(map, voxelModels, voxelScenes);
+  visitCollisionCandidates(
+    index,
+    { left: x, top: y, right: x, bottom: y },
+    ({ place }) => {
+      const model = voxelModels[place.modelId];
+      if (!model) return;
+      const fp = voxelPropFootprint(map, place, model);
+      if (!fp || fp.solidVoxH <= 0) return;
+      if (!pointInFootprint(x, y, fp)) return;
+      const surface = voxelPropColumnTopElev(map, model, fp, x, y);
+      if (surface != null) out.push(surface);
+    },
+  );
   return out;
 }
 
@@ -1017,103 +1242,114 @@ function circleHitsTallVoxelProp(
   body: ResolvedWorldBody = resolveWorldBody(),
 ): boolean {
   if (!voxelModels) return false;
-  const places = physicalVoxelPropPlacements(map, voxelModels, voxelScenes);
-  if (places.length === 0) return false;
+  const index = voxelCollisionSpatialIndex(map, voxelModels, voxelScenes);
+  if (index.items.length === 0) return false;
   const r = Math.max(0.5, radius);
-  for (const place of places) {
-    const model = voxelModels[place.modelId];
-    if (!model) continue;
-    const collider = resolveWorldCollider(
-      model.collider,
-      place.collider,
-      isVoxelModelPhysical(model),
-    );
-    if (!colliderAffectsBody(collider, body)) continue;
-    const fp = voxelPropFootprint(map, place, model);
-    if (!fp) continue;
-    if (
-      !circleOverlapsAabb(x, y, r, fp.left, fp.top, fp.right, fp.bottom)
-    ) {
-      continue;
-    }
+  return visitCollisionCandidates(
+    index,
+    { left: x - r, top: y - r, right: x + r, bottom: y + r },
+    ({ place }) => {
+      const model = voxelModels[place.modelId];
+      if (!model) return false;
+      const collider = resolveWorldCollider(
+        model.collider,
+        place.collider,
+        isVoxelModelPhysical(model),
+      );
+      if (!colliderAffectsBody(collider, body)) return false;
+      const fp = voxelPropFootprint(map, place, model);
+      if (!fp) return false;
+      if (
+        !circleOverlapsAabb(x, y, r, fp.left, fp.top, fp.right, fp.bottom)
+      ) {
+        return false;
+      }
 
-    const local = voxelPropLocalAtWorld(fp, x, y);
-    const heights = voxelModelColumnHeights(model);
-    const localR = r / fp.voxelWorld;
-    const cx = local.x;
-    const cz = local.z;
-    const minX = Math.max(0, Math.floor(cx - localR));
-    const maxX = Math.min(fp.sx - 1, Math.floor(cx + localR));
-    const minZ = Math.max(0, Math.floor(cz - localR));
-    const maxZ = Math.min(fp.sz - 1, Math.floor(cz + localR));
+      const local = voxelPropLocalAtWorld(fp, x, y);
+      const heights = voxelModelColumnHeights(model);
+      const localRX = r / fp.voxelWorldX;
+      const localRZ = r / fp.voxelWorldZ;
+      const cx = local.x;
+      const cz = local.z;
+      const minX = Math.max(0, Math.floor(cx - localRX));
+      const maxX = Math.min(fp.sx - 1, Math.floor(cx + localRX));
+      const minZ = Math.max(0, Math.floor(cz - localRZ));
+      const maxZ = Math.min(fp.sz - 1, Math.floor(cz + localRZ));
 
-    const footTile = worldToTile(map, x, y);
-    const floorE = elevationAt(map, footTile.tx, footTile.ty);
-    const onFloor =
-      Math.abs(elev - floorE) <= 0.05 &&
-      shortWallTopElev(map, footTile.tx, footTile.ty) == null;
-    // Fall soft-lock escape: grazing a tall exterior face while standing on
-    // the floor outside the prop. Once the center is inside the footprint,
-    // risers stay solid (stair phase-through).
-    const centerOutsideProp = !pointInFootprint(x, y, fp);
-    // Player radius reaches ~2.5 vx — only the immediate riser should body-block
-    // so 2vx sculpted stairs can climb without the +2 step walling them off.
-    const nearRiser = 1.05;
+      const footTile = worldToTile(map, x, y);
+      const floorE = elevationAt(map, footTile.tx, footTile.ty);
+      const onFloor =
+        Math.abs(elev - floorE) <= 0.05 &&
+        shortWallTopElev(map, footTile.tx, footTile.ty) == null;
+      // Fall soft-lock escape: grazing a tall exterior face while standing on
+      // the floor outside the prop. Once the center is inside the footprint,
+      // risers stay solid (stair phase-through).
+      const centerOutsideProp = !pointInFootprint(x, y, fp);
+      // Player radius reaches ~2.5 vx — only the immediate riser should body-block
+      // so 2vx sculpted stairs can climb without the +2 step walling them off.
+      const nearRiser = 1.05;
 
-    const spansByCol = voxelModelColumnSpans(model);
-    for (let lz = minZ; lz <= maxZ; lz++) {
-      for (let lx = minX; lx <= maxX; lx++) {
-        const h = heights[lx + lz * fp.sx] ?? 0;
-        if (h <= 0) continue;
-        const spans = spansByCol[lx + lz * fp.sx] ?? [];
-        // Prefer real solid runs (overhangs / floating cells) over a solid pillar.
-        const runs =
-          spans.length > 0
-            ? spans
-            : [{ lo: 0, hi: h }];
-        let blocked = false;
-        for (const span of runs) {
-          const spanBase =
-            fp.baseElev +
-            collider.offsetVoxels / VOXELS_PER_BLOCK +
-            voxelsToElevStories(map, span.lo);
-          const spanTop =
-            fp.baseElev +
-            collider.offsetVoxels / VOXELS_PER_BLOCK +
-            voxelsToElevStories(map, span.hi);
+      const spansByCol = voxelModelColumnSpans(model);
+      for (let lz = minZ; lz <= maxZ; lz++) {
+        for (let lx = minX; lx <= maxX; lx++) {
+          const h = heights[lx + lz * fp.sx] ?? 0;
+          if (h <= 0) continue;
+          const spans = spansByCol[lx + lz * fp.sx] ?? [];
+          // Prefer real solid runs (overhangs / floating cells) over a solid pillar.
+          const runs = spans.length > 0 ? spans : [{ lo: 0, hi: h }];
+          let blocked = false;
+          for (const span of runs) {
+            const spanBase =
+              fp.baseElev +
+              (collider.offsetVoxels / VOXELS_PER_BLOCK) * fp.verticalScale +
+              voxelsToElevStories(map, span.lo * fp.verticalScale);
+            const spanTop =
+              fp.baseElev +
+              (collider.offsetVoxels / VOXELS_PER_BLOCK) * fp.verticalScale +
+              voxelsToElevStories(map, span.hi * fp.verticalScale);
+            if (
+              elevBlockedByColumnTop(
+                elev,
+                spanBase,
+                spanTop,
+                body,
+                collider.layer,
+              )
+            ) {
+              blocked = true;
+              break;
+            }
+          }
+          if (!blocked) continue;
+          const centerInCol =
+            cx >= lx && cx < lx + 1 && cz >= lz && cz < lz + 1;
+          if (centerInCol) return true;
           if (
-            elevBlockedByColumnTop(
-              elev,
-              spanBase,
-              spanTop,
-              body,
-              collider.layer,
+            !ellipseOverlapsAabb(
+              cx,
+              cz,
+              localRX,
+              localRZ,
+              lx,
+              lz,
+              lx + 1,
+              lz + 1,
             )
           ) {
-            blocked = true;
-            break;
+            continue;
           }
+          if (onFloor && centerOutsideProp) continue;
+          const nearest = Math.hypot(
+            Math.max(lx - cx, 0, cx - (lx + 1)),
+            Math.max(lz - cz, 0, cz - (lz + 1)),
+          );
+          if (nearest > nearRiser) continue;
+          return true;
         }
-        if (!blocked) continue;
-        const centerInCol =
-          cx >= lx && cx < lx + 1 && cz >= lz && cz < lz + 1;
-        if (centerInCol) return true;
-        if (
-          !circleOverlapsAabb(cx, cz, localR, lx, lz, lx + 1, lz + 1)
-        ) {
-          continue;
-        }
-        if (onFloor && centerOutsideProp) continue;
-        const nearest = Math.hypot(
-          Math.max(lx - cx, 0, cx - (lx + 1)),
-          Math.max(lz - cz, 0, cz - (lz + 1)),
-        );
-        if (nearest > nearRiser) continue;
-        return true;
       }
-    }
-  }
-  return false;
+      return false;
+    },
+  );
 }
 
 /**
@@ -1278,11 +1514,27 @@ export function solidSpriteAabb(
   if (!raw) return null;
   const collider = resolveSpriteInstanceCollider(place, raw);
   if (!collider.enabled || !collider.blocksMovement || collider.isTrigger) return null;
+  return spritePlacementAabb(map, place, raw);
+}
+
+function spritePlacementAabb(
+  map: EmberMap,
+  place: EmberSpritePlacement,
+  raw: EmberPixelSprite,
+): {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  elev: number;
+  stories: number;
+} {
   const n = normalizePixelSprite(raw);
-  const elev = elevationAt(map, place.x, place.y);
+  const scale = resolveEmberTransformScale(place.scale);
+  const elev = place.elev ?? elevationAt(map, place.x, place.y);
   const ts = map.tileSize;
-  const hw = Math.max(2, n.width / 2);
-  const hh = Math.max(2, Math.min(ts, n.width) / 2);
+  const hw = Math.max(2, (n.width * scale.x) / 2);
+  const hh = Math.max(2, (Math.min(ts, n.width) * scale.y) / 2);
   const cx = place.x * ts + ts / 2;
   const cy = place.y * ts + ts / 2;
   return {
@@ -1291,8 +1543,76 @@ export function solidSpriteAabb(
     top: cy - hh,
     bottom: cy + hh,
     elev,
-    stories: spriteSolidStories(n),
+    stories: spriteSolidStories(n) * scale.z,
   };
+}
+
+function spriteCollisionBroadPhaseBounds(
+  map: EmberMap,
+  place: EmberSpritePlacement,
+  raw: EmberPixelSprite,
+): CollisionBounds {
+  const n = normalizePixelSprite(raw);
+  const ts = map.tileSize;
+  const cx = place.x * ts + ts / 2;
+  const cy = place.y * ts + ts / 2;
+  const hw = Math.max(2, n.width * EMBER_TRANSFORM_SCALE_MAX * 0.5);
+  const hh = Math.max(
+    2,
+    Math.min(ts, n.width) * EMBER_TRANSFORM_SCALE_MAX * 0.5,
+  );
+  return {
+    left: cx - hw,
+    top: cy - hh,
+    right: cx + hw,
+    bottom: cy + hh,
+  };
+}
+
+function spriteCollisionSpatialIndex(
+  map: EmberMap,
+  sprites: EmberSpriteLib,
+): CollisionSpatialIndex<SpriteCollisionCandidate> {
+  const cache = collisionSpatialCacheFor(map);
+  if (
+    cache.sprite &&
+    cache.spritesRef === map.sprites &&
+    cache.spriteLibRef === sprites
+  ) return cache.sprite;
+
+  const values = (map.sprites ?? []).map((place) => ({ place }));
+  const index = buildCollisionSpatialIndex(map, values, ({ place }) => {
+    const raw = sprites[place.spriteId];
+    return raw ? spriteCollisionBroadPhaseBounds(map, place, raw) : null;
+  });
+  cache.spritesRef = map.sprites;
+  cache.spriteLibRef = sprites;
+  cache.sprite = index;
+  return index;
+}
+
+function circleHitsIndexedSprite(
+  map: EmberMap,
+  sprites: EmberSpriteLib | undefined,
+  x: number,
+  y: number,
+  radius: number,
+  elev: number,
+  body: ResolvedWorldBody,
+): boolean {
+  if (!sprites || !map.sprites?.length) return false;
+  const index = spriteCollisionSpatialIndex(map, sprites);
+  return visitCollisionCandidates(
+    index,
+    {
+      left: x - radius,
+      top: y - radius,
+      right: x + radius,
+      bottom: y + radius,
+    },
+    ({ place }) =>
+      circleHitsSolidSprite(map, place, sprites, x, y, radius, elev, body),
+  );
 }
 
 function circleHitsSolidSprite(
@@ -1311,11 +1631,13 @@ function circleHitsSolidSprite(
   if (!raw) return false;
   const collider = resolveSpriteInstanceCollider(place, raw);
   if (!colliderAffectsBody(collider, body)) return false;
-  const offset = collider.offsetVoxels / VOXELS_PER_BLOCK;
+  const scale = resolveEmberTransformScale(place.scale);
+  const offset =
+    (collider.offsetVoxels / VOXELS_PER_BLOCK) * scale.z;
   const height =
     collider.heightVoxels == null
       ? box.stories
-      : collider.heightVoxels / VOXELS_PER_BLOCK;
+      : (collider.heightVoxels / VOXELS_PER_BLOCK) * scale.z;
   if (
     !spanBlocksBody(
       {
@@ -1556,13 +1878,7 @@ function circleHitsSolidTop(
     }
   }
 
-  if (sprites && map.sprites?.length) {
-    for (const place of map.sprites) {
-      if (circleHitsSolidSprite(map, place, sprites, x, y, r, elev, body)) {
-        return true;
-      }
-    }
-  }
+  if (circleHitsIndexedSprite(map, sprites, x, y, r, elev, body)) return true;
   if (circleHitsTallVoxelProp(map, x, y, r, elev, voxelModels, voxelScenes, body)) {
     return true;
   }
@@ -1716,13 +2032,7 @@ function circleHitsSolidYawed(
     }
   }
 
-  if (sprites && map.sprites?.length) {
-    for (const place of map.sprites) {
-      if (circleHitsSolidSprite(map, place, sprites, x, y, r, elev, body)) {
-        return true;
-      }
-    }
-  }
+  if (circleHitsIndexedSprite(map, sprites, x, y, r, elev, body)) return true;
   if (circleHitsTallVoxelProp(map, x, y, r, elev, voxelModels, voxelScenes, body)) {
     return true;
   }
@@ -2224,7 +2534,7 @@ export function canvasPixelToSpritePlacement(
     const raw = sprites[place.spriteId];
     if (!raw) continue;
     const n = normalizePixelSprite(raw);
-    const elev = elevationAt(map, place.x, place.y);
+    const elev = place.elev ?? elevationAt(map, place.x, place.y);
     const p = projectCell(viewMode, map, place.x, place.y, elev, scale);
     const floorX = p.px;
     const floorY = p.py;
@@ -2458,6 +2768,8 @@ export type LanternSource = {
   id: string;
   x: number;
   y: number;
+  /** Authored base Z for an elevated glow sprite. */
+  elev?: number;
   /** Implicit glow tile/sprite vs free-standing / override entry. */
   kind: "implicit" | "placed";
   params: ResolvedLanternParams;
@@ -2549,6 +2861,7 @@ export function listLanternSources(
     y: number,
     kind: "implicit" | "placed",
     id: string,
+    elev?: number,
   ) => {
     const key = `${x},${y}`;
     const ov = overrideByCell.get(key);
@@ -2560,6 +2873,7 @@ export function listLanternSources(
       id: ov?.id ?? id,
       x,
       y,
+      elev,
       kind: ov ? "placed" : kind,
       hasOverride: Boolean(ov),
       params: resolveLanternParams(mapLight, ov),
@@ -2583,7 +2897,13 @@ export function listLanternSources(
     for (const place of map.sprites) {
       const spr = sprites[place.spriteId];
       if (spr?.glow) {
-        upsert(place.x, place.y, "implicit", `sprite:${place.id}`);
+        upsert(
+          place.x,
+          place.y,
+          "implicit",
+          `sprite:${place.id}`,
+          place.elev,
+        );
       }
     }
   }
@@ -2603,6 +2923,116 @@ export function listLanternSources(
   }
 
   return [...byCell.values()];
+}
+
+/**
+ * Remove a visible lantern source from the authored map.
+ *
+ * A plain removal is insufficient for glow tiles/sprites: once their override
+ * disappears, listLanternSources immediately recreates the implicit source.
+ * In that case retain an invisible `enabled:false` cell override as a
+ * tombstone. Standalone placed lights are removed without a tombstone.
+ */
+export function removeLanternSource(
+  map: EmberMap,
+  tileset: EmberTileset,
+  sprites: EmberSpriteLib | undefined,
+  id: string,
+): EmberMap {
+  const source = listLanternSources(map, tileset, sprites).find(
+    (candidate) => candidate.id === id,
+  );
+  if (!source) return map;
+
+  const remaining = (map.lights ?? []).filter(
+    (light) =>
+      light.id !== id && !(light.x === source.x && light.y === source.y),
+  );
+  const withoutSource: EmberMap = { ...map, lights: remaining };
+  if (remaining.length === 0) delete withoutSource.lights;
+
+  const implicitReturns = listLanternSources(
+    withoutSource,
+    tileset,
+    sprites,
+  ).some((candidate) => candidate.x === source.x && candidate.y === source.y);
+  if (!implicitReturns) return withoutSource;
+
+  return {
+    ...withoutSource,
+    lights: [
+      ...remaining,
+      {
+        // Reuse an authored id when possible so Undo/Redo and diagnostics keep
+        // a stable identity. Implicit sources receive a deterministic cell id.
+        id: source.hasOverride
+          ? source.id
+          : `mute_${source.x}_${source.y}`,
+        x: source.x,
+        y: source.y,
+        enabled: false,
+      },
+    ],
+  };
+}
+
+/**
+ * Build a visual-only map pose for a lantern gizmo drag.
+ * Materializes implicit glow sources temporarily and suppresses their old
+ * cell, so renderer preview shows the actual PointLight/core at the pending
+ * position instead of only highlighting the terrain beneath it.
+ */
+export function previewLanternSourceMove(
+  map: EmberMap,
+  tileset: EmberTileset,
+  sprites: EmberSpriteLib | undefined,
+  id: string,
+  x: number,
+  y: number,
+): EmberMap {
+  const source = listLanternSources(map, tileset, sprites).find(
+    (candidate) => candidate.id === id,
+  );
+  if (!source || (source.x === x && source.y === y)) return map;
+
+  const rest = (map.lights ?? []).filter(
+    (light) =>
+      light.id !== source.id &&
+      !(light.x === source.x && light.y === source.y) &&
+      !(light.x === x && light.y === y),
+  );
+  const p = source.params;
+  const moved: EmberLightSource = {
+    id: source.id,
+    x,
+    y,
+    enabled: true,
+    lampColor: p.lampColor,
+    lampFaceColor: p.lampFaceColor,
+    lampRange: p.lampRange,
+    lampDiscCore: p.lampDiscCore,
+    lampDiscMid: p.lampDiscMid,
+    lampHeight: p.lampHeight,
+    lampShowCore: p.lampShowCore,
+    lampStrength0: p.lampStrength0,
+    lampStrengthFalloff: p.lampStrengthFalloff,
+    lampTorchFlicker: p.lampTorchFlicker,
+  };
+  return {
+    ...map,
+    lights: [
+      ...rest,
+      // Preview-only tombstone prevents the original glow tile/sprite from
+      // spawning a second source while the materialized light is being moved.
+      {
+        id: `preview_mute_${source.x}_${source.y}`,
+        x: source.x,
+        y: source.y,
+        enabled: false,
+      },
+      moved,
+    ],
+  };
 }
 
 /**
@@ -2707,10 +3137,17 @@ export type ResolvedMapAtmosphere = {
 
 /** Resolved map light (all fields filled). */
 export type ResolvedMapLight = Required<
-  Omit<EmberMapLight, "grade" | "atmosphere">
+  Omit<
+    EmberMapLight,
+    "grade" | "atmosphere" | "maxPointLights" | "maxPointShadows"
+  >
 > & {
   grade: ResolvedMapGrade;
   atmosphere: ResolvedMapAtmosphere;
+  /** `null` = use renderer/profile budget. */
+  maxPointLights: number | null;
+  /** `null` = use renderer/profile budget. `0` = no cube shadows. */
+  maxPointShadows: number | null;
 };
 
 export const DEFAULT_MAP_GRADE: ResolvedMapGrade = {
@@ -2764,6 +3201,11 @@ export const DEFAULT_MAP_LIGHT: ResolvedMapLight = {
   torchFlickerSpeed: 1,
   voxelSnapLight: false,
   lampTorchFlicker: true,
+  maxPointLights: null,
+  maxPointShadows: null,
+  dynamicPointShadows: 1,
+  dynamicShadowEnterScale: 0.8,
+  dynamicShadowExitScale: 1,
   grade: { ...DEFAULT_MAP_GRADE },
   atmosphere: { ...DEFAULT_MAP_ATMOSPHERE },
 };
@@ -2874,7 +3316,9 @@ export function resolveMapAtmosphere(
   };
 }
 
-export function resolveMapLight(map: Pick<EmberMap, "light">): ResolvedMapLight {
+export function resolveMapLight(map: {
+  light?: EmberMapLight | ResolvedMapLight | null;
+}): ResolvedMapLight {
   const L = map.light ?? {};
   const clamp01 = (v: number, d: number) =>
     Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : d;
@@ -2882,6 +3326,21 @@ export function resolveMapLight(map: Pick<EmberMap, "light">): ResolvedMapLight 
     Number.isFinite(v)
       ? Math.max(1, Math.min(MAP_LIGHT_RANGE_MAX, Math.round(v)))
       : d;
+  const dynamicShadowEnterScale = clampFinite(
+    L.dynamicShadowEnterScale,
+    MAP_DYNAMIC_SHADOW_SCALE_MIN,
+    1,
+    DEFAULT_MAP_LIGHT.dynamicShadowEnterScale,
+  );
+  const dynamicShadowExitScale = Math.max(
+    dynamicShadowEnterScale,
+    clampFinite(
+      L.dynamicShadowExitScale,
+      MAP_DYNAMIC_SHADOW_SCALE_MIN,
+      MAP_DYNAMIC_SHADOW_SCALE_MAX,
+      DEFAULT_MAP_LIGHT.dynamicShadowExitScale,
+    ),
+  );
   return {
     ambientColor: normalizeHex(L.ambientColor) ?? DEFAULT_MAP_LIGHT.ambientColor,
     ambientAlpha: clamp01(
@@ -3009,8 +3468,41 @@ export function resolveMapLight(map: Pick<EmberMap, "light">): ResolvedMapLight 
       typeof L.lampTorchFlicker === "boolean"
         ? L.lampTorchFlicker
         : DEFAULT_MAP_LIGHT.lampTorchFlicker,
+    maxPointLights: Number.isFinite(L.maxPointLights)
+      ? Math.max(
+          1,
+          Math.min(MAP_POINT_LIGHTS_MAX, Math.round(L.maxPointLights!)),
+        )
+      : null,
+    maxPointShadows: Number.isFinite(L.maxPointShadows)
+      ? Math.max(
+          0,
+          Math.min(MAP_POINT_SHADOWS_MAX, Math.round(L.maxPointShadows!)),
+        )
+      : null,
+    dynamicPointShadows: Number.isFinite(L.dynamicPointShadows)
+      ? Math.max(
+          0,
+          Math.min(
+            MAP_DYNAMIC_POINT_SHADOWS_MAX,
+            Math.round(L.dynamicPointShadows!),
+          ),
+        )
+      : DEFAULT_MAP_LIGHT.dynamicPointShadows,
+    dynamicShadowEnterScale,
+    dynamicShadowExitScale,
     grade: resolveMapGrade(L.grade),
     atmosphere: resolveMapAtmosphere(L.atmosphere),
+  };
+}
+
+/** Drop auto (`null`) caps so map JSON stays compact. */
+export function omitUnsetLightBudget(light: ResolvedMapLight): EmberMapLight {
+  const { maxPointLights, maxPointShadows, ...rest } = light;
+  return {
+    ...rest,
+    ...(maxPointLights != null ? { maxPointLights } : {}),
+    ...(maxPointShadows != null ? { maxPointShadows } : {}),
   };
 }
 

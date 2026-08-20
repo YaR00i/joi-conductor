@@ -19,8 +19,15 @@ interface JoiDesktopOllamaApi {
   stop: () => Promise<OllamaDesktopStatus & { stopped: boolean }>;
   models: () => Promise<string[]>;
   pull: (model: string) => Promise<OllamaDesktopStatus>;
+  delete: (model: string) => Promise<OllamaDesktopStatus>;
+  searchHtml?: (query: string) => Promise<string>;
   onPullProgress: (
-    cb: (payload: { model: string; line: string }) => void,
+    cb: (payload: {
+      model: string;
+      line: string;
+      phase?: string;
+      pct?: number;
+    }) => void,
   ) => () => void;
 }
 
@@ -57,7 +64,7 @@ interface JoiDesktopTtsApi {
   }>;
   speak: (payload: {
     text: string;
-    provider?: "auto" | "edge" | "piper" | "sovits" | "qwen";
+    provider?: "auto" | "edge" | "piper" | "sovits" | "qwen" | "qwen-cpu";
     voice?: string;
     emotion?: string;
     rate?: number;
@@ -72,10 +79,13 @@ interface JoiDesktopTtsApi {
     qwenModel?: string;
     qwenVoice?: string;
     qwenApiKey?: string;
+    qwenRefPath?: string;
+    qwenPromptText?: string;
   }) => Promise<TtsSpeakResult>;
   stop?: () => Promise<{ ok: boolean }>;
   piperStatus: () => Promise<PiperStatus>;
   installPiper: () => Promise<PiperStatus>;
+  uninstallPiper?: () => Promise<PiperStatus>;
   onPiperProgress: (
     cb: (payload: { phase: string; pct: number }) => void,
   ) => () => void;
@@ -114,12 +124,193 @@ interface JoiDesktopTtsApi {
     baseUrl: string;
     detail: string;
   }>;
+  sovitsInstallStatus?: () => Promise<{
+    root: string;
+    repo: string;
+    python: string;
+    venv?: boolean;
+    pretrained?: boolean;
+    ffmpeg?: boolean;
+    torchCuda?: boolean;
+    torchCpu?: boolean;
+    torchWheel?: string;
+    ready: boolean;
+    detail: string;
+  }>;
+  installSovits?: () => Promise<{
+    root: string;
+    repo: string;
+    python: string;
+    venv?: boolean;
+    pretrained?: boolean;
+    ffmpeg?: boolean;
+    torchCuda?: boolean;
+    torchCpu?: boolean;
+    ready: boolean;
+    detail: string;
+  }>;
+  uninstallSovits?: () => Promise<{
+    root: string;
+    repo: string;
+    python: string;
+    ready: boolean;
+    detail: string;
+  }>;
+  onSovitsInstallProgress?: (
+    cb: (payload: {
+      phase: string;
+      pct: number;
+      line?: string;
+      detail?: string;
+      filesDone?: number;
+      filesTotal?: number;
+    }) => void,
+  ) => () => void;
   qwenStatus: (opts?: {
     baseUrl?: string;
+    flavor?: string;
+    model?: string;
+    device?: string;
   }) => Promise<{
     online: boolean;
+    starting?: boolean;
+    managedByApp?: boolean;
+    python?: string | null;
+    modelPath?: string | null;
+    tokenizer?: boolean;
+    customVoice?: boolean;
+    base?: boolean;
+    torchCuda?: boolean;
+    torchCpu?: boolean;
+    device?: string;
+    gpu?: string;
+    torch?: string;
+    backend?: string;
     baseUrl: string;
     detail: string;
+  }>;
+  qwenStart?: (opts?: {
+    baseUrl?: string;
+    flavor?: string;
+    model?: string;
+    device?: string;
+  }) => Promise<{
+    online: boolean;
+    starting?: boolean;
+    managedByApp?: boolean;
+    python?: string | null;
+    modelPath?: string | null;
+    torchCuda?: boolean;
+    torchCpu?: boolean;
+    device?: string;
+    gpu?: string;
+    torch?: string;
+    backend?: string;
+    baseUrl: string;
+    detail: string;
+  }>;
+  qwenStop?: (opts?: { baseUrl?: string }) => Promise<{
+    stopped: boolean;
+    online: boolean;
+    starting?: boolean;
+    managedByApp?: boolean;
+    baseUrl: string;
+    detail: string;
+  }>;
+  qwenInstallStatus: () => Promise<{
+    root: string;
+    python: string;
+    venv?: boolean;
+    hub?: boolean;
+    qwenTts?: boolean;
+    vllm?: boolean;
+    fasterQwenTts?: boolean;
+    torchCuda?: boolean;
+    torchCpu?: boolean;
+    torchWheel?: string;
+    tokenizer: boolean;
+    customVoice: boolean;
+    base: boolean;
+    tokenizerDir: string;
+    customVoiceDir: string;
+    baseDir: string;
+  }>;
+  installQwenModel: (
+    target: "tokenizer" | "custom_voice" | "base",
+  ) => Promise<{
+    root: string;
+    python: string;
+    venv?: boolean;
+    hub?: boolean;
+    qwenTts?: boolean;
+    vllm?: boolean;
+    fasterQwenTts?: boolean;
+    torchCuda?: boolean;
+    torchCpu?: boolean;
+    torchWheel?: string;
+    tokenizer: boolean;
+    customVoice: boolean;
+    base: boolean;
+    tokenizerDir: string;
+    customVoiceDir: string;
+    baseDir: string;
+  }>;
+  uninstallQwenModel?: (
+    target: "tokenizer" | "custom_voice" | "base",
+  ) => Promise<{
+    root: string;
+    python: string;
+    venv?: boolean;
+    hub?: boolean;
+    qwenTts?: boolean;
+    vllm?: boolean;
+    fasterQwenTts?: boolean;
+    torchCuda?: boolean;
+    torchCpu?: boolean;
+    torchWheel?: string;
+    tokenizer: boolean;
+    customVoice: boolean;
+    base: boolean;
+    tokenizerDir: string;
+    customVoiceDir: string;
+    baseDir: string;
+  }>;
+  onQwenInstallProgress: (
+    cb: (payload: {
+      phase: string;
+      pct: number;
+      line?: string;
+      detail?: string;
+      filesDone?: number;
+      filesTotal?: number;
+    }) => void,
+  ) => () => void;
+  voiceRefShow: (
+    relPath: string,
+  ) => Promise<{ ok: boolean; path?: string; detail?: string }>;
+  voiceRefStat: (
+    relPath: string,
+  ) => Promise<{
+    exists: boolean;
+    path?: string | null;
+    bytes?: number;
+  }>;
+  voiceRefPick: () => Promise<{
+    ok: boolean;
+    canceled?: boolean;
+    sourcePath?: string;
+    bytesBase64?: string;
+    detail?: string;
+  }>;
+  voiceRefWrite: (payload: {
+    destRel: string;
+    wavBase64: string;
+  }) => Promise<{
+    ok: boolean;
+    relPath?: string;
+    path?: string;
+    bytes?: number;
+    detail?: string;
   }>;
 }
 
@@ -148,6 +339,9 @@ interface JoiDesktopMediaApi {
     managedByApp?: boolean;
     detail: string;
   }>;
+  onWd14Progress: (
+    cb: (payload: { phase: string; pct: number; detail?: string }) => void,
+  ) => () => void;
   wd14Stop: (opts?: { baseUrl?: string }) => Promise<{
     stopped: boolean;
     online: boolean;
@@ -241,6 +435,16 @@ interface JoiDesktopApi {
   isFullScreen?: () => Promise<boolean>;
   onMaximized: (cb: (maximized: boolean) => void) => () => void;
   onFullScreen?: (cb: (fullscreen: boolean) => void) => () => void;
+  cursor?: {
+    clip: (rect?: {
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+    }) => Promise<{ ok: boolean }>;
+    unclip: () => Promise<{ ok: boolean }>;
+    warpCenter?: () => void;
+  };
   shell?: JoiDesktopShellApi;
   ember?: JoiDesktopEmberApi;
   ollama?: JoiDesktopOllamaApi;

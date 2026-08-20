@@ -495,7 +495,7 @@ export function RunnerGame({ onReward, onExit }: Props) {
       ) : null}
 
       {taskGate ? (
-        <>
+        <div className="runner-taskview">
           {taskPic ? (
             <figure className="runner-taskpic" key={taskGate.seq}>
               <img src={taskPic.url} alt={taskPic.label} draggable={false} />
@@ -507,7 +507,7 @@ export function RunnerGame({ onReward, onExit }: Props) {
             task={taskGate.task}
             onComplete={finishTaskGate}
           />
-        </>
+        </div>
       ) : null}
 
       {paused && !taskGate ? (

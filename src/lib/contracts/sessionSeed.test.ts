@@ -292,6 +292,15 @@ describe("session seal helpers", () => {
       ),
     ).toBeNull();
 
+    const carried = {
+      ...open,
+      deadlineMs: Date.now() + 86_400_000,
+    };
+    const staleSeed = { ...seed, deadlineMs: Date.now() - 1_000 };
+    expect(
+      pruneStaleSessionSeed(() => carried, Date.now(), staleSeed)?.instanceId,
+    ).toBe(seed.instanceId);
+
     clearActiveSessionSeed();
   });
 });

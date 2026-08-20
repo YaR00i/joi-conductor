@@ -5,8 +5,12 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { emberAssetUrl, type EmberPack, type SceneStep } from "../../game";
-import type { SceneActor } from "../../game/content/types";
+import { emberAssetUrl } from "../../game/content/io";
+import type {
+  EmberPack,
+  SceneActor,
+  SceneStep,
+} from "../../game/content/types";
 import {
   actorPortraitUrl,
   PORTRAIT_ASSET_REV,

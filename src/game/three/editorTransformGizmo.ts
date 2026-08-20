@@ -5,7 +5,16 @@
 import * as THREE from "three";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 
-export type EditorTransformKind = "voxel" | "sprite" | "light" | "tile" | "group";
+export type EditorTransformKind =
+  | "voxel"
+  | "sprite"
+  | "light"
+  | "tile"
+  | "region"
+  | "selection"
+  | "group";
+
+export type EditorTransformMode = "translate" | "rotate" | "scale";
 
 export type EditorTransformTarget = {
   kind: EditorTransformKind;
@@ -17,7 +26,11 @@ export type EditorTransformTarget = {
   position: { x: number; y: number; z: number };
   /** Yaw in radians (voxel). */
   rotationY?: number;
+  /** Ember axes: X/Y map plane, Z vertical. */
+  scale?: { x: number; y: number; z: number };
   allowRotate: boolean;
+  allowScale: boolean;
+  scaleAxes?: { x: boolean; y: boolean; z: boolean };
 };
 
 export type EditorTransformCommit = {
@@ -25,29 +38,31 @@ export type EditorTransformCommit = {
   id?: string;
   tx?: number;
   ty?: number;
-  mode: "translate" | "rotate";
+  mode: EditorTransformMode;
   position: { x: number; y: number; z: number };
   rotationY: number;
+  /** Ember axes: X/Y map plane, Z vertical. */
+  scale: { x: number; y: number; z: number };
 };
+
+/** Live gizmo pose. It is visual-only and must never enter undo/history. */
+export type EditorTransformPreview = EditorTransformCommit;
 
 export type EditorTransformGizmo = {
   root: THREE.Object3D;
   setPointerDom: (el: HTMLElement | null) => void;
   setTarget: (target: EditorTransformTarget | null) => void;
-  setMode: (mode: "translate" | "rotate") => void;
-  getMode: () => "translate" | "rotate";
+  setMode: (mode: EditorTransformMode) => void;
+  getMode: () => EditorTransformMode;
   /** True while hovering a handle or actively dragging. */
   isBusy: () => boolean;
   /** True only while a handle is being dragged. */
   isDragging: () => boolean;
   onCommit: (cb: ((commit: EditorTransformCommit) => void) | null) => void;
   onDraggingChanged: (cb: ((dragging: boolean) => void) | null) => void;
-  /**
-   * Live world position while translating (null when not dragging).
-   * Used for snap-cell preview outlines.
-   */
+  /** Live visual-only gizmo pose while dragging. */
   onPreview: (
-    cb: ((pos: { x: number; y: number; z: number } | null) => void) | null,
+    cb: ((preview: EditorTransformPreview | null) => void) | null,
   ) => void;
   dispose: () => void;
 };
@@ -68,21 +83,42 @@ export function createEditorTransformGizmo(
   scene.add(controls.getHelper());
 
   let target: EditorTransformTarget | null = null;
-  let mode: "translate" | "rotate" = "translate";
+  let mode: EditorTransformMode = "translate";
   let commitCb: ((commit: EditorTransformCommit) => void) | null = null;
   let draggingCb: ((dragging: boolean) => void) | null = null;
-  let previewCb:
-    | ((pos: { x: number; y: number; z: number } | null) => void)
-    | null = null;
+  let previewCb: ((preview: EditorTransformPreview | null) => void) | null =
+    null;
   let dragging = false;
+  let pointerDom: HTMLElement | null = null;
+
+  // TransformControls and the map picker share one transparent overlay.
+  // Keep a handle press from bubbling into React's map-selection handler,
+  // which would otherwise replace the selected prop/light with its floor tile.
+  const stopMapPickerOnHandle = (event: MouseEvent) => {
+    if (!dragging && !controls.axis) return;
+    event.stopPropagation();
+  };
 
   const emitPreview = () => {
     if (!previewCb) return;
-    if (dragging && mode === "translate" && target) {
+    if (dragging && target) {
       previewCb({
-        x: pivot.position.x,
-        y: pivot.position.y,
-        z: pivot.position.z,
+        kind: target.kind,
+        id: target.id,
+        tx: target.tx,
+        ty: target.ty,
+        mode,
+        position: {
+          x: pivot.position.x,
+          y: pivot.position.y,
+          z: pivot.position.z,
+        },
+        rotationY: pivot.rotation.y,
+        scale: {
+          x: pivot.scale.x,
+          y: pivot.scale.z,
+          z: pivot.scale.y,
+        },
       });
       return;
     }
@@ -91,13 +127,25 @@ export function createEditorTransformGizmo(
 
   const applyMode = () => {
     const canRotate = Boolean(target?.allowRotate);
-    const next = mode === "rotate" && canRotate ? "rotate" : "translate";
+    const canScale = Boolean(target?.allowScale);
+    const next =
+      mode === "rotate" && canRotate
+        ? "rotate"
+        : mode === "scale" && canScale
+          ? "scale"
+          : "translate";
     mode = next;
     controls.setMode(next);
     if (next === "rotate") {
       controls.showX = false;
       controls.showY = true;
       controls.showZ = false;
+    } else if (next === "scale") {
+      const axes = target?.scaleAxes ?? { x: true, y: true, z: true };
+      controls.showX = axes.x;
+      // Three Y is Ember vertical Z; Three Z is Ember map-plane Y.
+      controls.showY = axes.z;
+      controls.showZ = axes.y;
     } else {
       controls.showX = true;
       controls.showY = true;
@@ -114,6 +162,8 @@ export function createEditorTransformGizmo(
     }
     pivot.position.set(target.position.x, target.position.y, target.position.z);
     pivot.rotation.set(0, target.rotationY ?? 0, 0);
+    const scale = target.scale ?? { x: 1, y: 1, z: 1 };
+    pivot.scale.set(scale.x, scale.z, scale.y);
     pivot.visible = true;
     controls.attach(pivot);
     controls.enabled = true;
@@ -142,6 +192,11 @@ export function createEditorTransformGizmo(
           z: pivot.position.z,
         },
         rotationY: pivot.rotation.y,
+        scale: {
+          x: pivot.scale.x,
+          y: pivot.scale.z,
+          z: pivot.scale.y,
+        },
       };
       dragging = false;
       draggingCb?.(false);
@@ -162,9 +217,19 @@ export function createEditorTransformGizmo(
   return {
     root: pivot,
     setPointerDom(el) {
+      // displayMap changes on every live preview frame. Reconnecting the same
+      // element here used to cancel TransformControls in the middle of a drag.
+      if (pointerDom === el && controls.domElement === el) return;
+      if (pointerDom) {
+        pointerDom.removeEventListener("mousedown", stopMapPickerOnHandle);
+      }
       if (controls.domElement) controls.disconnect();
       controls.domElement = el;
       if (el) controls.connect();
+      pointerDom = el;
+      if (pointerDom) {
+        pointerDom.addEventListener("mousedown", stopMapPickerOnHandle);
+      }
     },
     setTarget(next) {
       // Don't yank the pivot mid-drag.
@@ -173,6 +238,7 @@ export function createEditorTransformGizmo(
         ? {
             ...next,
             position: { ...next.position },
+            scale: next.scale ? { ...next.scale } : undefined,
           }
         : null;
       syncPivotFromTarget();
@@ -202,6 +268,10 @@ export function createEditorTransformGizmo(
       previewCb = cb;
     },
     dispose() {
+      if (pointerDom) {
+        pointerDom.removeEventListener("mousedown", stopMapPickerOnHandle);
+        pointerDom = null;
+      }
       controls.removeEventListener("change", onControlsChange);
       controls.removeEventListener(
         "dragging-changed",

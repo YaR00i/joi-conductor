@@ -43,8 +43,10 @@ export const PROGRESS_STORAGE_KEYS = [
   "joi-conductor.denialQuest",
   "joi-conductor.cageLock",
   "joi-contracts-v1",
+  "joi-contract-journal-v1",
   "joi-contract-media-drill-v1",
   "joi-contract-session-seed-v1",
+  "joi-soul-v1",
 ] as const;
 
 export type ProgressSnapshot = Partial<
@@ -206,8 +208,10 @@ export function buildSandboxSnapshot(): ProgressSnapshot {
     "joi-conductor.denialQuest": null,
     "joi-conductor.cageLock": null,
     "joi-contracts-v1": null,
+    "joi-contract-journal-v1": null,
     "joi-contract-media-drill-v1": null,
     "joi-contract-session-seed-v1": null,
+    "joi-soul-v1": null,
   };
 }
 

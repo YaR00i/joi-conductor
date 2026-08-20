@@ -288,11 +288,17 @@ export function addObjectBoundaryOutline(
   root: THREE.Object3D,
   obj: THREE.Object3D,
   tone: OutlineTone,
+  opacityMul = 1,
 ): void {
-  obj.updateWorldMatrix(true, true);
-  const mat = lineMat(tone);
+  const mat = lineMat(tone, opacityMul);
 
-  _box.setFromObject(obj);
+  const authoredWorldBounds = obj.userData.editorWorldBounds;
+  if (authoredWorldBounds instanceof THREE.Box3) {
+    _box.copy(authoredWorldBounds);
+  } else {
+    obj.updateWorldMatrix(true, true);
+    _box.setFromObject(obj);
+  }
   if (_box.isEmpty()) {
     mat.dispose();
     return;
@@ -450,7 +456,15 @@ export function addLampRangeRing(
 
 export function findPickRoot(
   hitObject: THREE.Object3D,
+  instanceId?: number,
 ): EditorPick | null {
+  if (instanceId != null && instanceId >= 0) {
+    const picks = hitObject.userData.editorInstancePicks as
+      | EditorPick[]
+      | undefined;
+    const pick = picks?.[instanceId];
+    if (pick?.kind === "voxel") return pick;
+  }
   let o: THREE.Object3D | null = hitObject;
   while (o) {
     const pick = o.userData.editorPick as EditorPick | undefined;
@@ -470,6 +484,17 @@ export function findPropByPick(
   let found: THREE.Object3D | null = null;
   propRoot.traverse((o) => {
     if (found) return;
+    const boundsById = o.userData.editorInstanceBoundsById as
+      | Map<string, THREE.Box3>
+      | undefined;
+    const bounds = boundsById?.get(pick.id);
+    if (pick.kind === "voxel" && bounds) {
+      const proxy = new THREE.Object3D();
+      proxy.userData.editorPick = pick;
+      proxy.userData.editorWorldBounds = bounds;
+      found = proxy;
+      return;
+    }
     const p = o.userData.editorPick as EditorPick | undefined;
     if (p && p.kind === pick.kind && p.id === pick.id) found = o;
   });

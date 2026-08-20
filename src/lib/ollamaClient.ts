@@ -14,6 +14,8 @@ export type OllamaStatus = {
 export type OllamaPullProgress = {
   model: string;
   line: string;
+  phase?: string;
+  pct?: number;
 };
 
 function desktopApi() {
@@ -120,12 +122,33 @@ export async function pullOllamaModel(model: string): Promise<OllamaStatus> {
   return api.pull(model);
 }
 
+export async function deleteOllamaModel(model: string): Promise<OllamaStatus> {
+  const api = desktopApi()?.ollama;
+  if (!api?.delete) {
+    throw new Error("Удаление модели доступно только в окне приложения");
+  }
+  return api.delete(model);
+}
+
 export function onOllamaPullProgress(
   cb: (payload: OllamaPullProgress) => void,
 ): () => void {
   const api = desktopApi()?.ollama;
   if (!api?.onPullProgress) return () => undefined;
   return api.onPullProgress(cb);
+}
+
+export async function fetchOllamaLibraryHtml(query: string): Promise<string> {
+  const q = query.trim().slice(0, 80);
+  if (!q) return "";
+  const api = desktopApi()?.ollama;
+  if (api?.searchHtml) return api.searchHtml(q);
+  const res = await fetch(
+    `/api/ollama-hub/search?q=${encodeURIComponent(q)}`,
+    { signal: AbortSignal.timeout ? AbortSignal.timeout(12000) : undefined },
+  );
+  if (!res.ok) throw new Error(`Библиотека Ollama HTTP ${res.status}`);
+  return res.text();
 }
 
 export function ollamaStatusTone(

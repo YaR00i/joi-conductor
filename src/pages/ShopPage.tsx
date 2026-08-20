@@ -11,6 +11,7 @@ import {
   shopPurchaseFailLine,
   shopPurchaseLine,
 } from "../lib/shopDialogue";
+import { consumeShopFocusTag } from "../lib/shopFocus";
 import {
   shopFavoritesShelfEmptyHintRu,
   shopFavoritesShelfEmptyRu,
@@ -130,6 +131,10 @@ function premiumSectionTitle(kind: ShopItem["kind"]): string {
   }
 }
 
+function isPremiumConsumable(item: ShopItem): boolean {
+  return item.kind === "beg_bonus" || item.kind === "cum_boost";
+}
+
 function ShopCard({
   item,
   wallet,
@@ -147,7 +152,7 @@ function ShopCard({
   likeCount?: number;
 }) {
   const owned = isShopOwned(wallet, item);
-  const consumable = item.kind === "beg_bonus" || item.kind === "cum_boost";
+  const consumable = isPremiumConsumable(item);
   const tooPoor = wallet.balance < item.cost;
   const packMeta = item.kind === "tag_pack" ? TAG_PACKS[item.payload] : null;
   const packUnlocked =
@@ -259,6 +264,7 @@ export function ShopPage({
   const [searching, setSearching] = useState(false);
   const [hasMore, setHasMore] = useState(favoritesHasMore);
   const [search, setSearch] = useState("");
+  const [showOwned, setShowOwned] = useState(false);
   const [typeMap, setTypeMap] = useState<TagTypeMap>(() => loadTagTypeMap());
   const [line, setLine] = useState(() => shopGreetLine());
   const [bubbleKey, setBubbleKey] = useState(0);
@@ -282,6 +288,13 @@ export function ShopPage({
       scheduleIdle();
     }, wait);
   }, [speak]);
+
+  useEffect(() => {
+    const focus = consumeShopFocusTag();
+    if (!focus) return;
+    setTab("favorites");
+    setSearch(focus);
+  }, []);
 
   useEffect(() => {
     scheduleIdle();
@@ -343,9 +356,24 @@ export function ShopPage({
     return groupTagsByType(rows, typeMap);
   }, [filteredFetishOffers, typeMap]);
 
+  const premiumUnownedCount = useMemo(
+    () =>
+      SHOP_CATALOG.filter(
+        (item) => isPremiumConsumable(item) || !isShopOwned(wallet, item),
+      ).length,
+    [wallet],
+  );
+
   const premiumGroups = useMemo(() => {
     const q = search.trim().toLowerCase();
     const items = SHOP_CATALOG.filter((item) => {
+      if (
+        !showOwned &&
+        !isPremiumConsumable(item) &&
+        isShopOwned(wallet, item)
+      ) {
+        return false;
+      }
       if (!q) return true;
       return (
         item.nameRu.toLowerCase().includes(q) ||
@@ -353,13 +381,16 @@ export function ShopPage({
         item.payload.toLowerCase().includes(q) ||
         kindLabel(item.kind).toLowerCase().includes(q)
       );
-    });
+    }).sort(
+      (a, b) =>
+        a.cost - b.cost || a.nameRu.localeCompare(b.nameRu, "ru"),
+    );
     return PREMIUM_KIND_ORDER.map((kind) => ({
       kind,
       title: premiumSectionTitle(kind),
       items: items.filter((i) => i.kind === kind),
     })).filter((g) => g.items.length > 0);
-  }, [search]);
+  }, [search, showOwned, wallet]);
 
   useEffect(() => {
     if (tab !== "favorites") return;
@@ -524,7 +555,7 @@ export function ShopPage({
               onClick={() => setTab("premium")}
             >
               Премиум
-              <span className="shop-page__tab-count">{SHOP_CATALOG.length}</span>
+              <span className="shop-page__tab-count">{premiumUnownedCount}</span>
             </button>
           </div>
 
@@ -551,6 +582,16 @@ export function ShopPage({
                 onClick={() => setSearch("")}
               >
                 Сбросить
+              </button>
+            ) : null}
+            {tab === "premium" ? (
+              <button
+                type="button"
+                className={`shop-page__owned-toggle${showOwned ? " is-on" : ""}`}
+                aria-pressed={showOwned}
+                onClick={() => setShowOwned((v) => !v)}
+              >
+                {showOwned ? "Скрыть купленное" : "Показать купленное"}
               </button>
             ) : null}
             {searching ? (
@@ -697,7 +738,13 @@ export function ShopPage({
                 теги с витрины «Из избранного».
               </p>
               {premiumGroups.length === 0 ? (
-                <p className="shop-page__empty">Ничего не найдено</p>
+                <p className="shop-page__empty">
+                  {search.trim()
+                    ? "Ничего не найдено по запросу."
+                    : showOwned
+                      ? "Каталог пуст."
+                      : "Всё уже куплено. Нажми «Показать купленное», если хочешь пересмотреть."}
+                </p>
               ) : (
                 <div className="shop-page__groups">
                   {premiumGroups.map((group) => (

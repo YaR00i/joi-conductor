@@ -1,4 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Component,
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ErrorInfo,
+  type ReactNode,
+} from "react";
 import { EveningRouteOverlay } from "./components/EveningRouteOverlay";
 import { SectionBriefingOverlay } from "./components/SectionBriefingOverlay";
 import { SideNav, type NavId } from "./components/SideNav";
@@ -142,6 +153,7 @@ import {
   setToyOwned,
 } from "./lib/toyInventory";
 import { isToyAllowedInSession } from "./lib/toyRoulette";
+import { equipToy, initialEquippedFromAllowed } from "./lib/toyLoadout";
 import {
   DEFAULT_PARAMS,
   type Emotion,
@@ -155,12 +167,14 @@ import {
 import { getVibeProfile } from "./lib/vibeProfiles";
 import { LocalLlmVoice, type VoiceActivity } from "./lib/voice/localLlmVoice";
 import { ensureSovitsAutoStart } from "./lib/voice/sovitsAutoStart";
+import { ensureQwenAutoStart } from "./lib/voice/qwenAutoStart";
 import { SpeechTts } from "./lib/voice/speechTts";
 import { TemplateVoice } from "./lib/voice/templateVoice";
 import { translateCaptionGoogleRu } from "./lib/voice/translateToRu";
 import {
   loadVoiceSettings,
   saveVoiceSettings,
+  seedMistressClonePrompt,
   setMistressVoiceTuning,
   withMistressVoice,
   type VoiceSettings,
@@ -175,15 +189,13 @@ import { AchievementsPage } from "./pages/AchievementsPage";
 import { FavoritesPage } from "./pages/FavoritesPage";
 import { ContractMediaDrillHud } from "./components/ContractMediaDrillHud";
 import { ContractsPage } from "./pages/ContractsPage";
-import { ContractJournalPage } from "./pages/ContractJournalPage";
 import { DiaryPage } from "./pages/DiaryPage";
+import { ChatPage } from "./pages/ChatPage";
 import { StatsPage } from "./pages/StatsPage";
 import { RoulettePage } from "./pages/RoulettePage";
 import { SessionPage, type SessionSpeech } from "./pages/SessionPage";
 import { ShopPage } from "./pages/ShopPage";
 import { SettingsPage } from "./pages/SettingsPage";
-import { EmberPlayPage } from "./pages/EmberPlayPage";
-import { EmberEditorPage } from "./pages/EmberEditorPage";
 import { MinigamesPage } from "./pages/MinigamesPage";
 import { SessionDebriefSheet } from "./components/SessionDebriefSheet";
 import { AbortDebriefSheet } from "./components/AbortDebriefSheet";
@@ -284,6 +296,10 @@ import {
   type TagSanitizeResult,
 } from "./lib/contentUnlocks";
 import {
+  applyMediaTypeQuery,
+  kindsForMediaType,
+} from "./lib/mediaTypeFilter";
+import {
   hasMoreShopOffersFromFavorites,
   loadMoreShopOffersFromFavorites,
   mergeShopOffers,
@@ -307,9 +323,74 @@ import {
   type WalletState,
 } from "./lib/wallet";
 
+const LazyEmberPlayPage = lazy(() =>
+  import("./pages/EmberPlayPage").then((module) => ({
+    default: module.EmberPlayPage,
+  })),
+);
+const LazyEmberEditorPage = lazy(() =>
+  import("./pages/EmberEditorPage").then((module) => ({
+    default: module.EmberEditorPage,
+  })),
+);
+
+function EmberRouteFallback() {
+  return (
+    <div className="page page--ember" aria-busy="true" aria-live="polite">
+      <div className="empty-state">Загрузка Ember…</div>
+    </div>
+  );
+}
+
+class EmberLazyBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Ember chunk failed to load", error, info.componentStack);
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div className="page page--ember">
+        <div className="empty-state">
+          <strong>Не удалось загрузить раздел Ember</strong>
+          <span>{this.state.error.message}</span>
+          <button type="button" onClick={() => window.location.reload()}>
+            Повторить после перезапуска
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
+
 initActiveMistress(mistressUnlockSnapshotFromWallet());
 
 const NAV_COLLAPSED_KEY = "joi-conductor-nav-collapsed";
+
+function resolveMediaTypeId(
+  settings: MediaSettings,
+): MediaSettings["mediaTypeId"] {
+  return settings.mediaTypeId ?? "all";
+}
+
+function filterPlaylistByMediaType(
+  items: MediaItem[],
+  typeId: MediaSettings["mediaTypeId"],
+  fallback = false,
+): MediaItem[] {
+  const filtered = filterMediaByKinds(items, kindsForMediaType(typeId));
+  if (filtered.length > 0) return filtered;
+  return fallback ? items : filtered;
+}
 
 export function App() {
   const [nav, setNav] = useState<NavId>("roulette");
@@ -572,7 +653,7 @@ export function App() {
             ttsPitch: loaded.ttsPitch,
             ttsVolume: loaded.ttsVolume,
           });
-    return withMistressVoice(seeded, pack);
+    return withMistressVoice(seedMistressClonePrompt(seeded, pack), pack);
   });
   const voiceSettingsRef = useRef(voiceSettings);
   voiceSettingsRef.current = voiceSettings;
@@ -836,10 +917,12 @@ export function App() {
     try {
       if (settings.source === "favorites") {
         const current = sessionPlaylistRef.current ?? [];
-        const fresh = await loadFavoritesAsMedia({
+        const typeId = resolveMediaTypeId(settings);
+        const freshRaw = await loadFavoritesAsMedia({
           offset: current.length,
-          limit: 60,
+          limit: 80,
         });
+        const fresh = filterPlaylistByMediaType(freshRaw, typeId);
         if (fresh.length === 0) {
           mediaTopUpCooldownUntilRef.current = performance.now() + 60_000;
           return;
@@ -854,7 +937,11 @@ export function App() {
       }
 
       const batch = Math.max(16, Math.min(40, settings.limit || 24));
-      const queryTags = sessionMediaTagsRef.current || settings.tags;
+      const typeId = resolveMediaTypeId(settings);
+      const queryTags = applyMediaTypeQuery(
+        sessionMediaTagsRef.current || settings.tags,
+        typeId,
+      );
       const flex = await fetchGelbooruFlexible(queryTags, batch, {
         userId: settings.gelbooruUserId,
         apiKey: settings.gelbooruApiKey,
@@ -863,7 +950,10 @@ export function App() {
       for (const item of mediaItemsRef.current) have.add(item.id);
       for (const item of sessionPlaylistRef.current ?? []) have.add(item.id);
       const fresh = shuffleMediaItems(
-        flex.items.filter((item) => !have.has(item.id)),
+        filterPlaylistByMediaType(
+          flex.items.filter((item) => !have.has(item.id)),
+          typeId,
+        ),
       );
       if (fresh.length === 0) {
         mediaTopUpCooldownUntilRef.current = performance.now() + 45_000;
@@ -1953,7 +2043,7 @@ export function App() {
       void loadFavoritesPlaylist();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mediaSettings.source]);
+  }, [mediaSettings.source, mediaSettings.mediaTypeId]);
 
   // Poll WD14 backend status only while the local media source is active.
   useEffect(() => {
@@ -2063,7 +2153,9 @@ export function App() {
       revokeFavoriteMedia(mediaItemsRef.current);
       // Keep only the first window in memory; the session deck appends another
       // page when it approaches the end.
-      const items = await loadFavoritesAsMedia({ offset: 0, limit: 60 });
+      const typeId = resolveMediaTypeId(mediaSettingsRef.current);
+      const raw = await loadFavoritesAsMedia({ offset: 0, limit: 80 });
+      const items = filterPlaylistByMediaType(raw, typeId);
       setMediaItems(items);
       setMediaSettings((m) => ({ ...m, source: "favorites" }));
       if (items.length === 0) {
@@ -2156,6 +2248,8 @@ export function App() {
       sovitsPromptText: voiceSettings.sovitsPromptText,
       sovitsPromptLang: voiceSettings.sovitsPromptLang,
       sovitsTextLang: voiceSettings.sovitsTextLang,
+      qwenRefPath: voiceSettings.qwenRefPath,
+      qwenPromptText: voiceSettings.qwenPromptText,
       qwenUrl: voiceSettings.qwenUrl,
       qwenModel: voiceSettings.qwenModel,
       qwenVoice: voiceSettings.qwenVoice,
@@ -2164,7 +2258,7 @@ export function App() {
     if (!voiceSettings.ttsEnabled) ttsRef.current.stop();
   }, [voiceSettings]);
 
-  // GPT-SoVITS auto-start on app boot (not only when Settings is opened).
+  // GPT-SoVITS / Qwen vLLM auto-start on app boot (not only when Settings is opened).
   useEffect(() => {
     void ensureSovitsAutoStart({
       ttsEnabled: voiceSettings.ttsEnabled,
@@ -2174,11 +2268,23 @@ export function App() {
     }).catch(() => {
       /* TitleBar / Settings show status; boot must not throw */
     });
+    void ensureQwenAutoStart({
+      ttsEnabled: voiceSettings.ttsEnabled,
+      autoStartQwen: voiceSettings.autoStartQwen,
+      ttsProvider: voiceSettings.ttsProvider,
+      qwenUrl: voiceSettings.qwenUrl,
+      qwenModel: voiceSettings.qwenModel,
+    }).catch(() => {
+      /* Settings show status; boot must not throw */
+    });
   }, [
     voiceSettings.ttsEnabled,
     voiceSettings.autoStartSovits,
+    voiceSettings.autoStartQwen,
     voiceSettings.ttsProvider,
     voiceSettings.sovitsUrl,
+    voiceSettings.qwenUrl,
+    voiceSettings.qwenModel,
   ]);
 
   useEffect(() => {
@@ -2261,7 +2367,13 @@ export function App() {
           sanitizedParams,
           { functions, patterns, toys: toysList },
           nextSeed,
-          { unlocks: walletRef.current.unlocks },
+          {
+            unlocks: walletRef.current.unlocks,
+            equippedToyIds: initialEquippedFromAllowed(
+              toysList,
+              sanitizedParams.allowedToyIds,
+            ),
+          },
         ),
       );
     } catch (err) {
@@ -2339,24 +2451,28 @@ export function App() {
       if (sanitized.params.mode !== params.mode) {
         rebuild(sanitized.params);
       }
-      const flex = await fetchGelbooruFlexible(sanitized.tags, limit, {
+      const typeId = resolveMediaTypeId(base);
+      const query = applyMediaTypeQuery(sanitized.tags, typeId);
+      const flex = await fetchGelbooruFlexible(query, limit, {
         userId: mediaSettingsRef.current.gelbooruUserId,
         apiKey: mediaSettingsRef.current.gelbooruApiKey,
       });
-      if (flex.items.length === 0) {
-        setMediaError("Пусто — попробуй другие теги");
+      const items = filterPlaylistByMediaType(flex.items, typeId);
+      if (items.length === 0) {
+        setMediaError("Пусто — попробуй другие теги или другой тип контента");
       }
-      setMediaItems(flex.items);
+      setMediaItems(items);
       const saved: MediaSettings = {
         ...mediaSettingsRef.current,
         source: "gelbooru",
         limit,
-        tags: flex.items.length > 0 ? flex.usedTags : sanitized.tags,
+        mediaTypeId: typeId,
+        tags: sanitized.tags,
       };
       setMediaSettings(saved);
-      saveMediaLibrary(saved, flex.items);
+      saveMediaLibrary(saved, items);
       // Background-download the whole queue (progress on Today / Session)
-      preloadEntirePlaylist(flex.items);
+      preloadEntirePlaylist(items);
     } catch (err) {
       setMediaError(err instanceof Error ? err.message : "Ошибка загрузки");
     } finally {
@@ -2643,7 +2759,7 @@ export function App() {
       if (patched.source === "gelbooru") {
         try {
           const flex = await fetchGelbooruFlexible(
-            sanitized.tags,
+            applyMediaTypeQuery(sanitized.tags, patched.mediaTypeId ?? "all"),
             patched.limit,
             {
               userId: patched.gelbooruUserId,
@@ -2651,9 +2767,15 @@ export function App() {
             },
           );
           if (flex.items.length > 0) {
-            setMediaItems(flex.items);
-            saveMediaLibrary(patched, flex.items);
-            mediaItemsRef.current = flex.items;
+            const items = filterPlaylistByMediaType(
+              flex.items,
+              patched.mediaTypeId ?? "all",
+            );
+            if (items.length > 0) {
+              setMediaItems(items);
+              saveMediaLibrary(patched, items);
+              mediaItemsRef.current = items;
+            }
           }
         } catch {
           // keep existing playlist
@@ -2687,7 +2809,14 @@ export function App() {
       sessionParams,
       { functions, patterns, toys: toysRef.current },
       seed,
-      { mood: startMood, unlocks: afterCum.state.unlocks },
+      {
+        mood: startMood,
+        unlocks: afterCum.state.unlocks,
+        equippedToyIds: initialEquippedFromAllowed(
+          toysRef.current,
+          sessionParams.allowedToyIds,
+        ),
+      },
     );
     setQueue(q);
     setNav("session");
@@ -2757,6 +2886,7 @@ export function App() {
       ...mediaSettingsRef.current,
       tags: sanitized.tags,
       source: "gelbooru",
+      mediaTypeId: result.mediaTypeId,
     };
     setMediaSettings(nextMedia);
     saveMediaSettings(nextMedia);
@@ -2784,7 +2914,11 @@ export function App() {
           `Booru пуст (пробовал ${attempted.length} запросов, от «${sanitized.tags}» до упрощённых). Проверь API key или крути заново`,
         );
       }
-      const mediaWithTags: MediaSettings = { ...nextMedia, tags: usedTags };
+      const mediaWithTags: MediaSettings = {
+        ...nextMedia,
+        tags: usedTags,
+        mediaTypeId: result.mediaTypeId,
+      };
       setMediaSettings(mediaWithTags);
       saveMediaSettings(mediaWithTags);
       setMediaItems(playlistItems);
@@ -2808,7 +2942,14 @@ export function App() {
         sessionParams,
         { functions, patterns, toys: toysRef.current },
         result.seed,
-        { mood: moodFix.mood, unlocks: afterCum.state.unlocks },
+        {
+          mood: moodFix.mood,
+          unlocks: afterCum.state.unlocks,
+          equippedToyIds: initialEquippedFromAllowed(
+            toysRef.current,
+            sessionParams.allowedToyIds,
+          ),
+        },
       );
       setQueue(q);
 
@@ -2914,10 +3055,12 @@ export function App() {
     moodRef.current = pending.mood ?? getActiveMoodLines().defaultMood;
     runtimeRef.current?.setUnlocks(walletRef.current.unlocks);
     const sunna = getActiveMistress().id === "sunna";
-    let sunnaEquip: string[] = [];
+    let equipped = initialEquippedFromAllowed(
+      toysRef.current,
+      pending.params.allowedToyIds,
+    );
     if (sunna) {
-      // Always prep cage + dildo; mode decides how they're used in the queue.
-      sunnaEquip = ["chastity_cage"];
+      equipped = equipToy(equipped, "chastity_cage");
       const allow = pending.params.allowedToyIds;
       const dildo = toysRef.current.find(
         (t) =>
@@ -2926,8 +3069,7 @@ export function App() {
             (t.satisfies?.includes("dildo") ?? false)) &&
           isToyAllowedInSession(t.id, allow),
       );
-      if (dildo) sunnaEquip = [...sunnaEquip, dildo.id];
-      // Chastity focus: also prep wand / vibe bullet when allowed.
+      if (dildo) equipped = equipToy(equipped, dildo.id);
       if (pending.params.mode === "chastity") {
         const external = toysRef.current.find(
           (t) =>
@@ -2937,16 +3079,14 @@ export function App() {
               (t.satisfies?.includes("wand") ?? false)) &&
             isToyAllowedInSession(t.id, allow),
         );
-        if (external && !sunnaEquip.includes(external.id)) {
-          sunnaEquip = [...sunnaEquip, external.id];
-        }
+        if (external) equipped = equipToy(equipped, external.id);
       }
     }
     runtimeRef.current?.start(pending.params, pending.queue, pending.seed, {
       moodScore: pending.moodScore,
       fetishPrefs: pending.fetishPrefs,
       begBonus: pending.begBonus,
-      equippedToyIds: sunnaEquip,
+      equippedToyIds: equipped,
       idolBuzzHoldMode: sunna ? sunnaBuzzHoldMode : undefined,
     });
   }
@@ -3067,6 +3207,7 @@ export function App() {
           ttsEnabled={voiceSettings.ttsEnabled}
           ttsProvider={voiceSettings.ttsProvider}
           sovitsUrl={voiceSettings.sovitsUrl}
+          qwenUrl={voiceSettings.qwenUrl}
         />
       ) : null}
       <div
@@ -3199,7 +3340,7 @@ export function App() {
               onSaveMedia={handleSaveMedia}
               wd14Status={wd14Status}
               tagProgress={tagProgress}
-              onStartWd14={() => void startWd14FromUI()}
+              onStartWd14={startWd14FromUI}
               onRefreshWd14={() => void refreshWd14Status()}
               onToyOwned={handleToyOwned}
               contractSeed={activeSessionSeed}
@@ -3220,29 +3361,38 @@ export function App() {
               onOpenFavorites={() => setNav("favorites")}
             />
           ) : nav === "ember" ? (
-            <EmberPlayPage
-              onReward={(n) => {
-                if (n <= 0) return;
-                setWallet((w) => creditCinders(w, n));
-              }}
-              onOpenEditor={() => setNav("ember_editor")}
-            />
+            <EmberLazyBoundary>
+              <Suspense fallback={<EmberRouteFallback />}>
+                <LazyEmberPlayPage
+                  onReward={(n) => {
+                    if (n <= 0) return;
+                    setWallet((w) => creditCinders(w, n));
+                  }}
+                  onOpenEditor={() => setNav("ember_editor")}
+                />
+              </Suspense>
+            </EmberLazyBoundary>
           ) : nav === "ember_editor" ? (
-            <EmberEditorPage
-              onBackToPlay={() => setNav("ember")}
-              onGrantCinders={(n) => {
-                if (n <= 0) return;
-                setWallet((w) => creditCinders(w, n));
-              }}
-            />
+            <EmberLazyBoundary>
+              <Suspense fallback={<EmberRouteFallback />}>
+                <LazyEmberEditorPage
+                  onBackToPlay={() => setNav("ember")}
+                  onGrantCinders={(n) => {
+                    if (n <= 0) return;
+                    setWallet((w) => creditCinders(w, n));
+                  }}
+                />
+              </Suspense>
+            </EmberLazyBoundary>
           ) : nav === "diary" ? (
             <DiaryPage
               revision={diaryRevision}
               onRepeatPlan={repeatDiaryPlan}
             />
-          ) : nav === "stats" ? (
+          ) : nav === "stats" || nav === "contract_journal" ? (
             <StatsPage
               revision={diaryRevision}
+              journalRevision={contractsRevision}
               onNavigate={setNav}
             />
           ) : nav === "achievements" ? (
@@ -3253,6 +3403,7 @@ export function App() {
           ) : nav === "favorites" ? (
             <FavoritesPage
               onNavigate={setNav}
+              unlocks={contentUnlocksFromWallet(wallet)}
               onFavoritesChanged={() => {
                 void refreshFavoriteMeta();
                 void refreshShopOffers();
@@ -3289,8 +3440,6 @@ export function App() {
                 return true;
               }}
             />
-          ) : nav === "contract_journal" ? (
-            <ContractJournalPage revision={contractsRevision} />
           ) : nav === "shop" ? (
             <ShopPage
               wallet={wallet}
@@ -3349,6 +3498,8 @@ export function App() {
                 setNav("roulette");
               }}
             />
+          ) : nav === "chat" ? (
+            <ChatPage tts={ttsRef.current} sessionLive={sessionLive} />
           ) : nav === "minigames" ? (
             <MinigamesPage
               onReward={(n) => {
@@ -3463,6 +3614,12 @@ export function App() {
                 onChoiceSpinDone: () =>
                   runtimeRef.current?.completeChoiceReveal(),
                 onSkip: () => runtimeRef.current?.skipBlock(),
+                onDropUpcoming: (i) =>
+                  runtimeRef.current?.dropUpcomingBlock(i),
+                onMoveUpcoming: (i, dir) =>
+                  runtimeRef.current?.moveUpcomingBlock(i, dir),
+                onInsertRestAfter: (i) =>
+                  runtimeRef.current?.insertRestAfter(i),
                 onForceFinale: () => runtimeRef.current?.forceFinale(),
                 onAnswerPrompt: (optionId) =>
                   runtimeRef.current?.answerPrompt(optionId),
@@ -3572,6 +3729,7 @@ export function App() {
                   runtimeRef.current?.reportUnauthorized("cum"),
               }}
               tideIdol={{
+                onTideHit: () => runtimeRef.current?.reportTideHit(),
                 onTideFail: () => runtimeRef.current?.reportTideFail(),
                 onAnswerTideMiss: (missed) =>
                   runtimeRef.current?.answerTideMiss(missed),

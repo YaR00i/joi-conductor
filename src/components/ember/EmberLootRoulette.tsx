@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { EmberLootOption } from "../../game";
+import type { EmberLootOption } from "../../game/bridge/events";
 import { ParamRoulette } from "../ParamRoulette";
 
 type Props = {

@@ -63,6 +63,38 @@
         "haze": 0,
         "sunGlare": 0
       }
+    },
+    {
+      "id": "look_village_dusk",
+      "nameRu": "деревня · сумерки",
+      "ambientColor": "#2a140c",
+      "ambientAlpha": 0.28,
+      "fillIntensity": 1.08,
+      "sunAzimuth": 214,
+      "sunElevation": 18,
+      "sunColor": "#ff9a4a",
+      "sunIntensity": 1.22,
+      "bloomStrength": 0.38,
+      "bloomThreshold": 0.68,
+      "bloomRadius": 0.32,
+      "grade": {
+        "tone": 0.26,
+        "brightness": 1.12,
+        "saturation": 1.18
+      },
+      "atmosphere": {
+        "fog": 0.035,
+        "fogColor": "#c89068",
+        "rain": 0,
+        "wind": 0.18,
+        "cloudShadows": 0.2,
+        "cloudSpeed": 0.16,
+        "dust": 0.42,
+        "fireflies": 0.12,
+        "vignette": 0.26,
+        "haze": 0.22,
+        "sunGlare": 0.55
+      }
     }
   ]
 }

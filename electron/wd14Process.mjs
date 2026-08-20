@@ -17,6 +17,12 @@ import {
   killPortListeners,
   killProcessTree,
 } from "../scripts/process-utils.mjs";
+import {
+  ensureWd14Runtime,
+  findAppWd14Python,
+  wd14AppModelDir,
+  wd14ModelsReady,
+} from "./wd14Install.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_HOST = "127.0.0.1";
@@ -53,9 +59,11 @@ export function findWd14Script() {
  */
 export function findWd14Python(overridePython = "") {
   const home = userHome();
+  const appPy = findAppWd14Python();
   const candidates = [
     overridePython,
     process.env.WD14_PYTHON || "",
+    appPy || "",
     path.join(home, "miniconda3", "envs", "wd14", "python.exe"),
     path.join(home, "anaconda3", "envs", "wd14", "python.exe"),
     path.join(home, "miniconda3", "envs", "wd14", "bin", "python"),
@@ -64,7 +72,6 @@ export function findWd14Python(overridePython = "") {
   for (const c of candidates) {
     if (c && existsSync(c)) return c;
   }
-  // System python fallback (resolved at spawn time).
   return process.env.WD14_PYTHON || "python";
 }
 
@@ -73,13 +80,18 @@ export function findWd14ModelDir(override = "") {
   const candidates = [
     override,
     process.env.WD14_MODEL_DIR || "",
+    wd14AppModelDir(),
     path.resolve(__dirname, "..", "scripts", "wd14-models"),
     path.resolve(process.cwd(), "scripts", "wd14-models"),
   ];
   for (const c of candidates) {
-    if (c && existsSync(c)) return c;
+    if (c && wd14ModelsReady(c)) return c;
   }
-  return path.resolve(__dirname, "..", "scripts", "wd14-models");
+  try {
+    return wd14AppModelDir();
+  } catch {
+    return path.resolve(process.cwd(), "scripts", "wd14-models");
+  }
 }
 
 function parseBaseUrl(baseUrl) {
@@ -170,8 +182,8 @@ export async function getWd14ProcessStatus(opts = {}) {
     detail = "онлайн · управляется приложением";
   else if (ping.online) detail = "онлайн · внешний процесс";
   else if (!scriptPath) detail = "wd14_server.py не найден в scripts/";
-  else if (!existsSync(modelDir))
-    detail = `модель не найдена: ${modelDir} (см. docs/WD14_TAGGER.md)`;
+  else if (!wd14ModelsReady(modelDir))
+    detail = "модель не на диске — скачается при «Запустить сервер»";
   else detail = "офлайн";
 
   return {
@@ -188,8 +200,9 @@ export async function getWd14ProcessStatus(opts = {}) {
 
 /**
  * @param {{ baseUrl?: string, pythonPath?: string, modelDir?: string }} [opts]
+ * @param {(p: { phase: string, pct: number, detail?: string }) => void} [onProgress]
  */
-export async function startWd14Process(opts = {}) {
+export async function startWd14Process(opts = {}, onProgress) {
   const { host, port, base } = parseBaseUrl(opts.baseUrl);
   const ping = await pingWd14(base);
   if (ping.online) {
@@ -208,15 +221,25 @@ export async function startWd14Process(opts = {}) {
     }
   }
 
+  starting = true;
+  try {
+    await ensureWd14Runtime(onProgress);
+  } catch (err) {
+    starting = false;
+    throw err;
+  }
+
   const scriptPath = findWd14Script();
   const python = findWd14Python(opts.pythonPath || "");
   const modelDir = findWd14ModelDir(opts.modelDir || "");
   if (!scriptPath) {
+    starting = false;
     throw new Error("Не найден scripts/wd14_server.py.");
   }
-  if (!existsSync(modelDir)) {
+  if (!wd14ModelsReady(modelDir)) {
+    starting = false;
     throw new Error(
-      `Модель не найдена: ${modelDir}. Положи model.onnx + selected_tags.csv (см. docs/WD14_TAGGER.md).`,
+      `Модель WD14 не найдена: ${modelDir}. Нажми «Запустить сервер» ещё раз — качается сама.`,
     );
   }
 

@@ -53,7 +53,13 @@ const GATE_H = 150;
 const COL_CX = 90;
 const PLAYER_SPEED = 178;
 const STRAFE_SPEED = 540;
-const ENEMY_SPEED = 45;
+/** Waves hold their line on the road (0 = no counter-march): everything on
+ *  the track then moves in one camera frame and depth reads synchronized.
+ *  The closing speed comes from the player's own run. */
+const ENEMY_SPEED = 0;
+/** Fight triggers when crowd edges touch (each spread reaches ±30 around its
+ *  center: 30 + 30 + 2) so clusters meet without interpenetrating. */
+const FIGHT_GAP = 62;
 const TASK_GATE_CHANCE = 0.2;
 const MAX_DRAWN_DUDES = 55;
 const CROWD_SPREAD_W = 52;
@@ -592,7 +598,7 @@ export function RunnerTrack({
         for (const e of world.enemies) {
           if (e.dead) continue;
           e.z -= ENEMY_SPEED * dt;
-          if (e.z - world.playerZ < 26) {
+          if (e.z - world.playerZ < FIGHT_GAP) {
             resolveFight(e);
             if (world.phase !== "run") break;
           }
@@ -883,10 +889,10 @@ export function RunnerTrack({
         const ry = rx * 0.32;
         ctx.beginPath();
         ctx.ellipse(base.x, base.y, rx, ry, 0, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${ringColor},0.12)`;
+        ctx.fillStyle = `rgba(${ringColor},0.16)`;
         ctx.fill();
         ctx.lineWidth = Math.max(1.5, 3 * base.s);
-        ctx.strokeStyle = `rgba(${ringColor},0.55)`;
+        ctx.strokeStyle = `rgba(${ringColor},0.7)`;
         ctx.stroke();
 
         const n = Math.min(count, MAX_DRAWN_DUDES);
@@ -930,10 +936,11 @@ export function RunnerTrack({
           const g2 = project(col.cx + GATE_HALF, row.z);
           const topH = GATE_H * g1.s * pxPerUnit;
           const postW = Math.max(3, 14 * g1.s);
-          // translucent wall (denser near the ground)
+          // translucent wall — dense at the header, clear near the ground so
+          // enemy crowds behind the gate stay readable at a glance
           const wg = ctx.createLinearGradient(0, g1.y - topH, 0, g1.y);
-          wg.addColorStop(0, `${c.wall}${0.05 + pulse * 0.12})`);
-          wg.addColorStop(1, `${c.wall}${0.3 + pulse * 0.18})`);
+          wg.addColorStop(0, `${c.wall}${0.24 + pulse * 0.12})`);
+          wg.addColorStop(1, `${c.wall}${0.08 + pulse * 0.08})`);
           ctx.fillStyle = wg;
           ctx.fillRect(g1.x, g1.y - topH, g2.x - g1.x, topH);
           // floor strip
@@ -976,6 +983,42 @@ export function RunnerTrack({
           }
         }
       };
+
+      // Enemy danger corridors: a fading red band on the road from each wave
+      // toward the player. Makes the wave's depth readable at a glance — the
+      // band starts exactly at the enemy line, so "behind or in front of the
+      // gate" is unambiguous (drawn on the ground, under gates and crowds).
+      if (world.phase !== "dying") {
+        for (const e of world.enemies) {
+          if (e.dead || e.z <= world.playerZ || e.z - world.playerZ > DRAW_DIST) continue;
+          const frontZ = e.z;
+          const backZ = Math.max(world.playerZ + 10, e.z - 150);
+          if (backZ >= frontZ) continue;
+          const fl = project(-ROAD_HALF, frontZ);
+          const fr = project(ROAD_HALF, frontZ);
+          const bl = project(-ROAD_HALF, backZ);
+          const br = project(ROAD_HALF, backZ);
+          const baseA = e.boss ? 0.3 : 0.2;
+          const bandG = ctx.createLinearGradient(0, fl.y, 0, bl.y);
+          bandG.addColorStop(0, `rgba(255,80,55,${baseA})`);
+          bandG.addColorStop(1, "rgba(255,80,55,0)");
+          ctx.fillStyle = bandG;
+          ctx.beginPath();
+          ctx.moveTo(fl.x, fl.y);
+          ctx.lineTo(fr.x, fr.y);
+          ctx.lineTo(br.x, br.y);
+          ctx.lineTo(bl.x, bl.y);
+          ctx.closePath();
+          ctx.fill();
+          // crisp front line under the wave itself
+          ctx.strokeStyle = `rgba(255,90,60,${e.boss ? 0.65 : 0.45})`;
+          ctx.lineWidth = Math.max(1.5, 3.5 * fl.s);
+          ctx.beginPath();
+          ctx.moveTo(fl.x, fl.y);
+          ctx.lineTo(fr.x, fr.y);
+          ctx.stroke();
+        }
+      }
 
       // depth-sorted world objects
       const items: Array<{ z: number; draw: () => void }> = [];

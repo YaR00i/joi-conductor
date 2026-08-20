@@ -40,6 +40,7 @@ function placementFromWorldCenter(
   elev: number,
   rot: number,
   id: string,
+  scale = 1,
 ): EmberVoxelPlacement {
   const { sx, sz } = voxelGridSize(model);
   const vw = tileSize / VOXELS_PER_BLOCK;
@@ -50,6 +51,7 @@ function placementFromWorldCenter(
     y: (worldY - sz * vw * 0.5) / tileSize,
     elev,
     rot: normalizeVoxelRot(rot),
+    scale: { x: scale, y: scale, z: scale },
   };
 }
 
@@ -102,6 +104,7 @@ export function zoneRegionPhysicalVoxelPlacements(
           elev,
           rot,
           `zone_${region.id}_${obj.id}`,
+          scale,
         ),
       );
     }
@@ -121,6 +124,7 @@ export function zoneRegionPhysicalVoxelPlacements(
       pose.elev,
       rot,
       `zone_${region.id}_${modelId}`,
+      scale,
     ),
   );
   return out;

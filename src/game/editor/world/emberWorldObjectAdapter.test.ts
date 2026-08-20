@@ -41,6 +41,7 @@ import {
   setEmberSpriteAssetComponentPresence,
   setEmberTileAssetComponentPresence,
   setEmberWorldObjectComponentPresence,
+  setEmberWorldObjectsElevation,
   translateEmberWorldObjects,
 } from "./emberWorldObjectAdapter";
 import {
@@ -73,6 +74,21 @@ function worldMap(): EmberMap {
 }
 
 describe("EmberWorldObject references", () => {
+  it("does not expose disabled light tombstones as scene objects", () => {
+    const map = worldMap();
+    map.lights = [
+      ...(map.lights ?? []),
+      { id: "mute_2_2", x: 2, y: 2, enabled: false },
+    ];
+
+    expect(
+      listEmberWorldObjects(map).some((object) => object.id === "mute_2_2"),
+    ).toBe(false);
+    expect(
+      getEmberWorldObject(map, { kind: "light", id: "mute_2_2" }),
+    ).toBeNull();
+  });
+
   it("uses type-safe stable keys, including tile elevation", () => {
     expect(emberWorldObjectRefKey({ kind: "voxel", id: "same" })).toBe(
       "voxel:same",
@@ -404,18 +420,43 @@ describe("EmberWorldObject adapter", () => {
     const voxel = patchEmberWorldObjectTransform(
       map,
       { kind: "voxel", id: "crate-1" },
-      { x: 7, z: null, rotationQuarterTurns: 5 },
+      {
+        x: 7,
+        z: null,
+        rotationQuarterTurns: 5,
+        scaleX: 2,
+        scaleY: 0.5,
+        scaleZ: 1.5,
+      },
     );
-    expect(voxel.voxelProps?.[0]).toMatchObject({ x: 7, y: 3, rot: 1 });
+    expect(voxel.voxelProps?.[0]).toMatchObject({
+      x: 7,
+      y: 3,
+      rot: 1,
+      scale: { x: 2, y: 0.5, z: 1.5 },
+    });
+    expect(
+      getEmberWorldObject(voxel, { kind: "voxel", id: "crate-1" })
+        ?.transform.scale,
+    ).toEqual({ x: 2, y: 0.5, z: 1.5 });
     expect(voxel.voxelProps?.[0]).not.toHaveProperty("elev");
     expect(map.voxelProps?.[0]).toMatchObject({ x: 2, elev: 2 });
 
     const sprite = patchEmberWorldObjectTransform(
       map,
       { kind: "sprite", id: "sign-1" },
-      { y: 7 },
+      { y: 7, z: 2, scaleX: 3 },
     );
-    expect(sprite.sprites?.[0]).toMatchObject({ x: 4, y: 7 });
+    expect(sprite.sprites?.[0]).toMatchObject({
+      x: 4,
+      y: 7,
+      elev: 2,
+      scale: { x: 3, y: 1, z: 1 },
+    });
+    expect(
+      getEmberWorldObject(sprite, { kind: "sprite", id: "sign-1" })
+        ?.transform,
+    ).toMatchObject({ position: { z: 2 }, resolvedZ: 2 });
 
     const light = patchEmberWorldObjectTransform(
       map,
@@ -427,9 +468,35 @@ describe("EmberWorldObject adapter", () => {
     const region = patchEmberWorldObjectTransform(
       map,
       { kind: "region", id: "exit-1" },
-      { x: 3, y: 2 },
+      { x: 3, y: 2, scaleX: 4, scaleY: 2 },
     );
-    expect(region.regions[0]).toMatchObject({ x: 3, y: 2, w: 2, h: 3 });
+    expect(region.regions[0]).toMatchObject({ x: 3, y: 2, w: 4, h: 2 });
+
+    const reset = patchEmberWorldObjectTransform(
+      voxel,
+      { kind: "voxel", id: "crate-1" },
+      { scaleX: 1, scaleY: 1, scaleZ: 1 },
+    );
+    expect(reset.voxelProps?.[0]).not.toHaveProperty("scale");
+  });
+
+  it("sets and drops mixed voxel/sprite elevation as one immutable edit", () => {
+    const map = worldMap();
+    const refs = [
+      { kind: "voxel" as const, id: "crate-1" },
+      { kind: "sprite" as const, id: "sign-1" },
+      { kind: "light" as const, id: "lamp-1" },
+    ];
+    const raised = setEmberWorldObjectsElevation(map, refs, 4.5);
+    expect(raised.voxelProps?.[0]?.elev).toBe(4.5);
+    expect(raised.sprites?.[0]?.elev).toBe(4.5);
+    expect(raised.lights?.[0]).toEqual(map.lights?.[0]);
+    expect(map.voxelProps?.[0]?.elev).toBe(2);
+    expect(map.sprites?.[0]).not.toHaveProperty("elev");
+
+    const dropped = setEmberWorldObjectsElevation(raised, refs, "floor");
+    expect(dropped.voxelProps?.[0]).not.toHaveProperty("elev");
+    expect(dropped.sprites?.[0]).not.toHaveProperty("elev");
   });
 
   it("converts a direct child's Local Transform through its stable Parent", () => {

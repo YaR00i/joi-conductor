@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { writeEmberJson, type EmberPack } from "../../../game";
+import { writeEmberJson } from "../../../game/content/io";
 import type {
   EmberMap,
+  EmberPack,
   EmberSpawnEntry,
   EmberSpawnTable,
 } from "../../../game/content/types";

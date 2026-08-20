@@ -10,12 +10,14 @@ import {
   endOfLocalDayMs,
   ensureDailyContractBoard,
   loadContractBoard,
+  markContractAccepted,
   rerollDailyContractBoard,
   rollDailyBoard,
   saveContractBoard,
   type ContractInstance,
   type DailyContractBoard,
 } from "./dailyBoard";
+import { isHabitContractId } from "./catalog";
 
 installLocalStorageMock();
 
@@ -75,6 +77,13 @@ describe("rollDailyBoard", () => {
     const board = rollDailyBoard("2026-07-22", "hu_tao");
     const cats = new Set(board.contracts.map((c) => c.category));
     expect(cats.size).toBeGreaterThanOrEqual(3);
+  });
+
+  it("always includes at least one daily habit", () => {
+    const board = rollDailyBoard("2026-07-22", "hu_tao");
+    expect(
+      board.contracts.some((c) => isHabitContractId(c.defId)),
+    ).toBe(true);
   });
 
   it("changes composition when reroll salt changes", () => {
@@ -222,5 +231,53 @@ describe("ensureDailyContractBoard day rollover", () => {
     expect(next.contracts.map((c) => c.instanceId)).not.toEqual(
       mismatched.contracts.map((c) => c.instanceId),
     );
+  });
+
+  it("keeps an accepted contract when the calendar day changes", () => {
+    const day1 = atLocal(2026, 7, 22);
+    localStorage.setItem("joi-contracts-mig-media-drill-1", "1");
+    const first = ensureDailyContractBoard(day1);
+    const kept = first.contracts[0]!;
+    markContractAccepted(kept.instanceId, day1.getTime());
+    const day2 = ensureDailyContractBoard(atLocal(2026, 7, 23));
+    const carried = day2.contracts.find((c) => c.instanceId === kept.instanceId);
+    expect(carried).toBeTruthy();
+    expect(carried?.status).toBe("open");
+    expect(carried?.titleRu).toBe(kept.titleRu);
+    expect(carried?.dayKey).toBe("2026-07-23");
+    expect(carried?.deadlineMs).toBe(endOfLocalDayMs("2026-07-23"));
+  });
+
+  it("does not expire an accepted contract past the old deadline", () => {
+    const now = atLocal(2026, 7, 22, 18);
+    const dayKey = contractsTodayKey(now);
+    localStorage.setItem("joi-contracts-mig-media-drill-1", "1");
+    const board: DailyContractBoard = {
+      dayKey,
+      mistressId: "hu_tao",
+      contracts: [
+        {
+          instanceId: `${dayKey}-accepted-1`,
+          defId: "session_long_edges",
+          dayKey,
+          mistressId: "hu_tao",
+          category: "session_mod",
+          titleRu: "accepted",
+          bodyRu: "b",
+          reward: 10,
+          deadlineMs: now.getTime() - 5_000,
+          status: "open",
+          params: {},
+          difficulty: 1,
+          acceptedAtMs: now.getTime() - 60_000,
+        } satisfies ContractInstance,
+      ],
+    };
+    saveContractBoard(board);
+    const next = ensureDailyContractBoard(now);
+    const accepted = next.contracts.find(
+      (c) => c.instanceId === `${dayKey}-accepted-1`,
+    );
+    expect(accepted?.status).toBe("open");
   });
 });

@@ -11,6 +11,7 @@ import {
   composeContentQuery,
 } from "./contentRoulette";
 import { buildCumplayTierStep, resolveCumplayPick } from "./cumplayTiers";
+import type { ContentMediaTypeId } from "./contentCatalog";
 import type { MediaKind } from "./media";
 import { modeWeightMultiplier } from "./mistress/playBias";
 import { mistressAllowsCumFinale } from "./mistress/playBias";
@@ -90,6 +91,7 @@ export type PlanRouletteResult = {
   tagsLabelRu: string;
   /** Preferred media kinds after fetch; empty = all */
   mediaKinds: MediaKind[];
+  mediaTypeId: ContentMediaTypeId;
   /** Toys chosen by roulette; use "__none__" gate when empty after a count roll. */
   sessionToyIds: string[];
   /** True when toys_count wheel ran (even if 0). */
@@ -451,6 +453,7 @@ export function applyRoulettePicks(
     tags: composed.tags,
     tagsLabelRu: composed.tagsLabelRu,
     mediaKinds: composed.mediaKinds,
+    mediaTypeId: composed.mediaTypeId,
     sessionToyIds,
     toysResolved,
     summary,

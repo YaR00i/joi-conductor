@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AvatarStub } from "../components/AvatarStub";
 import { BeatBar } from "../components/BeatBar";
 import { FinaleRoulette } from "../components/FinaleRoulette";
@@ -23,9 +23,11 @@ import { SessionShopStrip } from "../components/session/SessionShopStrip";
 import { SessionToolbar } from "../components/session/SessionToolbar";
 import { SessionUnauthorizedFab } from "../components/session/SessionUnauthorizedFab";
 import { SessionFxOverlay } from "../components/SessionFxOverlay";
+import { TideHitLevelMeter } from "../components/TideHitMeter";
+import { TideHitVerifyToggle } from "../components/TideHitVerifyToggle";
 import { TypewriterText } from "../components/TypewriterText";
 import { VibeHud } from "../components/VibeHud";
-import { getToy } from "../lib/catalog";
+import { getFunction, getToy } from "../lib/catalog";
 import { BREATH_MODE_META } from "../lib/breathHold";
 import { buildInstructionCard } from "../lib/instructions";
 import { gripFromIntensity } from "../lib/grip";
@@ -66,8 +68,20 @@ import {
   tideMissAskLabelRu,
   tideMissCap,
 } from "../lib/tideHits";
+import {
+  loadTideHitVerifySettings,
+  saveTideHitVerifySettings,
+  type TideHitVerifySettings,
+} from "../lib/tideHitVerify";
+import {
+  startTideHitMic,
+  tideHitMicStatusRu,
+  type TideHitMicHandle,
+  type TideHitMicStatus,
+} from "../lib/tideHitMic";
 import { BEAT_BLOCK_GAP_MS } from "../lib/beatTiming";
 import { getActiveMistress } from "../lib/mistress";
+import { getActiveSaveSlot } from "../lib/saveSlots";
 import { getActiveMoodLines } from "../lib/voice/moodLines";
 import {
   playUiClick,
@@ -252,6 +266,9 @@ export function SessionPage({
     onFinaleComplete,
     onChoiceSpinDone,
     onSkip,
+    onDropUpcoming,
+    onMoveUpcoming,
+    onInsertRestAfter,
     onForceFinale,
     onAnswerPrompt,
     onReportDare,
@@ -265,6 +282,7 @@ export function SessionPage({
   } = controls;
 
   const {
+    onTideHit,
     onTideFail,
     onAnswerTideMiss,
     onAnswerTideComplete,
@@ -451,6 +469,10 @@ export function SessionPage({
   const patternLabel =
     currentPat?.steps?.join("-") ?? currentPat?.nameRu ?? "—";
   const timeLabel = formatTime(state?.blockElapsedSec ?? 0);
+  const nextBlock = state?.queue[(state?.index ?? 0) + 1];
+  const nextLabel = nextBlock
+    ? `далее · ${getFunction(nextBlock.functionId)?.nameRu ?? nextBlock.functionId}`
+    : null;
   const beatHandoffDelayMs =
     busy && !highwaySilent && (state?.index ?? 0) > 0 ? BEAT_BLOCK_GAP_MS : 0;
   const beatOriginPerf = state?.beatOriginPerf ?? null;
@@ -570,6 +592,53 @@ export function SessionPage({
     !canConfirmHold &&
     !canConfirmRuin &&
     !breathHolding;
+
+  const [tideVerify, setTideVerify] = useState<TideHitVerifySettings>(() =>
+    loadTideHitVerifySettings(),
+  );
+  const [tideMicDb, setTideMicDb] = useState(-80);
+  const [tideMicStatus, setTideMicStatus] = useState<TideHitMicStatus>("idle");
+  const [tideMicDetail, setTideMicDetail] = useState<string | undefined>();
+  const [tideMicFlash, setTideMicFlash] = useState(false);
+  const tideMicRef = useRef<TideHitMicHandle | null>(null);
+  const onTideHitRef = useRef(onTideHit);
+  onTideHitRef.current = onTideHit;
+  const tideMicEnabled = showTideHitDock && tideVerify.mode === "mic";
+
+  useEffect(() => {
+    if (!tideMicEnabled) {
+      if (tideMicRef.current) {
+        tideMicRef.current.stop();
+        tideMicRef.current = null;
+        setTideMicStatus("idle");
+        setTideMicDetail(undefined);
+        setTideMicDb(-80);
+      }
+      return;
+    }
+    const handle = startTideHitMic({
+      thresholdDb: tideVerify.thresholdDb,
+      onHit: () => {
+        setTideMicFlash(true);
+        window.setTimeout(() => setTideMicFlash(false), 180);
+        onTideHitRef.current();
+      },
+      onLevel: setTideMicDb,
+      onStatus: (status, detail) => {
+        setTideMicStatus(status);
+        setTideMicDetail(detail);
+      },
+    });
+    tideMicRef.current = handle;
+    return () => {
+      handle.stop();
+      if (tideMicRef.current === handle) tideMicRef.current = null;
+    };
+  }, [tideMicEnabled]);
+
+  useEffect(() => {
+    tideMicRef.current?.setThresholdDb(tideVerify.thresholdDb);
+  }, [tideVerify.thresholdDb]);
 
   const idolTarget = state?.idolTarget ?? 0;
   const idolHits = state?.idolHits ?? 0;
@@ -756,7 +825,16 @@ export function SessionPage({
 
         <div className="session__hud-right">
           <div className="session__hud-right__row">
-            <SessionQueuePanel queue={state?.queue ?? []} index={state?.index ?? 0} />
+            <SessionQueuePanel
+              queue={state?.queue ?? []}
+              index={state?.index ?? 0}
+              editable={
+                busy && !inPreflight && getActiveSaveSlot() === "sandbox"
+              }
+              onDropUpcoming={onDropUpcoming}
+              onMoveUpcoming={onMoveUpcoming}
+              onInsertRestAfter={onInsertRestAfter}
+            />
             {mediaLoad.kind ? (
               <div
                 className={`session__media-chip session__media-chip--${mediaLoad.kind}${
@@ -1458,9 +1536,35 @@ export function SessionPage({
                   {tideHitCounterLabelRu(tideHits, tideTarget)}
                 </span>
                 <span className="confirm-dock__tide-hint">
-                  {tideHitProgressHintRu(currentBlock?.functionId)}
+                  {tideHitProgressHintRu(
+                    currentBlock?.functionId,
+                    tideVerify.mode,
+                  )}
                 </span>
+                {tideVerify.mode === "mic" ? (
+                  <>
+                    <TideHitLevelMeter
+                      db={tideMicDb}
+                      thresholdDb={tideVerify.thresholdDb}
+                      flash={tideMicFlash}
+                    />
+                    <span className="confirm-dock__tide-hint">
+                      {tideHitMicStatusRu(tideMicStatus, tideMicDetail)}
+                    </span>
+                  </>
+                ) : null}
               </div>
+              <TideHitVerifyToggle
+                compact
+                mode={tideVerify.mode}
+                onChange={(mode) => {
+                  void primeUiAudio();
+                  playUiClick();
+                  setTideVerify(
+                    saveTideHitVerifySettings({ ...tideVerify, mode }),
+                  );
+                }}
+              />
               <button
                 type="button"
                 className="confirm-dock__btn confirm-dock__btn--tide-fail"
@@ -1865,6 +1969,7 @@ export function SessionPage({
             hitSeq={pulse}
             patternLabel={patternLabel}
             timeLabel={timeLabel}
+            nextLabel={nextLabel}
           />
 
           <SessionToolbar

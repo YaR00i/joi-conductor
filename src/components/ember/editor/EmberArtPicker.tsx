@@ -4,9 +4,12 @@ import {
   writeEmberBytes,
   writeEmberJson,
   writeEmberText,
-  type EmberPack,
-} from "../../../game";
-import type { EmberArt, EmberArtKind } from "../../../game/content/types";
+} from "../../../game/content/io";
+import type {
+  EmberArt,
+  EmberArtKind,
+  EmberPack,
+} from "../../../game/content/types";
 
 const KIND_LABELS: Record<EmberArtKind, string> = {
   splash: "Splash",

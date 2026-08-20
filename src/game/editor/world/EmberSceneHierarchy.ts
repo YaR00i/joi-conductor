@@ -4,6 +4,7 @@ import type {
   EmberSceneHierarchy,
   EmberSceneLocalTransform,
 } from "../../content/types";
+import { resolveEmberTransformScale } from "../../world/worldTransform";
 export type {
   EmberSceneGroup,
   EmberSceneHierarchy,
@@ -16,9 +17,14 @@ function storedObjectPositions(map: EmberMap): Map<string, { x: number; y: numbe
     positions.set(`voxel:${item.id}`, { x: item.x, y: item.y, z: item.elev ?? 0 });
   }
   for (const item of map.sprites ?? []) {
-    positions.set(`sprite:${item.id}`, { x: item.x, y: item.y, z: 0 });
+    positions.set(`sprite:${item.id}`, {
+      x: item.x,
+      y: item.y,
+      z: item.elev ?? 0,
+    });
   }
   for (const item of map.lights ?? []) {
+    if (item.enabled === false) continue;
     positions.set(`light:${item.id}`, { x: item.x, y: item.y, z: item.lampHeight ?? 0 });
   }
   for (const item of map.regions) {
@@ -41,7 +47,9 @@ function storedObjectRotations(map: EmberMap): Map<string, number> {
     rotations.set(`voxel:${item.id}`, normalizeTurns(item.rot));
   }
   for (const item of map.sprites ?? []) rotations.set(`sprite:${item.id}`, 0);
-  for (const item of map.lights ?? []) rotations.set(`light:${item.id}`, 0);
+  for (const item of map.lights ?? []) {
+    if (item.enabled !== false) rotations.set(`light:${item.id}`, 0);
+  }
   for (const item of map.regions) rotations.set(`region:${item.id}`, 0);
   return rotations;
 }
@@ -333,6 +341,37 @@ export function rotateEmberSceneGroupTransforms(
               rotationQuarterTurns: normalizeTurns(
                 normalizeTurns(group.rotationQuarterTurns) + turns,
               ),
+            }
+          : group,
+      ),
+    },
+  });
+}
+
+/** Scales nested group pivots after their descendant world objects scale. */
+export function scaleEmberSceneGroupTransforms(
+  map: EmberMap,
+  id: string,
+  scale: Readonly<{ x: number; y: number; z: number }>,
+): EmberMap {
+  const hierarchy = map.sceneHierarchy;
+  const root = hierarchy?.groups.find((group) => group.id === id);
+  if (!hierarchy || !root) return map;
+  const delta = resolveEmberTransformScale(scale);
+  const branchIds = emberSceneGroupBranchIds(hierarchy, id);
+  return refreshEmberSceneHierarchyPivots({
+    ...map,
+    sceneHierarchy: {
+      version: 1,
+      groups: hierarchy.groups.map((group) =>
+        branchIds.has(group.id) && group.id !== id
+          ? {
+              ...group,
+              pivot: {
+                x: root.pivot.x + (group.pivot.x - root.pivot.x) * delta.x,
+                y: root.pivot.y + (group.pivot.y - root.pivot.y) * delta.y,
+                z: root.pivot.z + (group.pivot.z - root.pivot.z) * delta.z,
+              },
             }
           : group,
       ),

@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EmberLootRoulette } from "../components/ember/EmberLootRoulette";
 import { ScenePlayer } from "../components/ember/ScenePlayer";
-import {
-  createEmberGame,
-  loadEmberPack,
-  type EmberBridgeEvent,
-  type EmberGameApi,
-  type EmberLootOption,
-  type EmberPack,
-  type ValidationIssue,
-} from "../game";
+import type {
+  EmberBridgeEvent,
+  EmberGameApi,
+  EmberLootOption,
+} from "../game/bridge/events";
+import { loadEmberPack } from "../game/content/loadPack";
+import { resolveMapPlayProfile } from "../game/content/playProfile";
+import type {
+  EmberPack,
+  ValidationIssue,
+} from "../game/content/types";
+import { createEmberThreeGame } from "../game/three/createEmberThreeGame";
+import { requestPlayPointerLock } from "../game/three/playPointer";
 
 type Props = {
   onReward: (cinders: number) => void;
@@ -45,7 +49,13 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [engineLoading, setEngineLoading] = useState(false);
+  const [loadProgress, setLoadProgress] = useState({
+    ratio: 0.04,
+    labelRu: "Движок…",
+  });
   const [shortMode, setShortMode] = useState(true);
+  const [stageId, setStageId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [hud, setHud] = useState<Extract<EmberBridgeEvent, { type: "hud" }> | null>(
     null,
@@ -54,7 +64,12 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [result, setResult] = useState<ResultState | null>(null);
   const [sceneId, setSceneId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [relockAtMs, setRelockAtMs] = useState(0);
+  const [nowMs, setNowMs] = useState(0);
   const rewardedRef = useRef(false);
+  const engineRequestRef = useRef(0);
+  const startingRef = useRef(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -63,6 +78,10 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
       const { pack: p, issues: iss } = await loadEmberPack();
       setPack(p);
       setIssues(iss);
+      setStageId((prev) => {
+        if (prev && p.stages[prev]) return prev;
+        return p.meta.defaultStageId;
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "load failed");
     } finally {
@@ -75,14 +94,30 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
   }, [reload]);
 
   const stopGame = useCallback(() => {
+    engineRequestRef.current += 1;
     apiRef.current?.destroy();
     apiRef.current = null;
     setRunning(false);
     setLoot(null);
     setHud(null);
+    setMenuOpen(false);
   }, []);
 
   useEffect(() => () => stopGame(), [stopGame]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    if (performance.now() >= relockAtMs) {
+      setNowMs(relockAtMs);
+      return;
+    }
+    const id = window.setInterval(() => {
+      const now = performance.now();
+      setNowMs(now);
+      if (now >= relockAtMs) window.clearInterval(id);
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [menuOpen, relockAtMs]);
 
   const packRef = useRef(pack);
   packRef.current = pack;
@@ -132,6 +167,14 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
           setToast(ev.textRu);
           window.setTimeout(() => setToast(null), 1800);
           break;
+        case "load_progress":
+          setLoadProgress({ ratio: ev.ratio, labelRu: ev.labelRu });
+          break;
+        case "pause_menu":
+          setMenuOpen(true);
+          setRelockAtMs(performance.now() + ev.relockWaitMs);
+          setNowMs(performance.now());
+          break;
         default: {
           const _n: never = ev;
           void _n;
@@ -141,21 +184,80 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
     [stopGame],
   );
 
-  const start = () => {
-    if (!pack || !hostRef.current) return;
+  const start = async () => {
+    const host = hostRef.current;
+    if (!pack || !host || startingRef.current) return;
+    startingRef.current = true;
+    const shell = host.parentElement;
+    requestPlayPointerLock(shell instanceof HTMLElement ? shell : host);
     stopGame();
+    const requestId = engineRequestRef.current;
     setResult(null);
     setSceneId(null);
     rewardedRef.current = false;
-    const stageId = pack.meta.defaultStageId;
-    apiRef.current = createEmberGame({
-      parent: hostRef.current,
-      pack,
-      stageId,
-      onBridge,
-      shortMode,
-    });
-    setRunning(true);
+    setEngineLoading(true);
+    setLoadProgress({ ratio: 0.04, labelRu: "Движок…" });
+    setError(null);
+    try {
+      if (
+        requestId !== engineRequestRef.current ||
+        !hostRef.current
+      ) {
+        return;
+      }
+      const stageIdToStart = stageId && pack.stages[stageId]
+        ? stageId
+        : pack.meta.defaultStageId;
+      const startStage = pack.stages[stageIdToStart];
+      const startMap = startStage ? pack.maps[startStage.mapId] : undefined;
+      const exploreRun =
+        startMap != null && resolveMapPlayProfile(startMap) === "explore";
+      const api = createEmberThreeGame({
+        parent: hostRef.current,
+        pack,
+        stageId: stageIdToStart,
+        onBridge,
+        shortMode: exploreRun ? false : shortMode,
+      });
+      apiRef.current = api;
+      api.lockLook();
+      await api.ready;
+      if (
+        requestId !== engineRequestRef.current ||
+        apiRef.current !== api
+      ) {
+        api.destroy();
+        return;
+      }
+      api.lockLook();
+      setRunning(true);
+    } catch (err) {
+      if (requestId !== engineRequestRef.current) return;
+      setError(
+        err instanceof Error
+          ? `Не удалось загрузить движок: ${err.message}`
+          : "Не удалось загрузить движок",
+      );
+    } finally {
+      startingRef.current = false;
+      if (requestId === engineRequestRef.current) setEngineLoading(false);
+    }
+  };
+
+  const continuePlay = () => {
+    if (performance.now() < relockAtMs) return;
+    apiRef.current?.resume();
+    setMenuOpen(false);
+  };
+
+  const quitToLobby = () => {
+    setResult(null);
+    stopGame();
+  };
+
+  const quitToEditor = () => {
+    quitToLobby();
+    onOpenEditor();
   };
 
   const takeLoot = (itemId: string) => {
@@ -185,9 +287,20 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
   };
 
   const errors = issues.filter((i) => i.level === "error");
-  const stageName =
-    pack?.stages[pack.meta.defaultStageId]?.nameRu ?? "Загрузка…";
-  const idle = !running && !sceneId;
+  const selectedStageId =
+    (stageId && pack?.stages[stageId] ? stageId : null) ??
+    pack?.meta.defaultStageId ??
+    null;
+  const selectedStage = selectedStageId ? pack?.stages[selectedStageId] : undefined;
+  const selectedMap = selectedStage ? pack?.maps[selectedStage.mapId] : undefined;
+  const explore = selectedMap
+    ? resolveMapPlayProfile(selectedMap) === "explore"
+    : false;
+  const stageName = selectedStage?.nameRu ?? "Загрузка…";
+  const idle = !running && !sceneId && !engineLoading;
+  const relockWaitMs = Math.max(0, relockAtMs - nowMs);
+  const canContinue = relockWaitMs <= 0;
+  const relockWaitSec = Math.ceil(relockWaitMs / 1000);
 
   return (
     <div className="page page--ember">
@@ -203,8 +316,12 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
         {running && hud ? (
           <div className="ember-play-bar__live" aria-live="polite">
             <span>{fmtTime(hud.elapsedSec)}</span>
-            <span className="ember-play-bar__sep">/</span>
-            <span className="muted">{fmtTime(hud.durationSec)}</span>
+            {hud.durationSec > 0 ? (
+              <>
+                <span className="ember-play-bar__sep">/</span>
+                <span className="muted">{fmtTime(hud.durationSec)}</span>
+              </>
+            ) : null}
             <span className="ember-play-bar__dot" aria-hidden>
               ·
             </span>
@@ -212,7 +329,7 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
           </div>
         ) : (
           <div className="ember-play-bar__status muted">
-            {loading
+            {loading || engineLoading
               ? "Загрузка…"
               : error
                 ? "Ошибка пака"
@@ -260,42 +377,151 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
 
       <div className="ember-play-shell">
         <div
-          className={`ember-play__stage ${running ? "is-live" : ""} ${idle ? "is-idle" : ""}`}
+          className={`ember-play__stage ${running || engineLoading ? "is-live" : ""} ${!running && !sceneId ? "is-idle" : ""}`}
           ref={hostRef}
         />
+
+        {engineLoading ? (
+          <div
+            className="ember-play__boot"
+            role="status"
+            aria-live="polite"
+            onPointerDown={() => apiRef.current?.lockLook()}
+          >
+            <div className="ember-play__boot-card">
+              <p className="ember-play__kicker muted">Загрузка</p>
+              <h2 className="ember-play__stage-name">{stageName}</h2>
+              <div
+                className="ember-play__boot-track"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(loadProgress.ratio * 100)}
+              >
+                <div
+                  className="ember-play__boot-fill"
+                  style={{
+                    width: `${Math.max(4, Math.min(100, loadProgress.ratio * 100))}%`,
+                  }}
+                />
+              </div>
+              <p className="muted ember-play__boot-label">
+                {loadProgress.labelRu}
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         {idle ? (
           <div className="ember-play__lobby">
             <div className="ember-play__lobby-card">
-              <p className="ember-play__kicker muted">Забег</p>
-              <h2 className="ember-play__stage-name">{stageName}</h2>
+              <p className="ember-play__kicker muted">
+                {explore ? "Прогулка" : "Забег"}
+              </p>
+              {pack && Object.keys(pack.stages).length > 1 ? (
+                <label className="ember-play__stage-pick">
+                  Стадия
+                  <select
+                    value={selectedStageId ?? ""}
+                    onChange={(e) => setStageId(e.target.value)}
+                  >
+                    {Object.values(pack.stages).map((st) => (
+                      <option key={st.id} value={st.id}>
+                        {st.nameRu ?? st.id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <h2 className="ember-play__stage-name">{stageName}</h2>
+              )}
+              {pack && Object.keys(pack.stages).length > 1 ? (
+                <h2 className="ember-play__stage-name">{stageName}</h2>
+              ) : null}
               <p className="muted ember-play__blurb">
-                Движение WASD · атаки сами · XP и сундуки качают билд
+                {explore
+                  ? "WASD — гулять по деревне · без волн и орды · фонари и окна"
+                  : "Движение WASD · атаки сами · XP и сундуки качают билд"}
               </p>
 
-              <label className="ember-check ember-play__short">
-                <input
-                  type="checkbox"
-                  checked={shortMode}
-                  onChange={(e) => setShortMode(e.target.checked)}
-                />
-                Короткий режим (~90с)
-              </label>
+              {explore ? null : (
+                <label className="ember-check ember-play__short">
+                  <input
+                    type="checkbox"
+                    checked={shortMode}
+                    onChange={(e) => setShortMode(e.target.checked)}
+                  />
+                  Короткий режим (~90с)
+                </label>
+              )}
 
               <button
                 type="button"
                 className="primary ember-play__start"
-                disabled={!pack || loading || errors.length > 0}
-                onClick={start}
+                disabled={!pack || loading || engineLoading || errors.length > 0}
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  void start();
+                }}
+                onClick={(e) => {
+                  if (e.detail === 0) void start();
+                }}
               >
-                Начать
+                {engineLoading ? "Загрузка движка…" : "Начать"}
               </button>
 
               <ul className="muted ember-play__tips">
-                <li>Слизь замедляет</li>
-                <li>Урон оголяет (strip)</li>
-                <li>Контент — в Редакторе</li>
+                {explore ? (
+                  <>
+                    <li>Карта: {selectedMap?.nameRu ?? selectedStage?.mapId}</li>
+                    <li>Редактор → Карты → «Деревня Ху Тао»</li>
+                    <li>WASD — движение · мышь — камера · Esc — меню</li>
+                    <li>Фонари и окна — локальный свет с гибридными тенями</li>
+                  </>
+                ) : (
+                  <>
+                    <li>Мышь — камера · Esc — меню</li>
+                    <li>Слизь замедляет</li>
+                    <li>Урон оголяет (strip)</li>
+                    <li>Контент — в Редакторе</li>
+                  </>
+                )}
               </ul>
+            </div>
+          </div>
+        ) : null}
+
+        {menuOpen && running ? (
+          <div className="ember-play__menu" role="dialog" aria-modal="true" aria-label="Меню">
+            <div className="ember-play__menu-card">
+              <p className="ember-play__kicker muted">Пауза</p>
+              <h2 className="ember-play__stage-name">{stageName}</h2>
+              <button
+                type="button"
+                className="primary"
+                disabled={!canContinue}
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  continuePlay();
+                }}
+                onClick={(e) => {
+                  if (e.detail === 0) continuePlay();
+                }}
+              >
+                {canContinue
+                  ? "Продолжить"
+                  : `Продолжить (${relockWaitSec})`}
+              </button>
+              {!canContinue ? (
+                <p className="muted ember-play__menu-hint">
+                  После Esc браузер ~1.5 с не даёт снова захватить мышь
+                </p>
+              ) : null}
+              <button type="button" className="ghost" onClick={quitToLobby}>
+                Выйти
+              </button>
+              <button type="button" className="ghost" onClick={quitToEditor}>
+                Редактор
+              </button>
             </div>
           </div>
         ) : null}

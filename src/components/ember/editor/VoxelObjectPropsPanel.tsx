@@ -31,6 +31,7 @@ import {
   voxelGridSize,
 } from "../../../game/voxel/voxelModel";
 import { EditableRange } from "./EditableRange";
+import { DeferredColorInput } from "./DeferredColorInput";
 
 /** Parse draft; null while incomplete ("", "-", "1.", …). */
 function parseDraftNumber(raw: string): number | null {
@@ -134,6 +135,69 @@ function DraftNumberInput({
   );
 }
 
+/** Integer field whose text is harmless until the user explicitly presses Enter. */
+function EnterCommitIntegerInput({
+  value,
+  min,
+  max,
+  title,
+  onCommit,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  title?: string;
+  onCommit: (value: number) => void;
+}) {
+  const [text, setText] = useState(String(value));
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) setText(String(value));
+  }, [value, focused]);
+
+  const reset = () => setText(String(value));
+  const commit = () => {
+    const parsed = Number(text.trim());
+    if (!Number.isFinite(parsed)) {
+      reset();
+      return;
+    }
+    const next = Math.max(min, Math.min(max, Math.round(parsed)));
+    setText(String(next));
+    if (next !== value) onCommit(next);
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      value={text}
+      title={`${title ? `${title} · ` : ""}Enter — применить, Esc — отменить`}
+      onFocus={() => setFocused(true)}
+      onChange={(event) => {
+        const next = event.target.value.trim();
+        if (next !== "" && !/^\d+$/.test(next)) return;
+        setText(next);
+      }}
+      onBlur={() => {
+        setFocused(false);
+        reset();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          commit();
+        } else if (event.key === "Escape") {
+          event.preventDefault();
+          reset();
+          (event.currentTarget as HTMLInputElement).blur();
+        }
+      }}
+    />
+  );
+}
+
 type Props = {
   object: EmberVoxelSceneObject | null;
   model: EmberVoxelModel | null;
@@ -144,6 +208,7 @@ type Props = {
   onResizeHeight: (voxels: number) => void;
   onSetMaterial: (material: EmberMaterialKind | undefined) => void;
   onSetPaletteColor: (index: number, hex: string) => void;
+  onPreviewPaletteColor?: (index: number, hex: string) => void;
   onEditModel: (next: EmberVoxelModel) => void;
   onDuplicate?: () => void;
   onRemove?: () => void;
@@ -163,6 +228,7 @@ export function VoxelObjectPropsPanel({
   onResizeHeight,
   onSetMaterial,
   onSetPaletteColor,
+  onPreviewPaletteColor,
   onEditModel,
   onDuplicate,
   onRemove,
@@ -231,44 +297,34 @@ export function VoxelObjectPropsPanel({
             </span>
             <label>
               <span>Ширина</span>
-              <input
-                type="number"
+              <EnterCommitIntegerInput
                 min={1}
                 max={4}
                 value={model.sizeBlocks.x}
                 title={`Блоков по X (${grid.sx} вокс)`}
-                onChange={(e) =>
-                  onResizeBlocks("x", Number(e.target.value) || 1)
-                }
+                onCommit={(value) => onResizeBlocks("x", value)}
               />
               <em>бл</em>
             </label>
             <label>
               <span>Длина</span>
-              <input
-                type="number"
+              <EnterCommitIntegerInput
                 min={1}
                 max={4}
                 value={model.sizeBlocks.z}
                 title={`Блоков по Z (${grid.sz} вокс)`}
-                onChange={(e) =>
-                  onResizeBlocks("z", Number(e.target.value) || 1)
-                }
+                onCommit={(value) => onResizeBlocks("z", value)}
               />
               <em>бл</em>
             </label>
             <label>
               <span>Высота</span>
-              <input
-                type="number"
+              <EnterCommitIntegerInput
                 min={1}
                 max={64}
-                step={1}
                 value={heightVoxels}
                 title="Высота в вокселях"
-                onChange={(e) =>
-                  onResizeHeight(Number(e.target.value) || 1)
-                }
+                onCommit={onResizeHeight}
               />
               <em>вкс</em>
             </label>
@@ -569,16 +625,14 @@ export function VoxelObjectPropsPanel({
                     <span className="ember-voxel-objprops__group-meta">
                       #{g.index} · {g.count} кл.
                     </span>
-                    <input
-                      type="color"
+                    <DeferredColorInput
                       className="ember-voxel-objprops__color"
                       value={
                         g.color.startsWith("#") ? g.color : "#888888"
                       }
                       title="Цвет слота палитры"
-                      onChange={(e) =>
-                        onSetPaletteColor(g.index, e.target.value)
-                      }
+                      onPreview={(hex) => onPreviewPaletteColor?.(g.index, hex)}
+                      onCommit={(hex) => onSetPaletteColor(g.index, hex)}
                     />
                   </div>
                   <EditableRange

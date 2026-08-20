@@ -2,6 +2,7 @@
  * Boot-time / Settings shared GPT-SoVITS auto-start.
  * Prevents double spawn when App and Settings both try to start.
  */
+import { wantsSovitsAutoStart } from "./ttsEngineAutoStart";
 
 export type SovitsAutoStartResult = {
   online: boolean;
@@ -13,15 +14,6 @@ export type SovitsAutoStartResult = {
 
 let inFlight: Promise<SovitsAutoStartResult | null> | null = null;
 let startedOnce = false;
-
-function wantsSovitsAutoStart(opts: {
-  ttsEnabled: boolean;
-  autoStartSovits: boolean;
-  ttsProvider: string;
-}): boolean {
-  if (!opts.ttsEnabled || !opts.autoStartSovits) return false;
-  return opts.ttsProvider === "sovits" || opts.ttsProvider === "auto";
-}
 
 /**
  * Start GPT-SoVITS api_v2 when settings ask for it (Electron only).
@@ -78,7 +70,7 @@ export async function ensureSovitsAutoStart(opts: {
   return inFlight;
 }
 
-/** Allow Settings «Запустить» / toggle to try again after a failed boot start. */
+/** Allow Settings start / toggle to try again after a failed boot start. */
 export function resetSovitsAutoStartGate(): void {
   startedOnce = false;
   inFlight = null;

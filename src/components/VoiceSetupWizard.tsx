@@ -14,12 +14,11 @@ type Props = {
   tts: SpeechTts;
 };
 
-type WizardStep = 1 | 2 | 3;
+type WizardStep = 1 | 2;
 
 const STEPS: { id: WizardStep; label: string }[] = [
-  { id: 1, label: "Текст" },
-  { id: 2, label: "Озвучка" },
-  { id: 3, label: "Клон" },
+  { id: 1, label: "Озвучка" },
+  { id: 2, label: "Клон" },
 ];
 
 function sampleNameEn(id: MistressId): string {
@@ -90,6 +89,8 @@ function applyTtsConfig(tts: SpeechTts, voice: VoiceSettings, provider: TtsProvi
     sovitsPromptText: voice.sovitsPromptText,
     sovitsPromptLang: voice.sovitsPromptLang,
     sovitsTextLang: voice.sovitsTextLang,
+    qwenRefPath: voice.qwenRefPath,
+    qwenPromptText: voice.qwenPromptText,
   });
 }
 
@@ -170,8 +171,8 @@ export function VoiceSetupWizard({ voice, onVoice, tts }: Props) {
       <div className="voice-wizard__head">
         <strong>Быстрая настройка голоса</strong>
         <span className="tts-panel__sub">
-          Три шага для {mistress.displayNameRu}: режим текста → простая озвучка →
-          опционально клон SoVITS. Полные ручки — ниже.
+          Два шага для {mistress.displayNameRu}: простая озвучка → опционально
+          клон SoVITS. Текст реплик (шаблоны / LLM) — вкладка «ИИ ресурсы».
         </span>
       </div>
 
@@ -199,54 +200,8 @@ export function VoiceSetupWizard({ voice, onVoice, tts }: Props) {
       {step === 1 ? (
         <div className="voice-wizard__body">
           <p className="voice-howto">
-            <strong>Шаг 1.</strong> Кто пишет реплики: шаблоны из bible (без
-            Ollama) или Local LLM. Озвучка настраивается отдельно.
-          </p>
-          <div className="today__fields">
-            <label className="field">
-              <span className="field__label">Режим текста</span>
-              <span className="field__hint">
-                Templates — сразу. LLM — нужен Ollama (блок «Текст» ниже).
-              </span>
-              <select
-                value={voice.mode}
-                onChange={(e) =>
-                  onVoice({
-                    ...voice,
-                    mode: e.target.value === "llm" ? "llm" : "template",
-                  })
-                }
-              >
-                <option value="template">Templates (bible)</option>
-                <option value="llm">Local LLM (Ollama)</option>
-              </select>
-            </label>
-          </div>
-          <div className="today__actions">
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => {
-                setStep(2);
-                setHint(null);
-              }}
-            >
-              Дальше · озвучка
-            </button>
-            {voice.mode === "llm" ? (
-              <span className="tts-panel__sub">
-                Модель и Ollama — в секции «Текст · Templates / Local LLM».
-              </span>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
-      {step === 2 ? (
-        <div className="voice-wizard__body">
-          <p className="voice-howto">
-            <strong>Шаг 2.</strong> Выбери Edge или системный голос и проверь
-            фразу для <em>{mistress.displayNameRu}</em>. SoVITS — на шаге 3.
+            <strong>Шаг 1.</strong> Выбери Edge или системный голос и проверь
+            фразу для <em>{mistress.displayNameRu}</em>. SoVITS — на шаге 2.
           </p>
           <div className="voice-wizard__picks">
             <button
@@ -331,13 +286,6 @@ export function VoiceSetupWizard({ voice, onVoice, tts }: Props) {
           <div className="today__actions">
             <button
               type="button"
-              disabled={busy}
-              onClick={() => setStep(1)}
-            >
-              Назад
-            </button>
-            <button
-              type="button"
               className="btn-primary"
               disabled={
                 busy ||
@@ -353,9 +301,10 @@ export function VoiceSetupWizard({ voice, onVoice, tts }: Props) {
             </button>
             <button
               type="button"
+              className="btn-ghost"
               disabled={busy}
               onClick={() => {
-                setStep(3);
+                setStep(2);
                 setHint(null);
               }}
             >
@@ -370,12 +319,12 @@ export function VoiceSetupWizard({ voice, onVoice, tts }: Props) {
         </div>
       ) : null}
 
-      {step === 3 ? (
+      {step === 2 ? (
         <div className="voice-wizard__body">
           <p className="voice-howto">
-            <strong>Шаг 3 (необязательно).</strong> Клон голоса через GPT-SoVITS.
-            Референс уже из профиля {mistress.displayNameRu}. Нужны GPU и
-            установленный SoVITS — см. <code>docs/GPT_SOVITS_SETUP.md</code>.
+            Клон голоса через GPT-SoVITS. Нужен отдельный реф 4–10 с (не клип
+            Qwen). Скачать стек — вкладка «ИИ ресурсы». Подробности:{" "}
+            <code>docs/GPT_SOVITS_SETUP.md</code>.
           </p>
           <div className="today__fields">
             <label className="field">
@@ -406,8 +355,9 @@ export function VoiceSetupWizard({ voice, onVoice, tts }: Props) {
           <div className="today__actions">
             <button
               type="button"
+              className="btn-ghost"
               disabled={busy}
-              onClick={() => setStep(2)}
+              onClick={() => setStep(1)}
             >
               Назад
             </button>
@@ -421,12 +371,13 @@ export function VoiceSetupWizard({ voice, onVoice, tts }: Props) {
             </button>
             <button
               type="button"
+              className="btn-ghost"
               disabled={busy}
               onClick={() => {
                 setHint(
                   "Готово. Edge/system достаточно для старта; SoVITS — когда клон настроен.",
                 );
-                setStep(2);
+                setStep(1);
               }}
             >
               Пропустить · оставить Edge/system

@@ -67,6 +67,31 @@ const CATEGORIES: Array<{ id: MapLibCategory; labelRu: string }> = [
   { id: "regions", labelRu: "Зоны" },
 ];
 
+function regionKindGlyph(kind: MapRegionKind): string {
+  switch (kind) {
+    case "trigger":
+      return "Scr";
+    case "player_start":
+      return "▶";
+    case "teleport":
+      return "⇄";
+    case "chest":
+      return "▣";
+    case "spawn":
+      return "※";
+    case "npc_idle":
+      return "☺";
+    case "npc_wander":
+      return "↝";
+    case "camera_bound":
+      return "⬚";
+    default: {
+      const _never: never = kind;
+      return _never;
+    }
+  }
+}
+
 const BUILTIN_LIGHT_PRESETS: Array<{
   id: BuiltinLightPresetId;
   labelRu: string;
@@ -279,17 +304,7 @@ export function MapLibraryTray({
                 }}
                 aria-hidden
               >
-                {kind === "trigger"
-                  ? "Scr"
-                  : kind === "player_start"
-                    ? "▶"
-                    : kind === "teleport"
-                      ? "⇄"
-                      : kind === "chest"
-                        ? "▣"
-                        : kind === "spawn"
-                          ? "※"
-                          : "⬚"}
+                {regionKindGlyph(kind)}
               </span>
             ),
           };

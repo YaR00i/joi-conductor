@@ -27,6 +27,7 @@ import { presetsFromLightsFile } from "./lightPresets";
 import { presetsFromLooksFile } from "./lookPresets";
 import { validatePack } from "./validate";
 import { ensureMapLayers } from "../tile/mapUtils";
+import { normalizeMapPlayProfile } from "./playProfile";
 import {
   normalizeVoxelModel,
   stampSolidBlock,
@@ -80,7 +81,7 @@ async function loadJsonDir<T extends { id: string }>(
 ): Promise<Record<string, T>> {
   const listed = await listEmberDir(dir);
   const names = listed.ok
-    ? listed.data.filter((n) => n.endsWith(".json"))
+    ? listed.data.filter((n) => n.endsWith(".json") && !n.endsWith(".bak.json"))
     : [];
   const out: Record<string, T> = {};
   await Promise.all(
@@ -93,6 +94,42 @@ async function loadJsonDir<T extends { id: string }>(
   return out;
 }
 
+async function loadJsonDirWithFallback<T extends { id: string }>(
+  dir: string,
+  fallbackRels: string[],
+): Promise<Record<string, T>> {
+  const listed = await loadJsonDir<T>(dir);
+  if (Object.keys(listed).length > 0) return listed;
+  const out: Record<string, T> = {};
+  for (const rel of fallbackRels) {
+    const item = await loadJsonOptional<T | null>(rel, null);
+    if (item?.id) out[item.id] = item;
+  }
+  return out;
+}
+
+/** Merge extra voxel files without replacing ids already in the main registry. */
+export function mergeVoxelFiles(
+  base: EmberVoxelsFile,
+  extra: EmberVoxelsFile,
+): EmberVoxelsFile {
+  const models = [...(base.models ?? [])];
+  const seenModels = new Set(models.map((m) => m.id));
+  for (const model of extra.models ?? []) {
+    if (!model?.id || seenModels.has(model.id)) continue;
+    models.push(model);
+    seenModels.add(model.id);
+  }
+  const scenes = [...(base.scenes ?? [])];
+  const seenScenes = new Set(scenes.map((s) => s.id));
+  for (const scene of extra.scenes ?? []) {
+    if (!scene?.id || seenScenes.has(scene.id)) continue;
+    scenes.push(scene);
+    seenScenes.add(scene.id);
+  }
+  return { models, scenes };
+}
+
 export async function loadEmberPack(): Promise<{
   pack: EmberPack;
   issues: ReturnType<typeof validatePack>;
@@ -100,10 +137,10 @@ export async function loadEmberPack(): Promise<{
   const meta = await loadJson<EmberPackMeta>("pack.json");
 
   const [
-    mapYard,
-    tileset,
-    stage,
-    spawn,
+    mapsRaw,
+    tilesetsRaw,
+    stagesRaw,
+    spawnsRaw,
     poolW,
     poolC,
     weaponsFile,
@@ -114,13 +151,16 @@ export async function loadEmberPack(): Promise<{
     portraits,
     spritesLoad,
     voxelsLoad,
+    villageVoxels,
     lightsLoad,
     looksLoad,
   ] = await Promise.all([
-    loadJson<EmberMap>("maps/hu_tao_yard.json"),
-    loadJson<EmberTileset>("tilesets/graveyard_16.json"),
-    loadJson<EmberStage>("stages/hu_tao_p1.json"),
-    loadJson<EmberSpawnTable>("spawns/hu_tao_p1.json"),
+    loadJsonDirWithFallback<EmberMap>("maps", ["maps/hu_tao_yard.json"]),
+    loadJsonDirWithFallback<EmberTileset>("tilesets", [
+      "tilesets/graveyard_16.json",
+    ]),
+    loadJsonDirWithFallback<EmberStage>("stages", ["stages/hu_tao_p1.json"]),
+    loadJsonDirWithFallback<EmberSpawnTable>("spawns", ["spawns/hu_tao_p1.json"]),
     loadJson<EmberPool>("pools/p1_weapons.json"),
     loadJson<EmberPool>("pools/p1_chests.json"),
     loadJson<{ weapons: EmberWeaponDef[] }>("weapons.json"),
@@ -136,6 +176,9 @@ export async function loadEmberPack(): Promise<{
     loadJsonOptionalReported<EmberVoxelsFile>("voxels/registry.json", {
       models: [],
     }),
+    loadJsonOptional<EmberVoxelsFile>("voxels/village.json", {
+      models: [],
+    }),
     loadJsonOptionalReported<EmberLightsFile>("lights/registry.json", {
       presets: [],
     }),
@@ -145,9 +188,17 @@ export async function loadEmberPack(): Promise<{
   ]);
 
   const spritesFile = spritesLoad.data;
-  const voxelsFile = voxelsLoad.data;
+  const voxelsFile = mergeVoxelFiles(voxelsLoad.data, villageVoxels);
   const lightsFile = lightsLoad.data;
   const looksFile = looksLoad.data;
+
+  const maps: Record<string, EmberMap> = {};
+  for (const map of Object.values(mapsRaw)) {
+    maps[map.id] = normalizeLoadedMap(map);
+  }
+  const tilesets = tilesetsRaw;
+  const stages = stagesRaw;
+  const spawns = spawnsRaw;
 
   // Fallback if directory listing failed on older hosts
   if (Object.keys(scenes).length === 0) {
@@ -201,10 +252,10 @@ export async function loadEmberPack(): Promise<{
 
   const pack: EmberPack = {
     meta,
-    maps: { [mapYard.id]: ensureMapLayers(mapYard) },
-    tilesets: { [tileset.id]: tileset },
-    stages: { [stage.id]: stage },
-    spawns: { [spawn.id]: spawn },
+    maps,
+    tilesets,
+    stages,
+    spawns,
     pools: { [poolW.id]: poolW, [poolC.id]: poolC },
     weapons,
     enemies,
@@ -229,9 +280,26 @@ export async function loadEmberPack(): Promise<{
   return { pack, issues: [...loadIssues, ...validatePack(pack)] };
 }
 
+function normalizeLoadedMap(map: EmberMap): EmberMap {
+  const next = ensureMapLayers(map);
+  const raw = (map as { playProfile?: unknown }).playProfile;
+  if (raw == null || raw === "") {
+    delete next.playProfile;
+    return next;
+  }
+  const playProfile = normalizeMapPlayProfile(raw);
+  if (playProfile) {
+    next.playProfile = playProfile;
+    return next;
+  }
+  // Keep the unknown value so validatePack can report it.
+  (next as { playProfile?: unknown }).playProfile = raw;
+  return next;
+}
+
 /** Merge a single updated document back into an existing pack (editor). */
 export function upsertMap(pack: EmberPack, map: EmberMap): EmberPack {
-  return { ...pack, maps: { ...pack.maps, [map.id]: map } };
+  return { ...pack, maps: { ...pack.maps, [map.id]: normalizeLoadedMap(map) } };
 }
 
 export function upsertStage(pack: EmberPack, stage: EmberStage): EmberPack {

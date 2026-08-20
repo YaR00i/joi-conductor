@@ -4,6 +4,7 @@ import {
   CONTRACT_CATALOG,
   CONTRACT_CATEGORY_LABELS,
   getContractDef,
+  isHabitContractId,
   type ContractCategory,
   type ContractDef,
   type ContractRollKey,
@@ -45,6 +46,8 @@ export type ContractInstance = {
   status: ContractStatus;
   params: Record<string, string | number>;
   difficulty: 1 | 2 | 3;
+  /** Set when the player accepts; carried across day/mistress board rerolls. */
+  acceptedAtMs?: number;
 };
 
 export type DailyContractBoard = {
@@ -124,6 +127,7 @@ function contractWeight(def: ContractDef, mistressId: MistressId): number {
   if (def.difficulty === 3) w *= 0.55;
   if (def.kind === "media_drill") w *= 1.35;
   if (def.kind === "finish_debrief") w *= 1.2;
+  if (isHabitContractId(def.id, def.clonedFrom)) w *= 1.25;
   return w;
 }
 
@@ -282,6 +286,28 @@ export function rollDailyBoard(
     }
   }
 
+  const hasHabit = contracts.some((c) =>
+    isHabitContractId(c.defId, getContractDef(c.defId)?.clonedFrom),
+  );
+  if (!hasHabit) {
+    const catalog = getMergedContractCatalog();
+    const used = new Set(contracts.map((c) => c.defId));
+    const habitPool = catalog.filter(
+      (d) =>
+        isHabitContractId(d.id, d.clonedFrom) && !used.has(d.id),
+    );
+    const habit = pickWeighted(
+      habitPool,
+      (d) => contractWeight(d, mistressId) + 1.2,
+      rng,
+    );
+    if (habit && contracts.length > 0) {
+      let replaceAt = contracts.findIndex((c) => c.difficulty !== 3);
+      if (replaceAt < 0) replaceAt = contracts.length - 1;
+      contracts[replaceAt] = instantiate(habit, dayKey, mistressId, rng);
+    }
+  }
+
   return {
     dayKey,
     mistressId,
@@ -302,7 +328,10 @@ export function rerollDailyContractBoard(
   const existing = loadContractBoard();
   const prevSalt =
     existing && existing.dayKey === dayKey ? (existing.rerollSalt ?? 0) : 0;
-  const board = rollDailyBoard(dayKey, mistressId, prevSalt + 1);
+  const board = mergeCarriedAccepted(
+    rollDailyBoard(dayKey, mistressId, prevSalt + 1),
+    takeCarriedAccepted(existing),
+  );
   saveContractBoard(board);
   return board;
 }
@@ -320,13 +349,63 @@ function isBoard(raw: unknown): raw is DailyContractBoard {
 function expireOpen(board: DailyContractBoard, nowMs: number): DailyContractBoard {
   let changed = false;
   const contracts = board.contracts.map((c) => {
-    if (c.status === "open" && nowMs > c.deadlineMs) {
+    if (c.status === "open" && nowMs > c.deadlineMs && c.acceptedAtMs == null) {
       changed = true;
       return { ...c, status: "expired" as const };
     }
     return c;
   });
   return changed ? { ...board, contracts } : board;
+}
+
+function isAcceptedOpen(c: ContractInstance): boolean {
+  return c.status === "open" && typeof c.acceptedAtMs === "number";
+}
+
+function takeCarriedAccepted(
+  board: DailyContractBoard | null,
+): ContractInstance[] {
+  if (!board) return [];
+  return board.contracts.filter(
+    (c) => isAcceptedOpen(c) && !RETIRED_CONTRACT_DEF_IDS.has(c.defId),
+  );
+}
+
+function mergeCarriedAccepted(
+  board: DailyContractBoard,
+  carried: ContractInstance[],
+): DailyContractBoard {
+  if (carried.length === 0) return board;
+  const kept = carried.map((c) => ({
+    ...c,
+    dayKey: board.dayKey,
+    deadlineMs: Math.max(c.deadlineMs, endOfLocalDayMs(board.dayKey)),
+  }));
+  const usedDefs = new Set(kept.map((c) => c.defId));
+  const usedIds = new Set(kept.map((c) => c.instanceId));
+  const fresh = board.contracts.filter(
+    (c) => !usedDefs.has(c.defId) && !usedIds.has(c.instanceId),
+  );
+  const contracts = [...kept, ...fresh].slice(0, Math.max(BOARD_SIZE, kept.length));
+  return { ...board, contracts };
+}
+
+/** Stamp accept time so the row survives the next daily board roll. */
+export function markContractAccepted(
+  instanceId: string,
+  atMs = Date.now(),
+): DailyContractBoard | null {
+  const board = loadContractBoard();
+  if (!board) return null;
+  const idx = board.contracts.findIndex((c) => c.instanceId === instanceId);
+  if (idx < 0) return null;
+  const cur = board.contracts[idx]!;
+  if (cur.status !== "open") return board;
+  const contracts = board.contracts.slice();
+  contracts[idx] = { ...cur, acceptedAtMs: atMs };
+  const next = { ...board, contracts };
+  saveContractBoard(next);
+  return next;
 }
 
 export function loadContractBoard(): DailyContractBoard | null {
@@ -398,7 +477,9 @@ function ensureMediaDrillSlot(board: DailyContractBoard): DailyContractBoard {
     board.mistressId,
     rng,
   );
-  const openIdx = board.contracts.findIndex((c) => c.status === "open");
+  const openIdx = board.contracts.findIndex(
+    (c) => c.status === "open" && c.acceptedAtMs == null,
+  );
   const idx = openIdx >= 0 ? openIdx : 0;
   const contracts = board.contracts.slice();
   if (contracts.length === 0) contracts.push(drill);
@@ -424,6 +505,7 @@ export function ensureDailyContractBoard(
   const mistressId = getActiveMistress().id;
   const nowMs = now.getTime();
   const existing = loadContractBoard();
+  const carried = takeCarriedAccepted(existing);
 
   if (
     existing &&
@@ -436,7 +518,9 @@ export function ensureDailyContractBoard(
     return next;
   }
 
-  const board = ensureMediaDrillSlot(rollDailyBoard(dayKey, mistressId));
+  const board = ensureMediaDrillSlot(
+    mergeCarriedAccepted(rollDailyBoard(dayKey, mistressId), carried),
+  );
   saveContractBoard(board);
   return board;
 }

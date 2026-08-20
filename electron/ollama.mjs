@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -8,6 +8,12 @@ import {
   killPortListeners,
   killProcessTree,
 } from "../scripts/process-utils.mjs";
+import {
+  ollamaNameFromManifestRel,
+  parseOllamaListOutput,
+  uniqueOllamaNames,
+} from "./ollamaManifest.mjs";
+import { findAppOllamaBinary, installOllamaRuntime } from "./ollamaInstall.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -38,6 +44,9 @@ export function findOllamaBinary() {
   for (const c of candidates) {
     if (c && existsSync(c)) return c;
   }
+
+  const bundled = findAppOllamaBinary();
+  if (bundled) return bundled;
 
   // PATH lookup (Windows `where`)
   try {
@@ -103,9 +112,84 @@ export async function probeOllamaRunning() {
   }
 }
 
+function ollamaModelsRoot() {
+  const envDir = String(process.env.OLLAMA_MODELS || "").trim();
+  if (envDir) return envDir;
+  const home = process.env.USERPROFILE || process.env.HOME || "";
+  return path.join(home, ".ollama", "models");
+}
+
+/** Names of pulled models from the local manifest tree (serve not required). */
+export function listOllamaModelsFromDisk() {
+  const manifests = path.join(ollamaModelsRoot(), "manifests");
+  if (!existsSync(manifests)) return [];
+  /** @type {string[]} */
+  const acc = [];
+  const walk = (dir) => {
+    let names;
+    try {
+      names = readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      if (name.startsWith(".")) continue;
+      const full = path.join(dir, name);
+      let st;
+      try {
+        st = statSync(full);
+      } catch {
+        continue;
+      }
+      if (st.isDirectory()) walk(full);
+      else if (st.isFile()) {
+        const model = ollamaNameFromManifestRel(path.relative(manifests, full));
+        if (model) acc.push(model);
+      }
+    }
+  };
+  walk(manifests);
+  return uniqueOllamaNames(acc);
+}
+
+async function listOllamaModelsViaCli() {
+  const binary = findOllamaBinary();
+  if (!binary) return [];
+  try {
+    const { stdout } = await execFileAsync(binary, ["list"], {
+      timeout: 8000,
+      windowsHide: true,
+    });
+    return parseOllamaListOutput(stdout);
+  } catch {
+    return [];
+  }
+}
+
+/** HTTP tags when serve is up, otherwise disk (and CLI as last resort). */
+async function collectLocalOllamaModels(probeModels = []) {
+  const merged = uniqueOllamaNames([
+    ...probeModels,
+    ...listOllamaModelsFromDisk(),
+  ]);
+  if (merged.length > 0) return merged;
+  return listOllamaModelsViaCli();
+}
+
+function modelMatchesPreferred(name, preferredModel) {
+  const want = preferredModel.split(":")[0] ?? preferredModel;
+  const base = name.split(":")[0] ?? name;
+  return (
+    name === preferredModel ||
+    name.startsWith(`${preferredModel}:`) ||
+    base === want
+  );
+}
+
 export async function getOllamaStatus(preferredModel = "") {
   const binaryPath = findOllamaBinary();
   const probe = await probeOllamaRunning();
+  const models = await collectLocalOllamaModels(probe.models);
   const managedByApp = Boolean(
     ownedByApp || (managedServe && !managedServe.killed),
   );
@@ -115,41 +199,43 @@ export async function getOllamaStatus(preferredModel = "") {
   let detail = "";
 
   if (!binaryPath && !probe.running) {
-    detail = "Ollama не найден. Установи с ollama.com";
+    detail = "Ollama не на диске — скачается при старте или загрузке модели";
   } else if (!probe.running) {
+    const n = models.length;
+    const hasPref =
+      Boolean(preferredModel) &&
+      models.some((name) => modelMatchesPreferred(name, preferredModel));
     detail = managedByApp
       ? "Запускается…"
-      : "Ollama установлен, сервер не запущен";
+      : n > 0
+        ? hasPref
+          ? `Модель «${preferredModel}» на диске · сервер выключен`
+          : `На диске ${n} моделей · сервер выключен`
+        : "Ollama установлен, сервер не запущен";
   } else {
     ready = true;
     if (preferredModel) {
-      const want = preferredModel.split(":")[0] ?? preferredModel;
-      modelReady = probe.models.some((name) => {
-        const base = name.split(":")[0] ?? name;
-        return (
-          name === preferredModel ||
-          name.startsWith(`${preferredModel}:`) ||
-          base === want
-        );
-      });
+      modelReady = models.some((name) =>
+        modelMatchesPreferred(name, preferredModel),
+      );
       detail = modelReady
         ? `Готов · модель ${preferredModel}`
         : `Сервер онлайн, модели «${preferredModel}» нет — скачай`;
     } else {
       detail =
-        probe.models.length > 0
-          ? `Готов · ${probe.models.length} моделей`
+        models.length > 0
+          ? `Готов · ${models.length} моделей`
           : "Сервер онлайн, моделей пока нет";
-      modelReady = probe.models.length > 0;
+      modelReady = models.length > 0;
     }
   }
 
   return {
-    installed: Boolean(binaryPath) || probe.running,
+    installed: Boolean(binaryPath) || probe.running || models.length > 0,
     running: probe.running,
     ready: ready && (preferredModel ? modelReady : true),
     modelReady,
-    models: probe.models,
+    models,
     managedByApp,
     binaryPath,
     detail,
@@ -157,14 +243,23 @@ export async function getOllamaStatus(preferredModel = "") {
   };
 }
 
-export async function startOllamaServe() {
+/**
+ * @param {(p: { phase: string, pct: number, detail?: string }) => void} [onProgress]
+ */
+export async function ensureOllamaRuntime(onProgress) {
+  const existing = findOllamaBinary();
+  if (existing) return existing;
+  return installOllamaRuntime(onProgress);
+}
+
+export async function startOllamaServe(onProgress) {
   const already = await probeOllamaRunning();
   if (already.running) {
     ownedByApp = true; // adopt so app quit cleans up
     return getOllamaStatus();
   }
 
-  const binary = findOllamaBinary();
+  const binary = await ensureOllamaRuntime(onProgress);
   if (!binary) {
     throw new Error("Ollama не найден на диске");
   }
@@ -229,16 +324,26 @@ export function stopOllamaOnQuit() {
 
 export async function listOllamaModels() {
   const probe = await probeOllamaRunning();
-  return probe.models;
+  return collectLocalOllamaModels(probe.models);
 }
 
 /**
- * Pull model via CLI. onProgress(line) optional.
+ * Pull model via CLI. onProgress optional: string line or { line, phase, pct }.
  * @param {string} model
- * @param {(line: string) => void} [onProgress]
+ * @param {(payload: string | { line: string, phase?: string, pct?: number }) => void} [onProgress]
  */
 export async function pullOllamaModel(model, onProgress) {
-  const binary = findOllamaBinary();
+  const emit = (payload) => {
+    if (!onProgress) return;
+    onProgress(payload);
+  };
+  const binary = await ensureOllamaRuntime((p) => {
+    emit({
+      line: p.detail ? `${p.phase} · ${p.detail}` : p.phase,
+      phase: p.phase,
+      pct: p.pct,
+    });
+  });
   if (!binary) throw new Error("Ollama не найден");
 
   // Ensure serve is up
@@ -258,7 +363,7 @@ export async function pullOllamaModel(model, onProgress) {
     const push = (buf) => {
       const text = buf.toString("utf8");
       for (const line of text.split(/\r?\n/)) {
-        if (line.trim()) onProgress?.(line.trim());
+        if (line.trim()) emit(line.trim());
       }
     };
 
@@ -268,6 +373,45 @@ export async function pullOllamaModel(model, onProgress) {
     child.on("exit", (code) => {
       if (code === 0) resolve();
       else reject(new Error(`ollama pull завершился с кодом ${code}`));
+    });
+  });
+}
+
+/**
+ * Remove a pulled model (`ollama rm`).
+ * @param {string} model
+ */
+export async function deleteOllamaModel(model) {
+  const binary = await ensureOllamaRuntime();
+  if (!binary) throw new Error("Ollama не найден");
+  const name = String(model || "").trim();
+  if (!name) throw new Error("Укажи имя модели");
+
+  const probe = await probeOllamaRunning();
+  if (!probe.running) {
+    await startOllamaServe();
+  }
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(binary, ["rm", name], {
+      cwd: path.dirname(binary),
+      env: { ...process.env },
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    let err = "";
+    child.stderr?.on("data", (buf) => {
+      err += buf.toString("utf8");
+    });
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      if (code === 0) resolve();
+      else
+        reject(
+          new Error(
+            err.trim().slice(-240) || `ollama rm завершился с кодом ${code}`,
+          ),
+        );
     });
   });
 }

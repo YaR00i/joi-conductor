@@ -46,11 +46,16 @@ export type EmberBridgeEvent =
       type: "pending_event";
       eventId: string;
     }
-  | { type: "toast"; textRu: string };
+  | { type: "toast"; textRu: string }
+  | { type: "load_progress"; ratio: number; labelRu: string }
+  | { type: "pause_menu"; relockWaitMs: number };
 
 export type EmberBridgeHandler = (event: EmberBridgeEvent) => void;
 
 export type EmberGameApi = {
+  ready: Promise<void>;
+  /** Request pointer lock from a user gesture (Start click). */
+  lockLook: () => void;
   pause: () => void;
   resume: () => void;
   applyLoot: (itemId: string) => void;

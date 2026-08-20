@@ -2,6 +2,7 @@ import type { FunctionDef, SessionMode, ToyDef } from "./types";
 import { getActiveMistress } from "./mistress";
 import { functionPlayBiasBoost } from "./mistress/playBias";
 import { isShaftCbtFunction } from "./tideHits";
+import { isToyAllowedInSession } from "./toyRoulette";
 
 /** Mutually exclusive body slots for worn/inserted toys. */
 export type ToySlot = "anal" | "front" | "external";
@@ -23,6 +24,33 @@ export function hasExternalVibeEquipped(equipped: string[]): boolean {
   return equipped.some(
     (id) => id === "wand" || id === "vibe_bullet",
   );
+}
+
+function isExternalVibeToy(toy: ToyDef): boolean {
+  return (
+    toy.id === "wand" ||
+    toy.id === "vibe_bullet" ||
+    (toy.satisfies?.includes("wand") ?? false) ||
+    (toy.satisfies?.includes("external_vibe") ?? false)
+  );
+}
+
+/**
+ * Session params pick which toys are in play; the conductor only queues
+ * functions that fit the *equipped* loadout. If the plan explicitly includes
+ * a wand / vibe bullet, start with that toy already on so vibe blocks appear.
+ */
+export function initialEquippedFromAllowed(
+  toys: ToyDef[],
+  allowedToyIds?: string[],
+): string[] {
+  if (!allowedToyIds || allowedToyIds.length === 0) return [];
+  const pool = toys.filter(
+    (t) => t.owned && isToyAllowedInSession(t.id, allowedToyIds),
+  );
+  const external = pool.find((t) => isExternalVibeToy(t));
+  if (!external) return [];
+  return [external.id];
 }
 
 /** Toys that stay on until swapped — modifiers on every following block. */

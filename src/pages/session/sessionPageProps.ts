@@ -100,6 +100,9 @@ export type SessionControlsBundle = {
   onFinaleComplete: () => void;
   onChoiceSpinDone: () => void;
   onSkip: () => void;
+  onDropUpcoming?: (queueIndex: number) => void;
+  onMoveUpcoming?: (queueIndex: number, dir: -1 | 1) => void;
+  onInsertRestAfter?: (queueIndex: number) => void;
   onForceFinale: () => void;
   onAnswerPrompt: (optionId: string) => void;
   onReportDare: (success: boolean) => void;
@@ -113,6 +116,7 @@ export type SessionControlsBundle = {
 };
 
 export type SessionTideIdolBundle = {
+  onTideHit: () => void;
   onTideFail: () => void;
   onAnswerTideMiss: (missed: number) => void;
   onAnswerTideComplete: (allDone: boolean) => void;

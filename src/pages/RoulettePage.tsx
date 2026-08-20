@@ -162,7 +162,7 @@ interface RoulettePageProps {
   wd14Status?: { backend: string; online: boolean; detail: string } | null;
   /** Live tag progress while auto-tagging runs. */
   tagProgress?: { done: number; total: number } | null;
-  onStartWd14?: () => void;
+  onStartWd14?: () => void | Promise<unknown>;
   onRefreshWd14?: () => void;
   onToyOwned: (toyId: string, owned: boolean) => void;
   /** Active contract seed — locks plan fields after roulette / without spin */

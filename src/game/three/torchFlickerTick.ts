@@ -89,13 +89,8 @@ export function tickTorchFlicker(
     const nextDist = ud.distance * mul;
     if (Math.abs(pl.distance - nextDist) > 0.05) {
       pl.distance = nextDist;
-      if (pl.castShadow) {
-        pl.shadow.camera.far = Math.max(nextDist * 1.05, nextDist + 1);
-        pl.shadow.camera.updateProjectionMatrix();
-      }
       changed = true;
     }
-
     // Optional core sphere tracks radius slightly (not brightness).
     if (ud.coreMesh) {
       const s = 0.92 + 0.08 * mul;

@@ -12,21 +12,20 @@ import {
   ACTOR_Y_MIN,
   actorFloorY,
   defaultActorFromSpeaker,
-  emberAssetUrl,
   findIncomingStageActors,
   PORTRAIT_ASSET_REV,
   resolveDialogueActors,
   syncDialogueSpeakerFields,
-  writeEmberJson,
-  type EmberPack,
-  type EmberScene,
-  type SceneActor,
-  type SceneStep,
-} from "../../../game";
+} from "../../../game/content/sceneStage";
+import { emberAssetUrl, writeEmberJson } from "../../../game/content/io";
 import type {
   EmberArt,
   EmberEvent,
   EmberEventTrigger,
+  EmberPack,
+  EmberScene,
+  SceneActor,
+  SceneStep,
 } from "../../../game/content/types";
 import { ScenePlayer } from "../ScenePlayer";
 import { EmberArtPicker } from "./EmberArtPicker";

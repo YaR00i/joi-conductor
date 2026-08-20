@@ -3,6 +3,7 @@ import { playUiClick, playUiNav, primeUiAudio } from "../lib/uiSound";
 export type NavId =
   | "roulette"
   | "session"
+  | "chat"
   | "ember"
   | "ember_editor"
   | "shop"
@@ -86,6 +87,16 @@ export function SideNav({
 
       <button
         type="button"
+        className={`side-nav__item ${active === "chat" ? "is-active" : ""}`}
+        onClick={() => go("chat")}
+        title="Чат с госпожой"
+      >
+        <ChatIcon />
+        <span>Чат</span>
+      </button>
+
+      <button
+        type="button"
         className={`side-nav__item ${active === "shop" ? "is-active" : ""}`}
         onClick={() => go("shop")}
         title="Магазин"
@@ -116,16 +127,6 @@ export function SideNav({
 
       <button
         type="button"
-        className={`side-nav__item ${active === "contract_journal" ? "is-active" : ""}`}
-        onClick={() => go("contract_journal")}
-        title="Журнал отчётов по контрактам"
-      >
-        <JournalIcon />
-        <span>Журнал</span>
-      </button>
-
-      <button
-        type="button"
         className={`side-nav__item ${active === "diary" ? "is-active" : ""}`}
         onClick={() => go("diary")}
         title="Дневник сессий"
@@ -139,9 +140,9 @@ export function SideNav({
 
       <button
         type="button"
-        className={`side-nav__item ${active === "stats" ? "is-active" : ""}`}
+        className={`side-nav__item ${active === "stats" || active === "contract_journal" ? "is-active" : ""}`}
         onClick={() => go("stats")}
-        title="Статистика сессий"
+        title="Статистика сессий и журнал контрактов"
       >
         <StatsIcon />
         <span>Статистика</span>
@@ -363,6 +364,27 @@ function SessionIcon() {
   );
 }
 
+function ChatIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      aria-hidden
+    >
+      <path
+        d="M5 6.5h9.5a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-2.5 2.5H11l-3.5 3v-3H5A2.5 2.5 0 0 1 2.5 14V9A2.5 2.5 0 0 1 5 6.5Z"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M15.5 5h3A2.5 2.5 0 0 1 21 7.5V12a2.5 2.5 0 0 1-2 2.45"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function ShopIcon() {
   return (
     <svg
@@ -390,21 +412,6 @@ function ContractsIcon() {
       <path d="M8 3h8l1 3H7l1-3Z" strokeLinejoin="round" />
       <path d="M7 6h10v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V6Z" />
       <path d="M10 11h4M10 15h4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function JournalIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden
-    >
-      <path d="M5 3h11l3 3v15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
-      <path d="M8 9h8M8 13h8M8 17h5" strokeLinecap="round" />
     </svg>
   );
 }

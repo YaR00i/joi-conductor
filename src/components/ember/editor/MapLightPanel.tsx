@@ -4,22 +4,32 @@ import {
   lampParamsFromSource,
   newLightPresetId,
   normalizeLightPreset,
-  writeEmberJson,
-  type EmberLightPreset,
-  type EmberPack,
-} from "../../../game";
+} from "../../../game/content/lightPresets";
+import { writeEmberJson } from "../../../game/content/io";
 import type {
+  EmberLightPreset,
   EmberLightSource,
+  EmberMap,
   EmberMapLight,
+  EmberPack,
+  EmberTileset,
 } from "../../../game/content/types";
-import { MAP_LIGHT_RANGE_MAX } from "../../../game/tile/lightLimits";
+import {
+  MAP_DYNAMIC_POINT_SHADOWS_MAX,
+  MAP_DYNAMIC_SHADOW_SCALE_MIN,
+  MAP_LIGHT_RANGE_MAX,
+  MAP_POINT_LIGHTS_MAX,
+  MAP_POINT_SHADOWS_MAX,
+} from "../../../game/tile/lightLimits";
 import {
   clampLampDiscRadii,
+  omitUnsetLightBudget,
   resolveMapAtmosphere,
   resolveMapGrade,
   type LanternSource,
   type ResolvedMapLight,
 } from "../../../game/tile/mapUtils";
+import { countMapLocalLightObjects } from "../../../game/three/emissiveLocalLights";
 import {
   copyLampParams,
   hasLampClipboard,
@@ -28,6 +38,8 @@ import {
 
 type Props = {
   pack: EmberPack;
+  map: EmberMap;
+  tileset: EmberTileset;
   globalLight: ResolvedMapLight;
   sources: LanternSource[];
   selected: LanternSource | null;
@@ -643,36 +655,34 @@ export function LightSourceEditor({
         ) : null}
       </div>
 
-      {(selected.hasOverride || selected.kind === "placed") && (
-        <div className="ember-map-light-source__actions">
-          {selected.hasOverride ? (
-            <button
-              type="button"
-              className="ghost ember-map-light-source__btn"
-              title="Сбросить к глобальным настройкам ламп"
-              onClick={() => onClearSourceOverrides(selected.id)}
-            >
-              Сброс
-            </button>
-          ) : null}
-          {selected.kind === "placed" || selected.hasOverride ? (
-            <button
-              type="button"
-              className="ghost ember-danger ember-map-light-source__btn"
-              title="Убрать запись источника"
-              onClick={() => onDeleteSource(selected.id)}
-            >
-              Убрать
-            </button>
-          ) : null}
-        </div>
-      )}
+      <div className="ember-map-light-source__actions">
+        {selected.hasOverride ? (
+          <button
+            type="button"
+            className="ghost ember-map-light-source__btn"
+            title="Удалить только индивидуальные настройки и вернуть базовый glow-свет"
+            onClick={() => onClearSourceOverrides(selected.id)}
+          >
+            Сбросить override
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="ghost ember-danger ember-map-light-source__btn"
+          title="Полностью выключить этот источник, включая свет от glow-тайла или glow-спрайта"
+          onClick={() => onDeleteSource(selected.id)}
+        >
+          Удалить источник
+        </button>
+      </div>
     </div>
   );
 }
 
 export function MapLightPanel({
   pack,
+  map,
+  tileset,
   globalLight,
   sources,
   selected,
@@ -690,13 +700,26 @@ export function MapLightPanel({
 }: Props) {
   const [draft, setDraft] = useState(globalLight);
   const draftRef = useRef(globalLight);
+  const lightObjectCount = useMemo(
+    () =>
+      countMapLocalLightObjects(map, tileset, {
+        sprites: pack.sprites,
+        voxelModels: pack.voxelModels,
+        voxelScenes: pack.voxelScenes,
+      }),
+    [map, pack.sprites, pack.voxelModels, pack.voxelScenes, tileset],
+  );
+  const cubeShadowFromObjects = Math.max(
+    0,
+    Math.min(MAP_POINT_SHADOWS_MAX, lightObjectCount),
+  );
 
   useEffect(() => {
     setDraft(globalLight);
     draftRef.current = globalLight;
   }, [globalLight]);
 
-  const patchGlobal = (partial: EmberMapLight) => {
+  const patchGlobal = (partial: Partial<ResolvedMapLight>) => {
     const next: ResolvedMapLight = {
       ...draftRef.current,
       ...partial,
@@ -716,10 +739,10 @@ export function MapLightPanel({
     return next;
   };
 
-  const flushGlobal = () => onCommitGlobal({ ...draftRef.current });
+  const flushGlobal = () => onCommitGlobal(omitUnsetLightBudget(draftRef.current));
 
-  const patchAndCommitGlobal = (partial: EmberMapLight) => {
-    onCommitGlobal(patchGlobal(partial));
+  const patchAndCommitGlobal = (partial: Partial<ResolvedMapLight>) => {
+    onCommitGlobal(omitUnsetLightBudget(patchGlobal(partial)));
   };
 
   const onGlobalRange =
@@ -916,6 +939,188 @@ export function MapLightPanel({
               onKeyUp={flushGlobal}
             />
             <strong>{fmtNum(draft.lampPower)}</strong>
+          </label>
+        </div>
+      </section>
+
+      <section className="ember-map-lightpanel__section">
+        <h4>На экране</h4>
+        <p className="muted ember-hint">
+          Сколько PointLight видно сразу. «Теней (cube)» в режиме авто равно
+          числу объектов со светом на карте. «По объектам» записывает это
+          число и для динамических кубов. «Динамических рядом» — живые кубы
+          с актёрами (до числа объектов на карте).
+        </p>
+        <div className="ember-map-lightpanel__grid">
+          <label className="ember-map-lightpanel__field ember-map-lightpanel__field--full">
+            <span>Источников на экране</span>
+            <input
+              type="range"
+              min={1}
+              max={MAP_POINT_LIGHTS_MAX}
+              step={1}
+              value={draft.maxPointLights ?? 24}
+              onChange={(e) => {
+                const raw = Math.round(Number(e.target.value));
+                if (!Number.isFinite(raw)) return;
+                patchGlobal({
+                  maxPointLights: Math.max(
+                    1,
+                    Math.min(MAP_POINT_LIGHTS_MAX, raw),
+                  ),
+                });
+              }}
+              onPointerUp={flushGlobal}
+              onKeyUp={flushGlobal}
+            />
+            <span className="ember-map-lightpanel__value-row">
+              <strong>
+                {draft.maxPointLights == null ? "авто" : draft.maxPointLights}
+              </strong>
+              {draft.maxPointLights != null ? (
+                <button
+                  type="button"
+                  className="ghost ember-chip--sm"
+                  onClick={() =>
+                    patchAndCommitGlobal({ maxPointLights: null })
+                  }
+                >
+                  Авто
+                </button>
+              ) : null}
+            </span>
+          </label>
+          <div className="ember-map-lightpanel__field ember-map-lightpanel__field--full">
+            <span>Теней (cube)</span>
+            <input
+              type="range"
+              min={0}
+              max={MAP_POINT_SHADOWS_MAX}
+              step={1}
+              value={draft.maxPointShadows ?? cubeShadowFromObjects}
+              onChange={(e) => {
+                const raw = Math.round(Number(e.target.value));
+                if (!Number.isFinite(raw)) return;
+                patchGlobal({
+                  maxPointShadows: Math.max(
+                    0,
+                    Math.min(MAP_POINT_SHADOWS_MAX, raw),
+                  ),
+                });
+              }}
+              onPointerUp={flushGlobal}
+              onKeyUp={flushGlobal}
+            />
+            <span className="ember-map-lightpanel__value-row">
+              <strong>
+                {draft.maxPointShadows == null
+                  ? `авто · ${cubeShadowFromObjects}`
+                  : draft.maxPointShadows}
+              </strong>
+              <button
+                type="button"
+                className={`ghost ember-chip--sm${draft.maxPointShadows == null ? " is-active" : ""}`}
+                onClick={() =>
+                  patchAndCommitGlobal({ maxPointShadows: null })
+                }
+              >
+                Авто
+              </button>
+              <button
+                type="button"
+                className={`ghost ember-chip--sm${draft.maxPointShadows === cubeShadowFromObjects ? " is-active" : ""}`}
+                onClick={() =>
+                  patchAndCommitGlobal({
+                    maxPointShadows: cubeShadowFromObjects,
+                  })
+                }
+              >
+                По объектам
+              </button>
+            </span>
+          </div>
+          <div className="ember-map-lightpanel__field ember-map-lightpanel__field--full">
+            <span>Динамических рядом</span>
+            <input
+              type="range"
+              min={0}
+              max={MAP_DYNAMIC_POINT_SHADOWS_MAX}
+              step={1}
+              value={draft.dynamicPointShadows}
+              onChange={(e) =>
+                patchGlobal({
+                  dynamicPointShadows: Math.max(
+                    0,
+                    Math.min(
+                      MAP_DYNAMIC_POINT_SHADOWS_MAX,
+                      Math.round(Number(e.target.value)),
+                    ),
+                  ),
+                })
+              }
+              onPointerUp={flushGlobal}
+              onKeyUp={flushGlobal}
+            />
+            <span className="ember-map-lightpanel__value-row">
+              <strong>{draft.dynamicPointShadows}</strong>
+              <button
+                type="button"
+                className={`ghost ember-chip--sm${draft.dynamicPointShadows === cubeShadowFromObjects ? " is-active" : ""}`}
+                onClick={() =>
+                  patchAndCommitGlobal({
+                    dynamicPointShadows: cubeShadowFromObjects,
+                  })
+                }
+              >
+                По объектам
+              </button>
+            </span>
+          </div>
+          <label className="ember-map-lightpanel__field">
+            <span>Включение (% радиуса)</span>
+            <input
+              type="range"
+              min={MAP_DYNAMIC_SHADOW_SCALE_MIN}
+              max={1}
+              step={0.05}
+              value={draft.dynamicShadowEnterScale}
+              onChange={(e) => {
+                const enter = Number(e.target.value);
+                patchGlobal({
+                  dynamicShadowEnterScale: enter,
+                  dynamicShadowExitScale: Math.max(
+                    enter,
+                    draftRef.current.dynamicShadowExitScale,
+                  ),
+                });
+              }}
+              onPointerUp={flushGlobal}
+              onKeyUp={flushGlobal}
+            />
+            <strong>
+              {Math.round(draft.dynamicShadowEnterScale * 100)}%
+            </strong>
+          </label>
+          <label className="ember-map-lightpanel__field">
+            <span>Выключение (% радиуса)</span>
+            <input
+              type="range"
+              min={draft.dynamicShadowEnterScale}
+              max={1}
+              step={0.05}
+              value={Math.min(1, draft.dynamicShadowExitScale)}
+              onChange={(e) =>
+                patchGlobal({
+                  dynamicShadowExitScale: Math.max(
+                    draftRef.current.dynamicShadowEnterScale,
+                    Number(e.target.value),
+                  ),
+                })
+              }
+              onPointerUp={flushGlobal}
+              onKeyUp={flushGlobal}
+            />
+            <strong>{Math.round(draft.dynamicShadowExitScale * 100)}%</strong>
           </label>
         </div>
       </section>

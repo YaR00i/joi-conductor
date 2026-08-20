@@ -47,6 +47,19 @@ export type VoxelMeshBuild = {
   storyH: number;
 };
 
+export type VoxelMeshRegion = Readonly<{
+  x0: number;
+  y0: number;
+  /** Exclusive east/south bounds. */
+  x1: number;
+  y1: number;
+}>;
+
+export type VoxelMeshOptions = Readonly<{
+  /** Editor has no player trigger, so identical animated tiles can share a material. */
+  perCellEmissiveMaterials?: boolean;
+}>;
+
 /**
  * Box with side-face UVs scaled to world height / tileSize (top-aligned).
  * Top/bottom faces keep 0..1 UVs.
@@ -224,11 +237,15 @@ function resolveWaterBedEarthTile(
 export function buildVoxelMesh(
   mapIn: EmberMap,
   tileset: EmberTileset,
+  region?: VoxelMeshRegion,
+  options: VoxelMeshOptions = {},
 ): VoxelMeshBuild {
   const map = ensureMapLayers(mapIn);
   const ts = map.tileSize;
   const storyH = blockStoryHeight(ts);
   const voxUnit = ts / 16;
+  const perCellEmissiveMaterials =
+    options.perCellEmissiveMaterials !== false;
 
   const floorMats = new Map<number, THREE.Material>();
   const wallMats = new Map<number, THREE.Material>();
@@ -366,7 +383,10 @@ export function buildVoxelMesh(
     tx?: number,
     ty?: number,
   ): THREE.Material => {
-    if (emissiveAnimNeedsPerCellMaterial(tile.emissiveAnim)) {
+    if (
+      perCellEmissiveMaterials &&
+      emissiveAnimNeedsPerCellMaterial(tile.emissiveAnim)
+    ) {
       const m = buildFloorMat(tile);
       tagIfAnimated(m, tile, "top", tx, ty);
       return m;
@@ -385,7 +405,10 @@ export function buildVoxelMesh(
     tx?: number,
     ty?: number,
   ): THREE.Material => {
-    if (emissiveAnimNeedsPerCellMaterial(tile.emissiveAnim)) {
+    if (
+      perCellEmissiveMaterials &&
+      emissiveAnimNeedsPerCellMaterial(tile.emissiveAnim)
+    ) {
       const m = buildWallMat(tile);
       tagIfAnimated(m, tile, "wall", tx, ty);
       return m;
@@ -442,6 +465,7 @@ export function buildVoxelMesh(
   ) => {
     const cell = { tile, geom, tx, ty };
     if (
+      perCellEmissiveMaterials &&
       emissiveAnimNeedsPerCellMaterial(tile.emissiveAnim) &&
       tileHasEmissive(tile, "top")
     ) {
@@ -464,6 +488,7 @@ export function buildVoxelMesh(
   ) => {
     const cell = { tile, geom, tx, ty };
     if (
+      perCellEmissiveMaterials &&
       emissiveAnimNeedsPerCellMaterial(tile.emissiveAnim) &&
       tileHasEmissive(tile, "wall")
     ) {
@@ -478,8 +503,13 @@ export function buildVoxelMesh(
     }
   };
 
-  for (let ty = 0; ty < map.height; ty++) {
-    for (let tx = 0; tx < map.width; tx++) {
+  const x0 = Math.max(0, Math.min(map.width, region?.x0 ?? 0));
+  const y0 = Math.max(0, Math.min(map.height, region?.y0 ?? 0));
+  const x1 = Math.max(x0, Math.min(map.width, region?.x1 ?? map.width));
+  const y1 = Math.max(y0, Math.min(map.height, region?.y1 ?? map.height));
+
+  for (let ty = y0; ty < y1; ty++) {
+    for (let tx = x0; tx < x1; tx++) {
       const cx = (tx + 0.5) * ts;
       const cz = (ty + 0.5) * ts;
 
@@ -654,9 +684,10 @@ export function buildVoxelMesh(
   flushMerged(transparentFloorBuckets, "top", true);
 
   const bounds = new THREE.Box3().setFromObject(group);
+  const maxY = bounds.isEmpty() ? storyH : bounds.max.y;
   const center = new THREE.Vector3(
     (map.width * ts) / 2,
-    Math.max(storyH, bounds.max.y * 0.35),
+    Math.max(storyH, maxY * 0.35),
     (map.height * ts) / 2,
   );
 

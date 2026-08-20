@@ -5,8 +5,7 @@ import {
   writeEmberBytes,
   writeEmberJson,
   writeEmberText,
-  type EmberPack,
-} from "../../../game";
+} from "../../../game/content/io";
 import {
   normalizePixelSprite,
   spriteTotalHeight,
@@ -15,6 +14,7 @@ import type {
   EmberArt,
   EmberArtKind,
   EmberPixelSprite,
+  EmberPack,
   EmberTileset,
   MistressIdRef,
 } from "../../../game/content/types";

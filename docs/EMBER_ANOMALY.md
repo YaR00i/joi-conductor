@@ -8,10 +8,10 @@
 
 Госпожи = существующие packs (`hu_tao`, `furina`, `sunna`, `sparkle`), но для публичных материалов Hu Tao остаётся **прототипом / референсом**, а наружу нужен OC-эквивалент.
 
-**Стек (решение):** Phaser 3 + TypeScript, модуль `src/game/`, оболочка React/Electron.  
+**Текущий стек:** Three.js + TypeScript (`src/game/three/`), оболочка React/Electron. `src/game/phaser/` сохранён как legacy/reference и не является активным runtime.
 Level-up / сундуки / диалоги — React-оверлеи поверх canvas (переиспользуем эстетику рулетки).
 
-**Связанные доки:** [wallet / угольки](../src/lib/wallet.ts), [mistress packs](mistress-packs.md), [Hu Tao bible](character/hu-tao.md).
+**Связанные доки:** [AI handoff и архитектурный контракт](EMBER_AI_HANDOFF.md), [wallet / угольки](../src/lib/wallet.ts), [mistress packs](mistress-packs.md), [Hu Tao bible](character/hu-tao.md).
 
 ---
 
@@ -424,15 +424,22 @@ P1 сознательно режет **сюжетный хаб**, чтобы б�
 
 ### 5.7 Near-term editor priorities
 
-Это приоритеты ближайших 2–4 недель. Они обслуживают playable slice и asset velocity, а не расширение жанров.
+Синхронизировано с кодом 2026-08-20. Текущий фокус — надёжный Unity/Blender-подобный каркас мира; расширение контента идёт после него.
 
 | Приоритет | Что сделать | Почему сейчас |
 |-----------|-------------|---------------|
-| **Semantic tiles** | Visual overlays, biome palettes, full portal/trigger runtime over existing `slow` / `stain` / `hazard` / `portal` / `trigger` schema. | Даст больше геймплейного разнообразия без новых систем и сразу усилит map editor. |
-| **Voxel workflow** | Prefab browser, variants, material presets, chest + clip assembly, быстрый save/place/playtest. | Сейчас воксельный редактор уже есть, но контент-бутылочное горлышко — скорость сборки ассетов. |
-| **Asset library** | Tags/categories, bulk actions, usage references, быстрый переход к tile/sprite/voxel editor. | Нужно понимать, что уже создано, где используется и что можно переиспользовать. |
-| **Editor UX modes** | Укрупнить рабочие режимы вместо множества dock popovers: Map / Tiles / Voxels / Library / Balance / Playtest. | Редактор растёт; нужна навигация по задачам автора, а не по внутренним компонентам. |
-| **Balance editors** | Pool / Weapon / Enemy UI + playtest from editor. | Runtime уже читает JSON; ручное редактирование пулов и статов замедляет баланс. |
+| **1. Unified Transform / Scale — готово** | Записываемый Scale X/Y/Z, связанный/раздельный ввод, gizmo, snap/reset, Renderer/Collider/outline/light pivot, группы и multi-selection вокруг общего pivot, live preview, undo/redo. | Закрыто 2026-08-20 как общий `WorldObject`/Inspector-контракт. |
+| **2. Selection + placement — готово** | Фильтры viewport, locked/hidden, pick-cycle, явный multi-selection, общий Z/Drop/Lock/Hide/Delete, единый target Surface / Drop to Floor / Grid Z, серийная установка и invalid ghost с причиной. SpritePlacement имеет authored Z в editor/runtime/collision/light. | Закрыто 2026-08-20 как единый selection/placement contract. |
+| **3. Creative mode** | Walk/fly от первого лица, raycast place/remove, hotbar библиотеки, свет и trigger volumes через общий CommandStack. | Даёт Minecraft-подобный быстрый способ сборки, не создавая второй редактор данных. |
+| **4. Gameplay semantics** | Tile `portal`/`trigger` runtime, `scriptId`, `camera_bound`, единая диагностика trigger → event → action. | Региональные teleport и `on_region_enter` уже работают; нужно закрыть оставшиеся разрывы runtime. |
+| **5. Asset library 2.0** | Tags/categories, bulk actions, usage references, безопасный rename/import, быстрые переходы в редакторы. | Нужны переиспользование и контроль зависимостей при росте пака. |
+| **6. Balance editors** | Pool / Weapon / Enemy UI + playtest from editor. | Runtime уже читает JSON; формы нужны после стабилизации редактора мира. |
+
+Уже закрытая база: `EditorCore`/CommandStack, единый `EmberWorldObject`, компонентный Inspector, Outliner и группы, библиотечная постановка, pick-cycle, воксельные prefab/variant/material/chest workflows, высотная физика и плавное падение. Региональные телепорты и события `on_region_enter` исполняются в runtime; tile-based `portal`/`trigger` и прямой `scriptId` пока нет. Этап производительности закрыт текущим профилем: terrain worker/chunks, voxel instancing, merged terrain, light streaming/budgets, batched debug overlays и reflection scheduling; повторный аудит нужен на большой наполненной карте.
+
+Перед Creative mode закрыта стабильность динамического света (2026-08-20): retained object lights сохраняют яркость/animation state при смене streaming-окна; runtime flicker меняет видимый cutoff внутри заранее запечённого объёма и не пересобирает cube depth каждый кадр; static PointLight shadow bake временно расширяет сам `PointLight.distance` до 1.5 authored radius, потому что Three.js иначе перезаписывает `shadow.camera.far` текущим cutoff перед рендером. После bake живой радиус возвращается, а полная cube-depth карта и её decode range сохраняются. В локальные карты входят только статические объекты слоя 0; игрок и враги исключены. Редактор автоматически инвалидирует bake после правок геометрии/света и имеет ручную кнопку «Пересчитать статические тени». Bias/near приведены к масштабу вокселя, чтобы не терялась самотень. Вариант с динамическими cube maps был отклонён как слишком дорогой (~1880 draw calls уже при четырёх врагах).
+
+Повторный crowd-аудит runtime начат 2026-08-20. Этап 1 закрыт: PointLight cube shadows теперь запекают только статический слой мира и не пересчитываются от движения толпы; игрок/враги остаются в плавной направленной тени, а пули, XP и orbit-эффекты не являются дорогими shadow casters. Этап 2 закрыт: одинаковые враги собраны в плотные runtime `InstancedMesh`-батчи по enemy visual key со swap-remove и общей alpha-cutout тенью. Этап 3 закрыт: voxel props, модели chest-регионов и solid sprites живут в постоянном tile-bucket collision index; движение запрашивает только соседние кандидаты с allocation-free дедупликацией, сохраняя точную проверку voxel-колонок, Scale и вертикального clearance. Этап 4 закрыт: AI/физика врагов работают fixed-step 30 Hz, а billboard-поза и направленная тень интерполируются на каждом render frame; отдельный переиспользуемый spatial hash обслуживает bullets, nova, orbit и nearest-target без полного прохода по `actors`. Этап 5 закрыт: bullets, XP gems и orbit сведены в четыре не отбрасывающих тень instanced-батча, transient Actor/proxy переиспользуются через pool, а общие `actors.filter()` заменены плотными списками со swap-remove. В dev добавлен воспроизводимый stress-mode: `F4` = 120 врагов, `Shift+F4` = 180 и неуязвимость. Этап 6 закрыт: combat/contact остаются 30 Hz, но дорогие `moveWithVoxels` распределяются по distance/crowd LOD на 10–15 Hz с индивидуальной фазой и накопленным travel time; уже касающиеся игрока melee не вызывают лишнюю map-физику, а render-поза интерполируется на протяжении своего LOD-интервала. Этап 7 закрыт: локальное separation steering использует тот же spatial hash, учитывает максимум 12 соседей, симметрично раздвигает даже совпавшие позиции и смешивается с направлением погони до единственной map-физики. Для экстремальных >160 врагов movement LOD снижается до 7.5 Hz. Финальный stress на 180 врагах: CPU 14.6 ms, GPU 3.7 ms, ~536 draw calls; толпа визуально распределена, ошибок консоли нет. Обычная волна до 16 врагов остаётся full-rate и показывает около 6 ms CPU. Crowd/runtime pass закрыт; следующий этап по roadmap — Creative Mode.
 
 Текущие реальные точки кода: `src/pages/EmberEditorPage.tsx`, `src/components/ember/editor/MapEditorPanel.tsx`, `src/components/ember/editor/VoxelSculptPanel.tsx`, `src/components/ember/editor/StageEditorPanel.tsx`, content pack в `content/ember/`.
 
@@ -495,20 +502,21 @@ content/ember/      # data pack (git)
 
 ## 8. Порядок реализации Phase 1
 
-### Now (2–4 недели)
+### Now — редактор мира
 
-1. **Lock slice content:** одна карта, одна стадия, один clear event, короткий test duration, понятный win/fail.
-2. **Smooth edit → save → playtest:** из редактора быстро запускать нужную карту/стадию/сцену и возвращаться обратно.
-3. **Semantic tiles:** добавить overlays для `slow`, `stain/filth`, `hazard`, `portal`, `trigger`; довести portal/trigger runtime.
-4. **Voxel workflow accelerators:** prefab/variant flow, material presets, chest scene + open clip как готовый authoring path.
-5. **Pool / Weapon / Enemy UI:** минимальные формы поверх существующих JSON, чтобы балансить без ручного редактирования файлов.
+1. **Unified Transform / Scale:** Renderer + Collider + Inspector + gizmo + группы/multi-selection + live preview + undo/redo. *(Готово 2026-08-20.)*
+2. **Selection / placement pass:** фильтры, lock/hide, multi-edit, Surface / Floor / Grid Z, Serial и invalid reason. *(Готово 2026-08-20.)*
+3. **Creative walk/fly:** использует тот же `EditorCore`, Selection, Library и команды сохранения.
+4. **Gameplay semantics:** tile portal/trigger, region `scriptId`, `camera_bound`, debug chain.
+5. **Asset Library 2.0:** tags, usage references, bulk rename/import, dependency-safe navigation.
 
-### Next
+### Next — playable и баланс
 
-1. Отполировать playable cycle: результат, cinders, сцена, возврат, подсказки.
-2. Расширить asset library: tags/categories, usage, bulk rename/import, переходы в редакторы.
-3. Добавить больше контента в тот же slice: 2–3 tile hazards, 1 новый enemy variant, 1 chest/voxel prop, 1 улучшенная сцена.
-4. Сделать публичный OC-pass для ассетов/текстов вместо прямой Hu Tao-зависимости.
+1. Pool / Weapon / Enemy UI поверх существующих JSON.
+2. Отполировать короткий map/stage playtest и возврат в тот же editor context.
+3. Отполировать playable cycle: результат, cinders, сцена, возврат, подсказки.
+4. Добавить 2–3 tile hazards, enemy variant, chest/voxel prop и улучшенную сцену.
+5. Повторить performance-аудит на максимальной целевой карте и контентной плотности.
 
 ### Later
 
@@ -563,10 +571,11 @@ content/ember/      # data pack (git)
 
 **Known P1 gaps**
 
-- Semantic tile schema есть; ещё нужны visual overlays и полноценный portal/trigger runtime  
+- Creative walk/fly ещё не реализован  
+- Semantic overlays есть; `slow`/`stain`/`hazard` работают, но tile `portal`/`trigger` runtime ещё отсутствует  
+- Региональные teleport и `on_region_enter` работают; прямой `scriptId` и gameplay `camera_bound` ещё отсутствуют  
 - Pool / Weapon / Enemy UI ещё не first-class, хотя данные уже есть в `content/ember/`
-- Voxel editor мощный, но нужен faster prefab/variant/material/chest workflow
-- Editor UX перегружен мелкими dock popovers; нужны более крупные режимы работы
+- Asset Library нужна tags/usage/bulk/dependency навигация
 - Map/stage playtest loop из редактора нужно сделать максимально коротким
 - Full 15‑min balance pass — позже, после короткого reproducible slice
 

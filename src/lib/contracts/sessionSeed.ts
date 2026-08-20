@@ -17,7 +17,10 @@ import type { MistressId } from "../mistress/types";
 import type { RouletteOption, RouletteStepDef } from "../planRoulette";
 import type { RouletteStepId } from "../rouletteSettings";
 import { getContractDef } from "./catalog";
-import type { ContractInstance } from "./dailyBoard";
+import {
+  markContractAccepted,
+  type ContractInstance,
+} from "./dailyBoard";
 
 /** Eat-capable finish/cumplay pair for oral_next_ruin_eat seal. */
 export const CEI_SEAL_FINISH_ID = "hand";
@@ -745,6 +748,7 @@ export function startSessionSeedFromContract(
   const seed = buildSessionSeedFromContract(contract);
   if (!seed) return null;
   saveActiveSessionSeed(seed);
+  markContractAccepted(contract.instanceId, seed.startedAtMs);
   return seed;
 }
 
@@ -776,13 +780,15 @@ export function pruneStaleSessionSeedDetailed(
   if (!seed) {
     return { seed: null, clearedDenial: false, clearedCage: false };
   }
-  if (typeof seed.deadlineMs === "number" && nowMs > seed.deadlineMs) {
+  const open = findOpen(seed.instanceId);
+  if (!open || open.status !== "open") {
     const side = unlinkSessionSeedSideEffects(seed);
     clearActiveSessionSeed();
     return { seed: null, ...side };
   }
-  const open = findOpen(seed.instanceId);
-  if (!open || open.status !== "open" || nowMs > open.deadlineMs) {
+  // Prefer the live board deadline so a carried accept can outlive the
+  // original calendar day without the seed being wiped at midnight.
+  if (nowMs > open.deadlineMs) {
     const side = unlinkSessionSeedSideEffects(seed);
     clearActiveSessionSeed();
     return { seed: null, ...side };

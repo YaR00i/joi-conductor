@@ -1,6 +1,17 @@
 import type { Emotion } from "../types";
+import {
+  DEFAULT_QWEN_VOICE,
+  QWEN_TTS_CUSTOM_VOICE_ID,
+} from "../qwenTtsCatalog";
 
-export type TtsProvider = "auto" | "sovits" | "qwen" | "piper" | "edge" | "system";
+export type TtsProvider =
+  | "auto"
+  | "sovits"
+  | "qwen"
+  | "qwen-cpu"
+  | "piper"
+  | "edge"
+  | "system";
 
 export type TtsOptions = {
   enabled: boolean;
@@ -15,6 +26,8 @@ export type TtsOptions = {
   sovitsPromptText: string;
   sovitsPromptLang: string;
   sovitsTextLang: string;
+  qwenRefPath: string;
+  qwenPromptText: string;
   qwenUrl: string;
   qwenModel: string;
   qwenVoice: string;
@@ -30,14 +43,16 @@ const DEFAULTS: TtsOptions = {
   edgeVoice: "ru-RU-DariyaNeural",
   voiceURI: "",
   sovitsUrl: "http://127.0.0.1:9880",
-  sovitsRefPath: "voice-refs/hu-tao/ref.wav",
-  sovitsPromptText:
-    'Hu as in "Who put me in this coffin?" and Tao as in "I can\'t geT OUt!" Hehe... No, not funny?',
+  sovitsRefPath: "voice-refs/hu-tao/sovits-ref.wav",
+  sovitsPromptText: "",
   sovitsPromptLang: "en",
   sovitsTextLang: "en",
+  qwenRefPath: "voice-refs/hu-tao/ref.wav",
+  qwenPromptText:
+    'Hu as in "Who put me in this coffin?" and Tao as in "I can\'t geT OUt!" Hehe... No, not funny?',
   qwenUrl: "http://127.0.0.1:8000/v1",
-  qwenModel: "Qwen/Qwen3-TTS-0.6B",
-  qwenVoice: "Cherry",
+  qwenModel: QWEN_TTS_CUSTOM_VOICE_ID,
+  qwenVoice: DEFAULT_QWEN_VOICE,
   qwenApiKey: "",
 };
 
@@ -368,7 +383,8 @@ export class SpeechTts {
         provider === "edge" ||
         provider === "piper" ||
         provider === "sovits" ||
-        provider === "qwen"
+        provider === "qwen" ||
+        provider === "qwen-cpu"
           ? provider
           : "auto",
       voice: this.opts.edgeVoice,
@@ -385,6 +401,8 @@ export class SpeechTts {
       qwenModel: this.opts.qwenModel,
       qwenVoice: this.opts.qwenVoice,
       qwenApiKey: this.opts.qwenApiKey,
+      qwenRefPath: this.opts.qwenRefPath,
+      qwenPromptText: this.opts.qwenPromptText,
     });
 
     if (gen !== this.generation) return;

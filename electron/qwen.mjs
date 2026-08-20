@@ -1,6 +1,12 @@
+import { existsSync } from "node:fs";
 import http from "node:http";
 import https from "node:https";
 import net from "node:net";
+import {
+  isQwenBaseModel,
+  qwenLanguageName,
+  qwenMaxNewTokens,
+} from "./qwenLaunch.mjs";
 
 /**
  * Qwen3-TTS 0.6B engine bridge.
@@ -15,6 +21,8 @@ import net from "node:net";
  */
 
 const DEFAULT_BASE = "http://127.0.0.1:8000/v1";
+/** Idle timeout while the server computes (no bytes until wav is ready). */
+export const QWEN_SPEAK_TIMEOUT_MS = 180_000;
 
 /** Default port used by `vllm serve` (parsed from baseUrl for ping). */
 const DEFAULT_PORT = 8000;
@@ -30,17 +38,18 @@ const DEFAULT_PORT = 8000;
  */
 export function qwenParamsForEmotion(emotion, rateMul = 1) {
   const table = {
-    tease: { speed: 1.05, temperature: 0.9 },
-    amused: { speed: 1.08, temperature: 1.0 },
-    intense: { speed: 1.15, temperature: 1.0 },
-    strict: { speed: 0.95, temperature: 0.7 },
-    soft: { speed: 0.92, temperature: 0.8 },
-    neutral: { speed: 1.0, temperature: 0.9 },
+    tease: { speed: 1.05, temperature: 0.7, instruct: "playful teasing tone" },
+    amused: { speed: 1.08, temperature: 0.75, instruct: "amused light tone" },
+    intense: { speed: 1.15, temperature: 0.75, instruct: "urgent intense tone" },
+    strict: { speed: 0.95, temperature: 0.65, instruct: "cold strict tone" },
+    soft: { speed: 0.92, temperature: 0.7, instruct: "soft gentle tone" },
+    neutral: { speed: 1.0, temperature: 0.7, instruct: "" },
   };
   const base = table[emotion] ?? table.tease;
   return {
     speed: Math.max(0.5, Math.min(2.0, base.speed * rateMul)),
     temperature: base.temperature,
+    instruct: base.instruct,
   };
 }
 
@@ -85,7 +94,12 @@ function requestBuffer(url, { method = "GET", body, headers, timeoutMs = 30000 }
     );
     req.on("timeout", () => {
       req.destroy();
-      reject(new Error("Qwen timeout (сервер не ответил за 30с)"));
+      const sec = Math.round(timeoutMs / 1000);
+      reject(
+        new Error(
+          `Qwen timeout (сервер не ответил за ${sec}с). Первая фраза после старта на GPU часто 1–3 мин — это не длина текста.`,
+        ),
+      );
     });
     req.on("error", reject);
     if (body) req.write(body);
@@ -134,11 +148,72 @@ export async function pingQwen(baseUrl = DEFAULT_BASE) {
 }
 
 /**
- * Soft status probe: hit /models (every OpenAI-compatible server has it).
+ * Format /health JSON for the status pill.
+ * @param {{ device?: string, gpu?: string, torch?: string, backend?: string, engine?: string }} parsed
+ */
+export function qwenHealthDetail(parsed) {
+  const device = String(parsed?.device || "");
+  const gpu = String(parsed?.gpu || "");
+  const torch = String(parsed?.torch || "");
+  const backend = String(parsed?.backend || parsed?.engine || "");
+  const cpu = device === "cpu" || /[+]?cpu/i.test(torch);
+  if (cpu) {
+    return `онлайн · CPU (${torch || "torch без CUDA"}) — не GPU, синтез в RAM`;
+  }
+  const graphs =
+    backend === "faster" || backend.includes("faster-qwen3");
+  if (gpu) {
+    return graphs
+      ? `онлайн · GPU · ${gpu} · CUDA graphs`
+      : `онлайн · GPU · ${gpu}`;
+  }
+  return "";
+}
+
+/**
+ * Soft status probe: hit /health, then /models.
  * @param {string} baseUrl
  */
 export async function getQwenStatus(baseUrl = DEFAULT_BASE) {
   const base = normalizeBase(baseUrl);
+  try {
+    const { status, buf } = await requestBuffer(`${base}/health`, {
+      timeoutMs: 2500,
+    });
+    if (status < 400) {
+      let device = "";
+      let gpu = "";
+      let torch = "";
+      let backend = "";
+      try {
+        const parsed = JSON.parse(buf.toString("utf8"));
+        if (parsed && typeof parsed === "object") {
+          device = String(parsed.device || "");
+          gpu = String(parsed.gpu || "");
+          torch = String(parsed.torch || "");
+          backend = String(parsed.backend || parsed.engine || "");
+        }
+      } catch {
+        /* ignore */
+      }
+      const cpu = device === "cpu" || /[+]?cpu/i.test(torch);
+      const detail =
+        qwenHealthDetail({ device, gpu, torch, backend }) ||
+        buf.toString("utf8").slice(0, 120) ||
+        `HTTP ${status}`;
+      return {
+        online: true,
+        baseUrl: base,
+        device: device || (cpu ? "cpu" : ""),
+        gpu,
+        torch,
+        backend,
+        detail,
+      };
+    }
+  } catch {
+    /* fall through to /models */
+  }
   try {
     const { status, buf } = await requestBuffer(`${base}/models`, {
       timeoutMs: 2500,
@@ -166,6 +241,9 @@ export async function getQwenStatus(baseUrl = DEFAULT_BASE) {
  *   apiKey?: string,
  *   emotion?: string,
  *   rate?: number,
+ *   language?: string,
+ *   refAudio?: string,
+ *   refText?: string,
  * }} opts
  * @returns {Promise<{mime: string, base64: string, voice: string, bytes: number, engine: string}>}
  */
@@ -174,8 +252,10 @@ export async function synthesizeQwenTts(opts) {
   const text = String(opts.text ?? "").trim();
   if (!text) throw new Error("Пустой текст для Qwen3-TTS");
 
-  const model = String(opts.model || "Qwen/Qwen3-TTS-0.6B").trim();
-  const voice = String(opts.voice || "Cherry").trim();
+  const model = String(
+    opts.model || "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
+  ).trim();
+  const voice = String(opts.voice || "Serena").trim();
   const emotion = opts.emotion || "tease";
   const knobs = qwenParamsForEmotion(emotion, opts.rate ?? 1);
 
@@ -183,22 +263,43 @@ export async function synthesizeQwenTts(opts) {
   const apiKey = String(opts.apiKey ?? "").trim();
   if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
 
-  // OpenAI-compatible speech endpoint. `extra_body` passes Qwen-specific
-  // sampling knobs through vLLM without breaking the standard schema.
+  const extraBody = {
+    temperature: knobs.temperature,
+    language: qwenLanguageName(opts.language || "en"),
+    max_new_tokens: qwenMaxNewTokens(text),
+  };
+  if (knobs.instruct) extraBody.instruct = knobs.instruct;
+  const refAudio = String(opts.refAudio ?? "").trim();
+  const refText = String(opts.refText ?? "").trim();
+  if (isQwenBaseModel(model)) {
+    if (!refAudio) {
+      throw new Error(
+        "Qwen Base — клон: нужен wav госпожи (поле референса). Или переключись на CustomVoice.",
+      );
+    }
+    if (!existsSync(refAudio)) {
+      throw new Error(
+        `Qwen Base — нет файла рефа: ${refAudio}. Положи wav или переключись на CustomVoice.`,
+      );
+    }
+  }
+  if (refAudio) extraBody.ref_audio = refAudio;
+  if (refText) extraBody.ref_text = refText;
+
   const body = JSON.stringify({
     model,
     input: text,
     voice,
     response_format: "wav",
     speed: knobs.speed,
-    extra_body: { temperature: knobs.temperature },
+    extra_body: extraBody,
   });
 
   const { buf, contentType } = await requestBuffer(`${base}/audio/speech`, {
     method: "POST",
     headers,
     body,
-    timeoutMs: 30000,
+    timeoutMs: QWEN_SPEAK_TIMEOUT_MS,
   });
 
   // Error JSON from API
@@ -222,7 +323,7 @@ export async function synthesizeQwenTts(opts) {
     }
     if (peak <= 64) {
       throw new Error(
-        "Qwen вернул тишину. Проверь модель/голос и что vLLM собран с аудио-бэкендом.",
+        "Qwen вернул тишину. Проверь модель/голос и что сервер (qwen-tts или vLLM) собрался с аудио.",
       );
     }
   }

@@ -116,11 +116,14 @@ export const HU_TAO_PACK: MistressPack = {
     glitchHud: false,
   },
   voice: {
-    sovitsRefPath: "voice-refs/hu-tao/ref.wav",
-    sovitsPromptText:
-      'Hu as in "Who put me in this coffin?" and Tao as in "I can\'t geT OUt!" Hehe... No, not funny?',
+    sovitsRefPath: "voice-refs/hu-tao/sovits-ref.wav",
+    sovitsPromptText: "",
     sovitsPromptLang: "en",
     sovitsTextLang: "en",
+    qwenRefPath: "voice-refs/hu-tao/ref.wav",
+    qwenPromptText:
+      'Hu as in "Who put me in this coffin?" and Tao as in "I can\'t geT OUt!" Hehe... No, not funny?',
+    qwenPromptLang: "en",
     ttsRate: 1.05,
     ttsPitch: 1.12,
   },
@@ -191,7 +194,7 @@ export const FURINA_PACK: MistressPack = {
       "Prone ≠ дрочка: член упирается в поверхность, ритм бёдрами без рук",
       "Обычная дрочка руками редка — боль/давление в такт",
       "RouletteBias: жёсткие пулы · cum≤50%",
-      "Tide: авто-счёт акцентов на CBT/plapping · НЕ ВЫДЕРЖАЛ → пропуски",
+      "Tide: Честь (метроном) или Микрофон (громкость) на CBT/plapping · НЕ ВЫДЕРЖАЛ → пропуски",
     ],
   },
   fx: {
@@ -201,11 +204,14 @@ export const FURINA_PACK: MistressPack = {
     glitchHud: false,
   },
   voice: {
-    sovitsRefPath: "voice-refs/furina/ref.wav",
-    sovitsPromptText:
-      "Tea parties are a must for the well-mannered. If you'd like to learn the proper etiquette, I'd be happy to teach you.",
+    sovitsRefPath: "voice-refs/furina/sovits-ref.wav",
+    sovitsPromptText: "",
     sovitsPromptLang: "en",
     sovitsTextLang: "en",
+    qwenRefPath: "voice-refs/furina/ref.wav",
+    qwenPromptText:
+      "Tea parties are a must for the well-mannered. If you'd like to learn the proper etiquette, I'd be happy to teach you.",
+    qwenPromptLang: "en",
     ttsRate: 0.98,
     ttsPitch: 1.08,
   },
@@ -288,11 +294,14 @@ export const SUNNA_PACK: MistressPack = {
     glitchHud: false,
   },
   voice: {
-    sovitsRefPath: "voice-refs/sunna/ref.wav",
-    sovitsPromptText:
-      "Feels like Miss Cecilia really enjoys dolling us up like in a dress-up game.",
+    sovitsRefPath: "voice-refs/sunna/sovits-ref.wav",
+    sovitsPromptText: "",
     sovitsPromptLang: "en",
     sovitsTextLang: "en",
+    qwenRefPath: "voice-refs/sunna/ref.wav",
+    qwenPromptText:
+      "Feels like Miss Cecilia really enjoys dolling us up like in a dress-up game.",
+    qwenPromptLang: "en",
     ttsRate: 1.02,
     ttsPitch: 1.15,
     /** Quiet home capture — start a bit hotter than 100%. */
@@ -368,11 +377,14 @@ export const SPARKLE_PACK: MistressPack = {
     glitchHud: true,
   },
   voice: {
-    sovitsRefPath: "voice-refs/sparkle/ref.wav",
-    sovitsPromptText:
-      "Look who's graced us with their presence! Guess I'll be in your shadow now.",
+    sovitsRefPath: "voice-refs/sparkle/sovits-ref.wav",
+    sovitsPromptText: "",
     sovitsPromptLang: "en",
     sovitsTextLang: "en",
+    qwenRefPath: "voice-refs/sparkle/ref.wav",
+    qwenPromptText:
+      "Look who's graced us with their presence! Guess I'll be in your shadow now.",
+    qwenPromptLang: "en",
     ttsRate: 1.12,
     ttsPitch: 1.18,
   },

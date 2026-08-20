@@ -19,6 +19,11 @@ contextBridge.exposeInMainWorld("joiDesktop", {
     ipcRenderer.on("window:fullscreen", handler);
     return () => ipcRenderer.removeListener("window:fullscreen", handler);
   },
+  cursor: {
+    clip: (rect) => ipcRenderer.invoke("cursor:clip", rect),
+    unclip: () => ipcRenderer.invoke("cursor:unclip"),
+    warpCenter: () => ipcRenderer.send("cursor:warp-center"),
+  },
   ollama: {
     status: (preferredModel) =>
       ipcRenderer.invoke("ollama:status", preferredModel ?? ""),
@@ -27,6 +32,8 @@ contextBridge.exposeInMainWorld("joiDesktop", {
     stop: () => ipcRenderer.invoke("ollama:stop"),
     models: () => ipcRenderer.invoke("ollama:models"),
     pull: (model) => ipcRenderer.invoke("ollama:pull", model),
+    delete: (model) => ipcRenderer.invoke("ollama:delete", model),
+    searchHtml: (query) => ipcRenderer.invoke("ollama:search-html", query),
     onPullProgress: (cb) => {
       const handler = (_e, payload) => cb(payload);
       ipcRenderer.on("ollama:pull-progress", handler);
@@ -54,6 +61,7 @@ contextBridge.exposeInMainWorld("joiDesktop", {
     stop: () => ipcRenderer.invoke("tts:stop"),
     piperStatus: () => ipcRenderer.invoke("tts:piper-status"),
     installPiper: () => ipcRenderer.invoke("tts:piper-install"),
+    uninstallPiper: () => ipcRenderer.invoke("tts:piper-uninstall"),
     onPiperProgress: (cb) => {
       const handler = (_e, payload) => cb(payload);
       ipcRenderer.on("tts:piper-progress", handler);
@@ -67,11 +75,40 @@ contextBridge.exposeInMainWorld("joiDesktop", {
       ),
     sovitsStart: (opts) => ipcRenderer.invoke("tts:sovits-start", opts ?? {}),
     sovitsStop: (opts) => ipcRenderer.invoke("tts:sovits-stop", opts ?? {}),
+    sovitsInstallStatus: () => ipcRenderer.invoke("tts:sovits-install-status"),
+    installSovits: () => ipcRenderer.invoke("tts:sovits-install"),
+    uninstallSovits: () => ipcRenderer.invoke("tts:sovits-uninstall"),
+    onSovitsInstallProgress: (cb) => {
+      const handler = (_e, payload) => cb(payload);
+      ipcRenderer.on("tts:sovits-install-progress", handler);
+      return () =>
+        ipcRenderer.removeListener("tts:sovits-install-progress", handler);
+    },
     qwenStatus: (opts) =>
       ipcRenderer.invoke(
         "tts:qwen-status",
         typeof opts === "string" ? { baseUrl: opts } : opts ?? {},
       ),
+    qwenStart: (opts) => ipcRenderer.invoke("tts:qwen-start", opts ?? {}),
+    qwenStop: (opts) => ipcRenderer.invoke("tts:qwen-stop", opts ?? {}),
+    qwenInstallStatus: () => ipcRenderer.invoke("tts:qwen-install-status"),
+    installQwenModel: (target) =>
+      ipcRenderer.invoke("tts:qwen-install", { target }),
+    uninstallQwenModel: (target) =>
+      ipcRenderer.invoke("tts:qwen-uninstall", { target }),
+    onQwenInstallProgress: (cb) => {
+      const handler = (_e, payload) => cb(payload);
+      ipcRenderer.on("tts:qwen-install-progress", handler);
+      return () =>
+        ipcRenderer.removeListener("tts:qwen-install-progress", handler);
+    },
+    voiceRefShow: (relPath) =>
+      ipcRenderer.invoke("tts:voice-ref-show", relPath ?? ""),
+    voiceRefStat: (relPath) =>
+      ipcRenderer.invoke("tts:voice-ref-stat", relPath ?? ""),
+    voiceRefPick: () => ipcRenderer.invoke("tts:voice-ref-pick"),
+    voiceRefWrite: (payload) =>
+      ipcRenderer.invoke("tts:voice-ref-write", payload ?? {}),
   },
   media: {
     wd14Status: (opts) =>
@@ -81,6 +118,12 @@ contextBridge.exposeInMainWorld("joiDesktop", {
       ),
     wd14Start: (opts) => ipcRenderer.invoke("media:wd14-start", opts ?? {}),
     wd14Stop: (opts) => ipcRenderer.invoke("media:wd14-stop", opts ?? {}),
+    onWd14Progress: (cb) => {
+      const handler = (_e, payload) => cb(payload);
+      ipcRenderer.on("media:wd14-progress", handler);
+      return () =>
+        ipcRenderer.removeListener("media:wd14-progress", handler);
+    },
     tagImage: (payload) => ipcRenderer.invoke("media:wd14-tag", payload),
   },
   device: {

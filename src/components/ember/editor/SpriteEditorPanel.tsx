@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { writeEmberJson, type EmberPack } from "../../../game";
+import { writeEmberJson } from "../../../game/content/io";
 import {
   clampSpriteDim,
   emptySpritePixels,
@@ -20,6 +20,7 @@ import type {
   EmberEmissiveTriggerWhen,
   EmberEnemyDef,
   EmberMaterialKind,
+  EmberPack,
   EmberPixelSprite,
   EmberSpriteRole,
   EmberTileset,
@@ -97,6 +98,7 @@ const ROLES: Array<{ id: EmberSpriteRole; label: string }> = [
   { id: "enemy", label: "Враг" },
   { id: "player", label: "Герой" },
   { id: "prop", label: "Проп" },
+  { id: "npc", label: "NPC" },
 ];
 
 const BASE_PALETTE = [

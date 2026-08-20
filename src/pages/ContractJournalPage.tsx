@@ -11,6 +11,7 @@ import { listMistressPacks } from "../lib/mistress/packs";
 
 type Props = {
   revision?: number;
+  variant?: "page" | "embed";
 };
 
 type OutcomeFilter = "all" | ContractJournalOutcome;
@@ -51,7 +52,10 @@ function formatWhen(iso: string): { day: string; time: string } {
   return { day, time };
 }
 
-export function ContractJournalPage({ revision = 0 }: Props) {
+export function ContractJournalPage({
+  revision = 0,
+  variant = "page",
+}: Props) {
   const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const entries = useMemo(
@@ -88,14 +92,17 @@ export function ContractJournalPage({ revision = 0 }: Props) {
   }
 
   return (
-    <section className="contract-journal">
+    <section
+      className={`contract-journal${variant === "embed" ? " contract-journal--embed" : ""}`}
+    >
       <header className="contract-journal__head">
         <div>
           <p className="contracts-page__eyebrow">Хроника</p>
           <h1 className="contracts-page__title">Журнал контрактов</h1>
           <p className="contracts-page__sub">
-            Отдельно от дневника сессий — только итоги контрактов: выполнение,
-            награды, отчёты-вопросники.
+            {variant === "embed"
+              ? "Итоги контрактов этого сохранения — отдельно от дневника."
+              : "Отдельно от дневника сессий — только итоги контрактов: выполнение, награды, отчёты-вопросники."}
           </p>
         </div>
       </header>

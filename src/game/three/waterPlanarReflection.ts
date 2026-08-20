@@ -247,6 +247,9 @@ export function createWaterPlanarReflection(
     virtualCamera.near = Math.max(0.5, camera.near);
     virtualCamera.fov = camera.fov;
     virtualCamera.aspect = camera.aspect;
+    // Runtime actors use a separate layer for static PointLight shadow bakes;
+    // the mirror should still see the same layers as the gameplay camera.
+    virtualCamera.layers.mask = camera.layers.mask;
     virtualCamera.updateProjectionMatrix();
     virtualCamera.updateMatrixWorld(true);
     virtualCamera.projectionMatrix.copy(camera.projectionMatrix);

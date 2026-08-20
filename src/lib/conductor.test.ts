@@ -209,4 +209,60 @@ describe("buildQueue", () => {
       /No compatible functions/,
     );
   });
+
+  it("queues vibe blocks when a wand or vibe bullet is equipped", () => {
+    const vibeCatalog: CatalogSlice = {
+      functions: [
+        ...catalog.functions,
+        makeFn({
+          id: "hands_off_vibe",
+          category: "vibe",
+          modes: ["stroke", "chastity"],
+          drive: "vibe",
+          requiresToys: ["wand"],
+          intensity: 3,
+        }),
+      ],
+      patterns: catalog.patterns,
+      toys: [
+        ...catalog.toys,
+        {
+          id: "vibe_bullet",
+          nameRu: "Вибропуля",
+          descriptionRu: "",
+          owned: true,
+          tags: ["vibe"],
+          satisfies: ["wand", "external_vibe"],
+        },
+      ],
+    };
+    const unlocks = {
+      ...emptyWallet().unlocks,
+      functionIds: ["hands_off_vibe"],
+    };
+    const without = buildQueue(
+      baseParams({
+        allowedToyIds: ["vibe_bullet"],
+        allowedFunctionIds: ["hands_off_vibe", "rest_hands_off"],
+      }),
+      vibeCatalog,
+      seed,
+      { unlocks },
+    );
+    expect(without.some((b) => b.drive === "vibe")).toBe(false);
+
+    const withBullet = buildQueue(
+      baseParams({
+        allowedToyIds: ["vibe_bullet"],
+        allowedFunctionIds: ["hands_off_vibe", "rest_hands_off"],
+      }),
+      vibeCatalog,
+      seed,
+      { unlocks, equippedToyIds: ["vibe_bullet"] },
+    );
+    expect(withBullet.some((b) => b.functionId === "hands_off_vibe")).toBe(
+      true,
+    );
+    expect(withBullet.some((b) => b.drive === "vibe")).toBe(true);
+  });
 });

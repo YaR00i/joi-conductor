@@ -26,6 +26,7 @@ import {
   WALL_HEIGHT,
   type EmberSpriteLib,
   layerData,
+  listLanternSources,
   tileSurfaceElev,
 } from "../tile/mapUtils";
 import {
@@ -39,16 +40,18 @@ import {
 } from "../voxel/voxelEmissiveLight";
 import { sceneFootprintVoxels } from "../voxel/voxelModelApply";
 import { voxelGridSize } from "../voxel/voxelModel";
+import { resolveEmberTransformScale } from "../world/worldTransform";
 import { normalizeVoxelRot } from "../voxel/voxelPlacement";
 import {
   tagEmissiveLight,
   type EmberEmissiveLightMeta,
 } from "./emissiveAnimTick";
+import { MAP_POINT_LIGHTS_MAX } from "../tile/lightLimits";
 import { packLampDiscDecay } from "./threeLighting";
 
 export const THREE_MAX_EMISSIVE_LIGHTS = 48;
-/** Soft fill shadows are expensive (cube maps) — keep a modest budget. */
-export const THREE_MAX_EMISSIVE_SHADOWS = 12;
+/** Match the map light ceiling so every emissive source can keep a baked cube. */
+export const THREE_MAX_EMISSIVE_SHADOWS = MAP_POINT_LIGHTS_MAX;
 
 export type EmissiveLocalLightSource = {
   id: string;
@@ -150,11 +153,10 @@ function voxelLightWorldPosition(
   const w = sx * vw;
   const d = sz * vw;
   const rot = normalizeVoxelRot(place.rot);
-  const lx = origin.x * vw;
-  const ly = origin.y * vw;
-  const lz = origin.z * vw;
-  const rx = lx - w * 0.5;
-  const rz = lz - d * 0.5;
+  const scale = resolveEmberTransformScale(place.scale);
+  const ly = origin.y * vw * scale.z;
+  const rx = (origin.x * vw - w * 0.5) * scale.x;
+  const rz = (origin.z * vw - d * 0.5) * scale.y;
   const angle = rot * (Math.PI / 2);
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
@@ -509,6 +511,28 @@ export function listEmissiveLocalLights(
   return out.slice(0, THREE_MAX_EMISSIVE_LIGHTS);
 }
 
+/** Authored lanterns plus emissive PointLight objects currently on the map. */
+export function countMapLocalLightObjects(
+  map: EmberMap,
+  tileset: EmberTileset,
+  opts?: {
+    sprites?: EmberSpriteLib;
+    voxelModels?: EmberVoxelModelLib;
+    voxelScenes?: EmberVoxelSceneLib;
+  },
+): number {
+  return (
+    listLanternSources(map, tileset, opts?.sprites).length +
+    listEmissiveLocalLights(
+      map,
+      tileset,
+      opts?.sprites,
+      opts?.voxelModels,
+      opts?.voxelScenes,
+    ).length
+  );
+}
+
 function enableEmissiveShadow(
   pl: THREE.PointLight,
   tileSize: number,
@@ -517,11 +541,20 @@ function enableEmissiveShadow(
   pl.castShadow = true;
   const res = Math.max(128, Math.round(mapSize));
   pl.shadow.mapSize.set(res, res);
-  pl.shadow.bias = -0.0004;
-  pl.shadow.normalBias = Math.max(0.05, tileSize * 0.01);
-  pl.shadow.camera.near = Math.max(0.25, tileSize * 0.04);
-  // Cover MAP_LIGHT_RANGE_MAX (~16 tiles) so far clip doesn't kill umbras.
-  pl.shadow.camera.far = Math.max(pl.distance * 1.25, tileSize * 18);
+  pl.shadow.bias = -0.0002;
+  // Keep the offset below a voxel edge on normal 16 px tiles. The former
+  // tileSize*0.01 could detach the host's own shadow entirely.
+  pl.shadow.normalBias = Math.max(
+    0.025,
+    Math.min(0.08, tileSize * 0.004),
+  );
+  pl.shadow.camera.near = Math.max(
+    0.05,
+    Math.min(0.2, tileSize * 0.008),
+  );
+  // Cover the maximum torch radius wobble without changing the projection at
+  // runtime. MAP_LIGHT_RANGE_MAX remains covered by the tile fallback.
+  pl.shadow.camera.far = Math.max(pl.distance * 1.5, tileSize * 18);
   pl.shadow.camera.updateProjectionMatrix();
   pl.shadow.radius = 0;
   pl.shadow.intensity = 1;
@@ -542,15 +575,26 @@ export function addThreeEmissiveLocalLights(
     shadowMapSize?: number;
     voxelModels?: EmberVoxelModelLib;
     voxelScenes?: EmberVoxelSceneLib;
+    /** Optional tile-space runtime window for local light streaming. */
+    sourceBounds?: { x0: number; y0: number; x1: number; y1: number };
   },
 ): THREE.PointLight[] {
-  const sources = listEmissiveLocalLights(
+  const allSources = listEmissiveLocalLights(
     map,
     tileset,
     sprites,
     opts?.voxelModels,
     opts?.voxelScenes,
   );
+  const sources = opts?.sourceBounds
+    ? allSources.filter(
+        (source) =>
+          source.x >= opts.sourceBounds!.x0 &&
+          source.y >= opts.sourceBounds!.y0 &&
+          source.x < opts.sourceBounds!.x1 &&
+          source.y < opts.sourceBounds!.y1,
+      )
+    : allSources;
   const lights: THREE.PointLight[] = [];
   const ts = Math.max(1, map.tileSize);
   const allowShadows = opts?.shadows !== false;
@@ -594,12 +638,15 @@ export function addThreeEmissiveLocalLights(
         src.y * ts + src.localZ,
       );
     }
-    if (src.castShadows && shadowSlots > 0) {
+    const shadowRequested = allowShadows && src.castShadows;
+    if (shadowRequested) {
       enableEmissiveShadow(pl, ts, shadowMapSize);
-      shadowSlots -= 1;
+      if (shadowSlots > 0) shadowSlots -= 1;
+      else pl.castShadow = false;
     }
     pl.userData.emberEmissiveLight = true;
     pl.userData.emberEmissiveSourceId = src.id;
+    pl.userData.emberShadowRequested = shadowRequested;
     tagEmissiveLight(pl, src.meta);
     root.add(pl);
     lights.push(pl);

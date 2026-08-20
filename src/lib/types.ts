@@ -306,8 +306,8 @@ export interface SessionState {
   /** Beats/strokes counted during breath_beats / stroke_count. */
   breathProgress?: number;
   /**
-   * Auto-counted strong accents on CBT/plapping this block (Tide).
-   * 0 / cleared when not on a Tide-hit stroke block.
+   * Counted CBT/plapping hits this block (Tide): metronome accents (honor)
+   * or mic peaks (mic verify). 0 / cleared when not on a Tide-hit stroke block.
    */
   tideHits?: number;
   /** Soft target hits for the current Tide block; 0 = dock hidden. */

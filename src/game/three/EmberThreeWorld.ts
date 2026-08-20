@@ -24,6 +24,11 @@ import type {
   EmberWeaponDef,
 } from "../content/types";
 import {
+  resolveMapAutoAttack,
+  resolveMapPlayProfile,
+  stageUsesTimedClear,
+} from "../content/playProfile";
+import {
   emissivePlacementSeed,
   hasEmissiveInk,
   resolveEmissiveGlowStrength,
@@ -50,28 +55,57 @@ import {
 import { applyVoxelPlacementTransform } from "../voxel/voxelPlacement";
 import { VOXELS_PER_BLOCK } from "../voxel/constants";
 import { voxelGridSize } from "../voxel/voxelModel";
+import { advanceWorldFall } from "../world/worldPhysics";
 import {
   buildVoxelSceneMesh,
   type VoxelSceneMesh,
 } from "../voxel/voxelSceneMesh";
 import {
+  applySpritePlacementScale,
   createColorBillboard,
   createPixelBillboard,
   disposeYawBillboard,
   hexColorOr,
   updateYawBillboards,
 } from "./billboards";
+import {
+  PLAY_LOOK_LOCK_UI_SELECTOR,
+  PLAY_POINTER_LOCK_RELOCK_MS,
+  isPlayMenuToggleKey,
+  isPlayPointerLockTarget,
+  playCameraYawFromMovement,
+  playCanvasCursor,
+  playLookActive,
+  playLookWantsPointerLock,
+  playPointerDownShouldLock,
+  requestPlayPointerLock,
+  releasePlayCursorClip,
+  syncPlayCursorClip,
+  playLookTakeMove,
+  playLookWarpSkipCount,
+  warpPlayCursorIfNeeded,
+} from "./playPointer";
+import { emberWorldLoadProgress } from "./emberLoadProgress";
 import { getEmberEnvMap } from "./envMap";
 import { createMapAtmosphere, type MapAtmosphereHandle } from "./mapAtmosphere";
 import { createPostFx, type EmberPostFx } from "./postFx";
 import {
-  lanternShadowShare,
+  applyMapLightBudget,
+  lanternVisibleShare,
   resolveEmberRenderBudget,
+  resolvePlayProfileBudget,
+  type EmberPlayProfileBudget,
   type EmberRenderBudget,
 } from "./renderBudget";
 import {
+  isTriggeredPlayerWeapon,
+  shouldTriggerPlayerWeapon,
+  type PlayerAttackTrigger,
+} from "./playerAttackPolicy";
+import {
   addThreeFillLights,
   addThreeLanternLights,
+  sunDirectionFromAngles,
 } from "./threeLighting";
 import { addThreeEmissiveLocalLights } from "./emissiveLocalLights";
 import { setEmberVoxelLightSnap } from "./voxelLightSnap";
@@ -82,7 +116,9 @@ import {
   moveWithVoxels,
 } from "./voxelCollision";
 import {
+  captureEmissiveLightRuntimeStates,
   collectEmissiveMaterials,
+  restoreEmissiveLightRuntimeStates,
   tagEmissiveMaterial,
   tickEmissiveLights,
   tickEmissiveMaterials,
@@ -92,7 +128,16 @@ import {
   collectPlanarReflectMaterials,
   estimatePlanarFloorY,
 } from "./planarReflectMaterial";
-import { buildVoxelMesh, disposeVoxelMesh } from "./voxelMesh";
+import {
+  createChunkedVoxelTerrain,
+  DEFAULT_TERRAIN_CHUNK_SIZE,
+  terrainChunkDescriptors,
+  terrainChunkKeySignature,
+  terrainChunkWindow,
+  type ChunkedVoxelTerrain,
+  type TerrainChunkDescriptor,
+  type TerrainStreamingStats,
+} from "./voxelTerrainChunks";
 import {
   collectWaterMaterials,
   ensureWaterShoreAttributes,
@@ -109,6 +154,51 @@ import {
   createInteractiveOutline,
   type InteractiveOutlineHandle,
 } from "./interactiveOutline";
+import {
+  createLocalShadowDebugOverlay,
+  type LocalShadowDebugOverlay,
+} from "./localShadowDebugOverlay";
+import { LocalPointShadowMapBank } from "./localPointShadowMapBank";
+import {
+  createEmberFrameProfiler,
+  type EmberFrameProfiler,
+  type EmberProfilerExtras,
+} from "./emberFrameProfiler";
+import {
+  EMBER_DYNAMIC_ACTOR_LAYER,
+  beginPointShadowBake,
+  configureCachedSunShadow,
+  mapWideDirectionalHalf,
+  directionalShadowLightDistance,
+  fitDirectionalShadowToFocus,
+  invalidatePointLightShadows,
+  pickDynamicPointShadowLightsFrom,
+  pointLightRequestsShadow,
+  setObjectRenderLayer,
+} from "./dynamicShadowPolicy";
+import {
+  RuntimeBillboardBatches,
+  type RuntimeBillboardInstance,
+} from "./runtimeBillboardInstancing";
+import { RuntimeActorSpatialIndex } from "./runtimeActorSpatialIndex";
+import { RuntimeObjectPool } from "./runtimeObjectPool";
+import {
+  collectExploreNpcSpawns,
+  stepExploreNpcWander,
+  type ExploreNpcSpawn,
+  type ExploreNpcWanderBounds,
+} from "./exploreNpcs";
+import {
+  clampCoordToMap,
+  enemySimLod,
+  noteMovementCadence,
+  runsOnStaggeredTick,
+} from "./enemyAiLod";
+import {
+  addCrowdSeparation,
+  resolveCrowdSteering,
+  type CrowdSeparationAccumulator,
+} from "./enemyCrowdAvoidance";
 
 export type EmberThreeWorldOpts = {
   parent: HTMLElement;
@@ -118,6 +208,12 @@ export type EmberThreeWorldOpts = {
   shortMode?: boolean;
   width?: number;
   height?: number;
+  terrainStreaming?: {
+    enabled?: boolean;
+    chunkSize?: number;
+    loadRadiusChunks?: number;
+    unloadRadiusChunks?: number;
+  };
 };
 
 const STRIP_COLORS = ["#e8a878", "#e09070", "#d07090", "#c050a0"];
@@ -125,14 +221,49 @@ const STRIP_COLORS = ["#e8a878", "#e09070", "#d07090", "#c050a0"];
 type WeaponSlot = { def: EmberWeaponDef; level: number; cooldown: number };
 
 const CHEST_INTERACT_R = 14;
+const ENEMY_AI_STEP = 1 / 30;
+const ENEMY_AI_MAX_STEPS = 3;
+
+type FrozenShadow = {
+  shadow: THREE.LightShadow<THREE.Camera>;
+  autoUpdate: boolean;
+  needsUpdate: boolean;
+};
+
+function samePointLights(
+  a: readonly THREE.PointLight[],
+  b: readonly THREE.PointLight[],
+): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function createUnshadowedEffectBillboard(
+  color: string,
+  size: number,
+): THREE.Mesh {
+  const mesh = createColorBillboard(color, size);
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  mesh.customDepthMaterial?.dispose();
+  mesh.customDistanceMaterial?.dispose();
+  mesh.customDepthMaterial = undefined;
+  mesh.customDistanceMaterial = undefined;
+  return mesh;
+}
 
 type Actor = {
   mesh: THREE.Object3D;
+  enemyBillboard?: RuntimeBillboardInstance;
+  effectBillboard?: RuntimeBillboardInstance;
   lx: number;
   ly: number;
   elev: number;
   radius: number;
-  kind: "player" | "enemy" | "bullet" | "ebullet" | "gem" | "chest" | "orbit";
+  kind: "player" | "enemy" | "npc" | "bullet" | "ebullet" | "gem" | "chest" | "orbit";
   hp?: number;
   maxHp?: number;
   def?: EmberEnemyDef;
@@ -149,6 +280,20 @@ type Actor = {
   uid?: number;
   dead?: boolean;
   outline?: InteractiveOutlineHandle | null;
+  actorIndex?: number;
+  enemyIndex?: number;
+  projectileIndex?: number;
+  gemIndex?: number;
+  simPrevX?: number;
+  simPrevY?: number;
+  simPrevElev?: number;
+  simBlendElapsed?: number;
+  simBlendDuration?: number;
+  moveAccum?: number;
+  aiPhase?: number;
+  npcWander?: ExploreNpcWanderBounds;
+  npcDirX?: number;
+  npcDirY?: number;
 };
 
 type Orbital = {
@@ -169,8 +314,43 @@ export class EmberThreeWorld {
   private readonly clock = new THREE.Clock();
   private readonly post: EmberPostFx;
   private readonly renderBudget: EmberRenderBudget;
+  private readonly profiler: EmberFrameProfiler;
+  private readonly localShadowDebug: LocalShadowDebugOverlay;
+  private readonly playProfileBudget: EmberPlayProfileBudget;
+  private readonly autoAttackEnabled: boolean;
+  private readonly lookOffset = new THREE.Vector3();
+  private readonly lookAxis = new THREE.Vector3(0, 1, 0);
   private mapGroup: THREE.Group | null = null;
+  private terrainChunks: ChunkedVoxelTerrain | null = null;
+  private readonly terrainStreaming: Required<
+    NonNullable<EmberThreeWorldOpts["terrainStreaming"]>
+  >;
+  private terrainFocusChunkKey = "";
+  private terrainLoadKeySig = "";
+  private terrainRetainKeySig = "";
+  private readonly terrainDatasetKey: string;
   private entityRoot = new THREE.Group();
+  private readonly enemyBillboards = new RuntimeBillboardBatches(
+    this.entityRoot,
+    192,
+  );
+  private readonly effectBillboards = new RuntimeBillboardBatches(
+    this.entityRoot,
+    512,
+  );
+  private readonly transientActors = new RuntimeObjectPool<Actor>(() => ({
+    mesh: new THREE.Object3D(),
+    lx: 0,
+    ly: 0,
+    elev: 0,
+    radius: 1,
+    kind: "bullet",
+  }));
+  private readonly staticPropRoot = new THREE.Group();
+  private readonly staticPropChunks = new Map<string, THREE.Group>();
+  private readonly loadedStaticPropChunkKeys = new Set<string>();
+  private staticPropQueue: TerrainChunkDescriptor[] = [];
+  private staticPropFrame = 0;
   /** Cached animated emissive materials (no per-frame scene traverse). */
   private emissiveMats: THREE.Material[] = [];
   /** Shared animated water materials from the static map mesh. */
@@ -181,6 +361,28 @@ export class EmberThreeWorld {
   private emissiveLights: THREE.PointLight[] = [];
   /** Lantern PointLights for global torch flicker. */
   private lanternLights: THREE.PointLight[] = [];
+  /** Moving/yawing runtime casters invalidate cached shadow depth this frame. */
+  private dynamicShadowDirty = true;
+  /** Terrain/props/lights changed; cached point-light cube maps need one bake. */
+  private staticShadowDirty = true;
+  private sunShadowDirty = true;
+  private terrainSettled = false;
+  private staticPropsSettled = false;
+  private shadowWarmupComplete = false;
+  private localLightsSpawned = false;
+  private lastLoadRatio = -1;
+  private lastLoadLabel = "";
+  private shadowReadyResolve!: () => void;
+  readonly ready = new Promise<void>((resolve) => {
+    this.shadowReadyResolve = resolve;
+  });
+  private staticShadowBakeTarget: THREE.WebGLRenderTarget | null = null;
+  private readonly staticShadowBakeCamera = new THREE.PerspectiveCamera(
+    40,
+    1,
+    1,
+    2,
+  );
   private raf = 0;
   private disposed = false;
   private contextLost = false;
@@ -192,8 +394,37 @@ export class EmberThreeWorld {
   private readonly shortMode: boolean;
 
   private actors: Actor[] = [];
+  private readonly enemies: Actor[] = [];
+  private readonly npcs: Actor[] = [];
+  private readonly npcPlacementIds = new Set<string>();
+  private npcAiAccumulator = 0;
+  private readonly projectiles: Actor[] = [];
+  private readonly gems: Actor[] = [];
+  private readonly enemySpatial: RuntimeActorSpatialIndex<Actor>;
+  private enemySpatialDirty = true;
+  private enemyAiAccumulator = 0;
+  private enemyAiStepsLastFrame = 0;
+  private enemyAiTick = 0;
+  private enemyPhysicsMovesLastFrame = 0;
+  private enemyContactSkipsLastFrame = 0;
+  private enemyAvoidanceActorsLastFrame = 0;
+  private enemyAvoidanceNeighborsLastFrame = 0;
+  private enemyCadenceLastFrame = { full: 0, half: 0, third: 0, quarter: 0 };
+  private readonly crowdSeparation: CrowdSeparationAccumulator = {
+    x: 0,
+    y: 0,
+    weight: 0,
+  };
+  private readonly crowdSteering = { x: 0, y: 0 };
+  private readonly emissiveEnemyTiles: Array<{ x: number; y: number }> = [];
+  private stressEnemyTarget = 0;
   private player!: Actor;
+  /** Discrete support story used by horizontal Minecraft-style collision. */
   private playerElev = 0;
+  /** Continuous feet height used by rendering, camera and combat. */
+  private playerFeetElev = 0;
+  private playerFallVelocity = 0;
+  private playerGrounded = true;
   private weapons: WeaponSlot[] = [];
   private orbitals: Orbital[] = [];
   private orbitAngle = 0;
@@ -247,18 +478,84 @@ export class EmberThreeWorld {
   private activeEmissiveEvents = new Set<string>();
   private awaitingLoot = false;
   private pausedLogic = false;
+  private lookWarpSkip = 0;
   private finished = false;
   private followDist = 120;
   private readonly followTarget = new THREE.Vector3();
+  private keyLight: THREE.DirectionalLight | null = null;
+  private readonly sunDir = new THREE.Vector3(0, 1, 0);
+  private localShadowActorsMoved = false;
+  private localShadowSkip = 0;
+  private localPointShadowLimit = 0;
+  private readonly localShadowMapBank = new LocalPointShadowMapBank();
+  private dynamicLocalLights: THREE.PointLight[] = [];
+  private localShadowCandidates: THREE.PointLight[] = [];
+  private readonly localShadowActorFocuses: THREE.Vector3[] = [];
   private readonly lightRoot = new THREE.Group();
+  private readonly fillLightRoot = new THREE.Group();
+  private readonly localLightRoot = new THREE.Group();
   private atmosphere!: MapAtmosphereHandle;
   private uidSeq = 1;
 
   private readonly onKeyDown = (ev: KeyboardEvent) => {
+    if (ev.code === "F4" && !ev.repeat && import.meta.env.DEV) {
+      ev.preventDefault();
+      this.spawnCrowdStress(ev.shiftKey ? 180 : 120);
+      return;
+    }
+    if (isPlayMenuToggleKey(ev)) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (ev.repeat) return;
+      this.openPauseMenu(PLAY_POINTER_LOCK_RELOCK_MS);
+      return;
+    }
     if (ev.code === "Space") ev.preventDefault();
     this.setKey(ev.code, true);
   };
-  private readonly onKeyUp = (ev: KeyboardEvent) => this.setKey(ev.code, false);
+  private readonly onKeyUp = (ev: KeyboardEvent) => {
+    this.setKey(ev.code, false);
+  };
+  private readonly onPointerDown = (ev: PointerEvent) => {
+    if (ev.button !== 0) return;
+    if (this.hasLookLock()) return;
+    const target = ev.target;
+    const shell = this.lookLockTarget();
+    const inside = target instanceof Node && shell.contains(target);
+    const el =
+      target instanceof Element
+        ? target
+        : target instanceof Node
+          ? target.parentElement
+          : null;
+    const ui = el != null && el.closest(PLAY_LOOK_LOCK_UI_SELECTOR) != null;
+    if (!playPointerDownShouldLock(inside, ui)) return;
+    this.renderer.domElement.focus();
+    this.requestLookLock();
+  };
+  private readonly onPointerMove = (ev: PointerEvent) => {
+    if (!playLookActive(this.lookState())) return;
+    const taken = playLookTakeMove(this.lookWarpSkip);
+    this.lookWarpSkip = taken.skipRemaining;
+    if (!taken.apply) return;
+    const yaw = playCameraYawFromMovement(ev.movementX);
+    if (yaw === 0) return;
+    this.lookOffset.copy(this.camera.position).sub(this.controls.target);
+    this.lookOffset.applyAxisAngle(this.lookAxis, yaw);
+    this.camera.position.copy(this.controls.target).add(this.lookOffset);
+    const locked = this.hasLookLock();
+    warpPlayCursorIfNeeded(true, locked);
+    this.lookWarpSkip = playLookWarpSkipCount(locked);
+  };
+  private readonly onPointerLockChange = () => {
+    this.syncPointerLock();
+  };
+  private readonly onWindowBlur = () => {
+    this.syncPointerLock();
+  };
+  private readonly onWindowFocus = () => {
+    this.syncPointerLock();
+  };
   private readonly onContextLost = (ev: Event) => {
     ev.preventDefault();
     if (this.disposed || this.contextLost) return;
@@ -274,7 +571,9 @@ export class EmberThreeWorld {
     if (this.disposed) return;
     this.contextLost = false;
     this.clock.getDelta();
-    this.renderer.shadowMap.needsUpdate = true;
+    this.localShadowMapBank.resetGpuResources();
+    this.dynamicLocalLights = [];
+    this.invalidateStaticShadows();
     this.onResize();
     this.scene.traverse((obj) => {
       if (!(obj instanceof THREE.Mesh || obj instanceof THREE.Sprite)) return;
@@ -300,15 +599,45 @@ export class EmberThreeWorld {
     const mapRaw = opts.pack.maps[stage.mapId];
     if (!mapRaw) throw new Error(`map ${stage.mapId}`);
     this.map = ensureMapLayers(mapRaw);
+    this.autoAttackEnabled = resolveMapAutoAttack(this.map);
+    this.enemySpatial = new RuntimeActorSpatialIndex(
+      Math.max(24, this.map.tileSize * 2),
+    );
     const tileset = opts.pack.tilesets[this.map.tilesetId];
     if (!tileset) throw new Error(`tileset ${this.map.tilesetId}`);
     this.tileset = tileset;
+    this.terrainStreaming = {
+      enabled:
+        opts.terrainStreaming?.enabled ??
+        resolveMapPlayProfile(this.map) !== "explore",
+      chunkSize: Math.max(
+        4,
+        Math.round(
+          opts.terrainStreaming?.chunkSize ?? DEFAULT_TERRAIN_CHUNK_SIZE,
+        ),
+      ),
+      loadRadiusChunks: Math.max(
+        1,
+        Math.round(opts.terrainStreaming?.loadRadiusChunks ?? 2),
+      ),
+      unloadRadiusChunks: Math.max(
+        2,
+        Math.round(opts.terrainStreaming?.unloadRadiusChunks ?? 3),
+      ),
+    };
+    this.terrainStreaming.unloadRadiusChunks = Math.max(
+      this.terrainStreaming.loadRadiusChunks + 1,
+      this.terrainStreaming.unloadRadiusChunks,
+    );
+    this.terrainDatasetKey = `runtime:${stage.mapId}:${this.map.tilesetId}`;
 
     this.maxHp = stage.playerHp;
     this.hp = stage.playerHp;
-    this.duration = this.shortMode
-      ? Math.min(90, stage.durationSec)
-      : stage.durationSec;
+    this.duration = stageUsesTimedClear(resolveMapPlayProfile(this.map))
+      ? this.shortMode
+        ? Math.min(90, stage.durationSec)
+        : stage.durationSec
+      : 0;
     this.xpToLevel = stage.baseXpToLevel;
 
     const width = opts.width ?? (opts.parent.clientWidth || 960);
@@ -317,14 +646,20 @@ export class EmberThreeWorld {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x0e0a08);
     this.scene.environment = getEmberEnvMap();
+    this.localShadowDebug = createLocalShadowDebugOverlay(this.scene);
     this.camera = new THREE.PerspectiveCamera(40, width / height, 1, 5000);
+    this.camera.layers.enable(EMBER_DYNAMIC_ACTOR_LAYER);
     this.renderer = new THREE.WebGLRenderer({
       antialias: false,
       powerPreference: "high-performance",
     });
+    this.playProfileBudget = resolvePlayProfileBudget(
+      resolveMapPlayProfile(this.map),
+    );
     this.renderBudget = resolveEmberRenderBudget(
       this.renderer.capabilities,
       "play",
+      resolveMapPlayProfile(this.map),
     );
     this.renderer.setSize(width, height);
     // Cap DPR — bloom + shadows already dominate GPU cost.
@@ -332,6 +667,7 @@ export class EmberThreeWorld {
     this.renderer.shadowMap.enabled = true;
     // Hard cartoon umbras (not soft PCF bleed).
     this.renderer.shadowMap.type = THREE.BasicShadowMap;
+    this.renderer.shadowMap.autoUpdate = false;
     this.renderer.domElement.style.display = "block";
     this.renderer.domElement.style.width = "100%";
     this.renderer.domElement.style.height = "100%";
@@ -339,6 +675,12 @@ export class EmberThreeWorld {
     this.renderer.domElement.tabIndex = 0;
     opts.parent.innerHTML = "";
     opts.parent.appendChild(this.renderer.domElement);
+    this.profiler = createEmberFrameProfiler(
+      this.renderer,
+      "GAME",
+      (visible) => this.localShadowDebug.setVisible(visible),
+    );
+    this.localShadowDebug.setVisible(this.profiler.isVisible());
     this.renderer.domElement.addEventListener(
       "webglcontextlost",
       this.onContextLost,
@@ -354,13 +696,18 @@ export class EmberThreeWorld {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.1;
     this.controls.enablePan = false;
-    // Locked isometric pitch — only horizontal (azimuth) orbit.
+    this.controls.enableRotate = false;
+    this.controls.enableZoom = true;
+    // Locked isometric pitch — mouse look only yaws around the player.
     const isoPolar = 0.95;
     this.controls.minPolarAngle = isoPolar;
     this.controls.maxPolarAngle = isoPolar;
     this.controls.minDistance = 64;
     this.controls.maxDistance = 220;
     this.lightRoot.name = "lights";
+    this.fillLightRoot.name = "fillLights";
+    this.localLightRoot.name = "localLights";
+    this.lightRoot.add(this.fillLightRoot, this.localLightRoot);
     this.scene.add(this.lightRoot);
     this.atmosphere = createMapAtmosphere(this.scene);
 
@@ -373,19 +720,23 @@ export class EmberThreeWorld {
     );
 
     this.entityRoot.name = "entities";
+    this.staticPropRoot.name = "staticPropChunks";
+    this.entityRoot.add(this.staticPropRoot);
     this.scene.add(this.entityRoot);
 
     this.buildMapAndLights();
-    this.placeMapProps();
     this.refreshWaterMats();
     this.spawnPlayerAndGear();
+    this.spawnExploreNpcs();
+    this.updateTerrainStreaming(true);
     this.placeChests();
     this.refreshEmissiveMats();
+    this.invalidateStaticShadows();
     // Snap follow target to player immediately.
     const focus = logicToThree(
       this.player.lx,
       this.player.ly,
-      this.player.elev,
+      this.playerFeetElev,
       6,
       this.map.tileSize,
     );
@@ -400,12 +751,15 @@ export class EmberThreeWorld {
 
     window.addEventListener("keydown", this.onKeyDown, true);
     window.addEventListener("keyup", this.onKeyUp, true);
+    window.addEventListener("blur", this.onWindowBlur);
+    window.addEventListener("focus", this.onWindowFocus);
     this.onResize = this.onResize.bind(this);
     window.addEventListener("resize", this.onResize);
-    this.renderer.domElement.addEventListener("pointerdown", () => {
-      this.renderer.domElement.focus();
-    });
+    document.addEventListener("pointerdown", this.onPointerDown, true);
+    document.addEventListener("pointermove", this.onPointerMove);
+    document.addEventListener("pointerlockchange", this.onPointerLockChange);
     this.renderer.domElement.focus();
+    this.syncPointerLock();
 
     this.tick = this.tick.bind(this);
     this.raf = requestAnimationFrame(this.tick);
@@ -454,9 +808,13 @@ export class EmberThreeWorld {
   }
 
   private buildMapAndLights(): void {
-    const built = buildVoxelMesh(this.map, this.tileset);
-    this.mapGroup = built.group;
-    this.scene.add(built.group);
+    this.terrainChunks = createChunkedVoxelTerrain(this.map, this.tileset, {
+      chunkSize: this.terrainStreaming.chunkSize,
+      deferInitial: true,
+    });
+    this.mapGroup = this.terrainChunks.group;
+    this.scene.add(this.mapGroup);
+    const mapCenter = this.terrainChunks.center;
 
     const lightCfg = resolveMapLight(this.map);
     setEmberVoxelLightSnap(
@@ -482,55 +840,238 @@ export class EmberThreeWorld {
     );
 
     this.clearLightRoot();
-    addThreeFillLights(this.lightRoot, lightCfg, built.center, {
+    // Fixed isometric framing around player (retargeted after spawn).
+    this.followDist = THREE.MathUtils.clamp(this.map.tileSize * 7.5, 96, 160);
+    sunDirectionFromAngles(
+      lightCfg.sunAzimuth,
+      lightCfg.sunElevation,
+      this.sunDir,
+    );
+    const mapSpan = Math.max(
+      this.map.width * this.map.tileSize,
+      this.map.height * this.map.tileSize,
+    );
+    const sunHalf = mapWideDirectionalHalf(mapSpan);
+    this.keyLight = addThreeFillLights(this.fillLightRoot, lightCfg, mapCenter, {
       keyLight: true,
       shadows: true,
       shadowMapSize: this.renderBudget.directionalShadowMapSize,
       mapWidth: this.map.width * this.map.tileSize,
       mapDepth: this.map.height * this.map.tileSize,
     });
-    const lampShadowBudget = lanternShadowShare(this.renderBudget);
-    this.lanternLights = addThreeLanternLights(this.lightRoot, {
+    if (this.keyLight?.castShadow) {
+      configureCachedSunShadow(
+        this.keyLight,
+        this.renderBudget.directionalShadowMapSize,
+      );
+      fitDirectionalShadowToFocus(this.keyLight, mapCenter, this.sunDir, {
+        halfExtent: sunHalf,
+        lightDistance: directionalShadowLightDistance(sunHalf),
+        mapSize: this.renderBudget.directionalShadowMapSize,
+        voxelSize: this.map.tileSize / VOXELS_PER_BLOCK,
+        snapMin: 0,
+      });
+    }
+    const isoPolar = 0.95;
+    const yaw = Math.PI * 0.25;
+    const spherical = new THREE.Spherical(this.followDist, isoPolar, yaw);
+    this.controls.target.copy(mapCenter);
+    this.camera.position.setFromSpherical(spherical).add(this.controls.target);
+    this.controls.update();
+  }
+
+  private updateTerrainStreaming(force = false): void {
+    const terrain = this.terrainChunks;
+    if (!terrain || !this.player) return;
+    const { tx, ty } = worldToTile(this.map, this.player.lx, this.player.ly);
+    const chunkX = Math.floor(tx / this.terrainStreaming.chunkSize);
+    const chunkY = Math.floor(ty / this.terrainStreaming.chunkSize);
+    const focusKey = `${chunkX}:${chunkY}`;
+    if (!this.terrainStreaming.enabled) {
+      if (!force && this.terrainFocusChunkKey !== "") return;
+    } else if (!force && focusKey === this.terrainFocusChunkKey) {
+      return;
+    }
+    const descriptors = terrainChunkDescriptors(
+      this.map.width,
+      this.map.height,
+      this.terrainStreaming.chunkSize,
+    );
+    const visualWindow = this.terrainStreaming.enabled
+      ? terrainChunkWindow(
+          descriptors,
+          tx,
+          ty,
+          this.terrainStreaming.loadRadiusChunks,
+          this.terrainStreaming.unloadRadiusChunks,
+          this.terrainStreaming.chunkSize,
+        )
+      : {
+          load: descriptors,
+          retainKeys: new Set(descriptors.map((descriptor) => descriptor.key)),
+        };
+    const loadSig = terrainChunkKeySignature(
+      visualWindow.load.map((descriptor) => descriptor.key),
+    );
+    const retainSig = terrainChunkKeySignature(visualWindow.retainKeys);
+    const loadChanged = loadSig !== this.terrainLoadKeySig;
+    const retainChanged = retainSig !== this.terrainRetainKeySig;
+    this.terrainFocusChunkKey = focusKey;
+    this.terrainLoadKeySig = loadSig;
+    this.terrainRetainKeySig = retainSig;
+    if (!force && !loadChanged && !retainChanged) return;
+
+    if (force || retainChanged) {
+      this.rebuildLocalLights(
+        descriptors.filter((descriptor) =>
+          visualWindow.retainKeys.has(descriptor.key),
+        ),
+      );
+    }
+    if (force || loadChanged || retainChanged) {
+      this.syncStaticPropChunks(visualWindow.load, visualWindow.retainKeys);
+    }
+
+    const onApplied = (complete: boolean) => {
+      if (this.disposed) return;
+      this.syncTerrainStreamingStats();
+      this.invalidateStaticShadows();
+      if (!complete) return;
+      this.terrainSettled = true;
+      this.refreshEmissiveMats();
+      this.refreshWaterMats();
+      this.emitLoadProgress();
+    };
+    if (!force && !loadChanged) {
+      this.syncTerrainStreamingStats();
+      return;
+    }
+    this.terrainSettled = false;
+    if (!this.terrainStreaming.enabled) {
+      terrain.scheduleUpdate(this.map, this.tileset, onApplied);
+    } else {
+      terrain.streamAround(
+        this.map,
+        this.tileset,
+        tx,
+        ty,
+        {
+          loadRadiusChunks: this.terrainStreaming.loadRadiusChunks,
+          unloadRadiusChunks: this.terrainStreaming.unloadRadiusChunks,
+          datasetKey: this.terrainDatasetKey,
+        },
+        onApplied,
+      );
+    }
+    this.syncTerrainStreamingStats();
+  }
+
+  private rebuildLocalLights(
+    retainedDescriptors: readonly TerrainChunkDescriptor[],
+  ): void {
+    const emissiveRuntime = captureEmissiveLightRuntimeStates(
+      this.emissiveLights,
+    );
+    this.localShadowMapBank.replaceLights([]);
+    this.clearLightGroup(this.localLightRoot);
+    this.dynamicLocalLights = [];
+    this.localShadowCandidates = [];
+    this.localPointShadowLimit = 0;
+    this.lanternLights = [];
+    this.emissiveLights = [];
+    if (retainedDescriptors.length === 0) {
+      this.localShadowDebug.rebuild([], [], 1);
+      this.localLightsSpawned = true;
+      this.emitLoadProgress();
+      return;
+    }
+    const sourceBounds = retainedDescriptors.reduce(
+      (bounds, descriptor) => ({
+        x0: Math.min(bounds.x0, descriptor.x0),
+        y0: Math.min(bounds.y0, descriptor.y0),
+        x1: Math.max(bounds.x1, descriptor.x1),
+        y1: Math.max(bounds.y1, descriptor.y1),
+      }),
+      { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity },
+    );
+    const lightCfg = resolveMapLight(this.map);
+    const lightCaps = applyMapLightBudget(this.renderBudget, lightCfg);
+    this.localShadowMapBank.setDynamicLimit(lightCfg.dynamicPointShadows);
+    const explore = !this.playProfileBudget.allowHorde;
+    const maxLamps = lanternVisibleShare(lightCaps, {
+      authoredLights: lightCfg.maxPointLights != null,
+      explore,
+    });
+    this.lanternLights = addThreeLanternLights(this.localLightRoot, {
       map: this.map,
       light: lightCfg,
-      center: built.center,
+      center: this.terrainChunks?.center ?? new THREE.Vector3(),
       tileset: this.tileset,
       sprites: this.pack.sprites,
-      maxLamps: Math.ceil(this.renderBudget.maxPointLights / 2),
-      maxShadows: lampShadowBudget,
-      // Match editor: cube shadows occlude lamps through walls.
+      sourceBounds,
+      maxLamps,
+      maxShadows: lightCaps.maxPointLights,
       shadows: true,
       shadowMapSize: this.renderBudget.pointShadowMapSize,
+      shadowFocus: explore ? this.player.mesh.position : undefined,
     });
     this.emissiveLights = addThreeEmissiveLocalLights(
-      this.lightRoot,
+      this.localLightRoot,
       this.map,
       this.tileset,
       this.pack.sprites,
       {
+        sourceBounds,
         maxLights: Math.max(
           0,
-          this.renderBudget.maxPointLights - this.lanternLights.length,
+          lightCaps.maxPointLights - this.lanternLights.length,
         ),
-        maxShadows: Math.max(
-          0,
-          this.renderBudget.maxPointShadows -
-            this.lanternLights.filter((light) => light.castShadow).length,
-        ),
+        maxShadows: this.playProfileBudget.emissiveShadows
+          ? lightCaps.maxPointLights
+          : 0,
         shadowMapSize: this.renderBudget.pointShadowMapSize,
         voxelModels: this.pack.voxelModels,
         voxelScenes: this.pack.voxelScenes,
       },
     );
+    this.localShadowCandidates = [
+      ...this.lanternLights,
+      ...this.emissiveLights,
+    ].filter(pointLightRequestsShadow);
+    this.localPointShadowLimit = this.localShadowCandidates.length;
+    this.localShadowMapBank.replaceLights(this.localShadowCandidates);
+    this.localShadowDebug.rebuild(
+      [...this.lanternLights, ...this.emissiveLights],
+      this.dynamicLocalLights,
+      lightCfg.dynamicShadowEnterScale,
+    );
+    // Existing sources must not restart their fade/flicker state when only the
+    // streamed terrain window changed around the player.
+    restoreEmissiveLightRuntimeStates(this.emissiveLights, emissiveRuntime);
+    const canvas = this.renderer.domElement;
+    canvas.dataset.staticPropLoadedChunks = String(
+      this.loadedStaticPropChunkKeys.size,
+    );
+    canvas.dataset.localLanternLights = String(this.lanternLights.length);
+    canvas.dataset.localEmissiveLights = String(this.emissiveLights.length);
+    this.localLightsSpawned = true;
+    this.invalidateStaticShadows();
+    this.emitLoadProgress();
+  }
 
-    // Fixed isometric framing around player (retargeted after spawn).
-    this.followDist = THREE.MathUtils.clamp(this.map.tileSize * 7.5, 96, 160);
-    const isoPolar = 0.95;
-    const yaw = Math.PI * 0.25;
-    const spherical = new THREE.Spherical(this.followDist, isoPolar, yaw);
-    this.controls.target.copy(built.center);
-    this.camera.position.setFromSpherical(spherical).add(this.controls.target);
-    this.controls.update();
+  /** Lightweight counters for the in-game diagnostics overlay/devtools. */
+  getTerrainStreamingStats(): TerrainStreamingStats | null {
+    return this.terrainChunks?.getStreamingStats() ?? null;
+  }
+
+  private syncTerrainStreamingStats(): void {
+    const stats = this.getTerrainStreamingStats();
+    if (!stats) return;
+    const canvas = this.renderer.domElement;
+    canvas.dataset.terrainLoadedChunks = String(stats.loadedChunks);
+    canvas.dataset.terrainDesiredChunks = String(stats.desiredChunks);
+    canvas.dataset.terrainPendingChunks = String(stats.pendingChunks);
+    canvas.dataset.terrainTotalChunks = String(stats.totalChunks);
   }
 
   private spawnPlayerAndGear(): void {
@@ -547,6 +1088,9 @@ export class EmberThreeWorld {
     const pos = regionCenter(this.map, start);
     const tile = worldToTile(this.map, pos.x, pos.y);
     this.playerElev = tileSurfaceElev(this.map, tile.tx, tile.ty);
+    this.playerFeetElev = this.playerElev;
+    this.playerFallVelocity = 0;
+    this.playerGrounded = true;
     const mesh = createColorBillboard(STRIP_COLORS[0]!, 10, "#1a1010");
     this.player = {
       mesh,
@@ -653,12 +1197,24 @@ export class EmberThreeWorld {
     }
   }
 
-  /** Static map sprites + sculpted voxel props (non-actors). */
-  private placeMapProps(): void {
+  /** Build one independently disposable chunk of non-actor map visuals. */
+  private buildStaticPropChunk(
+    descriptor: TerrainChunkDescriptor,
+  ): THREE.Group {
+    const root = new THREE.Group();
+    root.name = `staticPropChunk:${descriptor.key}`;
+    const contains = (x: number, y: number) =>
+      x >= descriptor.x0 &&
+      y >= descriptor.y0 &&
+      x < descriptor.x1 &&
+      y < descriptor.y1;
+
     for (const p of this.map.sprites ?? []) {
+      if (!contains(p.x, p.y)) continue;
+      if (this.npcPlacementIds.has(p.id)) continue;
       const def = this.pack.sprites[p.spriteId];
       if (!def) continue;
-      const elev = tileSurfaceElev(this.map, p.x, p.y);
+      const elev = p.elev ?? tileSurfaceElev(this.map, p.x, p.y);
       const mesh = createPixelBillboard(
         def,
         hexColorOr(def.color, "#c8a878"),
@@ -670,6 +1226,7 @@ export class EmberThreeWorld {
           this.map.tileSize * 0.45,
         (p.y + 0.5) * this.map.tileSize,
       );
+      applySpritePlacementScale(mesh, p.scale);
       const n = normalizePixelSprite(def);
       if (n.emissivePixels && hasEmissiveInk(n.emissivePixels)) {
         tagEmissiveMaterial(mesh.material as THREE.MeshBasicMaterial, {
@@ -687,9 +1244,10 @@ export class EmberThreeWorld {
           ty: p.y,
         });
       }
-      this.entityRoot.add(mesh);
+      root.add(mesh);
     }
     for (const p of this.map.voxelProps ?? []) {
+      if (!contains(p.x, p.y)) continue;
       const model = this.pack.voxelModels[p.modelId];
       if (!model) continue;
       const elev = p.elev ?? tileSurfaceElev(this.map, p.x, p.y);
@@ -708,22 +1266,495 @@ export class EmberThreeWorld {
         this.map.tileSize,
         elev,
       );
-      this.entityRoot.add(built.group);
+      root.add(built.group);
     }
+    return root;
+  }
+
+  private syncStaticPropChunks(
+    load: readonly TerrainChunkDescriptor[],
+    retainKeys: ReadonlySet<string>,
+  ): void {
+    this.staticPropsSettled = false;
+    if (this.staticPropFrame) cancelAnimationFrame(this.staticPropFrame);
+    this.staticPropFrame = 0;
+    this.staticPropQueue = [];
+    let removed = false;
+    for (const key of [...this.loadedStaticPropChunkKeys]) {
+      if (retainKeys.has(key)) continue;
+      const group = this.staticPropChunks.get(key);
+      if (group) {
+        this.staticPropRoot.remove(group);
+        this.disposeObject(group);
+        this.staticPropChunks.delete(key);
+      }
+      this.loadedStaticPropChunkKeys.delete(key);
+      removed = true;
+    }
+
+    this.staticPropQueue = load.filter(
+      (descriptor) => !this.loadedStaticPropChunkKeys.has(descriptor.key),
+    );
+    this.renderer.domElement.dataset.staticPropPendingChunks = String(
+      this.staticPropQueue.length,
+    );
+    const finish = () => {
+      this.staticPropsSettled = true;
+      this.refreshEmissiveMats();
+      this.refreshWaterMats();
+      this.renderer.domElement.dataset.staticPropLoadedChunks = String(
+        this.loadedStaticPropChunkKeys.size,
+      );
+      this.renderer.domElement.dataset.staticPropPendingChunks = String(
+        this.staticPropQueue.length,
+      );
+      this.invalidateStaticShadows();
+      this.emitLoadProgress();
+    };
+    if (this.staticPropQueue.length === 0) {
+      if (removed) finish();
+      else {
+        this.staticPropsSettled = true;
+        this.emitLoadProgress();
+      }
+      return;
+    }
+    const pump = () => {
+      this.staticPropFrame = 0;
+      if (this.disposed) return;
+      const descriptor = this.staticPropQueue.shift();
+      if (!descriptor) {
+        finish();
+        return;
+      }
+      const group = this.buildStaticPropChunk(descriptor);
+      this.loadedStaticPropChunkKeys.add(descriptor.key);
+      if (group.children.length > 0) {
+        this.staticPropRoot.add(group);
+        this.staticPropChunks.set(descriptor.key, group);
+      }
+      this.renderer.domElement.dataset.staticPropPendingChunks = String(
+        this.staticPropQueue.length,
+      );
+      if (this.staticPropQueue.length > 0) {
+        this.staticPropFrame = requestAnimationFrame(pump);
+      } else {
+        finish();
+      }
+    };
+    this.staticPropFrame = requestAnimationFrame(pump);
   }
 
   private addActor(a: Actor): void {
+    if (a.kind !== "chest" && !a.enemyBillboard && !a.effectBillboard) {
+      setObjectRenderLayer(a.mesh, EMBER_DYNAMIC_ACTOR_LAYER);
+    }
+    // Short-lived effects do not need real shadow-map silhouettes. Keeping
+    // only player/enemy actors as dynamic casters avoids bullet/gem storms
+    // multiplying the directional shadow pass before they are instanced.
+    if (
+      a.kind === "bullet" ||
+      a.kind === "ebullet" ||
+      a.kind === "gem" ||
+      a.kind === "orbit"
+    ) {
+      a.mesh.traverse((object) => {
+        if (object instanceof THREE.Mesh) object.castShadow = false;
+      });
+    }
+    a.actorIndex = this.actors.length;
     this.actors.push(a);
-    this.entityRoot.add(a.mesh);
+    if (a.kind === "enemy") {
+      a.enemyIndex = this.enemies.length;
+      a.simPrevX = a.lx;
+      a.simPrevY = a.ly;
+      a.simPrevElev = a.elev;
+      a.simBlendElapsed = 0;
+      a.simBlendDuration = 0;
+      a.moveAccum = 0;
+      this.enemies.push(a);
+      this.enemySpatialDirty = true;
+    } else if (a.kind === "npc") {
+      a.simPrevX = a.lx;
+      a.simPrevY = a.ly;
+      a.simPrevElev = a.elev;
+      a.simBlendElapsed = 0;
+      a.simBlendDuration = 0;
+      a.moveAccum = 0;
+      this.npcs.push(a);
+    } else if (a.kind === "bullet" || a.kind === "ebullet") {
+      a.projectileIndex = this.projectiles.length;
+      this.projectiles.push(a);
+    } else if (a.kind === "gem") {
+      a.gemIndex = this.gems.length;
+      this.gems.push(a);
+    }
+    if (!a.enemyBillboard && !a.effectBillboard) this.entityRoot.add(a.mesh);
+  }
+
+  private acquireTransientActor(
+    kind: "bullet" | "ebullet" | "gem" | "orbit",
+    lx: number,
+    ly: number,
+    elev: number,
+    radius: number,
+    extra?: Partial<Actor>,
+  ): Actor {
+    const actor = this.transientActors.acquire();
+    actor.enemyBillboard = undefined;
+    actor.effectBillboard = undefined;
+    actor.lx = lx;
+    actor.ly = ly;
+    actor.elev = elev;
+    actor.radius = radius;
+    actor.kind = kind;
+    actor.hp = undefined;
+    actor.maxHp = undefined;
+    actor.def = undefined;
+    actor.touchCd = undefined;
+    actor.vx = undefined;
+    actor.vy = undefined;
+    actor.dmg = undefined;
+    actor.life = undefined;
+    actor.xp = undefined;
+    actor.regionId = undefined;
+    actor.filth = undefined;
+    actor.filthMs = undefined;
+    actor.strip = undefined;
+    actor.uid = undefined;
+    actor.dead = false;
+    actor.outline = null;
+    actor.actorIndex = undefined;
+    actor.enemyIndex = undefined;
+    actor.projectileIndex = undefined;
+    actor.gemIndex = undefined;
+    actor.simPrevX = undefined;
+    actor.simPrevY = undefined;
+    actor.simPrevElev = undefined;
+    actor.simBlendElapsed = undefined;
+    actor.simBlendDuration = undefined;
+    actor.moveAccum = undefined;
+    actor.aiPhase = undefined;
+    actor.mesh.name = `transientProxy:${kind}`;
+    actor.mesh.position.set(0, 0, 0);
+    actor.mesh.rotation.set(0, 0, 0);
+    actor.mesh.scale.set(1, 1, 1);
+    if (extra) Object.assign(actor, extra);
+    // Pool ownership cannot be replaced by optional gameplay metadata.
+    actor.kind = kind;
+    return actor;
+  }
+
+  private attachEffectBillboard(
+    actor: Actor,
+    key: string,
+    color: string,
+    size: number,
+  ): void {
+    actor.effectBillboard = this.effectBillboards.add(
+      key,
+      actor.mesh,
+      () => createUnshadowedEffectBillboard(color, size),
+    );
+  }
+
+  /**
+   * Sun/moon and most lamp cubes contain authored geometry and stay cached
+   * while the camera and actors move. Local PointLights still add light
+   * inside the baked umbra. The nearest in-range lamp also captures the
+   * player/enemy layer.
+   */
+  private invalidateStaticShadows(): void {
+    this.staticShadowDirty = true;
+    this.sunShadowDirty = true;
+    this.dynamicShadowDirty = true;
+    this.localShadowMapBank.markAllDirty();
+    invalidatePointLightShadows(this.lightRoot);
+  }
+
+  private freezeShadowsExcept(
+    allow: (light: THREE.Light) => boolean,
+  ): FrozenShadow[] {
+    const states: FrozenShadow[] = [];
+    this.lightRoot.traverse((object) => {
+      if (!(object instanceof THREE.Light) || !object.castShadow) return;
+      if (allow(object)) return;
+      const withShadow = object as THREE.Light & {
+        shadow?: THREE.LightShadow<THREE.Camera>;
+      };
+      const shadow = withShadow.shadow;
+      if (!shadow) return;
+      states.push({
+        shadow,
+        autoUpdate: shadow.autoUpdate,
+        needsUpdate: shadow.needsUpdate,
+      });
+      shadow.autoUpdate = false;
+      shadow.needsUpdate = false;
+    });
+    return states;
+  }
+
+  private restoreFrozenShadows(states: readonly FrozenShadow[]): void {
+    for (const state of states) {
+      state.shadow.autoUpdate = state.autoUpdate;
+      state.shadow.needsUpdate = state.needsUpdate;
+    }
+  }
+
+  private renderOffscreenShadowPass(includeActors: boolean): void {
+    const bakeCamera = this.staticShadowBakeCamera;
+    bakeCamera.layers.set(0);
+    if (includeActors) bakeCamera.layers.enable(EMBER_DYNAMIC_ACTOR_LAYER);
+    bakeCamera.position.set(1_000_000, 1_000_000, 1_000_000);
+    bakeCamera.lookAt(1_000_001, 1_000_000, 1_000_000);
+    bakeCamera.updateProjectionMatrix();
+    bakeCamera.updateMatrixWorld(true);
+    this.staticShadowBakeTarget ??= new THREE.WebGLRenderTarget(1, 1, {
+      depthBuffer: false,
+      stencilBuffer: false,
+    });
+    const previousTarget = this.renderer.getRenderTarget();
+    try {
+      this.renderer.setRenderTarget(this.staticShadowBakeTarget);
+      this.renderer.shadowMap.needsUpdate = true;
+      this.renderer.render(this.scene, bakeCamera);
+    } finally {
+      this.renderer.setRenderTarget(previousTarget);
+    }
+  }
+
+  private bakeStaticPointShadows(): boolean {
+    if (
+      (!this.staticShadowDirty && !this.sunShadowDirty) ||
+      !this.terrainSettled ||
+      !this.staticPropsSettled
+    ) {
+      return false;
+    }
+
+    const sun = this.keyLight;
+    const dirtyLights =
+      this.localPointShadowLimit > 0
+        ? this.localShadowMapBank.dirtyLights()
+        : [];
+    const batchSize = this.shadowWarmupComplete
+      ? 1
+      : Math.max(1, this.localPointShadowLimit);
+    const batch = dirtyLights.slice(0, batchSize);
+    const includeSun = this.sunShadowDirty && sun?.castShadow === true;
+    this.localShadowMapBank.prepareStaticBatch(batch);
+    const allowed = new Set<THREE.Light>(batch);
+    if (includeSun && sun) allowed.add(sun);
+    const frozen = this.freezeShadowsExcept((light) => allowed.has(light));
+    const pointBake = beginPointShadowBake(batch);
+    if (sun?.castShadow) {
+      sun.shadow.autoUpdate = false;
+      sun.shadow.needsUpdate = includeSun;
+    }
+    let rendered = false;
+    try {
+      if (pointBake.count > 0 || includeSun) {
+        this.renderOffscreenShadowPass(false);
+        rendered = true;
+      }
+    } finally {
+      pointBake.restore();
+      this.localShadowMapBank.captureStaticBatch(batch);
+      this.restoreFrozenShadows(frozen);
+      if (sun) sun.shadow.needsUpdate = false;
+    }
+    this.sunShadowDirty = false;
+    this.staticShadowDirty =
+      this.localPointShadowLimit > 0 &&
+      this.localShadowMapBank.dirtyLights().length > 0;
+    this.localShadowMapBank.applyAssignments(
+      this.localShadowCandidates,
+      this.dynamicLocalLights,
+    );
+    this.localShadowDebug.update(this.dynamicLocalLights);
+    if (!this.staticShadowDirty) this.completeShadowWarmup();
+    else this.emitLoadProgress();
+    if (rendered) this.dynamicShadowDirty = true;
+    return rendered;
+  }
+
+  private completeShadowWarmup(): void {
+    if (this.shadowWarmupComplete) return;
+    if (!this.disposed) {
+      this.lastLoadRatio = -1;
+      this.onBridge({
+        type: "load_progress",
+        ratio: 0.96,
+        labelRu: "Кадр…",
+      });
+      this.bakeDynamicLocalPointShadows(true);
+      this.primePlayPresent();
+    }
+    this.shadowWarmupComplete = true;
+    this.emitLoadProgress();
+    this.shadowReadyResolve();
+  }
+
+  private primePlayPresent(): void {
+    this.camera.updateMatrixWorld(true);
+    this.renderer.compile(this.scene, this.camera);
+    if (this.waterReflect) {
+      this.waterReflect.render(this.renderer, this.scene, this.camera);
+    }
+    this.post.render();
+  }
+
+  private emitLoadProgress(): void {
+    if (this.disposed) return;
+    const bank = this.localShadowMapBank.stats();
+    const progress = emberWorldLoadProgress({
+      terrainSettled: this.terrainSettled,
+      staticPropsSettled: this.staticPropsSettled,
+      lightsReady: this.localLightsSpawned,
+      shadowCached: bank.cached,
+      shadowTotal: Math.max(this.localPointShadowLimit, bank.cached + bank.dirty),
+      warmupComplete: this.shadowWarmupComplete,
+    });
+    if (
+      !this.shadowWarmupComplete &&
+      progress.labelRu === this.lastLoadLabel &&
+      Math.abs(progress.ratio - this.lastLoadRatio) < 0.01
+    ) {
+      return;
+    }
+    this.lastLoadRatio = progress.ratio;
+    this.lastLoadLabel = progress.labelRu;
+    this.onBridge({
+      type: "load_progress",
+      ratio: progress.ratio,
+      labelRu: progress.labelRu,
+    });
+  }
+
+  private bakeDynamicLocalPointShadows(staticJustBaked: boolean): void {
+    const lightCfg = resolveMapLight(this.map);
+    this.localShadowActorFocuses.length = 0;
+    for (const enemy of this.enemies) {
+      if (!enemy.dead) this.localShadowActorFocuses.push(enemy.mesh.position);
+    }
+    for (const npc of this.npcs) {
+      if (!npc.dead) this.localShadowActorFocuses.push(npc.mesh.position);
+    }
+    const selected = pickDynamicPointShadowLightsFrom(
+      this.localShadowCandidates,
+      this.player.mesh.position,
+      {
+        maxLights: Math.min(
+          lightCfg.dynamicPointShadows,
+          this.localPointShadowLimit,
+        ),
+        previous: this.dynamicLocalLights,
+        enterScale: lightCfg.dynamicShadowEnterScale,
+        exitScale: lightCfg.dynamicShadowExitScale,
+        actorFocuses: this.localShadowActorFocuses,
+        camera: this.camera,
+      },
+    );
+    const selectionChanged = !samePointLights(
+      selected,
+      this.dynamicLocalLights,
+    );
+    const assignment = this.localShadowMapBank.applyAssignments(
+      this.localShadowCandidates,
+      selected,
+    );
+
+    const actorsMoved =
+      this.localShadowActorsMoved || this.chestOpens.length > 0;
+    this.localShadowSkip += 1;
+    const lampDue =
+      selectionChanged ||
+      assignment.enteredDynamic.length > 0 ||
+      staticJustBaked ||
+      (actorsMoved && (this.localShadowSkip & 1) === 0);
+    if (selected.length > 0 && lampDue) {
+      const allowed = new Set<THREE.Light>(selected);
+      const frozen = this.freezeShadowsExcept((light) => allowed.has(light));
+      const bake = beginPointShadowBake(selected);
+      try {
+        if (bake.count > 0) this.renderOffscreenShadowPass(true);
+      } finally {
+        bake.restore();
+        this.restoreFrozenShadows(frozen);
+      }
+    }
+
+    this.dynamicLocalLights = selected;
+    this.localShadowDebug.update(selected);
+    this.localShadowActorsMoved = false;
   }
 
   private removeActor(a: Actor): void {
     a.dead = true;
     a.outline?.dispose();
     a.outline = null;
-    this.entityRoot.remove(a.mesh);
-    this.disposeObject(a.mesh);
-    this.actors = this.actors.filter((x) => x !== a);
+    const pooledTransient =
+      a.kind === "bullet" ||
+      a.kind === "ebullet" ||
+      a.kind === "gem" ||
+      a.kind === "orbit";
+    if (a.enemyBillboard) {
+      this.enemyBillboards.remove(a.enemyBillboard);
+      a.enemyBillboard = undefined;
+    } else if (a.effectBillboard) {
+      this.effectBillboards.remove(a.effectBillboard);
+      a.effectBillboard = undefined;
+    } else {
+      this.entityRoot.remove(a.mesh);
+      this.disposeObject(a.mesh);
+    }
+    if (a.kind === "enemy" && a.enemyIndex != null) {
+      const index = a.enemyIndex;
+      const last = this.enemies.pop();
+      if (last && last !== a) {
+        this.enemies[index] = last;
+        last.enemyIndex = index;
+      }
+      a.enemyIndex = undefined;
+      this.enemySpatialDirty = true;
+    }
+    if (
+      (a.kind === "bullet" || a.kind === "ebullet") &&
+      a.projectileIndex != null
+    ) {
+      const index = a.projectileIndex;
+      const last = this.projectiles.pop();
+      if (last && last !== a) {
+        this.projectiles[index] = last;
+        last.projectileIndex = index;
+      }
+      a.projectileIndex = undefined;
+    }
+    if (a.kind === "gem" && a.gemIndex != null) {
+      const index = a.gemIndex;
+      const last = this.gems.pop();
+      if (last && last !== a) {
+        this.gems[index] = last;
+        last.gemIndex = index;
+      }
+      a.gemIndex = undefined;
+    }
+    if (a.kind === "npc") {
+      const index = this.npcs.indexOf(a);
+      if (index >= 0) this.npcs.splice(index, 1);
+    }
+    if (a.actorIndex != null) {
+      const index = a.actorIndex;
+      const last = this.actors.pop();
+      if (last && last !== a) {
+        this.actors[index] = last;
+        last.actorIndex = index;
+      }
+      a.actorIndex = undefined;
+    }
+    if (pooledTransient) this.transientActors.release(a);
+    else this.dynamicShadowDirty = true;
   }
 
   private tickInteractiveOutlines(): void {
@@ -742,14 +1773,69 @@ export class EmberThreeWorld {
   }
 
   private syncActor(a: Actor): void {
+    this.syncActorAt(
+      a,
+      a.lx,
+      a.ly,
+      a.kind === "player" ? this.playerFeetElev : a.elev,
+    );
+  }
+
+  private syncActorAt(a: Actor, lx: number, ly: number, feetElev: number): void {
     const yLift =
       a.kind === "player"
         ? 5
         : a.kind === "chest" && a.mesh.userData.voxelChest
           ? 0
           : 4;
-    const p = logicToThree(a.lx, a.ly, a.elev, yLift, this.map.tileSize);
+    const p = logicToThree(lx, ly, feetElev, yLift, this.map.tileSize);
+    if (
+      !a.enemyBillboard &&
+      !a.effectBillboard &&
+      a.mesh.position.distanceToSquared(p) > 1e-10
+    ) {
+      this.localShadowActorsMoved = true;
+    }
     a.mesh.position.set(p.x, p.y, p.z);
+    this.enemyBillboards.markDirty(a.enemyBillboard);
+    this.effectBillboards.markDirty(a.effectBillboard);
+  }
+
+  private setPlayerSupportElev(elev: number): void {
+    this.playerElev = elev;
+    this.player.elev = elev;
+    if (elev >= this.playerFeetElev - 1e-4) {
+      this.playerFeetElev = elev;
+      this.playerFallVelocity = 0;
+      this.playerGrounded = true;
+    } else {
+      this.playerGrounded = false;
+    }
+  }
+
+  private resetPlayerVertical(elev: number): void {
+    this.playerElev = elev;
+    this.player.elev = elev;
+    this.playerFeetElev = elev;
+    this.playerFallVelocity = 0;
+    this.playerGrounded = true;
+    this.syncActor(this.player);
+  }
+
+  private tickPlayerVertical(dt: number): void {
+    const next = advanceWorldFall(
+      {
+        feetElev: this.playerFeetElev,
+        velocity: this.playerFallVelocity,
+        grounded: this.playerGrounded,
+      },
+      this.playerElev,
+      dt,
+    );
+    this.playerFeetElev = next.feetElev;
+    this.playerFallVelocity = next.velocity;
+    this.playerGrounded = next.grounded;
+    this.syncActor(this.player);
   }
 
   private setKey(code: string, down: boolean): void {
@@ -797,41 +1883,53 @@ export class EmberThreeWorld {
       );
       this.waterReflect.setResolution(res.width, res.height);
     }
+    this.syncPointerLock();
   }
 
   private tick(): void {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.tick);
     if (this.contextLost) return;
+    this.profiler.beginFrame();
     const dt = Math.min(0.05, this.clock.getDelta());
     this.nowMs += dt * 1000;
 
-    if (!this.pausedLogic && !this.awaitingLoot && !this.finished) {
+    if (
+      this.shadowWarmupComplete &&
+      !this.pausedLogic &&
+      !this.awaitingLoot &&
+      !this.finished
+    ) {
       this.elapsed += dt;
       this.handleMove(dt);
+      this.tickPlayerVertical(dt);
       this.tickTeleport(dt);
       this.tickTriggerRegions(dt);
       this.tickWeapons(dt);
       this.tickBullets(dt);
       this.tickOrbitals();
       this.tickSpawns(dt);
-      this.tickEnemies(dt);
+      this.tickEnemyAi(dt);
+      this.tickNpcs(dt);
       this.tickChestPickup();
       this.tickGems();
       this.tickTileSemantics();
       this.tickFilth();
-      if (this.elapsed >= this.duration) this.finish("clear");
+      if (this.duration > 0 && this.elapsed >= this.duration) {
+        this.finish("clear");
+      }
     } else {
       this.tickOrbitals();
     }
     // Keep lid anim running even while loot UI is up (rare) / between frames.
     this.tickChestOpens(dt);
+    this.updateTerrainStreaming();
 
     // Follow player: translate target + camera together so orbit radius stays put.
     const focus = logicToThree(
       this.player.lx,
       this.player.ly,
-      this.player.elev,
+      this.playerFeetElev,
       6,
       this.map.tileSize,
     );
@@ -839,9 +1937,9 @@ export class EmberThreeWorld {
 
     if (this.keys.q || this.keys.e) {
       const sign = this.keys.q ? -1 : 1;
-      const offset = this.camera.position.clone().sub(this.controls.target);
-      offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), sign * dt * 1.4);
-      this.camera.position.copy(this.controls.target).add(offset);
+      this.lookOffset.copy(this.camera.position).sub(this.controls.target);
+      this.lookOffset.applyAxisAngle(this.lookAxis, sign * dt * 1.4);
+      this.camera.position.copy(this.controls.target).add(this.lookOffset);
     }
 
     const prevX = this.controls.target.x;
@@ -855,6 +1953,8 @@ export class EmberThreeWorld {
     this.controls.update();
 
     // Sprites stay upright: yaw toward camera only (no pitch tip).
+    this.enemyBillboards.sync(this.camera);
+    this.effectBillboards.sync(this.camera);
     updateYawBillboards(this.entityRoot, this.camera);
     this.atmosphere.tick(dt, this.nowMs / 1000, this.camera);
     this.tickEmissiveAnims(dt);
@@ -862,17 +1962,117 @@ export class EmberThreeWorld {
     if (this.waterMats.length) tickWaterMaterials(this.waterMats, this.nowMs / 1000);
     this.tickInteractiveOutlines();
 
+    // Cached sun bake + lamp cubes. Radius flicker only changes light cutoff.
+    const staticJustBaked = this.bakeStaticPointShadows();
+    if (this.shadowWarmupComplete) {
+      this.bakeDynamicLocalPointShadows(staticJustBaked);
+    }
+
+    // Most lamps stay on the cached layer-0 cube. The nearest in-range lamp
+    // also captures layer-1 player/enemy silhouettes for this frame.
+    if (this.dynamicShadowDirty || this.chestOpens.length > 0) {
+      this.renderer.shadowMap.needsUpdate = true;
+      this.dynamicShadowDirty = false;
+    }
+
     this.hudAcc += dt * 1000;
     if (this.hudAcc > 100) {
       this.hudAcc = 0;
       this.emitHud();
     }
 
+    this.profiler.beginGpu();
     if (this.waterReflect) {
       this.camera.updateMatrixWorld(true);
       this.waterReflect.render(this.renderer, this.scene, this.camera);
     }
     this.post.render();
+    this.profiler.endGpu();
+    this.profiler.endFrame(
+      this.profiler.isVisible() ? this.profilerExtras() : undefined,
+    );
+  }
+
+  private profilerExtras(): EmberProfilerExtras {
+    const terrain = this.terrainChunks?.getStreamingStats();
+    const shadowBank = this.localShadowMapBank.stats();
+    const enemyBatchStats = this.enemyBillboards.stats();
+    const effectBatchStats = this.effectBillboards.stats();
+    const transientPoolStats = this.transientActors.stats();
+    let activeLights = 0;
+    let shadowLights = 0;
+    let pointShadowLights = 0;
+    this.lightRoot.traverse((object) => {
+      const light = object as THREE.Light;
+      if (!light.isLight || !light.visible) return;
+      activeLights += 1;
+      if (light.castShadow) {
+        shadowLights += 1;
+        if (light instanceof THREE.PointLight) pointShadowLights += 1;
+      }
+    });
+    const dynamicIds = this.dynamicLocalLights
+      .map((light, index) => {
+        const lamp = light.userData.emberLamp as
+          | { sourceId?: string }
+          | undefined;
+        return (
+          lamp?.sourceId ??
+          (light.userData.emberEmissiveSourceId as string | undefined) ??
+          `local-${index + 1}`
+        );
+      })
+      .join(", ");
+    return {
+      chunks: terrain
+        ? {
+            loaded: terrain.loadedChunks,
+            desired: terrain.desiredChunks,
+            pending: terrain.pendingChunks,
+            total: terrain.totalChunks,
+          }
+        : undefined,
+      workers: terrain
+        ? { active: terrain.workerCount, jobs: terrain.workerJobs }
+        : undefined,
+      lights: {
+        active: activeLights,
+        shadows: shadowLights,
+        staticPointShadows: Math.max(
+          0,
+          pointShadowLights - this.dynamicLocalLights.length,
+        ),
+        dynamicPointShadows: this.dynamicLocalLights.length,
+        dynamicIds,
+        cachedPointShadows: shadowBank.cached,
+        dirtyPointShadows: shadowBank.dirty,
+        activePointShadowSlots: shadowBank.active,
+        pooledDynamicShadows: shadowBank.pooledDynamic,
+      },
+      actors: {
+        enemies: this.enemies.length,
+        npcs: this.npcs.length,
+        batches: enemyBatchStats.batches,
+        bullets: this.projectiles.length,
+        effects: this.gems.length + this.orbitals.length,
+        logicHz: Math.round(1 / ENEMY_AI_STEP),
+        logicSteps: this.enemyAiStepsLastFrame,
+        spatialBuckets: this.enemySpatial.stats().buckets,
+        effectBatches: effectBatchStats.batches,
+        effectInstances: effectBatchStats.instances,
+        pooledTransient: transientPoolStats.available,
+        createdTransient: transientPoolStats.created,
+        stressTarget: this.stressEnemyTarget || undefined,
+        physicsMoves: this.enemyPhysicsMovesLastFrame,
+        contactSkips: this.enemyContactSkipsLastFrame,
+        cadenceFull: this.enemyCadenceLastFrame.full,
+        cadenceHalf: this.enemyCadenceLastFrame.half,
+        cadenceThird: this.enemyCadenceLastFrame.third,
+        cadenceQuarter: this.enemyCadenceLastFrame.quarter,
+        avoidanceActors: this.enemyAvoidanceActorsLastFrame,
+        avoidanceNeighbors: this.enemyAvoidanceNeighborsLastFrame,
+      },
+    };
   }
 
   private tickTorchFlickerAnims(): void {
@@ -888,15 +2088,10 @@ export class EmberThreeWorld {
   private tickEmissiveAnims(dt: number): void {
     if (!this.emissiveMats.length && !this.emissiveLights.length) return;
     const ts = this.map.tileSize;
-    // Fractional tile coords → soft distance falloff while walking.
     const playerTiles = [
       { x: this.player.lx / ts, y: this.player.ly / ts },
     ];
-    const enemyTiles: Array<{ x: number; y: number }> = [];
-    for (const a of this.actors) {
-      if (a.kind !== "enemy" || a.dead) continue;
-      enemyTiles.push({ x: a.lx / ts, y: a.ly / ts });
-    }
+    const enemyTiles = this.collectNearbyEnemyTiles(18);
     const light = resolveMapLight(this.map);
     const ctx = {
       timeSec: this.nowMs / 1000,
@@ -908,7 +2103,35 @@ export class EmberThreeWorld {
       torchFlickerSpeed: light.torchFlickerSpeed,
     };
     if (this.emissiveMats.length) tickEmissiveMaterials(this.emissiveMats, ctx);
-    if (this.emissiveLights.length) tickEmissiveLights(this.emissiveLights, ctx);
+    if (this.emissiveLights.length) {
+      tickEmissiveLights(this.emissiveLights, ctx);
+    }
+  }
+
+  private collectNearbyEnemyTiles(maxTiles: number): Array<{ x: number; y: number }> {
+    const out = this.emissiveEnemyTiles;
+    const ts = this.map.tileSize;
+    const maxDist = maxTiles * ts;
+    const maxDistSq = maxDist * maxDist;
+    const px = this.player.lx;
+    const py = this.player.ly;
+    let n = 0;
+    for (const a of this.enemies) {
+      if (a.dead) continue;
+      const dx = a.lx - px;
+      const dy = a.ly - py;
+      if (dx * dx + dy * dy > maxDistSq) continue;
+      let tile = out[n];
+      if (!tile) {
+        tile = { x: 0, y: 0 };
+        out[n] = tile;
+      }
+      tile.x = a.lx / ts;
+      tile.y = a.ly / ts;
+      n += 1;
+    }
+    out.length = n;
+    return out;
   }
 
   private currentGroundTile() {
@@ -940,7 +2163,7 @@ export class EmberThreeWorld {
     }
 
     this.jumpCd = Math.max(0, this.jumpCd - dt);
-    if (this.jumpQueued && this.jumpCd <= 0) {
+    if (this.jumpQueued && this.jumpCd <= 0 && this.playerGrounded) {
       this.jumpQueued = false;
       const jumped = jumpLedgeVoxels(
         this.map,
@@ -959,9 +2182,7 @@ export class EmberThreeWorld {
       if (jumped) {
         this.player.lx = jumped.x;
         this.player.ly = jumped.y;
-        this.playerElev = jumped.elev;
-        this.player.elev = jumped.elev;
-        this.syncActor(this.player);
+        this.setPlayerSupportElev(jumped.elev);
         this.jumpCd = 0.35;
         return;
       }
@@ -993,9 +2214,7 @@ export class EmberThreeWorld {
     );
     this.player.lx = pos.x;
     this.player.ly = pos.y;
-    this.playerElev = pos.elev;
-    this.player.elev = pos.elev;
-    this.syncActor(this.player);
+    this.setPlayerSupportElev(pos.elev);
   }
 
   private tickTeleport(dt: number): void {
@@ -1007,9 +2226,7 @@ export class EmberThreeWorld {
       if (!dest) continue;
       this.player.lx = dest.x;
       this.player.ly = dest.y;
-      this.playerElev = dest.elev;
-      this.player.elev = dest.elev;
-      this.syncActor(this.player);
+      this.resetPlayerVertical(dest.elev);
       this.teleportCd = 0.5;
       return;
     }
@@ -1030,6 +2247,7 @@ export class EmberThreeWorld {
       this.triggerCd = 1.2;
       this.activeEmissiveEvents.add(event.id);
       this.finished = true;
+      this.syncPointerLock();
       this.onBridge({ type: "pending_event", eventId: event.id });
       return;
     }
@@ -1038,15 +2256,24 @@ export class EmberThreeWorld {
   private tickWeapons(dt: number): void {
     this.orbitAngle += dt * 2.8;
     for (const slot of this.weapons) {
+      if (!isTriggeredPlayerWeapon(slot.def.kind)) continue;
+      slot.cooldown -= dt * 1000;
+    }
+    this.triggerReadyPlayerWeapons("auto");
+  }
+
+  private triggerReadyPlayerWeapons(trigger: PlayerAttackTrigger): void {
+    for (const slot of this.weapons) {
+      if (!isTriggeredPlayerWeapon(slot.def.kind)) continue;
       if (
-        slot.def.kind === "passive" ||
-        slot.def.kind === "instant_heal" ||
-        slot.def.kind === "orbit"
+        !shouldTriggerPlayerWeapon(
+          trigger,
+          this.autoAttackEnabled,
+          slot.cooldown,
+        )
       ) {
         continue;
       }
-      slot.cooldown -= dt * 1000;
-      if (slot.cooldown > 0) continue;
       slot.cooldown = Math.max(200, slot.def.cooldownMs - (slot.level - 1) * 40);
       this.fireWeapon(slot);
     }
@@ -1080,7 +2307,7 @@ export class EmberThreeWorld {
             Math.sin(angle) * speed,
             dmg,
             Math.max(0.6, range / speed),
-            this.playerElev,
+            this.playerFeetElev,
             false,
           );
         }
@@ -1111,30 +2338,34 @@ export class EmberThreeWorld {
     enemyShot: boolean,
     extra?: Partial<Actor>,
   ): void {
-    const mesh = createColorBillboard(
-      enemyShot ? "#60ffb0" : "#ffc040",
-      enemyShot ? 5 : 7,
-    );
-    const a: Actor = {
-      mesh,
+    const kind = enemyShot ? "ebullet" : "bullet";
+    const a = this.acquireTransientActor(
+      kind,
       lx,
       ly,
       elev,
-      radius: 3,
-      kind: enemyShot ? "ebullet" : "bullet",
-      vx,
-      vy,
-      dmg,
-      life: Math.max(0.4, life),
-      ...extra,
-    };
+      3,
+      {
+        vx,
+        vy,
+        dmg,
+        life: Math.max(0.4, life),
+        ...extra,
+      },
+    );
+    this.attachEffectBillboard(
+      a,
+      enemyShot ? "enemy-bullet" : "player-bullet",
+      enemyShot ? "#60ffb0" : "#ffc040",
+      enemyShot ? 5 : 7,
+    );
     this.addActor(a);
     this.syncActor(a);
   }
 
   private tickBullets(dt: number): void {
-    for (const b of [...this.actors]) {
-      if (b.kind !== "bullet" && b.kind !== "ebullet") continue;
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      const b = this.projectiles[i]!;
       if (b.dead) continue;
       b.life = (b.life ?? 0) - dt;
       if ((b.life ?? 0) <= 0) {
@@ -1162,17 +2393,18 @@ export class EmberThreeWorld {
       this.syncActor(b);
 
       if (b.kind === "bullet") {
-        for (const e of this.actors) {
-          if (e.kind !== "enemy" || e.dead) continue;
-          if (Math.hypot(e.lx - b.lx, e.ly - b.ly) > e.radius + b.radius) {
-            continue;
-          }
+        this.enemySpatial.visitRadius(b.lx, b.ly, b.radius, (e) => {
+          if (e.dead) return false;
+          const dx = e.lx - b.lx;
+          const dy = e.ly - b.ly;
+          const hitRadius = e.radius + b.radius;
+          if (dx * dx + dy * dy > hitRadius * hitRadius) return false;
           this.applyDamageToEnemy(e, b.dmg ?? 0);
           this.removeActor(b);
-          break;
-        }
+          return true;
+        });
       } else if (
-        elevNearlyEqual(b.elev, this.playerElev) &&
+        elevNearlyEqual(b.elev, this.playerFeetElev) &&
         Math.hypot(b.lx - this.player.lx, b.ly - this.player.ly) <=
           PLAYER_HURT_R + b.radius
       ) {
@@ -1188,6 +2420,7 @@ export class EmberThreeWorld {
   private rebuildOrbitals(): void {
     for (const o of this.orbitals) this.removeActor(o.actor);
     this.orbitals = [];
+    if (!this.autoAttackEnabled) return;
     for (const slot of this.weapons) {
       if (slot.def.kind !== "orbit") continue;
       const count = Math.max(
@@ -1202,15 +2435,14 @@ export class EmberThreeWorld {
       const dmg =
         slot.def.damage + (slot.level - 1) * (slot.def.levelBonus?.damage ?? 0);
       for (let i = 0; i < count; i++) {
-        const mesh = createColorBillboard("#ff8840", 8);
-        const actor: Actor = {
-          mesh,
-          lx: this.player.lx,
-          ly: this.player.ly,
-          elev: this.playerElev,
-          radius: 5,
-          kind: "orbit",
-        };
+        const actor = this.acquireTransientActor(
+          "orbit",
+          this.player.lx,
+          this.player.ly,
+          this.playerFeetElev,
+          5,
+        );
+        this.attachEffectBillboard(actor, "orbit", "#ff8840", 8);
         this.addActor(actor);
         this.orbitals.push({
           actor,
@@ -1231,22 +2463,25 @@ export class EmberThreeWorld {
         this.orbitAngle + (Math.PI * 2 * o.index) / Math.max(1, o.count);
       o.actor.lx = this.player.lx + Math.cos(a) * o.range;
       o.actor.ly = this.player.ly + Math.sin(a) * o.range;
-      o.actor.elev = this.playerElev;
+      o.actor.elev = this.playerFeetElev;
       this.syncActor(o.actor);
-      for (const e of this.actors) {
-        if (e.kind !== "enemy" || e.dead) continue;
+      this.enemySpatial.visitRadius(o.actor.lx, o.actor.ly, 5, (e) => {
+        if (e.dead) return false;
         const uid = e.uid ?? (e.uid = this.uidSeq++);
-        if ((o.hitCd.get(uid) ?? 0) > this.nowMs) continue;
-        if (Math.hypot(e.lx - o.actor.lx, e.ly - o.actor.ly) > e.radius + 5) {
-          continue;
-        }
+        if ((o.hitCd.get(uid) ?? 0) > this.nowMs) return false;
+        const dx = e.lx - o.actor.lx;
+        const dy = e.ly - o.actor.ly;
+        const hitRadius = e.radius + 5;
+        if (dx * dx + dy * dy > hitRadius * hitRadius) return false;
         o.hitCd.set(uid, this.nowMs + 280);
         this.applyDamageToEnemy(e, o.dmg);
-      }
+        return false;
+      });
     }
   }
 
   private tickSpawns(dt: number): void {
+    if (!this.playProfileBudget.allowHorde) return;
     const table = this.pack.spawns[this.stage.spawnTableId];
     if (!table) return;
     const bossAt = this.shortMode
@@ -1285,7 +2520,7 @@ export class EmberThreeWorld {
   private spawnEnemy(enemyId: string, group: string): void {
     const def = this.pack.enemies[enemyId];
     if (!def) return;
-    if (this.actors.filter((a) => a.kind === "enemy" && !a.dead).length > 180) {
+    if (this.enemies.length >= 180) {
       return;
     }
     let regions = findRegions(this.map, "spawn", group);
@@ -1320,14 +2555,26 @@ export class EmberThreeWorld {
     if (!p) return;
     const linked = def.spriteId ? this.pack.sprites[def.spriteId] : undefined;
     const color = hexColorOr(def.color, "#e07050");
-    const mesh =
-      linked && spriteHasVisual(linked)
-        ? createPixelBillboard(linked, color, Math.max(8, def.radius))
-        : createColorBillboard(color, Math.max(8, def.radius), def.boss ? "#ffdd88" : undefined);
+    const mesh = new THREE.Object3D();
+    mesh.name = `enemyProxy:${def.id}`;
+    const enemyBillboard = this.enemyBillboards.add(
+      `enemy:${def.id}`,
+      mesh,
+      () =>
+        linked && spriteHasVisual(linked)
+          ? createPixelBillboard(linked, color, Math.max(8, def.radius))
+          : createColorBillboard(
+              color,
+              Math.max(8, def.radius),
+              def.boss ? "#ffdd88" : undefined,
+            ),
+    );
     const { tx, ty } = worldToTile(this.map, p.x, p.y);
     const elev = tileSurfaceElev(this.map, tx, ty);
+    const uid = this.uidSeq++;
     const a: Actor = {
       mesh,
+      enemyBillboard,
       lx: p.x,
       ly: p.y,
       elev,
@@ -1337,24 +2584,277 @@ export class EmberThreeWorld {
       maxHp: def.hp,
       def,
       touchCd: 0,
-      uid: this.uidSeq++,
+      uid,
+      aiPhase: uid,
     };
     this.addActor(a);
     this.syncActor(a);
   }
 
-  private tickEnemies(dt: number): void {
-    for (const e of [...this.actors]) {
-      if (e.kind !== "enemy" || e.dead || !e.def) continue;
+  private spawnExploreNpcs(): void {
+    this.npcPlacementIds.clear();
+    if (!this.playProfileBudget.allowNpc) return;
+    const spawns = collectExploreNpcSpawns(
+      this.map,
+      this.pack.sprites,
+      this.playProfileBudget.maxNpcs,
+    );
+    for (const spawn of spawns) {
+      if (spawn.placementId) this.npcPlacementIds.add(spawn.placementId);
+      this.spawnNpc(spawn);
+    }
+  }
+
+  private spawnNpc(spawn: ExploreNpcSpawn): void {
+    const def = this.pack.sprites[spawn.spriteId];
+    if (!def) return;
+    const mesh = new THREE.Object3D();
+    mesh.name = `npcProxy:${spawn.spriteId}`;
+    const color = hexColorOr(def.color, "#c8a878");
+    const size = Math.max(8, this.map.tileSize * 0.9);
+    const enemyBillboard = this.enemyBillboards.add(
+      `npc:${spawn.spriteId}`,
+      mesh,
+      () =>
+        spriteHasVisual(def)
+          ? createPixelBillboard(def, color, size)
+          : createColorBillboard(color, size),
+    );
+    const { tx, ty } = worldToTile(this.map, spawn.x, spawn.y);
+    const elev = tileSurfaceElev(this.map, tx, ty);
+    const angle = Math.random() * Math.PI * 2;
+    const a: Actor = {
+      mesh,
+      enemyBillboard,
+      lx: spawn.x,
+      ly: spawn.y,
+      elev,
+      radius: Math.max(4, this.map.tileSize * 0.3),
+      kind: "npc",
+      uid: this.uidSeq++,
+      npcWander: spawn.wander,
+      npcDirX: Math.cos(angle),
+      npcDirY: Math.sin(angle),
+    };
+    this.addActor(a);
+    this.syncActor(a);
+  }
+
+  /** Development-only deterministic crowd load for repeatable profiling. */
+  private spawnCrowdStress(target: number): void {
+    if (!this.playProfileBudget.allowHorde) {
+      this.onBridge({
+        type: "toast",
+        textRu: "Stress-орда только на арене",
+      });
+      return;
+    }
+    const ids = Object.values(this.pack.enemies)
+      .filter((enemy) => !enemy.boss)
+      .map((enemy) => enemy.id);
+    if (ids.length === 0) return;
+    this.stressEnemyTarget = Math.max(
+      this.stressEnemyTarget,
+      Math.min(180, Math.round(target)),
+    );
+    let attempts = 0;
+    let consecutiveFailures = 0;
+    while (
+      this.enemies.length < this.stressEnemyTarget &&
+      attempts < this.stressEnemyTarget * 4 &&
+      consecutiveFailures < ids.length * 4
+    ) {
+      const before = this.enemies.length;
+      this.spawnEnemy(ids[attempts % ids.length]!, "");
+      attempts += 1;
+      consecutiveFailures =
+        this.enemies.length === before ? consecutiveFailures + 1 : 0;
+    }
+    this.enemySpatialDirty = true;
+    this.onBridge({
+      type: "toast",
+      textRu: `Stress: ${this.enemies.length}/${this.stressEnemyTarget} врагов · неуязвимость`,
+    });
+  }
+
+  private tickEnemyAi(dt: number): void {
+    this.enemyAiAccumulator = Math.min(
+      ENEMY_AI_STEP * ENEMY_AI_MAX_STEPS,
+      this.enemyAiAccumulator + dt,
+    );
+    let steps = 0;
+    if (this.enemyAiAccumulator >= ENEMY_AI_STEP) {
+      this.enemyPhysicsMovesLastFrame = 0;
+      this.enemyContactSkipsLastFrame = 0;
+      this.enemyAvoidanceActorsLastFrame = 0;
+      this.enemyAvoidanceNeighborsLastFrame = 0;
+      this.enemyCadenceLastFrame.full = 0;
+      this.enemyCadenceLastFrame.half = 0;
+      this.enemyCadenceLastFrame.third = 0;
+      this.enemyCadenceLastFrame.quarter = 0;
+    }
+    if (this.enemySpatialDirty) {
+      this.enemySpatial.rebuild(this.enemies);
+      this.enemySpatialDirty = false;
+    }
+    while (
+      this.enemyAiAccumulator >= ENEMY_AI_STEP &&
+      steps < ENEMY_AI_MAX_STEPS
+    ) {
+      this.tickEnemiesFixed(ENEMY_AI_STEP);
+      this.enemyAiAccumulator -= ENEMY_AI_STEP;
+      steps += 1;
+    }
+    if (steps > 0) this.enemySpatial.rebuild(this.enemies);
+    this.enemyAiStepsLastFrame = steps;
+    this.syncInterpolatedEnemies(dt);
+  }
+
+  private tickNpcs(dt: number): void {
+    if (this.npcs.length === 0) return;
+    this.npcAiAccumulator = Math.min(
+      ENEMY_AI_STEP * ENEMY_AI_MAX_STEPS,
+      this.npcAiAccumulator + dt,
+    );
+    let steps = 0;
+    while (
+      this.npcAiAccumulator >= ENEMY_AI_STEP &&
+      steps < ENEMY_AI_MAX_STEPS
+    ) {
+      this.tickNpcsFixed(ENEMY_AI_STEP);
+      this.npcAiAccumulator -= ENEMY_AI_STEP;
+      steps += 1;
+    }
+    this.syncInterpolatedNpcs(dt);
+  }
+
+  private tickNpcsFixed(dt: number): void {
+    const tileSize = this.map.tileSize;
+    for (const npc of this.npcs) {
+      if (npc.dead || !npc.npcWander) continue;
+      npc.simPrevX = npc.lx;
+      npc.simPrevY = npc.ly;
+      npc.simPrevElev = npc.elev;
+      npc.simBlendElapsed = 0;
+      npc.simBlendDuration = dt;
+      const stepped = stepExploreNpcWander(
+        npc.lx,
+        npc.ly,
+        npc.npcDirX ?? 1,
+        npc.npcDirY ?? 0,
+        dt,
+        npc.npcWander,
+        this.map.width,
+        this.map.height,
+        tileSize,
+        npc.radius,
+      );
+      const pos = moveWithVoxels(
+        this.map,
+        this.tileset,
+        npc.lx,
+        npc.ly,
+        stepped.x,
+        stepped.y,
+        npc.radius,
+        npc.elev,
+        this.pack.sprites,
+      );
+      npc.lx = pos.x;
+      npc.ly = pos.y;
+      npc.elev = pos.elev;
+      npc.npcDirX = stepped.dirX;
+      npc.npcDirY = stepped.dirY;
+      if (Math.abs(pos.x - stepped.x) > 0.4 || Math.abs(pos.y - stepped.y) > 0.4) {
+        npc.npcDirX = -stepped.dirX;
+        npc.npcDirY = -stepped.dirY;
+      }
+    }
+  }
+
+  private syncInterpolatedNpcs(renderDt: number): void {
+    let anyMoving = false;
+    for (const npc of this.npcs) {
+      if (npc.dead || !npc.npcWander) {
+        this.syncActor(npc);
+        continue;
+      }
+      const prevX = npc.simPrevX ?? npc.lx;
+      const prevY = npc.simPrevY ?? npc.ly;
+      const prevElev = npc.simPrevElev ?? npc.elev;
+      npc.simBlendElapsed = (npc.simBlendElapsed ?? 0) + renderDt;
+      const duration = npc.simBlendDuration ?? 0;
+      const alpha =
+        duration <= 1e-6
+          ? 1
+          : Math.min(1, (npc.simBlendElapsed ?? duration) / duration);
+      if (
+        !anyMoving &&
+        (alpha < 1 || prevX !== npc.lx || prevY !== npc.ly)
+      ) {
+        anyMoving = true;
+      }
+      this.syncActorAt(
+        npc,
+        prevX + (npc.lx - prevX) * alpha,
+        prevY + (npc.ly - prevY) * alpha,
+        prevElev + (npc.elev - prevElev) * alpha,
+      );
+    }
+    if (anyMoving) this.localShadowActorsMoved = true;
+  }
+
+  private syncInterpolatedEnemies(renderDt: number): void {
+    let anyMoving = false;
+    for (const enemy of this.enemies) {
+      if (enemy.dead) continue;
+      const prevX = enemy.simPrevX ?? enemy.lx;
+      const prevY = enemy.simPrevY ?? enemy.ly;
+      const prevElev = enemy.simPrevElev ?? enemy.elev;
+      enemy.simBlendElapsed = (enemy.simBlendElapsed ?? 0) + renderDt;
+      const duration = enemy.simBlendDuration ?? 0;
+      const alpha =
+        duration <= 1e-6
+          ? 1
+          : Math.min(1, (enemy.simBlendElapsed ?? duration) / duration);
+      if (
+        !anyMoving &&
+        (alpha < 1 || prevX !== enemy.lx || prevY !== enemy.ly)
+      ) {
+        anyMoving = true;
+      }
+      this.syncActorAt(
+        enemy,
+        prevX + (enemy.lx - prevX) * alpha,
+        prevY + (enemy.ly - prevY) * alpha,
+        prevElev + (enemy.elev - prevElev) * alpha,
+      );
+    }
+    if (anyMoving) this.localShadowActorsMoved = true;
+  }
+
+  private tickEnemiesFixed(dt: number): void {
+    const crowdSize = this.enemies.length;
+    const tileSize = this.map.tileSize;
+    for (const e of this.enemies) {
+      if (e.dead || !e.def) continue;
       const def = e.def;
       const dist = Math.hypot(e.lx - this.player.lx, e.ly - this.player.ly);
-      const angle = Math.atan2(this.player.ly - e.ly, this.player.lx - e.lx);
-      const sameElev = elevNearlyEqual(e.elev, this.playerElev);
+      const sameElev = elevNearlyEqual(e.elev, this.playerFeetElev);
+      const touching =
+        !def.ranged &&
+        sameElev &&
+        dist < e.radius + PLAYER_HURT_R;
+      const lod = enemySimLod(dist, tileSize, crowdSize);
+      noteMovementCadence(this.enemyCadenceLastFrame, lod.cadence);
+      e.moveAccum = Math.min(0.15, (e.moveAccum ?? 0) + dt);
       e.touchCd = (e.touchCd ?? 0) - dt;
 
       if (def.ranged && sameElev && dist < (def.range ?? 140) && dist > 40) {
+        e.moveAccum = Math.min(e.moveAccum, lod.cadence * dt);
         if ((e.touchCd ?? 0) <= 0) {
           e.touchCd = 1.6;
+          const angle = Math.atan2(this.player.ly - e.ly, this.player.lx - e.lx);
           const sp = def.projectileSpeed ?? 120;
           this.spawnBullet(
             e.lx,
@@ -1372,36 +2872,106 @@ export class EmberThreeWorld {
             },
           );
         }
-      } else {
-        const pos = moveWithVoxels(
-          this.map,
-          this.tileset,
-          e.lx,
-          e.ly,
-          e.lx + Math.cos(angle) * def.speed * dt,
-          e.ly + Math.sin(angle) * def.speed * dt,
-          e.radius,
-          e.elev,
-          this.pack.sprites,
-          this.pack.voxelModels,
-          this.pack.voxelScenes,
-        );
-        e.lx = pos.x;
-        e.ly = pos.y;
-        e.elev = pos.elev;
-        this.syncActor(e);
+      } else if (touching) {
+        // Contact attacks remain 30 Hz, but an actor already touching the
+        // player does not need another expensive map collision query.
+        e.moveAccum = Math.min(e.moveAccum, lod.cadence * dt);
+        this.enemyContactSkipsLastFrame += 1;
+      } else if (
+        runsOnStaggeredTick(this.enemyAiTick, e.aiPhase ?? 0, lod.cadence)
+      ) {
+        const moveDt = Math.max(dt, e.moveAccum);
+        e.moveAccum = 0;
+        e.simPrevX = e.lx;
+        e.simPrevY = e.ly;
+        e.simPrevElev = e.elev;
+        e.simBlendElapsed = 0;
+        e.simBlendDuration = moveDt;
+        const angle = Math.atan2(this.player.ly - e.ly, this.player.lx - e.lx);
+        const pursuitX = Math.cos(angle);
+        const pursuitY = Math.sin(angle);
+        if (lod.crowdSteer) {
+          this.resolveEnemyCrowdSteering(e, pursuitX, pursuitY, lod.maxNeighbors);
+        } else {
+          this.crowdSteering.x = pursuitX;
+          this.crowdSteering.y = pursuitY;
+        }
+        const nextX = e.lx + this.crowdSteering.x * def.speed * moveDt;
+        const nextY = e.ly + this.crowdSteering.y * def.speed * moveDt;
+        if (lod.collideWorld) {
+          const pos = moveWithVoxels(
+            this.map,
+            this.tileset,
+            e.lx,
+            e.ly,
+            nextX,
+            nextY,
+            e.radius,
+            e.elev,
+            this.pack.sprites,
+          );
+          e.lx = pos.x;
+          e.ly = pos.y;
+          e.elev = pos.elev;
+        } else {
+          e.lx = clampCoordToMap(nextX, e.radius, this.map.width, tileSize);
+          e.ly = clampCoordToMap(nextY, e.radius, this.map.height, tileSize);
+        }
+        this.enemyPhysicsMovesLastFrame += 1;
       }
 
       if (
-        !def.ranged &&
-        elevNearlyEqual(e.elev, this.playerElev) &&
-        dist < e.radius + PLAYER_HURT_R &&
+        touching &&
         (e.touchCd ?? 0) <= 0
       ) {
         e.touchCd = 0.55;
         this.damagePlayer(def.damage, def.stripDamage, def);
       }
     }
+    this.enemyAiTick += 1;
+  }
+
+  private resolveEnemyCrowdSteering(
+    enemy: Actor,
+    pursuitX: number,
+    pursuitY: number,
+    maxNeighbors: number,
+  ): void {
+    const separation = this.crowdSeparation;
+    separation.x = 0;
+    separation.y = 0;
+    separation.weight = 0;
+    let overlaps = 0;
+    const neighborCap = Math.max(0, maxNeighbors);
+    if (neighborCap <= 0) {
+      this.crowdSteering.x = pursuitX;
+      this.crowdSteering.y = pursuitY;
+      return;
+    }
+    this.enemySpatial.visitRadius(
+      enemy.lx,
+      enemy.ly,
+      enemy.radius + 2,
+      (other) => {
+        if (
+          other === enemy ||
+          other.dead ||
+          !elevNearlyEqual(other.elev, enemy.elev)
+        ) return false;
+        if (addCrowdSeparation(separation, enemy, other)) overlaps += 1;
+        return overlaps >= neighborCap;
+      },
+    );
+    if (overlaps > 0) {
+      this.enemyAvoidanceActorsLastFrame += 1;
+      this.enemyAvoidanceNeighborsLastFrame += overlaps;
+    }
+    resolveCrowdSteering(
+      this.crowdSteering,
+      pursuitX,
+      pursuitY,
+      separation,
+    );
   }
 
   private tickChestPickup(): void {
@@ -1501,8 +3071,9 @@ export class EmberThreeWorld {
   }
 
   private tickGems(): void {
-    for (const g of [...this.actors]) {
-      if (g.kind !== "gem" || g.dead) continue;
+    for (let i = this.gems.length - 1; i >= 0; i--) {
+      const g = this.gems[i]!;
+      if (g.dead) continue;
       if (Math.hypot(g.lx - this.player.lx, g.ly - this.player.ly) > 12) {
         continue;
       }
@@ -1518,17 +3089,11 @@ export class EmberThreeWorld {
   }
 
   private nearestEnemy(): Actor | null {
-    let best: Actor | null = null;
-    let bestD = Infinity;
-    for (const e of this.actors) {
-      if (e.kind !== "enemy" || e.dead) continue;
-      const d = Math.hypot(e.lx - this.player.lx, e.ly - this.player.ly);
-      if (d < bestD) {
-        bestD = d;
-        best = e;
-      }
-    }
-    return best;
+    return this.enemySpatial.nearest(
+      this.player.lx,
+      this.player.ly,
+      (enemy) => !enemy.dead,
+    );
   }
 
   private damageEnemiesInRadius(
@@ -1537,10 +3102,14 @@ export class EmberThreeWorld {
     r: number,
     dmg: number,
   ): void {
-    for (const e of this.actors) {
-      if (e.kind !== "enemy" || e.dead) continue;
-      if (Math.hypot(e.lx - x, e.ly - y) <= r) this.applyDamageToEnemy(e, dmg);
-    }
+    const radiusSq = r * r;
+    this.enemySpatial.visitRadius(x, y, r, (e) => {
+      if (e.dead) return false;
+      const dx = e.lx - x;
+      const dy = e.ly - y;
+      if (dx * dx + dy * dy <= radiusSq) this.applyDamageToEnemy(e, dmg);
+      return false;
+    });
   }
 
   private applyDamageToEnemy(enemy: Actor, dmg: number): void {
@@ -1557,16 +3126,10 @@ export class EmberThreeWorld {
     this.removeActor(enemy);
     this.killed += 1;
     if (!def) return;
-    const mesh = createColorBillboard("#60e0ff", 6);
-    const gem: Actor = {
-      mesh,
-      lx,
-      ly,
-      elev,
-      radius: 4,
-      kind: "gem",
+    const gem = this.acquireTransientActor("gem", lx, ly, elev, 4, {
       xp: def.xp * this.stage.xpGemValue,
-    };
+    });
+    this.attachEffectBillboard(gem, "xp-gem", "#60e0ff", 6);
     this.addActor(gem);
     this.syncActor(gem);
   }
@@ -1577,6 +3140,7 @@ export class EmberThreeWorld {
     src?: Pick<EmberEnemyDef, "filthOnHit" | "filthDurationMs">,
   ): void {
     if (this.finished || this.awaitingLoot) return;
+    if (this.stressEnemyTarget > 0 && import.meta.env.DEV) return;
     this.hp -= dmg;
     this.stripMeter += strip;
     while (this.stripMeter >= 25 && this.stripTier < 3) {
@@ -1606,6 +3170,7 @@ export class EmberThreeWorld {
     this.entityRoot.remove(this.player.mesh);
     this.disposeObject(this.player.mesh);
     this.player.mesh = createColorBillboard(color, 10, "#1a1010");
+    setObjectRenderLayer(this.player.mesh, EMBER_DYNAMIC_ACTOR_LAYER);
     this.entityRoot.add(this.player.mesh);
     this.syncActor(this.player);
   }
@@ -1646,6 +3211,7 @@ export class EmberThreeWorld {
     const pool = this.pack.pools[this.stage.weaponPoolId];
     if (!pool) return;
     this.awaitingLoot = true;
+    this.syncPointerLock();
     const roll = rollLootOptions(this.pack, pool, 3, this.ownedWeaponIds());
     this.onBridge({
       type: "level_up",
@@ -1658,6 +3224,7 @@ export class EmberThreeWorld {
     const pool = this.pack.pools[this.stage.chestPoolId];
     if (!pool) return;
     this.awaitingLoot = true;
+    this.syncPointerLock();
     const roll = rollLootOptions(this.pack, pool, 3, this.ownedWeaponIds());
     this.onBridge({
       type: "chest",
@@ -1670,6 +3237,7 @@ export class EmberThreeWorld {
     const def = this.pack.weapons[itemId];
     if (!def) {
       this.awaitingLoot = false;
+      this.requestLookLock();
       return;
     }
     if (def.kind === "instant_heal") {
@@ -1691,6 +3259,7 @@ export class EmberThreeWorld {
       this.rebuildOrbitals();
     }
     this.awaitingLoot = false;
+    this.requestLookLock();
   }
 
   private recalcPassives(): void {
@@ -1725,6 +3294,7 @@ export class EmberThreeWorld {
         outcome === "clear" ? this.stage.onClearEventId : undefined,
       onFailEventId: outcome === "fail" ? this.stage.onFailEventId : undefined,
     });
+    this.syncPointerLock();
   }
 
   private emitHud(): void {
@@ -1740,16 +3310,91 @@ export class EmberThreeWorld {
       stripTier: this.stripTier,
       filthMs: Math.max(0, this.filthUntil - this.nowMs),
       killed: this.killed,
-      paused: this.pausedLogic || this.awaitingLoot,
+      paused:
+        !this.shadowWarmupComplete ||
+        this.pausedLogic ||
+        this.awaitingLoot,
     });
   }
 
   pause(): void {
     this.pausedLogic = true;
+    this.syncPointerLock();
+  }
+
+  private openPauseMenu(relockWaitMs: number): void {
+    if (
+      !this.shadowWarmupComplete ||
+      this.pausedLogic ||
+      this.awaitingLoot ||
+      this.finished
+    ) {
+      return;
+    }
+    this.pause();
+    this.onBridge({ type: "pause_menu", relockWaitMs });
   }
 
   resume(): void {
     this.pausedLogic = false;
+    this.requestLookLock();
+  }
+
+  private lookState(): {
+    paused: boolean;
+    finished: boolean;
+    awaitingLoot: boolean;
+  } {
+    return {
+      paused: this.pausedLogic,
+      finished: this.finished,
+      awaitingLoot: this.awaitingLoot,
+    };
+  }
+
+  private wantsLookLock(): boolean {
+    return playLookWantsPointerLock(this.lookState());
+  }
+
+  lockLook(): void {
+    this.requestLookLock();
+  }
+
+  private hasLookLock(): boolean {
+    return isPlayPointerLockTarget(
+      document.pointerLockElement,
+      this.renderer.domElement,
+      this.parent,
+      this.parent.parentElement,
+    );
+  }
+
+  private lookLockTarget(): HTMLElement {
+    const shell = this.parent.parentElement;
+    return shell instanceof HTMLElement ? shell : this.parent;
+  }
+
+  private syncPointerLock(): void {
+    if (this.disposed) return;
+    const canvas = this.renderer.domElement;
+    const looking = playLookActive(this.lookState());
+    canvas.style.cursor = playCanvasCursor(looking);
+    this.parent.classList.toggle("is-looking", looking);
+    this.parent.parentElement?.classList.toggle("is-looking", looking);
+    syncPlayCursorClip(looking, this.lookLockTarget());
+    if (!this.wantsLookLock() && document.pointerLockElement) {
+      document.exitPointerLock();
+    }
+  }
+
+  private requestLookLock(): void {
+    if (this.disposed || !this.wantsLookLock()) {
+      this.syncPointerLock();
+      return;
+    }
+    this.syncPointerLock();
+    if (this.hasLookLock()) return;
+    requestPlayPointerLock(this.lookLockTarget());
   }
 
   private disposeObject(obj: THREE.Object3D): void {
@@ -1775,10 +3420,20 @@ export class EmberThreeWorld {
   destroy(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.completeShadowWarmup();
     cancelAnimationFrame(this.raf);
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("keydown", this.onKeyDown, true);
     window.removeEventListener("keyup", this.onKeyUp, true);
+    window.removeEventListener("blur", this.onWindowBlur);
+    window.removeEventListener("focus", this.onWindowFocus);
+    document.removeEventListener("pointerdown", this.onPointerDown, true);
+    document.removeEventListener("pointermove", this.onPointerMove);
+    document.removeEventListener("pointerlockchange", this.onPointerLockChange);
+    this.parent.classList.remove("is-looking");
+    this.parent.parentElement?.classList.remove("is-looking");
+    releasePlayCursorClip();
+    if (document.pointerLockElement) document.exitPointerLock();
     this.renderer.domElement.removeEventListener(
       "webglcontextlost",
       this.onContextLost,
@@ -1790,17 +3445,35 @@ export class EmberThreeWorld {
       false,
     );
     this.controls.dispose();
+    this.profiler.dispose();
     this.post.dispose();
     this.atmosphere.dispose();
     this.waterReflect?.dispose();
     this.waterReflect = null;
+    this.staticShadowBakeTarget?.dispose();
+    this.staticShadowBakeTarget = null;
+    if (this.staticPropFrame) cancelAnimationFrame(this.staticPropFrame);
+    this.staticPropFrame = 0;
+    this.staticPropQueue = [];
+    for (const group of this.staticPropChunks.values()) {
+      this.staticPropRoot.remove(group);
+      this.disposeObject(group);
+    }
+    this.staticPropChunks.clear();
+    this.loadedStaticPropChunkKeys.clear();
     if (this.mapGroup) {
       this.scene.remove(this.mapGroup);
-      disposeVoxelMesh(this.mapGroup);
+      this.terrainChunks?.dispose();
+      this.terrainChunks = null;
       this.mapGroup = null;
     }
     for (const a of [...this.actors]) this.removeActor(a);
+    this.enemyBillboards.dispose();
+    this.effectBillboards.dispose();
+    this.transientActors.clear();
+    this.localShadowMapBank.dispose();
     this.clearLightRoot();
+    this.localShadowDebug.dispose();
     this.renderer.dispose();
     try {
       this.renderer.forceContextLoss();
@@ -1813,9 +3486,18 @@ export class EmberThreeWorld {
   }
 
   private clearLightRoot(): void {
-    while (this.lightRoot.children.length) {
-      const c = this.lightRoot.children[0]!;
-      this.lightRoot.remove(c);
+    this.clearLightGroup(this.fillLightRoot);
+    this.clearLightGroup(this.localLightRoot);
+    this.keyLight = null;
+    this.dynamicLocalLights = [];
+    this.lanternLights = [];
+    this.emissiveLights = [];
+  }
+
+  private clearLightGroup(root: THREE.Group): void {
+    while (root.children.length) {
+      const c = root.children[0]!;
+      root.remove(c);
       c.traverse((obj) => {
         const light = obj as THREE.Light;
         if (light.isLight && light.shadow?.map) {
@@ -1830,7 +3512,5 @@ export class EmberThreeWorld {
         }
       });
     }
-    this.lanternLights = [];
-    this.emissiveLights = [];
   }
 }

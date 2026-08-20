@@ -433,6 +433,8 @@ export function buildVoxelModelMesh(
       patchEmberVoxelLightSnap(toon);
       mat = toon;
     }
+    mat.userData.emberVoxelPaletteIndex = pi;
+    mat.userData.emberVoxelHasEmissiveColor = intensity > 0;
     const mesh = new THREE.Mesh(geo, mat);
     // Emissive / glass must not occlude PointLights (shadow cube maps).
     mesh.castShadow = !suppressCastShadow && intensity <= 0 && !useAlpha;
@@ -441,6 +443,35 @@ export function buildVoxelModelMesh(
   }
 
   return { group, voxelWorld };
+}
+
+/**
+ * Update only material uniforms for a palette preview. Geometry and the source
+ * model remain untouched until the editor commits the chosen color.
+ */
+export function previewVoxelPaletteColor(
+  root: THREE.Object3D,
+  paletteIndex: number,
+  hex: string,
+): void {
+  const color = hexColor(hex);
+  root.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(obj.material)
+      ? obj.material
+      : [obj.material];
+    for (const material of materials) {
+      if (material.userData.emberVoxelPaletteIndex !== paletteIndex) continue;
+      const colored = material as THREE.Material & {
+        color?: THREE.Color;
+        emissive?: THREE.Color;
+      };
+      colored.color?.copy(color);
+      if (material.userData.emberVoxelHasEmissiveColor === true) {
+        colored.emissive?.copy(color);
+      }
+    }
+  });
 }
 
 export function disposeVoxelModelMesh(group: THREE.Object3D): void {

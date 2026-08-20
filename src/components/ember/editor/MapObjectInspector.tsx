@@ -7,6 +7,7 @@ import type {
   EmberLightSource,
   EmberMap,
   EmberMapLight,
+  EmberMapPlayProfile,
   EmberMapRegion,
   EmberPack,
   EmberSceneGroup,
@@ -105,6 +106,19 @@ export function mapSelectionToWorldObjectRef(
 
 export type MapObjectInspectorProps = {
   selection: MapSelection;
+  /** Complete editor selection. The Inspector still edits only its primary. */
+  selectionItems?: readonly MapSelection[];
+  onSetSelectionPrimary?: (selection: MapSelection) => void;
+  onToggleSelection?: (selection: MapSelection) => void;
+  onClearSelection?: () => void;
+  multiWorldObjects?: readonly EmberWorldObject[];
+  multiAllLocked?: boolean;
+  multiAllHidden?: boolean;
+  onSetMultiElevation?: (elevation: number) => void;
+  onDropMultiToFloor?: () => void;
+  onSetMultiLocked?: (locked: boolean) => void;
+  onSetMultiHidden?: (hidden: boolean) => void;
+  onDeleteMulti?: () => void;
   /** Editor-only lock from the Scene Outliner. */
   locked?: boolean;
   /** Editor-only visibility from the Scene Outliner. */
@@ -143,6 +157,10 @@ export type MapObjectInspectorProps = {
   onDuplicateGroup?: (id: string) => void;
   onTranslateGroup?: (id: string, dx: number, dy: number) => void;
   onRotateGroup?: (id: string, quarterTurns: number) => void;
+  onScaleGroup?: (
+    id: string,
+    scale: { x: number; y: number; z: number },
+  ) => void;
   onSelectGroupMembers?: (id: string) => void;
   onRemoveGroup?: (id: string) => void;
   onSetGroupParent?: (id: string, parentGroupId?: string) => void;
@@ -158,6 +176,7 @@ export type MapObjectInspectorProps = {
   onSelectLight: (id: string | null) => void;
   onCommitGlobal: (light: EmberMapLight) => void;
   onResetGlobal: () => void;
+  onCommitPlayProfile?: (profile: EmberMapPlayProfile) => void;
   onCommitSource: (
     source: EmberLightSource,
     opts?: { history?: boolean },
@@ -292,6 +311,49 @@ function titleFor(sel: MapSelection, pack: EmberPack, tileset?: EmberTileset): s
       return _n;
     }
   }
+}
+
+function compactSelectionLabel(selection: MapSelection): string {
+  switch (selection.kind) {
+    case "voxel":
+      return `Воксель · ${selection.id}`;
+    case "sprite":
+      return `Спрайт · ${selection.id}`;
+    case "light":
+      return `Свет · ${selection.id}`;
+    case "region":
+      return `Зона · ${selection.id}`;
+    case "group":
+      return `Группа · ${selection.id}`;
+    case "tile":
+      return `${selection.tx}, ${selection.ty}${selection.elev == null ? "" : ` · Z${selection.elev}`}`;
+    case "lib":
+      return "Ассет библиотеки";
+    case "globalLight":
+      return "Свет карты";
+    default: {
+      const exhaustive: never = selection;
+      return exhaustive;
+    }
+  }
+}
+
+function compactSelectionKey(selection: MapSelection): string {
+  if (selection.kind === "tile") {
+    return `tile:${selection.tx}:${selection.ty}:${selection.elev ?? ""}`;
+  }
+  if (selection.kind === "lib") {
+    return `lib:${JSON.stringify(selection.payload)}`;
+  }
+  if (selection.kind === "globalLight") return "globalLight";
+  return `${selection.kind}:${selection.id}`;
+}
+
+function mapSelectionEqualsForInspector(
+  left: MapSelection,
+  right: MapSelection,
+): boolean {
+  return compactSelectionKey(left) === compactSelectionKey(right);
 }
 
 function libTitle(
@@ -1321,12 +1383,14 @@ function GroupBody({
   group,
   onTranslate,
   onRotate,
+  onScale,
   onSelectMembers,
   groups,
 }: {
   group: EmberSceneGroup;
   onTranslate?: (id: string, dx: number, dy: number) => void;
   onRotate?: (id: string, quarterTurns: number) => void;
+  onScale?: (id: string, scale: { x: number; y: number; z: number }) => void;
   onSelectMembers?: (id: string) => void;
   groups: readonly EmberSceneGroup[];
 }) {
@@ -1340,6 +1404,15 @@ function GroupBody({
     const delta = Math.round(value - group.pivot[axis]);
     if (delta) onTranslate?.(group.id, axis === "x" ? delta : 0, axis === "y" ? delta : 0);
   };
+  const commitScale = (axis: "x" | "y" | "z", raw: string) => {
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value <= 0 || value === 1) return;
+    onScale?.(group.id, {
+      x: axis === "x" ? value : 1,
+      y: axis === "y" ? value : 1,
+      z: axis === "z" ? value : 1,
+    });
+  };
   return (
     <div className="ember-map-inspector__body">
       <section className="ember-map-inspector__card">
@@ -1348,6 +1421,29 @@ function GroupBody({
           <span>X</span>
           <input key={`x-${group.pivot.x}`} type="number" step="1" defaultValue={group.pivot.x} onBlur={(event) => commitPivot("x", event.target.value)} />
         </label>
+        <label className="ember-map-inspector__row">
+          <span>Y</span>
+          <input key={`y-${group.pivot.y}`} type="number" step="1" defaultValue={group.pivot.y} onBlur={(event) => commitPivot("y", event.target.value)} />
+        </label>
+        {(["x", "y", "z"] as const).map((axis) => (
+          <label className="ember-map-inspector__row" key={`scale-${axis}`}>
+            <span>Scale {axis.toUpperCase()}</span>
+            <input
+              type="number"
+              min="0.125"
+              max="8"
+              step="0.125"
+              defaultValue="1"
+              onBlur={(event) => {
+                commitScale(axis, event.target.value);
+                event.currentTarget.value = "1";
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+              }}
+            />
+          </label>
+        ))}
         <label className="ember-map-inspector__row">
           <span>Rotation</span>
           <input
@@ -1364,10 +1460,6 @@ function GroupBody({
               if (delta) onRotate?.(group.id, delta);
             }}
           />
-        </label>
-        <label className="ember-map-inspector__row">
-          <span>Y</span>
-          <input key={`y-${group.pivot.y}`} type="number" step="1" defaultValue={group.pivot.y} onBlur={(event) => commitPivot("y", event.target.value)} />
         </label>
         <div className="ember-map-inspector__pad" role="group" aria-label="Сдвиг группы">
           <span />
@@ -1420,6 +1512,18 @@ function GroupBody({
 
 export function MapObjectInspector(props: MapObjectInspectorProps) {
   const { selection, map, pack, tileset, globalLight, lanternSources } = props;
+  const multiTransformObjects = (props.multiWorldObjects ?? []).filter(
+    (object) => object.kind === "voxel" || object.kind === "sprite",
+  );
+  const multiElevation = (() => {
+    const first = multiTransformObjects[0]?.transform.resolvedZ;
+    if (first == null) return null;
+    return multiTransformObjects.every(
+      (object) => Math.abs(object.transform.resolvedZ - first) < 0.001,
+    )
+      ? first
+      : null;
+  })();
   const worldObject =
     props.worldObject ??
     (() => {
@@ -1649,6 +1753,118 @@ export function MapObjectInspector(props: MapObjectInspectorProps) {
       onMouseDown={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
     >
+      {(props.selectionItems?.length ?? 0) > 1 ? (
+        <section
+          className="ember-map-inspector__multi"
+          aria-label="Мультивыделение"
+        >
+          <div className="ember-map-inspector__multi-head">
+            <strong>Выбрано: {props.selectionItems?.length}</strong>
+            <button
+              type="button"
+              className="ghost"
+              onClick={props.onClearSelection}
+            >
+              Снять всё
+            </button>
+          </div>
+          <div className="ember-map-inspector__multi-list">
+            {props.selectionItems?.map((item) => {
+              const active = mapSelectionEqualsForInspector(
+                item,
+                selection,
+              );
+              return (
+                <div
+                  className={`ember-map-inspector__multi-item ${active ? "is-primary" : ""}`}
+                  key={compactSelectionKey(item)}
+                >
+                  <button
+                    type="button"
+                    title="Сделать основным объектом Inspector"
+                    onClick={() => props.onSetSelectionPrimary?.(item)}
+                  >
+                    {compactSelectionLabel(item)}
+                  </button>
+                  <button
+                    type="button"
+                    className="ember-map-inspector__multi-remove"
+                    aria-label={`Убрать из выбора: ${compactSelectionLabel(item)}`}
+                    onClick={() => props.onToggleSelection?.(item)}
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <small>
+            Inspector редактирует основной объект, gizmo — совместимые объекты
+            набора.
+          </small>
+          <div className="ember-map-inspector__multi-tools">
+            <label title="Установить одинаковый authored Z вокселям и спрайтам">
+              <span>Z</span>
+              <input
+                key={`multi-z-${multiElevation ?? "mixed"}`}
+                type="number"
+                min="0"
+                max="8"
+                step="0.25"
+                defaultValue={multiElevation ?? ""}
+                placeholder="mixed"
+                disabled={multiTransformObjects.length === 0}
+                onBlur={(event) => {
+                  const value = Number(event.currentTarget.value);
+                  if (Number.isFinite(value) && event.currentTarget.value.trim()) {
+                    props.onSetMultiElevation?.(value);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.currentTarget.blur();
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              disabled={multiTransformObjects.length === 0}
+              onClick={props.onDropMultiToFloor}
+            >
+              Drop to Floor
+            </button>
+            <button
+              type="button"
+              disabled={(props.multiWorldObjects?.length ?? 0) === 0}
+              onClick={() => props.onSetMultiLocked?.(!props.multiAllLocked)}
+            >
+              {props.multiAllLocked ? "Unlock All" : "Lock All"}
+            </button>
+            <button
+              type="button"
+              disabled={(props.multiWorldObjects?.length ?? 0) === 0}
+              onClick={() => props.onSetMultiHidden?.(!props.multiAllHidden)}
+            >
+              {props.multiAllHidden ? "Show All" : "Hide All"}
+            </button>
+            <button
+              type="button"
+              className="is-danger"
+              disabled={(props.multiWorldObjects?.length ?? 0) === 0}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Удалить выбранные объекты (${props.multiWorldObjects?.length ?? 0})?`,
+                  )
+                ) {
+                  props.onDeleteMulti?.();
+                }
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        </section>
+      ) : null}
       <InspectorObjectHeader
         kindLabel={kindEyebrow(selection)}
         name={headerName}
@@ -1729,6 +1945,7 @@ export function MapObjectInspector(props: MapObjectInspectorProps) {
             group={props.sceneGroup}
             onTranslate={props.onTranslateGroup}
             onRotate={props.onRotateGroup}
+            onScale={props.onScaleGroup}
             onSelectMembers={props.onSelectGroupMembers}
             groups={props.sceneGroups ?? []}
           />
@@ -1740,6 +1957,8 @@ export function MapObjectInspector(props: MapObjectInspectorProps) {
             pack={pack}
             onPackChange={props.onPackChange}
             onSaved={props.onSaved}
+            playProfile={map.playProfile}
+            onCommitPlayProfile={props.onCommitPlayProfile}
             onCommitGlobal={props.onCommitGlobal}
             onResetGlobal={props.onResetGlobal}
           />

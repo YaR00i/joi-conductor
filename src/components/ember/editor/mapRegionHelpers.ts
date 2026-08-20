@@ -7,6 +7,8 @@ export const MAP_REGION_KIND_ORDER: MapRegionKind[] = [
   "teleport",
   "trigger",
   "camera_bound",
+  "npc_idle",
+  "npc_wander",
 ];
 
 export const MAP_REGION_KIND_LABEL: Record<MapRegionKind, string> = {
@@ -17,6 +19,8 @@ export const MAP_REGION_KIND_LABEL: Record<MapRegionKind, string> = {
   trigger: "Триггер",
   /** Editor overlay only — not enforced in gameplay yet. */
   camera_bound: "Кам (оверлей)",
+  npc_idle: "NPC стоит",
+  npc_wander: "NPC гуляет",
 };
 
 export const MAP_REGION_KIND_COLOR: Record<MapRegionKind, string> = {
@@ -26,6 +30,8 @@ export const MAP_REGION_KIND_COLOR: Record<MapRegionKind, string> = {
   teleport: "#e0a0ff",
   trigger: "#88aaff",
   camera_bound: "#88aaff",
+  npc_idle: "#9ad4ff",
+  npc_wander: "#7ec8e8",
 };
 
 export function newRegionId(
@@ -85,6 +91,12 @@ export function makeRegionAt(
     // Runtime scripts not wired yet — stub fields for later.
     region.scriptId = "";
     region.note = "Скрипт зоны (заглушка)";
+  }
+  if (kind === "npc_idle" || kind === "npc_wander") {
+    region.note =
+      kind === "npc_wander"
+        ? "Исследование: гуляющий NPC (spriteId)"
+        : "Исследование: стоячий NPC (spriteId)";
   }
   return region;
 }

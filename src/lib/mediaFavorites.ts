@@ -426,6 +426,64 @@ export function favoriteMatchesTagFilter(
   });
 }
 
+export type FavoriteKindFilter = "all" | "image" | "gif" | "video";
+
+/** Resolve kind from v5 metadata, falling back to mime for older rows. */
+export function favoriteMediaKind(
+  meta: Pick<FavoriteMetadata, "kind" | "mime">,
+): MediaKind {
+  if (meta.kind) return meta.kind;
+  const mime = (meta.mime ?? "").toLowerCase();
+  if (mime.startsWith("video/")) return "video";
+  if (mime === "image/gif") return "gif";
+  return "image";
+}
+
+export function favoriteMatchesKindFilter(
+  meta: Pick<FavoriteMetadata, "kind" | "mime">,
+  kind: FavoriteKindFilter,
+): boolean {
+  if (kind === "all") return true;
+  const resolved = favoriteMediaKind(meta);
+  if (kind === "video") return resolved === "video";
+  if (kind === "gif") return resolved === "gif";
+  if (kind === "image") return resolved === "image";
+  const _exhaustive: never = kind;
+  return _exhaustive;
+}
+
+/** Whole-library filter (tags + search + kind) without loading blobs. */
+export function filterFavoriteMetadata(
+  rows: FavoriteMetadata[],
+  opts: {
+    selectedTags: string[];
+    search: string;
+    kind: FavoriteKindFilter;
+  },
+): FavoriteMetadata[] {
+  return rows.filter(
+    (row) =>
+      favoriteMatchesKindFilter(row, opts.kind) &&
+      favoriteMatchesTagFilter(row.tags, opts.selectedTags, opts.search),
+  );
+}
+
+/** Fetch records by id, preserving the requested order. */
+export async function listFavoriteRecordsByIds(
+  ids: string[],
+): Promise<FavoriteRecord[]> {
+  if (ids.length === 0) return [];
+  const db = await openDb();
+  const tx = db.transaction(STORE, "readonly");
+  const store = tx.objectStore(STORE);
+  const rows = await Promise.all(
+    ids.map((id) =>
+      idbReq(store.get(id) as IDBRequest<FavoriteRecord | undefined>),
+    ),
+  );
+  return rows.filter((row): row is FavoriteRecord => Boolean(row));
+}
+
 /** Download current booru (or any remote) item and store locally. */
 export async function addFavoriteFromItem(item: MediaItem): Promise<void> {
   if (item.source === "favorites") return;

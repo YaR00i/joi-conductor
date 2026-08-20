@@ -41,7 +41,7 @@ export function InspectorObjectHeader({
   onDelete,
   onClose,
 }: InspectorObjectHeaderProps) {
-  const hasMenu = Boolean(onDuplicate || onDelete);
+  const hasMenu = Boolean(onDuplicate);
 
   return (
     <header className="ember-inspector-object-head">
@@ -100,28 +100,35 @@ export function InspectorObjectHeader({
         </button>
         {hasMenu ? (
           <details className="ember-inspector-object-head__menu">
-            <summary aria-label="Действия с объектом">⋮</summary>
+            <summary aria-label="Действия с объектом" title="Дополнительные действия">⋮</summary>
             <div className="ember-inspector-object-head__menu-popover">
               {onDuplicate ? (
                 <button type="button" onClick={onDuplicate}>
                   Дублировать
                 </button>
               ) : null}
-              {onDelete ? (
-                <button type="button" className="danger" onClick={onDelete}>
-                  Удалить
-                </button>
-              ) : null}
             </div>
           </details>
+        ) : null}
+        {onDelete ? (
+          <button
+            type="button"
+            className="ghost danger ember-inspector-object-head__tool"
+            aria-label="Удалить объект"
+            title="Удалить объект с карты (можно отменить через Undo)"
+            onClick={onDelete}
+          >
+            🗑
+          </button>
         ) : null}
         <button
           type="button"
           className="ghost ember-inspector-object-head__tool"
           aria-label="Закрыть Inspector"
+          title="Закрыть Inspector — объект останется на карте"
           onClick={onClose}
         >
-          ×
+          ›
         </button>
       </div>
 

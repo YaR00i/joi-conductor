@@ -173,10 +173,17 @@ function TransformComponent({
     localTransform ? "local" : "world",
   );
   const [positionSnap, setPositionSnap] = useState(1);
+  const [scaleSnap, setScaleSnap] = useState(0.125);
+  const [scaleLinked, setScaleLinked] = useState(true);
   const space = requestedSpace === "local" && localTransform ? "local" : "world";
   const canMove = object.kind !== "tile" && Boolean(onPatch);
   const canEditZ = object.kind === "voxel" && Boolean(onPatch);
   const canRotate = object.kind === "voxel" && Boolean(onPatch);
+  const canScale =
+    (object.kind === "voxel" ||
+      object.kind === "sprite" ||
+      object.kind === "region") &&
+    Boolean(onPatch);
   const position =
     space === "local" && localTransform
       ? localTransform.position
@@ -196,6 +203,23 @@ function TransformComponent({
     if (axis !== "z") return;
     onPatch?.(space, { rotationQuarterTurns: value / 90 });
   };
+  const commitScale = (axis: "x" | "y" | "z", value: number) => {
+    if (!canScale) return;
+    if (scaleLinked) {
+      onPatch?.(
+        space,
+        object.kind === "region"
+          ? { scaleX: value, scaleY: value }
+          : { scaleX: value, scaleY: value, scaleZ: value },
+      );
+      return;
+    }
+    onPatch?.(space, {
+      ...(axis === "x" ? { scaleX: value } : {}),
+      ...(axis === "y" ? { scaleY: value } : {}),
+      ...(axis === "z" ? { scaleZ: value } : {}),
+    });
+  };
   const snapTransform = () => {
     if (!onPatch || object.kind === "tile") return;
     onPatch(space, {
@@ -204,6 +228,15 @@ function TransformComponent({
       ...(canEditZ ? { z: snapValue(position.z, positionSnap) } : {}),
       ...(canRotate
         ? { rotationQuarterTurns: Math.round(rotationQuarterTurns) }
+        : {}),
+      ...(canScale
+        ? {
+            scaleX: snapValue(object.transform.scale.x, scaleSnap),
+            scaleY: snapValue(object.transform.scale.y, scaleSnap),
+            ...(object.kind !== "region"
+              ? { scaleZ: snapValue(object.transform.scale.z, scaleSnap) }
+              : {}),
+          }
         : {}),
     });
   };
@@ -214,6 +247,13 @@ function TransformComponent({
       y: 0,
       ...(canEditZ ? { z: 0 } : {}),
       ...(canRotate ? { rotationQuarterTurns: 0 } : {}),
+      ...(canScale
+        ? {
+            scaleX: 1,
+            scaleY: 1,
+            ...(object.kind !== "region" ? { scaleZ: 1 } : {}),
+          }
+        : {}),
     });
   };
 
@@ -275,8 +315,13 @@ function TransformComponent({
               object.transform.scale.y,
               object.transform.scale.z,
             ]}
-            disabled={[true, true, true]}
-            step={0.1}
+            disabled={[
+              !canScale,
+              !canScale,
+              !canScale || object.kind === "region",
+            ]}
+            step={scaleSnap}
+            onCommit={commitScale}
           />
           <div className="ember-transform-component__meta">
             <span>{space === "local" ? `Parent · ${parentName ?? "Group"}` : "Scene Root · World space"}</span>
@@ -300,13 +345,38 @@ function TransformComponent({
                 <span>Rotation</span>
                 <input type="text" value="90°" disabled />
               </label>
+              <label>
+                <span>Scale</span>
+                <input
+                  type="number"
+                  min="0.125"
+                  max="8"
+                  step="0.125"
+                  value={scaleSnap}
+                  onChange={(event) =>
+                    setScaleSnap(
+                      Math.max(0.125, Number(event.target.value) || 0.125),
+                    )
+                  }
+                />
+              </label>
+              <label>
+                <span>Связать оси</span>
+                <input
+                  type="checkbox"
+                  checked={scaleLinked}
+                  disabled={!canScale}
+                  onChange={(event) => setScaleLinked(event.target.checked)}
+                />
+              </label>
               <button type="button" className="ghost" disabled={!canMove} onClick={snapTransform}>
                 Привязать сейчас
               </button>
             </div>
           </details>
           <p className="muted ember-map-inspector__hint">
-            Scale пока только читается: его запись появится вместе с единым масштабированием Renderer и Collider.
+            Scale изменяет визуал и Collider совместно. У Region X/Y задают
+            размер зоны; тайлы и источники света не масштабируются.
           </p>
         </div>
     </InspectorComponentFrame>

@@ -45,6 +45,11 @@ export interface MediaSettings {
   wd14Url: string;
   /** WD14 general-tag threshold (0..1). */
   wd14Threshold: number;
+  /**
+   * Hub / session media-type filter (same ids as the roulette wheel:
+   * photo, gifs, video, photo_gifs, all).
+   */
+  mediaTypeId: "photo" | "gifs" | "video" | "photo_gifs" | "all";
 }
 
 export const DEFAULT_MEDIA_SETTINGS: MediaSettings = {
@@ -59,6 +64,7 @@ export const DEFAULT_MEDIA_SETTINGS: MediaSettings = {
   autoTagOnImport: true,
   wd14Url: "http://127.0.0.1:7878",
   wd14Threshold: 0.35,
+  mediaTypeId: "all",
 };
 
 const SETTINGS_KEY = "joi-conductor-media-settings";
@@ -98,6 +104,15 @@ export function loadMediaSettings(): MediaSettings {
     } else {
       parsed.wd14Threshold = Math.min(0.95, Math.max(0.05, parsed.wd14Threshold));
     }
+    const typeId = parsed.mediaTypeId;
+    parsed.mediaTypeId =
+      typeId === "photo" ||
+      typeId === "gifs" ||
+      typeId === "video" ||
+      typeId === "photo_gifs" ||
+      typeId === "all"
+        ? typeId
+        : "all";
     return parsed;
   } catch {
     return { ...DEFAULT_MEDIA_SETTINGS };
@@ -174,13 +189,29 @@ export function saveMediaLibrary(
   return { savedSettings: true, playlistCount: 0 };
 }
 
-function guessKind(url: string): MediaKind {
+function guessKindFromName(url: string): MediaKind {
   const u = url.toLowerCase();
   if (u.includes(".mp4") || u.includes(".webm") || u.includes(".mkv")) {
     return "video";
   }
   if (u.includes(".gif")) return "gif";
   return "image";
+}
+
+/** File extension plus Gelbooru tags (`animated` vs `video`). */
+export function inferMediaKind(url: string, tags?: string): MediaKind {
+  const u = url.toLowerCase();
+  const tagSet = new Set(
+    (tags ?? "").toLowerCase().split(/\s+/).filter(Boolean),
+  );
+  const taggedVideo =
+    tagSet.has("video") || tagSet.has("webm") || tagSet.has("mp4");
+  const taggedAnimated =
+    tagSet.has("animated") || tagSet.has("animated_gif");
+  if (u.includes(".mp4") || u.includes(".mkv") || taggedVideo) return "video";
+  if (u.includes(".gif") || taggedAnimated) return "gif";
+  if (u.includes(".webm")) return "video";
+  return guessKindFromName(url);
 }
 
 interface GelbooruPost {
@@ -424,14 +455,15 @@ export async function fetchGelbooru(
     if (!url) continue;
     const gelbooruId =
       p.id != null && String(p.id).trim() !== "" ? String(p.id) : undefined;
+    const postTags = (p.tags && p.tags.trim()) || tags;
     items.push({
       id: gelbooruId ? `gb-${gelbooruId}` : `gb-url-${simpleHash(url)}`,
       url,
       previewUrl: p.preview_url || p.sample_url || url,
-      kind: guessKind(url),
+      kind: inferMediaKind(url, p.tags),
       source: "gelbooru",
       // Prefer post tags from API (booru-style); fall back to search query
-      tags: (p.tags && p.tags.trim()) || tags,
+      tags: postTags,
       gelbooruId,
     });
   }
@@ -704,7 +736,7 @@ export function mediaFromFiles(files: FileList | File[]): MediaItem[] {
     return {
       id: `local-${file.name}-${i}-${file.size}`,
       url,
-      kind: guessKind(file.name),
+      kind: guessKindFromName(file.name),
       source: "local" as const,
       tags: file.name,
       tagSource: "filename" as const,
@@ -726,7 +758,7 @@ export function mediaFromFilesWithBlobs(
     return {
       id: `local-${file.name}-${i}-${file.size}`,
       url,
-      kind: guessKind(file.name),
+      kind: guessKindFromName(file.name),
       source: "local" as const,
       tags: file.name,
       tagSource: "filename" as const,

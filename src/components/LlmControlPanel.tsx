@@ -199,7 +199,7 @@ export function LlmControlPanel({
         </span>
         {!enabled ? (
           <span className="llm-panel__hint">
-            Режим голоса сейчас Templates — переключи на Local LLM ниже
+            Сейчас Templates — включи Local LLM выше, чтобы писать живые реплики
           </span>
         ) : null}
         {!manage ? (
@@ -258,6 +258,7 @@ export function LlmControlPanel({
       <div className="llm-panel__actions">
         <button
           type="button"
+          className="btn-ghost"
           disabled={busy !== "idle"}
           onClick={() => void refresh()}
         >
@@ -265,6 +266,7 @@ export function LlmControlPanel({
         </button>
         <button
           type="button"
+          className="btn-primary"
           disabled={!manage || busy !== "idle" || Boolean(status?.running)}
           onClick={() => void handleStart()}
         >
@@ -272,6 +274,7 @@ export function LlmControlPanel({
         </button>
         <button
           type="button"
+          className="btn-ghost"
           disabled={!manage || busy !== "idle" || !status?.managedByApp}
           onClick={() => void handleStop()}
           title="Останавливает только процесс, запущенный этим приложением"
@@ -280,6 +283,7 @@ export function LlmControlPanel({
         </button>
         <button
           type="button"
+          className="btn-primary"
           disabled={!manage || busy !== "idle" || !model.trim()}
           onClick={() => void handlePull()}
         >

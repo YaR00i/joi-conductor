@@ -33,6 +33,27 @@ export type ResolvedWorldCollider = {
   offsetVoxels: number;
 };
 
+export type WorldVerticalMotion = {
+  /** Continuous feet height in Ember elevation/story units. */
+  feetElev: number;
+  /** Elevation units per second; falling is negative. */
+  velocity: number;
+  grounded: boolean;
+};
+
+export type WorldFallConfig = {
+  gravity: number;
+  terminalVelocity: number;
+  groundEpsilon: number;
+};
+
+export const DEFAULT_WORLD_FALL: WorldFallConfig = {
+  // One-story drop takes about 0.4 s: readable, but not floaty.
+  gravity: 12,
+  terminalVelocity: 10,
+  groundEpsilon: 1e-4,
+};
+
 export const DEFAULT_WORLD_BODY: ResolvedWorldBody = {
   radiusVoxels: 2.5,
   heightVoxels: 12,
@@ -203,4 +224,53 @@ export function mergeVerticalSpans(
     out.push({ ...span });
   }
   return out;
+}
+
+/**
+ * Advance a downward-only fall toward the resolved support surface.
+ *
+ * Horizontal collision still resolves the support story. This integrator owns
+ * the continuous feet position so stepping off an edge no longer teleports the
+ * actor vertically. The analytic acceleration step is stable across frame rates.
+ */
+export function advanceWorldFall(
+  state: WorldVerticalMotion,
+  supportElev: number,
+  dtSeconds: number,
+  config: WorldFallConfig = DEFAULT_WORLD_FALL,
+): WorldVerticalMotion {
+  const support = Number.isFinite(supportElev) ? supportElev : state.feetElev;
+  const dt = Math.max(0, Number.isFinite(dtSeconds) ? dtSeconds : 0);
+  const gravity = Math.max(0.01, config.gravity);
+  const terminal = Math.max(0.01, config.terminalVelocity);
+  const epsilon = Math.max(0, config.groundEpsilon);
+
+  // Rising support is an auto-step / stair / teleport, not a fall. Keep the
+  // actor out of the floor and preserve the existing responsive step behavior.
+  if (support >= state.feetElev - epsilon) {
+    return { feetElev: support, velocity: 0, grounded: true };
+  }
+  if (dt <= 0) {
+    return { ...state, grounded: false };
+  }
+
+  let velocity = Math.max(-terminal, Math.min(0, state.velocity));
+  let nextFeet = state.feetElev;
+  const timeToTerminal = Math.max(0, (terminal + velocity) / gravity);
+
+  if (timeToTerminal >= dt) {
+    nextFeet += velocity * dt - 0.5 * gravity * dt * dt;
+    velocity = Math.max(-terminal, velocity - gravity * dt);
+  } else {
+    nextFeet +=
+      velocity * timeToTerminal -
+      0.5 * gravity * timeToTerminal * timeToTerminal;
+    nextFeet -= terminal * (dt - timeToTerminal);
+    velocity = -terminal;
+  }
+
+  if (nextFeet <= support + epsilon) {
+    return { feetElev: support, velocity: 0, grounded: true };
+  }
+  return { feetElev: nextFeet, velocity, grounded: false };
 }

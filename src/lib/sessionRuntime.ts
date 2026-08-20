@@ -48,6 +48,11 @@ import {
   BEAT_LEAD_IN_MS,
 } from "./beatTiming";
 import {
+  dropUpcomingBlock,
+  insertBlockAfter,
+  moveUpcomingBlock,
+} from "./queueEdit";
+import {
   applyMoodDelta,
   confirmObedienceDelta,
   DEFAULT_MOOD_SCORE,
@@ -124,6 +129,10 @@ import {
   tideMissConsequence,
   tideSoftTarget,
 } from "./tideHits";
+import {
+  loadTideHitVerifySettings,
+  shouldAutoCountTideOnAccent,
+} from "./tideHitVerify";
 import { getActiveMistress } from "./mistress";
 import {
   isNoneToyAllowList,
@@ -240,7 +249,8 @@ export class SessionRuntime {
         isTideHitFunction(block.functionId) &&
         (s.tideTarget ?? 0) > 0 &&
         isTideAutoAccent(payload.accent) &&
-        s.promptPhase !== "tide_miss_pending"
+        s.promptPhase !== "tide_miss_pending" &&
+        shouldAutoCountTideOnAccent(loadTideHitVerifySettings().mode)
       ) {
         this.reportTideHit();
       } else if (
@@ -1254,6 +1264,44 @@ export class SessionRuntime {
     }, waitMs);
   }
 
+  dropUpcomingBlock(queueIndex: number): void {
+    const state = this.state;
+    if (!state || (state.status !== "running" && state.status !== "paused")) {
+      return;
+    }
+    const next = dropUpcomingBlock(state.queue, queueIndex, state.index);
+    if (!next) return;
+    this.state = { ...state, queue: next };
+    this.notify();
+  }
+
+  moveUpcomingBlock(queueIndex: number, dir: -1 | 1): void {
+    const state = this.state;
+    if (!state || (state.status !== "running" && state.status !== "paused")) {
+      return;
+    }
+    const next = moveUpcomingBlock(state.queue, queueIndex, dir, state.index);
+    if (!next) return;
+    this.state = { ...state, queue: next };
+    this.notify();
+  }
+
+  insertRestAfter(queueIndex: number): void {
+    const state = this.state;
+    if (!state || (state.status !== "running" && state.status !== "paused")) {
+      return;
+    }
+    const rest = this.makeRestBlock(
+      `edit-rest-${Date.now()}`,
+      20,
+      state.params.mode,
+    );
+    const next = insertBlockAfter(state.queue, queueIndex, state.index, rest);
+    if (!next) return;
+    this.state = { ...state, queue: next };
+    this.notify();
+  }
+
   confirmFinaleEdge(): void {
     if (!this.state || this.state.status !== "running") return;
     const block = this.state.queue[this.state.index];
@@ -1995,7 +2043,7 @@ export class SessionRuntime {
     this.completeBreath(success);
   }
 
-  /** Auto / counted +1 on CBT/plapping stroke blocks (Tide). */
+  /** Counted +1 on CBT/plapping stroke blocks (Tide). Honor: metronome. Mic: loud peak. */
   reportTideHit(): void {
     if (!this.state || this.state.status !== "running") return;
     if (isPromptGate(this.state.promptPhase)) return;

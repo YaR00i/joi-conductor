@@ -8,6 +8,7 @@
 - [V1 Spec (Phase 1 — механика)](docs/V1_SPEC.md) ✅
 - [V2 Spec (Phase 2 — voice + presets)](docs/V2_SPEC.md) ✅
 - [Ember Anomaly (игра — vertical slice + editor)](docs/EMBER_ANOMALY.md)
+- [Ember AI handoff (архитектура, решения и ближайший план)](docs/EMBER_AI_HANDOFF.md)
 - [Hu Tao bible notes](docs/character/hu-tao.md)
 - [Игрушки и механика](docs/TOYS_MECHANICS.md)
 

@@ -94,6 +94,74 @@ const APPLY_EPS = 0.012;
 /** Floor so torch breathe is visible even when map torchFlicker is 0. */
 const EMISSIVE_TORCH_AMOUNT_FLOOR = 0.55;
 
+export type EmberEmissiveLightRuntimeState = {
+  intensity: number;
+  distance: number;
+  smooth?: number;
+  applied?: number;
+  distanceApplied?: number;
+  flicker?: EmissiveFlickerState;
+  bulb?: LanternBulbFlickerState;
+};
+
+/**
+ * Preserve live light animation across terrain-window rebuilds. Without this,
+ * every retained emissive prop is recreated at zero intensity and visibly
+ * flashes back on whenever the player crosses a chunk boundary.
+ */
+export function captureEmissiveLightRuntimeStates(
+  lights: readonly THREE.PointLight[],
+): Map<string, EmberEmissiveLightRuntimeState> {
+  const states = new Map<string, EmberEmissiveLightRuntimeState>();
+  for (const light of lights) {
+    const id = light.userData.emberEmissiveSourceId as string | undefined;
+    if (!id) continue;
+    const smooth = light.userData[SMOOTH_KEY];
+    const applied = light.userData[APPLIED_KEY];
+    const distanceApplied = light.userData[DIST_APPLIED_KEY];
+    const flicker = light.userData[FLICKER_KEY] as
+      | EmissiveFlickerState
+      | undefined;
+    const bulb = light.userData[BULB_KEY] as
+      | LanternBulbFlickerState
+      | undefined;
+    states.set(id, {
+      intensity: light.intensity,
+      distance: light.distance,
+      ...(typeof smooth === "number" ? { smooth } : {}),
+      ...(typeof applied === "number" ? { applied } : {}),
+      ...(typeof distanceApplied === "number" ? { distanceApplied } : {}),
+      ...(flicker ? { flicker: { ...flicker } } : {}),
+      ...(bulb ? { bulb: { ...bulb } } : {}),
+    });
+  }
+  return states;
+}
+
+/** Restore retained sources after addThreeEmissiveLocalLights rebuilt them. */
+export function restoreEmissiveLightRuntimeStates(
+  lights: readonly THREE.PointLight[],
+  states: ReadonlyMap<string, EmberEmissiveLightRuntimeState>,
+): number {
+  let restored = 0;
+  for (const light of lights) {
+    const id = light.userData.emberEmissiveSourceId as string | undefined;
+    const state = id ? states.get(id) : undefined;
+    if (!state) continue;
+    light.intensity = state.intensity;
+    light.distance = state.distance;
+    if (state.smooth != null) light.userData[SMOOTH_KEY] = state.smooth;
+    if (state.applied != null) light.userData[APPLIED_KEY] = state.applied;
+    if (state.distanceApplied != null) {
+      light.userData[DIST_APPLIED_KEY] = state.distanceApplied;
+    }
+    if (state.flicker) light.userData[FLICKER_KEY] = { ...state.flicker };
+    if (state.bulb) light.userData[BULB_KEY] = { ...state.bulb };
+    restored += 1;
+  }
+  return restored;
+}
+
 export function tagEmissiveMaterial(
   mat: THREE.Material,
   meta: EmberEmissiveMatMeta,
@@ -395,10 +463,6 @@ function stepTorchDistance(
   if (prev >= 0 && Math.abs(prev - nextDist) < 0.05) return false;
   light.userData[DIST_APPLIED_KEY] = nextDist;
   light.distance = nextDist;
-  if (light.castShadow) {
-    light.shadow.camera.far = Math.max(nextDist * 1.05, nextDist + 1);
-    light.shadow.camera.updateProjectionMatrix();
-  }
   return true;
 }
 

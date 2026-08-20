@@ -4,8 +4,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { type EmberPack } from "../../../game";
 import type {
+  EmberPack,
   EmberVoxelModel,
 } from "../../../game/content/types";
 import { EDITOR_ISO_POLAR } from "../../../game/three/editorThreePreview";
@@ -26,6 +26,7 @@ import {
 import {
   buildVoxelModelMesh,
   disposeVoxelModelMesh,
+  previewVoxelPaletteColor,
 } from "../../../game/voxel/voxelMesher";
 import {
   createVoxelAxisGizmo,
@@ -128,6 +129,7 @@ import { packLampDiscDecay } from "../../../game/three/threeLighting";
 import { EditableRange } from "./EditableRange";
 import { VoxelAnimTimeline } from "./VoxelAnimTimeline";
 import { VoxelObjectPropsPanel } from "./VoxelObjectPropsPanel";
+import { DeferredColorInput } from "./DeferredColorInput";
 import { VoxelSceneOutliner } from "./VoxelSceneOutliner";
 
 export type VoxelSculptSession =
@@ -198,6 +200,8 @@ type SceneApi = {
   render: () => void;
   applyCam: () => void;
   setMesh: (group: THREE.Group) => void;
+  /** Palette hover without rebuilding geometry or changing the draft model. */
+  previewPaletteColor: (paletteIndex: number, hex: string) => void;
   /** Other scene objects (relative to active), cleared on each call. */
   setPeerMeshes: (groups: THREE.Group[]) => void;
   setSelection: (sel: VoxelSelectionSet | null) => void;
@@ -1669,6 +1673,10 @@ export function VoxelSculptPanel({
         meshRoot.add(group);
         api.render();
       },
+      previewPaletteColor(paletteIndex, hex) {
+        previewVoxelPaletteColor(meshRoot, paletteIndex, hex);
+        api.render();
+      },
       setPeerMeshes(groups) {
         while (peerRoot.children.length) {
           const c = peerRoot.children[0]!;
@@ -2258,8 +2266,9 @@ export function VoxelSculptPanel({
       if (t === "fill" && !once) return;
       if (t === "move") return;
       const key = `${cell.x},${cell.y},${cell.z}:${t}`;
-      if (lastCellRef.current === key) return;
+      if (lastCellRef.current === key || strokeCells.has(key)) return;
       lastCellRef.current = key;
+      strokeCells.add(key);
       beginEditRef.current();
       const seeds = expandCellWithMirror(
         draftRef.current,
@@ -2278,10 +2287,35 @@ export function VoxelSculptPanel({
           transparencyRef.current,
         );
       }
-      if (next !== draftRef.current) setDraft(next);
+      if (next !== draftRef.current) {
+        // Pointer events may arrive before React commits the previous state.
+        // Keep the imperative ray/edit source current for the whole stroke.
+        draftRef.current = next;
+        setDraft(next);
+      }
     };
 
+    let activePointerId: number | null = null;
+    let pointerStartX = 0;
+    let pointerStartY = 0;
+    let paintDragStarted = false;
+    const strokeCells = new Set<string>();
+    const PAINT_DRAG_THRESHOLD_PX = 3;
+
     const onDown = (e: PointerEvent) => {
+      if (!e.isPrimary || activePointerId !== null) return;
+      if (e.button !== 0 && e.button !== 1 && e.button !== 2) return;
+      activePointerId = e.pointerId;
+      pointerStartX = e.clientX;
+      pointerStartY = e.clientY;
+      paintDragStarted = false;
+      strokeCells.clear();
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch {
+        activePointerId = null;
+        return;
+      }
       // Middle mouse — pan orbit target (camera center).
       if (e.button === 1) {
         e.preventDefault();
@@ -2423,6 +2457,7 @@ export function VoxelSculptPanel({
     };
 
     const onMove = (e: PointerEvent) => {
+      if (activePointerId !== null && e.pointerId !== activePointerId) return;
       if (lightDrag.active) {
         const ray = pointerRay(e);
         const hit = lightTranslateGizmo.projectDrag(
@@ -2498,7 +2533,17 @@ export function VoxelSculptPanel({
         api.render();
         return;
       }
-      if (paintingRef.current) stroke(e, false);
+      if (paintingRef.current) {
+        if (!paintDragStarted) {
+          const moved = Math.hypot(
+            e.clientX - pointerStartX,
+            e.clientY - pointerStartY,
+          );
+          if (moved < PAINT_DRAG_THRESHOLD_PX) return;
+          paintDragStarted = true;
+        }
+        stroke(e, false);
+      }
       else if (activeTool() === "hinge") showHover(pickVertex(e));
       else if (activeTool() === "inspect") {
         const hit = pickInspect(e);
@@ -2540,7 +2585,11 @@ export function VoxelSculptPanel({
       }
     };
 
-    const onUp = (e: PointerEvent) => {
+    const finishPointer = (e: PointerEvent, releaseCapture: boolean) => {
+      if (activePointerId !== e.pointerId) return;
+      // Clear first: releasePointerCapture may synchronously emit
+      // lostpointercapture, which must not finish the stroke twice.
+      activePointerId = null;
       if (lightDrag.active) {
         lightDrag.active = false;
         lightTranslateGizmo.setHighlight(null);
@@ -2558,16 +2607,25 @@ export function VoxelSculptPanel({
       selectSubtractRef.current = false;
       lastCellRef.current = null;
       boxAnchorRef.current = null;
+      strokeCells.clear();
       if (editSnapRef.current) {
         editSnapRef.current = false;
         persistHistNowRef.current();
       }
       el.style.cursor = "";
-      try {
-        el.releasePointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
+      if (releaseCapture) {
+        try {
+          el.releasePointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
       }
+    };
+
+    const onUp = (e: PointerEvent) => finishPointer(e, true);
+    const onCancel = (e: PointerEvent) => finishPointer(e, false);
+    const onLostPointerCapture = (e: PointerEvent) => {
+      if (activePointerId === e.pointerId) finishPointer(e, false);
     };
 
     const onLeave = () => {
@@ -2611,6 +2669,8 @@ export function VoxelSculptPanel({
     el.addEventListener("pointerdown", onDown);
     el.addEventListener("pointermove", onMove);
     el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointercancel", onCancel);
+    el.addEventListener("lostpointercapture", onLostPointerCapture);
     el.addEventListener("pointerleave", onLeave);
     el.addEventListener("wheel", onWheel, { passive: false });
     el.addEventListener("contextmenu", onContext);
@@ -2640,6 +2700,8 @@ export function VoxelSculptPanel({
       el.removeEventListener("pointerdown", onDown);
       el.removeEventListener("pointermove", onMove);
       el.removeEventListener("pointerup", onUp);
+      el.removeEventListener("pointercancel", onCancel);
+      el.removeEventListener("lostpointercapture", onLostPointerCapture);
       el.removeEventListener("pointerleave", onLeave);
       el.removeEventListener("wheel", onWheel);
       el.removeEventListener("contextmenu", onContext);
@@ -3852,6 +3914,10 @@ export function VoxelSculptPanel({
     applyEdit({ ...draft, palette });
   };
 
+  const previewPaletteColor = (index: number, hex: string) => {
+    apiRef.current?.previewPaletteColor(index, hex);
+  };
+
   const addPaletteColor = () => {
     if (!draft) return;
     const palette = [...draft.palette, "#ffb060"];
@@ -3867,6 +3933,7 @@ export function VoxelSculptPanel({
   const save = async () => {
     if (!draft) return;
     setSaving(true);
+    const currentPack = packRef.current;
     if (session.mode === "placementVariant") {
       const newId = newVoxelVariantId();
       const saved = cloneVoxelModel(
@@ -3876,17 +3943,17 @@ export function VoxelSculptPanel({
       );
       // Never overwrite the shared source model id.
       const modelsMap = {
-        ...(pack.voxelModels ?? {}),
+        ...(currentPack.voxelModels ?? {}),
         [newId]: saved,
       };
-      const scenesMap = ensureVoxelScenes(modelsMap, pack.voxelScenes);
+      const scenesMap = ensureVoxelScenes(modelsMap, currentPack.voxelScenes);
       const res = await writeVoxelRegistry(modelsMap, scenesMap);
       setSaving(false);
       if (!res.ok) {
         onSaved?.(`Воксели: ошибка сохранения — ${res.error}`);
         return;
       }
-      onPackChange(packWithVoxels(pack, modelsMap, scenesMap));
+      onPackChange(packWithVoxels(currentPack, modelsMap, scenesMap));
       onSavedVariant?.({ model: saved, placementId: session.placementId });
       onSaved?.(
         `Вариант «${saved.nameRu ?? saved.id}» сохранён в библиотеку`,
@@ -3897,7 +3964,7 @@ export function VoxelSculptPanel({
 
     const normalized = normalizeVoxelModel(draft);
     const modelsMap = {
-      ...(pack.voxelModels ?? {}),
+      ...(currentPack.voxelModels ?? {}),
       [normalized.id]: normalized,
     };
     const scenesMap = { ...voxelScenes };
@@ -3910,7 +3977,7 @@ export function VoxelSculptPanel({
     lastSavedJsonRef.current = JSON.stringify(normalized);
     skipPackSyncRef.current = true;
     persistHistSession(normalized);
-    onPackChange(packWithVoxels(pack, modelsMap, scenesMap));
+    onPackChange(packWithVoxels(currentPack, modelsMap, scenesMap));
     setAutoSaveNote("Сохранено");
     onSaved?.(`Воксели «${normalized.nameRu ?? normalized.id}» сохранены`);
   };
@@ -4508,12 +4575,10 @@ export function VoxelSculptPanel({
               </div>
               <label className="ember-voxel-sculpt__color">
                 Цвет
-                <input
-                  type="color"
+                <DeferredColorInput
                   value={activeColor.startsWith("#") ? activeColor : "#888888"}
-                  onChange={(e) =>
-                    setPaletteColor(paletteIndex, e.target.value)
-                  }
+                  onPreview={(hex) => previewPaletteColor(paletteIndex, hex)}
+                  onCommit={(hex) => setPaletteColor(paletteIndex, hex)}
                 />
               </label>
             </>
@@ -4758,6 +4823,10 @@ export function VoxelSculptPanel({
                 if (!draft || draft.id !== activeObject.modelId) return;
                 setPaletteColor(index, hex);
               }}
+              onPreviewPaletteColor={(index, hex) => {
+                if (!draft || draft.id !== activeObject.modelId) return;
+                previewPaletteColor(index, hex);
+              }}
               onEditModel={(next) => {
                 if (!draft || draft.id !== activeObject.modelId) return;
                 applyEdit(next);
@@ -4915,14 +4984,12 @@ export function VoxelSculptPanel({
                         {canEdit && pi > 0 ? (
                           <label className="ember-voxel-inspect__field">
                             <span>Цвет слота</span>
-                            <input
-                              type="color"
+                            <DeferredColorInput
                               value={
                                 color.startsWith("#") ? color : "#888888"
                               }
-                              onChange={(e) =>
-                                setPaletteColor(pi, e.target.value)
-                              }
+                              onPreview={(hex) => previewPaletteColor(pi, hex)}
+                              onCommit={(hex) => setPaletteColor(pi, hex)}
                             />
                           </label>
                         ) : null}

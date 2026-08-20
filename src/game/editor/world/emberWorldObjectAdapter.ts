@@ -57,6 +57,10 @@ import {
   tileInstanceColliderPresent,
   tileInstanceModifierAt,
 } from "../../world/worldObjectModifiers";
+import {
+  compactEmberTransformScale,
+  resolveEmberTransformScale,
+} from "../../world/worldTransform";
 
 export type EmberWorldObjectAdapterContext = Readonly<{
   pack?: EmberPack;
@@ -73,12 +77,13 @@ function transform(
   authoredZ: number | null,
   resolvedZ: number,
   rotationQuarterTurns = 0,
+  authoredScale?: { x?: number; y?: number; z?: number },
 ): EmberWorldTransform {
   return {
     position: { x, y, z: authoredZ },
     resolvedZ,
     rotationQuarterTurns: normalizeQuarterTurns(rotationQuarterTurns),
-    scale: { x: 1, y: 1, z: 1 },
+    scale: resolveEmberTransformScale(authoredScale),
   };
 }
 
@@ -269,6 +274,7 @@ export function getEmberWorldObject(
       value.elev ?? null,
       resolvedZ,
       value.rot,
+      value.scale,
     );
     const model = context.pack?.voxelModels?.[value.modelId];
     return {
@@ -291,8 +297,15 @@ export function getEmberWorldObject(
   if (ref.kind === "sprite") {
     const value = map.sprites?.find((item) => item.id === ref.id);
     if (!value) return null;
-    const resolvedZ = tileSurfaceElev(map, value.x, value.y);
-    const valueTransform = transform(value.x, value.y, null, resolvedZ);
+    const resolvedZ = value.elev ?? tileSurfaceElev(map, value.x, value.y);
+    const valueTransform = transform(
+      value.x,
+      value.y,
+      value.elev ?? null,
+      resolvedZ,
+      0,
+      value.scale,
+    );
     const sprite = context.pack?.sprites?.[value.spriteId];
     const components: EmberWorldObjectComponent[] = [
       { type: "transform", value: valueTransform },
@@ -315,7 +328,9 @@ export function getEmberWorldObject(
     };
   }
   if (ref.kind === "light") {
-    const value = map.lights?.find((item) => item.id === ref.id);
+    const value = map.lights?.find(
+      (item) => item.id === ref.id && item.enabled !== false,
+    );
     if (!value) return null;
     const resolvedZ = tileSurfaceElev(map, value.x, value.y);
     const valueTransform = transform(value.x, value.y, null, resolvedZ);
@@ -876,7 +891,7 @@ export function listEmberWorldObjects(
       kind: "sprite" as const,
       id: item.id,
     })),
-    ...(map.lights ?? []).map((item) => ({
+    ...(map.lights ?? []).filter((item) => item.enabled !== false).map((item) => ({
       kind: "light" as const,
       id: item.id,
     })),
@@ -920,6 +935,7 @@ function cloneMapForWorldEdit(map: EmberMap): EmberMap {
     lights: map.lights?.map((item) => ({ ...item })),
     sprites: map.sprites?.map((item) => ({
       ...item,
+      scale: item.scale ? { ...item.scale } : undefined,
       componentStates: item.componentStates
         ? { ...item.componentStates }
         : undefined,
@@ -932,7 +948,10 @@ function cloneMapForWorldEdit(map: EmberMap): EmberMap {
         : undefined,
       collider: modifier.collider ? { ...modifier.collider } : undefined,
     })),
-    voxelProps: map.voxelProps?.map((item) => ({ ...item })),
+    voxelProps: map.voxelProps?.map((item) => ({
+      ...item,
+      scale: item.scale ? { ...item.scale } : undefined,
+    })),
     regions: map.regions.map((item) => ({ ...item })),
     sceneHierarchy: map.sceneHierarchy
       ? {
@@ -969,13 +988,24 @@ export function patchEmberWorldObjectTransform(
   // Terrain elevation constants describe walkable ground and must not limit
   // scene objects placed above it (bridges, lamps, overhead voxel props).
   const clampZ = (value: number) => Math.max(0, Math.min(8, value));
+  const hasScalePatch =
+    patch.scaleX != null || patch.scaleY != null || patch.scaleZ != null;
+  const patchScale = (current: { x: number; y: number; z: number } | undefined) => {
+    if (!hasScalePatch) return current;
+    const resolved = resolveEmberTransformScale(current);
+    return compactEmberTransformScale({
+      x: patch.scaleX ?? resolved.x,
+      y: patch.scaleY ?? resolved.y,
+      z: patch.scaleZ ?? resolved.z,
+    });
+  };
   let next = map;
   if (ref.kind === "voxel") {
     next = {
       ...map,
       voxelProps: (map.voxelProps ?? []).map((item) => {
         if (item.id !== ref.id) return item;
-        const updated = {
+        const updated: EmberVoxelPlacement = {
           ...item,
           x: patch.x == null ? item.x : clampX(patch.x),
           y: patch.y == null ? item.y : clampY(patch.y),
@@ -984,6 +1014,11 @@ export function patchEmberWorldObjectTransform(
               ? item.rot
               : normalizeQuarterTurns(patch.rotationQuarterTurns),
         };
+        if (hasScalePatch) {
+          const scale = patchScale(item.scale);
+          if (scale) updated.scale = scale;
+          else delete updated.scale;
+        }
         if (patch.z === null) delete updated.elev;
         else if (patch.z != null) updated.elev = clampZ(patch.z);
         return updated;
@@ -992,15 +1027,22 @@ export function patchEmberWorldObjectTransform(
   } else if (ref.kind === "sprite") {
     next = {
       ...map,
-      sprites: (map.sprites ?? []).map((item) =>
-        item.id === ref.id
-          ? {
-              ...item,
-              x: patch.x == null ? item.x : clampX(patch.x),
-              y: patch.y == null ? item.y : clampY(patch.y),
-            }
-          : item,
-      ),
+      sprites: (map.sprites ?? []).map((item) => {
+        if (item.id !== ref.id) return item;
+        const updated = {
+          ...item,
+          x: patch.x == null ? item.x : clampX(patch.x),
+          y: patch.y == null ? item.y : clampY(patch.y),
+        };
+        if (patch.z === null) delete updated.elev;
+        else if (patch.z != null) updated.elev = clampZ(patch.z);
+        if (hasScalePatch) {
+          const scale = patchScale(item.scale);
+          if (scale) updated.scale = scale;
+          else delete updated.scale;
+        }
+        return updated;
+      }),
     };
   } else if (ref.kind === "light") {
     next = {
@@ -1018,15 +1060,24 @@ export function patchEmberWorldObjectTransform(
   } else if (ref.kind === "region") {
     next = {
       ...map,
-      regions: map.regions.map((item) =>
-        item.id === ref.id
-          ? {
-              ...item,
-              x: patch.x == null ? item.x : clampX(patch.x, item.w),
-              y: patch.y == null ? item.y : clampY(patch.y, item.h),
-            }
-          : item,
-      ),
+      regions: map.regions.map((item) => {
+        if (item.id !== ref.id) return item;
+        const w =
+          patch.scaleX == null
+            ? item.w
+            : Math.max(1, Math.min(map.width, Math.round(patch.scaleX)));
+        const h =
+          patch.scaleY == null
+            ? item.h
+            : Math.max(1, Math.min(map.height, Math.round(patch.scaleY)));
+        return {
+          ...item,
+          w,
+          h,
+          x: patch.x == null ? Math.min(item.x, map.width - w) : clampX(patch.x, w),
+          y: patch.y == null ? Math.min(item.y, map.height - h) : clampY(patch.y, h),
+        };
+      }),
     };
   }
   return next === map ? map : refreshEmberSceneHierarchyPivots(next);
@@ -1096,6 +1147,9 @@ export function patchEmberWorldObjectLocalTransform(
           ),
         }
       : {}),
+    ...(patch.scaleX != null ? { scaleX: patch.scaleX } : {}),
+    ...(patch.scaleY != null ? { scaleY: patch.scaleY } : {}),
+    ...(patch.scaleZ != null ? { scaleZ: patch.scaleZ } : {}),
   });
 }
 
@@ -1164,6 +1218,49 @@ export function translateEmberWorldObjects(
         : item,
     ),
   });
+}
+
+/**
+ * Atomically edits authored Z for voxel/sprite instances. `floor` removes the
+ * explicit override so the object follows its current terrain surface.
+ */
+export function setEmberWorldObjectsElevation(
+  map: EmberMap,
+  refs: readonly EmberWorldObjectRef[],
+  elevation: number | "floor",
+): EmberMap {
+  const keys = new Set(refs.map(emberWorldObjectRefKey));
+  const authored =
+    elevation === "floor" ? null : Math.max(0, Math.min(8, elevation));
+  let changed = false;
+  const voxelProps = map.voxelProps?.map((item) => {
+    if (!keys.has(`voxel:${item.id}`)) return item;
+    if (authored == null) {
+      if (item.elev == null) return item;
+      changed = true;
+      const next = { ...item };
+      delete next.elev;
+      return next;
+    }
+    if (item.elev === authored) return item;
+    changed = true;
+    return { ...item, elev: authored };
+  });
+  const sprites = map.sprites?.map((item) => {
+    if (!keys.has(`sprite:${item.id}`)) return item;
+    if (authored == null) {
+      if (item.elev == null) return item;
+      changed = true;
+      const next = { ...item };
+      delete next.elev;
+      return next;
+    }
+    if (item.elev === authored) return item;
+    changed = true;
+    return { ...item, elev: authored };
+  });
+  if (!changed) return map;
+  return refreshEmberSceneHierarchyPivots({ ...map, voxelProps, sprites });
 }
 
 /** Removes several non-tile scene objects as one editor command. */
@@ -1235,6 +1332,97 @@ export function rotateEmberWorldObjectsAroundPivot(
         h,
         x: Math.max(0, Math.min(map.width - w, Math.round(center.x - (w - 1) / 2))),
         y: Math.max(0, Math.min(map.height - h, Math.round(center.y - (h - 1) / 2))),
+      };
+    }),
+  });
+}
+
+/** Scales mixed scene objects around a shared grid/elevation pivot. */
+export function scaleEmberWorldObjectsAroundPivot(
+  map: EmberMap,
+  refs: readonly EmberWorldObjectRef[],
+  pivot: Readonly<{ x: number; y: number; z?: number }>,
+  authoredScale: Readonly<{ x: number; y: number; z: number }>,
+): EmberMap {
+  const delta = resolveEmberTransformScale(authoredScale);
+  if (delta.x === 1 && delta.y === 1 && delta.z === 1) return map;
+  const keys = new Set(refs.map(emberWorldObjectRefKey));
+  const pivotZ = pivot.z ?? 0;
+  const scalePoint = (x: number, y: number) => ({
+    x: pivot.x + (x - pivot.x) * delta.x,
+    y: pivot.y + (y - pivot.y) * delta.y,
+  });
+  const clampX = (value: number, width = 1) =>
+    Math.max(0, Math.min(map.width - width, Math.round(value)));
+  const clampY = (value: number, height = 1) =>
+    Math.max(0, Math.min(map.height - height, Math.round(value)));
+  const multiplyScale = (current: { x: number; y: number; z: number } | undefined) => {
+    const value = resolveEmberTransformScale(current);
+    return compactEmberTransformScale({
+      x: value.x * delta.x,
+      y: value.y * delta.y,
+      z: value.z * delta.z,
+    });
+  };
+  return refreshEmberSceneHierarchyPivots({
+    ...map,
+    voxelProps: map.voxelProps?.map((item) => {
+      if (!keys.has(`voxel:${item.id}`)) return item;
+      const point = scalePoint(item.x, item.y);
+      const currentZ = item.elev ?? tileSurfaceElev(map, item.x, item.y);
+      const next = {
+        ...item,
+        x: clampX(point.x),
+        y: clampY(point.y),
+        elev:
+          delta.z === 1
+            ? item.elev
+            : Math.max(0, Math.min(8, pivotZ + (currentZ - pivotZ) * delta.z)),
+      };
+      const scale = multiplyScale(item.scale);
+      if (scale) next.scale = scale;
+      else delete next.scale;
+      if (next.elev == null) delete next.elev;
+      return next;
+    }),
+    sprites: map.sprites?.map((item) => {
+      if (!keys.has(`sprite:${item.id}`)) return item;
+      const point = scalePoint(item.x, item.y);
+      const currentZ = item.elev ?? tileSurfaceElev(map, item.x, item.y);
+      const next = {
+        ...item,
+        x: clampX(point.x),
+        y: clampY(point.y),
+        elev:
+          delta.z === 1
+            ? item.elev
+            : Math.max(0, Math.min(8, pivotZ + (currentZ - pivotZ) * delta.z)),
+      };
+      const scale = multiplyScale(item.scale);
+      if (scale) next.scale = scale;
+      else delete next.scale;
+      if (next.elev == null) delete next.elev;
+      return next;
+    }),
+    lights: map.lights?.map((item) => {
+      if (!keys.has(`light:${item.id}`)) return item;
+      const point = scalePoint(item.x, item.y);
+      return { ...item, x: clampX(point.x), y: clampY(point.y) };
+    }),
+    regions: map.regions.map((item) => {
+      if (!keys.has(`region:${item.id}`)) return item;
+      const center = scalePoint(
+        item.x + (item.w - 1) / 2,
+        item.y + (item.h - 1) / 2,
+      );
+      const w = Math.max(1, Math.min(map.width, Math.round(item.w * delta.x)));
+      const h = Math.max(1, Math.min(map.height, Math.round(item.h * delta.y)));
+      return {
+        ...item,
+        w,
+        h,
+        x: clampX(center.x - (w - 1) / 2, w),
+        y: clampY(center.y - (h - 1) / 2, h),
       };
     }),
   });

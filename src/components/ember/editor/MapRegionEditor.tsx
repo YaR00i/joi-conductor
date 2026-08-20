@@ -981,6 +981,59 @@ export function MapRegionEditor({
         </p>
       ) : null}
 
+      {region.kind === "npc_idle" || region.kind === "npc_wander" ? (
+        <div className="ember-map-region-ed__block">
+          <p className="muted ember-hint">
+            {region.kind === "npc_wander"
+              ? "Исследование: NPC патрулирует зону. Диалогов нет."
+              : "Исследование: NPC стоит на месте. Диалогов нет."}
+          </p>
+          <label className="ember-map-region-ed__field">
+            <span>Спрайт</span>
+            <select
+              value={region.spriteId ?? ""}
+              onChange={(e) =>
+                patch({ spriteId: e.target.value.trim() || undefined })
+              }
+            >
+              <option value="">— не задан —</option>
+              {Object.values(pack?.sprites ?? {})
+                .slice()
+                .sort((a, b) =>
+                  (a.nameRu ?? a.id).localeCompare(b.nameRu ?? b.id, "ru"),
+                )
+                .map((sprite) => (
+                  <option key={sprite.id} value={sprite.id}>
+                    {sprite.nameRu ?? sprite.id}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {region.kind === "npc_wander" ? (
+            <label className="ember-map-region-ed__field">
+              <span>Зона прогулки</span>
+              <select
+                value={region.wanderRegionId ?? ""}
+                onChange={(e) =>
+                  patch({
+                    wanderRegionId: e.target.value.trim() || undefined,
+                  })
+                }
+              >
+                <option value="">Эта зона</option>
+                {map.regions
+                  .filter((item) => item.id !== region.id)
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.id} ({MAP_REGION_KIND_LABEL[item.kind]})
+                    </option>
+                  ))}
+              </select>
+            </label>
+          ) : null}
+        </div>
+      ) : null}
+
       <label className="ember-map-region-ed__field ember-map-region-ed__field--stack">
         <span>Заметка</span>
         <textarea

@@ -23,6 +23,7 @@ import {
 import {
   categoryLabelRu,
   CONTRACT_BOARD_REROLL_COST,
+  contractBrief,
   countOpenContracts,
   ensureDailyContractBoard,
   findContract,
@@ -684,6 +685,9 @@ export function ContractsPage({
                 ) : null}
               </div>
               <h2 className="contracts-card__title">{c.titleRu}</h2>
+              {contractBrief(c.defId) ? (
+                <p className="contracts-card__brief">{contractBrief(c.defId)}</p>
+              ) : null}
               <p className="contracts-card__body">{c.bodyRu}</p>
               {active ? (
                 <p className="contracts-card__drill-timer">

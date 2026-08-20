@@ -4,13 +4,17 @@ export type MistressIdRef = "hu_tao" | "furina" | "sunna" | "sparkle";
 
 export type EmberRarity = "common" | "rare" | "epic";
 
+export type EmberMapPlayProfile = "arena" | "explore";
+
 export type MapRegionKind =
   | "player_start"
   | "spawn"
   | "chest"
   | "trigger"
   | "camera_bound"
-  | "teleport";
+  | "teleport"
+  | "npc_idle"
+  | "npc_wander";
 
 /**
  * Edge outline for tools that bind a voxel model/scene (chest now;
@@ -94,6 +98,15 @@ export type EmberMapRegion = {
    * Authoring lives on the region; runtime draws edges around the mesh.
    */
   modelOutline?: EmberModelOutline;
+  /**
+   * Explore NPC: pixel sprite from `pack.sprites`.
+   * Used by `npc_idle` / `npc_wander` regions.
+   */
+  spriteId?: string;
+  /**
+   * Explore NPC wander AABB. Missing means patrol this region's own footprint.
+   */
+  wanderRegionId?: string;
 };
 
 /** Max walkable floor elevation (editor + runtime clamp). */
@@ -242,6 +255,31 @@ export type EmberMapLight = {
    * Per-source `lampTorchFlicker` can override.
    */
   lampTorchFlicker?: boolean;
+  /**
+   * Cap visible PointLights (lanterns first, then emissive fill).
+   * Omit = renderer/profile budget. Clamped to hardware.
+   */
+  maxPointLights?: number;
+  /**
+   * Cap PointLight cube-shadows. 0 = fill light only, no cubes.
+   * Omit = renderer/profile budget. Clamped to hardware.
+   */
+  maxPointShadows?: number;
+  /**
+   * How many nearby PointLight cubes may include moving actors.
+   * 0 disables actor shadows; default 1; maximum is the map light-object count.
+   */
+  dynamicPointShadows?: number;
+  /**
+   * Enter dynamic mode inside this fraction of the authored light radius.
+   * Default 0.8.
+   */
+  dynamicShadowEnterScale?: number;
+  /**
+   * Leave dynamic mode beyond this fraction of the authored light radius.
+   * Kept >= enter scale to prevent rapid switching. Default 1.
+   */
+  dynamicShadowExitScale?: number;
   /** Post-light color grade for the whole scene. */
   grade?: EmberMapGrade;
   /** Weather / atmosphere (fog, rain, clouds…). */
@@ -276,7 +314,7 @@ export type EmberLightSource = {
 /** @deprecated Legacy square canvas presets — migrated via normalizePixelSprite. */
 export type EmberSpriteSize = 8 | 16 | 24 | 32;
 
-export type EmberSpriteRole = "decor" | "enemy" | "player" | "prop";
+export type EmberSpriteRole = "decor" | "enemy" | "player" | "prop" | "npc";
 
 /**
  * Self-glow on painted pixels (not lantern flood).
@@ -307,6 +345,16 @@ export type EmberPhysicsLayer =
   | "projectile"
   | "interaction"
   | "trigger";
+
+/**
+ * Shared authored Transform scale.
+ * X/Y are the map plane, Z is vertical elevation (Three.js Y internally).
+ */
+export type EmberTransformScale = {
+  x: number;
+  y: number;
+  z: number;
+};
 
 /**
  * Common collider component for tiles, sprites and voxel objects.
@@ -433,6 +481,15 @@ export type EmberSpritePlacement = {
   collider?: EmberColliderModifier;
   x: number;
   y: number;
+  /** Authored floor Z; omitted follows the terrain surface (legacy maps). */
+  elev?: number;
+  /** Per-instance Transform scale; omitted means 1×1×1. */
+  scale?: EmberTransformScale;
+  /**
+   * Explore NPC instance. Asset `roles` may also include `"npc"`;
+   * this field forces a placed sprite into the NPC layer.
+   */
+  role?: "npc";
 };
 
 /** Per-cell component overrides for one authored tile block. */
@@ -542,6 +599,8 @@ export type EmberVoxelPlacement = {
   x: number;
   y: number;
   elev?: number;
+  /** Per-instance Transform scale; omitted means 1×1×1. */
+  scale?: EmberTransformScale;
   /** Per-instance collider overrides merged over the model collider. */
   collider?: EmberColliderModifier;
   /**
@@ -719,6 +778,16 @@ export type EmberMap = {
   width: number;
   height: number;
   tilesetId: string;
+  /**
+   * Play systems for this map. Omit = `"arena"` (horde, F4, few lamps).
+   * `"explore"` is village/JRPG: no waves, street cubes, window fill, few NPCs.
+   */
+  playProfile?: EmberMapPlayProfile;
+  /**
+   * Automatically trigger projectile/nova weapons when their cooldown expires.
+   * Omit = enabled for arena and disabled for explore; LMB remains manual attack.
+   */
+  autoAttack?: boolean;
   /** Version 2 uses independent block volumes and body/head clearance. */
   worldPhysicsVersion?: 2;
   /**

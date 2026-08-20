@@ -10,12 +10,14 @@ import {
   removeEmberSceneGroup,
   renameEmberSceneGroup,
   rotateEmberSceneGroupTransforms,
+  scaleEmberSceneGroupTransforms,
   setEmberSceneGroupParent,
   translateEmberSceneGroupTransforms,
 } from "./EmberSceneHierarchy";
 import {
   removeEmberWorldObjects,
   rotateEmberWorldObjectsAroundPivot,
+  scaleEmberWorldObjectsAroundPivot,
   translateEmberWorldObjects,
 } from "./emberWorldObjectAdapter";
 
@@ -30,6 +32,25 @@ function sceneMap(): EmberMap {
 }
 
 describe("EmberSceneHierarchy", () => {
+  it("drops disabled light tombstones from saved groups", () => {
+    const map = sceneMap();
+    map.lights = [{ id: "lamp", x: 4, y: 2, enabled: false }];
+    map.sceneHierarchy = {
+      version: 1,
+      groups: [
+        {
+          id: "lights",
+          name: "Lights",
+          objectKeys: ["light:lamp"],
+          pivot: { x: 4, y: 2, z: 0 },
+        },
+      ],
+    };
+
+    const normalized = normalizeEmberSceneHierarchy(map);
+    expect(normalized.sceneHierarchy?.groups[0]?.objectKeys).toEqual([]);
+  });
+
   it("creates a persistent group with a world-space pivot", () => {
     const result = createEmberSceneGroup(
       sceneMap(),
@@ -188,6 +209,37 @@ describe("EmberSceneHierarchy", () => {
       localTransforms: {
         "voxel:a": { position: { x: -2, y: -2, z: 1 }, rotationQuarterTurns: 0 },
         "voxel:b": { position: { x: 2, y: 2, z: -1 }, rotationQuarterTurns: 0 },
+      },
+    });
+  });
+
+  it("scales group children atomically around the shared XYZ pivot", () => {
+    const grouped = createEmberSceneGroup(
+      sceneMap(),
+      ["voxel:a", "voxel:b"],
+      { id: "props" },
+    ).map;
+    const pivot = grouped.sceneHierarchy!.groups[0].pivot;
+    const objectsScaled = scaleEmberWorldObjectsAroundPivot(
+      grouped,
+      [{ kind: "voxel", id: "a" }, { kind: "voxel", id: "b" }],
+      pivot,
+      { x: 2, y: 0.5, z: 2 },
+    );
+    const scaled = scaleEmberSceneGroupTransforms(
+      objectsScaled,
+      "props",
+      { x: 2, y: 0.5, z: 2 },
+    );
+    expect(scaled.voxelProps).toMatchObject([
+      { id: "a", x: 0, y: 5, elev: 3, scale: { x: 2, y: 0.5, z: 2 } },
+      { id: "b", x: 8, y: 7, elev: 0, scale: { x: 2, y: 0.5, z: 2 } },
+    ]);
+    expect(scaled.sceneHierarchy?.groups[0]).toMatchObject({
+      pivot: { x: 4, y: 6, z: 1 },
+      localTransforms: {
+        "voxel:a": { position: { x: -4, y: -1, z: 2 } },
+        "voxel:b": { position: { x: 4, y: 1, z: -1 } },
       },
     });
   });

@@ -13,14 +13,64 @@ import {
   saveDeviceSettings,
 } from "../lib/device/deviceSettings";
 import {
-  DEVICE_BACKEND_LABELS_RU,
   type DeviceBackendId,
+  type DeviceConnectionState,
   type DeviceSettings,
   type DeviceStatus,
   emptyDeviceStatus,
 } from "../lib/device/deviceTypes";
+import { UiCheck } from "./UiCheck";
 
-const BACKENDS: DeviceBackendId[] = ["mock", "lovense", "buttplug"];
+function deviceTone(
+  state: DeviceConnectionState,
+): "ok" | "off" | "busy" | "warn" {
+  switch (state) {
+    case "connected":
+      return "ok";
+    case "connecting":
+      return "busy";
+    case "error":
+      return "off";
+    case "disconnected":
+      return "warn";
+    default: {
+      const _exhaustive: never = state;
+      return _exhaustive;
+    }
+  }
+}
+
+function deviceStateRu(state: DeviceConnectionState): string {
+  switch (state) {
+    case "connected":
+      return "онлайн";
+    case "connecting":
+      return "подключаю";
+    case "error":
+      return "ошибка";
+    case "disconnected":
+      return "офлайн";
+    default: {
+      const _exhaustive: never = state;
+      return _exhaustive;
+    }
+  }
+}
+
+function backendRowCopy(id: DeviceBackendId): { title: string; sub: string } {
+  switch (id) {
+    case "mock":
+      return { title: "Mock", sub: "без железа" };
+    case "lovense":
+      return { title: "Lovense", sub: "Game Mode · LAN" };
+    case "buttplug":
+      return { title: "Buttplug", sub: "Intiface" };
+    default: {
+      const _exhaustive: never = id;
+      return _exhaustive;
+    }
+  }
+}
 
 function backendBlurb(id: DeviceBackendId): string {
   switch (id) {
@@ -37,7 +87,13 @@ function backendBlurb(id: DeviceBackendId): string {
   }
 }
 
-export function DeviceSettingsPanel() {
+const BACKENDS: DeviceBackendId[] = ["mock", "lovense", "buttplug"];
+
+export function DeviceSettingsPanel({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const [settings, setSettings] = useState<DeviceSettings>(() =>
     loadDeviceSettings(),
   );
@@ -121,47 +177,89 @@ export function DeviceSettingsPanel() {
   }
 
   const connected = status.state === "connected";
-  const stateClass =
-    status.state === "connected"
-      ? "is-ok"
-      : status.state === "error"
-        ? "is-err"
-        : status.state === "connecting"
-          ? "is-busy"
-          : "";
+  const tone = deviceTone(status.state);
 
   return (
-    <div className="device-panel">
-      <div className="device-panel__head">
-        <strong>Игрушка · Device Bridge</strong>
-        <span className="device-panel__sub">
-          Уровни сессии 0–5 → интенсивность. Пауза / конец / смена блока — стоп.
+    <div className={embedded ? "gameplay-pane" : "device-panel"}>
+      {embedded ? null : (
+        <div className="device-panel__head">
+          <strong>Игрушка · Device Bridge</strong>
+          <span className="device-panel__sub">
+            Уровни сессии 0–5 → интенсивность. Пауза / конец / смена блока —
+            стоп.
+          </span>
+        </div>
+      )}
+
+      <div className="brain-panel__bar">
+        <span className={`brain-dot brain-dot--${tone}`}>
+          {deviceStateRu(status.state)}
+          {status.desktop ? " · electron" : " · браузер"}
         </span>
+        <div className="brain-panel__links">
+          <button
+            type="button"
+            className="brain-act"
+            disabled={busy || connected}
+            onClick={() => void onConnect()}
+          >
+            connect
+          </button>
+          <button
+            type="button"
+            className="brain-act"
+            disabled={busy || !connected}
+            onClick={() => void onStop()}
+          >
+            стоп
+          </button>
+          <button
+            type="button"
+            className="brain-act"
+            disabled={busy || status.state === "disconnected"}
+            onClick={() => void onDisconnect()}
+          >
+            disconnect
+          </button>
+        </div>
       </div>
 
-      <div className="today__fields">
-        <label className="field">
-          <span className="field__label">Backend</span>
-          <select
-            value={settings.backend}
-            disabled={busy || connected}
-            onChange={(e) => {
-              const backend = e.target.value as DeviceBackendId;
-              if (!BACKENDS.includes(backend)) return;
-              persist({ ...settings, backend });
-            }}
-          >
-            {BACKENDS.map((id) => (
-              <option key={id} value={id}>
-                {DEVICE_BACKEND_LABELS_RU[id]}
-              </option>
-            ))}
-          </select>
-          <span className="field__hint">{backendBlurb(settings.backend)}</span>
-        </label>
+      <h3 className="brain-panel__h">Backend</h3>
+      <ul className="brain-list">
+        {BACKENDS.map((id) => {
+          const copy = backendRowCopy(id);
+          const active = settings.backend === id;
+          return (
+            <li
+              key={id}
+              className={"brain-row" + (active ? " is-active" : "")}
+            >
+              <div className="brain-row__main">
+                <span className="brain-row__name">{copy.title}</span>
+                <span className="brain-row__meta">
+                  {active ? "активен · " : ""}
+                  {copy.sub}
+                </span>
+              </div>
+              <div className="brain-row__acts">
+                <button
+                  type="button"
+                  className="brain-act"
+                  disabled={active || busy || connected}
+                  onClick={() => persist({ ...settings, backend: id })}
+                >
+                  выбрать
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="brain-panel__hint">{backendBlurb(settings.backend)}</p>
 
+      <div className="brain-fields">
         {settings.backend === "lovense" ? (
-          <label className="field">
+          <label className="brain-field">
             <span className="field__label">Lovense Game Mode URL</span>
             <input
               value={settings.lovenseBaseUrl}
@@ -179,7 +277,7 @@ export function DeviceSettingsPanel() {
         ) : null}
 
         {settings.backend === "buttplug" ? (
-          <label className="field">
+          <label className="brain-field">
             <span className="field__label">Intiface WebSocket</span>
             <input
               value={settings.buttplugUrl}
@@ -191,106 +289,53 @@ export function DeviceSettingsPanel() {
               autoComplete="off"
             />
             <span className="field__hint">
-              Запусти Intiface Central и включи Server. Железо здесь не
-              проверялось.
+              Запусти Intiface Central и включи Server.
             </span>
           </label>
         ) : null}
 
-        <label className="field field--check">
-          <input
-            type="checkbox"
-            checked={settings.autoConnect}
-            onChange={(e) =>
-              persist({ ...settings, autoConnect: e.target.checked })
-            }
-          />
-          <span>
-            Авто-Connect при старте приложения
-            <span className="field__hint">
-              {" "}
-              · сработает в Electron, если bridge доступен
-            </span>
-          </span>
-        </label>
-      </div>
-
-      <div
-        className={`device-panel__status ${stateClass}${
-          connected && status.intensity > 0 ? " is-pulse" : ""
-        }`}
-        role="status"
-      >
-        <div className="device-panel__status-row">
-          <span className="device-panel__dot" aria-hidden />
-          <strong>
-            {DEVICE_BACKEND_LABELS_RU[status.backend]} · {status.state}
-          </strong>
-        </div>
-        <p>{status.detailRu}</p>
-        {status.devices.length > 0 ? (
-          <p className="device-panel__devices">
-            Устройства: {status.devices.join(", ")}
-          </p>
-        ) : null}
-        {status.trustNoteRu ? (
-          <p className="device-panel__trust">{status.trustNoteRu}</p>
-        ) : null}
-      </div>
-
-      <div className="device-panel__actions today__actions">
-        <button
-          type="button"
-          className="btn-primary"
-          disabled={busy || connected}
-          onClick={() => void onConnect()}
+        <UiCheck
+          checked={settings.autoConnect}
+          onChange={(v) => persist({ ...settings, autoConnect: v })}
         >
-          Connect
-        </button>
-        <button
-          type="button"
-          className="btn-ghost"
+          Авто-Connect при старте приложения
+        </UiCheck>
+      </div>
+
+      <p className="brain-panel__hint" role="status">
+        {status.detailRu}
+        {status.devices.length > 0
+          ? ` · ${status.devices.join(", ")}`
+          : ""}
+        {status.trustNoteRu ? ` · ${status.trustNoteRu}` : ""}
+      </p>
+
+      <h3 className="brain-panel__h">Тест</h3>
+      <label className="brain-field">
+        <span className="field__label">Уровень {testLevel} / 5</span>
+        <input
+          type="range"
+          min={0}
+          max={5}
+          step={1}
+          value={testLevel}
           disabled={busy || !connected}
-          onClick={() => void onStop()}
-        >
-          Stop
-        </button>
+          onChange={(e) => setTestLevel(Number(e.target.value))}
+        />
+      </label>
+      <div className="brain-panel__links">
         <button
           type="button"
-          className="btn-ghost"
-          disabled={busy || status.state === "disconnected"}
-          onClick={() => void onDisconnect()}
-        >
-          Disconnect
-        </button>
-      </div>
-
-      <div className="device-panel__test">
-        <label className="field">
-          <span className="field__label">Тест уровня (0–5)</span>
-          <input
-            type="range"
-            min={0}
-            max={5}
-            step={1}
-            value={testLevel}
-            disabled={busy || !connected}
-            onChange={(e) => setTestLevel(Number(e.target.value))}
-          />
-          <span className="field__hint">сейчас: {testLevel}</span>
-        </label>
-        <button
-          type="button"
-          className="btn-ghost"
+          className="brain-act"
           disabled={busy || !connected}
           onClick={() => void onTest()}
         >
-          Отправить уровень
+          отправить уровень
         </button>
       </div>
 
       {hint ? (
-        <p className="device-panel__hint" role="status">
+        <p className="brain-panel__log" role="status">
           {hint}
         </p>
       ) : null}

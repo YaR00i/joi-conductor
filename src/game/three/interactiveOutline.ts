@@ -8,9 +8,6 @@ import type { EmberModelOutline } from "../content/types";
 const DEFAULT_COLOR = "#ffcc66";
 const DEFAULT_INTERACT = "#7dffb0";
 const DEFAULT_PULSE_SEC = 1.15;
-const _box = new THREE.Box3();
-const _size = new THREE.Vector3();
-const _center = new THREE.Vector3();
 
 export type InteractiveOutlineHandle = {
   root: THREE.Group;
@@ -28,46 +25,6 @@ function parseHex(hex: string | undefined, fallback: string): THREE.Color {
     c.set(fallback);
   }
   return c;
-}
-
-function pushBoxEdges(
-  out: number[],
-  minX: number,
-  minY: number,
-  minZ: number,
-  maxX: number,
-  maxY: number,
-  maxZ: number,
-): void {
-  const corners: [number, number, number][] = [
-    [minX, minY, minZ],
-    [maxX, minY, minZ],
-    [maxX, minY, maxZ],
-    [minX, minY, maxZ],
-    [minX, maxY, minZ],
-    [maxX, maxY, minZ],
-    [maxX, maxY, maxZ],
-    [minX, maxY, maxZ],
-  ];
-  const edges: [number, number][] = [
-    [0, 1],
-    [1, 2],
-    [2, 3],
-    [3, 0],
-    [4, 5],
-    [5, 6],
-    [6, 7],
-    [7, 4],
-    [0, 4],
-    [1, 5],
-    [2, 6],
-    [3, 7],
-  ];
-  for (const [a, b] of edges) {
-    const ca = corners[a]!;
-    const cb = corners[b]!;
-    out.push(ca[0], ca[1], ca[2], cb[0], cb[1], cb[2]);
-  }
 }
 
 export function resolveModelOutline(
@@ -89,10 +46,9 @@ export function resolveModelOutline(
 }
 
 /**
- * Build a world-space edge outline around `target` (AABB).
- * Parent the returned root next to the target (same parent), not as a child,
- * so scale/rotation of the model does not squash the lines — we rebuild from
- * world bounds when `refreshBounds` is called.
+ * Build edge lines from the target's actual rendered meshes. Lines are attached
+ * to their source meshes, so voxel-scene joints and chest lid animation carry
+ * the outline automatically instead of falling back to one large AABB.
  */
 export function createInteractiveOutline(
   target: THREE.Object3D,
@@ -108,43 +64,73 @@ export function createInteractiveOutline(
     color: idle.clone(),
     transparent: true,
     opacity: 0.95,
-    depthTest: false,
+    depthTest: true,
     depthWrite: false,
     toneMapped: false,
   });
-  const geo = new THREE.BufferGeometry();
-  const lines = new THREE.LineSegments(geo, mat);
-  lines.renderOrder = 40;
-  lines.frustumCulled = false;
   const root = new THREE.Group();
   root.name = "interactiveOutline";
-  root.add(lines);
   parent.add(root);
 
   let canInteract = false;
-  const inflate = 0.35;
+  const attachments: Array<{
+    host: THREE.Mesh;
+    lines: THREE.LineSegments;
+  }> = [];
+
+  const clearAttachments = () => {
+    for (const entry of attachments.splice(0)) {
+      entry.host.remove(entry.lines);
+      entry.lines.geometry.dispose();
+    }
+  };
+
+  const slightlyInflate = (geo: THREE.BufferGeometry) => {
+    geo.computeBoundingBox();
+    const box = geo.boundingBox;
+    const pos = geo.getAttribute("position");
+    if (!box || !(pos instanceof THREE.BufferAttribute)) return;
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxSide = Math.max(0.001, size.x, size.y, size.z);
+    const scale = 1 + Math.min(0.025, 0.18 / maxSide);
+    for (let i = 0; i < pos.count; i++) {
+      pos.setXYZ(
+        i,
+        center.x + (pos.getX(i) - center.x) * scale,
+        center.y + (pos.getY(i) - center.y) * scale,
+        center.z + (pos.getZ(i) - center.z) * scale,
+      );
+    }
+    pos.needsUpdate = true;
+    geo.computeBoundingSphere();
+  };
 
   const refreshBounds = () => {
-    _box.setFromObject(target);
-    if (_box.isEmpty()) return;
-    _box.getSize(_size);
-    _box.getCenter(_center);
-    if (_size.x < 0.01 && _size.y < 0.01 && _size.z < 0.01) return;
-    const positions: number[] = [];
-    pushBoxEdges(
-      positions,
-      _box.min.x - inflate,
-      _box.min.y - inflate * 0.35,
-      _box.min.z - inflate,
-      _box.max.x + inflate,
-      _box.max.y + inflate,
-      _box.max.z + inflate,
-    );
-    geo.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(positions, 3),
-    );
-    geo.computeBoundingSphere();
+    clearAttachments();
+    const hosts: THREE.Mesh[] = [];
+    target.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh)) return;
+      if (obj.userData.emberInteractiveOutline === true) return;
+      if (!obj.geometry.getAttribute("position")) return;
+      hosts.push(obj);
+    });
+    for (const host of hosts) {
+      const geo = new THREE.EdgesGeometry(host.geometry, 18);
+      const position = geo.getAttribute("position");
+      if (!position || position.count === 0) {
+        geo.dispose();
+        continue;
+      }
+      slightlyInflate(geo);
+      const lines = new THREE.LineSegments(geo, mat);
+      lines.name = "interactiveVoxelEdges";
+      lines.userData.emberInteractiveOutline = true;
+      lines.renderOrder = 40;
+      lines.frustumCulled = true;
+      host.add(lines);
+      attachments.push({ host, lines });
+    }
   };
 
   refreshBounds();
@@ -171,8 +157,8 @@ export function createInteractiveOutline(
       mat.opacity = 0.78 + phase * 0.22;
     },
     dispose: () => {
+      clearAttachments();
       parent.remove(root);
-      geo.dispose();
       mat.dispose();
     },
     refreshBounds,

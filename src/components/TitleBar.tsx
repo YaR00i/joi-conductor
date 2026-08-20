@@ -4,7 +4,7 @@ import {
   ollamaStatusTone,
   type OllamaStatus,
 } from "../lib/ollamaClient";
-import type { TtsProviderSetting } from "../lib/voiceSettings";
+import { isQwenTtsProvider, type TtsProviderSetting } from "../lib/voiceSettings";
 import { CageLockPill } from "./CageLockPill";
 import { DenialQuestPill } from "./DenialQuestPill";
 
@@ -82,6 +82,7 @@ type TitleBarProps = {
   ttsEnabled?: boolean;
   ttsProvider?: TtsProviderSetting;
   sovitsUrl?: string;
+  qwenUrl?: string;
 };
 
 /** Always visible themed window controls (min / max / close). */
@@ -91,6 +92,7 @@ export function TitleBar({
   ttsEnabled = false,
   ttsProvider = "sovits",
   sovitsUrl = "http://127.0.0.1:9880",
+  qwenUrl = "http://127.0.0.1:8000/v1",
 }: TitleBarProps) {
   const [desktop, setDesktop] = useState(() => isDesktopShell());
   const [maximized, setMaximized] = useState(false);
@@ -170,6 +172,43 @@ export function TitleBar({
         return;
       }
 
+      if (isQwenTtsProvider(ttsProvider)) {
+        const qwenApi = window.joiDesktop?.tts;
+        if (!qwenApi?.qwenStatus) {
+          if (!cancelled) {
+            setVoiceTone(desktop ? "off" : "warn");
+            setVoiceDetail(
+              desktop ? "Нет IPC Qwen" : "Голос только в Electron",
+            );
+          }
+          return;
+        }
+        try {
+          if (!cancelled) setVoiceTone((t) => (t === "ok" ? t : "busy"));
+          const st = await qwenApi.qwenStatus({ baseUrl: qwenUrl });
+          if (cancelled) return;
+          if (st.online) {
+            setVoiceTone("ok");
+            setVoiceDetail(
+              ttsProvider === "qwen-cpu"
+                ? st.detail || "Qwen RAM"
+                : st.detail || "Qwen онлайн",
+            );
+          } else {
+            setVoiceTone("off");
+            setVoiceDetail(st.detail || "Qwen офлайн");
+          }
+        } catch (err) {
+          if (!cancelled) {
+            setVoiceTone("off");
+            setVoiceDetail(
+              err instanceof Error ? err.message : "Ошибка статуса Qwen",
+            );
+          }
+        }
+        return;
+      }
+
       // sovits / auto — green when SoVITS online
       const api = window.joiDesktop?.tts;
       if (!api?.sovitsStatus) {
@@ -208,7 +247,7 @@ export function TitleBar({
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [ttsEnabled, ttsProvider, sovitsUrl, desktop]);
+  }, [ttsEnabled, ttsProvider, sovitsUrl, qwenUrl, desktop]);
 
   function onMinimize() {
     window.joiDesktop?.minimize();

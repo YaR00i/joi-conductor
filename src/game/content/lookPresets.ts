@@ -6,7 +6,11 @@ import type {
   EmberLooksFile,
   EmberMapLight,
 } from "./types";
-import { resolveMapLight, type ResolvedMapLight } from "../tile/mapUtils";
+import {
+  omitUnsetLightBudget,
+  resolveMapLight,
+  type ResolvedMapLight,
+} from "../tile/mapUtils";
 
 /** Built-in golden-hour evening — warm low sun, soft haze, long shadows. */
 export const BUILTIN_SUNNY_EVENING_LOOK: EmberLookPreset = {
@@ -111,7 +115,7 @@ export function applyLookPresetToLight(
 ): EmberMapLight {
   const base = resolveMapLight({ light: current });
   const look = normalizeLookPreset(preset) ?? preset;
-  return {
+  return omitUnsetLightBudget({
     ...base,
     ambientColor: look.ambientColor,
     ambientAlpha: look.ambientAlpha,
@@ -140,7 +144,7 @@ export function applyLookPresetToLight(
     floorGlowScale: base.floorGlowScale,
     faceGlowBase: base.faceGlowBase,
     faceGlowScale: base.faceGlowScale,
-  };
+  });
 }
 
 export function looksFileFromPresets(

@@ -6,6 +6,7 @@ import type { EmberVoxelModel, EmberVoxelPlacement } from "../content/types";
 import { blockStoryHeight } from "../tile/extruded";
 import { VOXELS_PER_BLOCK } from "./constants";
 import { voxelGridSize } from "./voxelModel";
+import { resolveEmberTransformScale } from "../world/worldTransform";
 
 /** Normalize quarter-turns (0..3). */
 export function normalizeVoxelRot(rot: number | undefined): number {
@@ -19,7 +20,10 @@ export function normalizeVoxelRot(rot: number | undefined): number {
  */
 export function applyVoxelPlacementTransform(
   group: THREE.Group,
-  placement: Pick<EmberVoxelPlacement, "x" | "y" | "elev" | "rot">,
+  placement: Pick<
+    EmberVoxelPlacement,
+    "x" | "y" | "elev" | "rot" | "scale"
+  >,
   model: EmberVoxelModel,
   tileSize: number,
   elev: number,
@@ -29,6 +33,7 @@ export function applyVoxelPlacementTransform(
   const w = sx * vw;
   const d = sz * vw;
   const rot = normalizeVoxelRot(placement.rot);
+  const scale = resolveEmberTransformScale(placement.scale);
 
   // Center pivot so yaw spins in place (SW corner stays consistent at rot=0).
   if (!group.userData.voxelPivotReady) {
@@ -50,4 +55,6 @@ export function applyVoxelPlacementTransform(
     placement.y * tileSize + d * 0.5,
   );
   group.rotation.y = rot * (Math.PI / 2);
+  // Ember uses X/Y on the map plane and Z vertically; Three uses X/Z + Y-up.
+  group.scale.set(scale.x, scale.z, scale.y);
 }

@@ -44,6 +44,8 @@ const FILTER_CHIPS: Array<{ id: RegionFilter; label: string }> = [
   { id: "teleport", label: "ТП" },
   { id: "trigger", label: "Триг" },
   { id: "camera_bound", label: "Кам*" },
+  { id: "npc_idle", label: "NPC" },
+  { id: "npc_wander", label: "Гуляет" },
 ];
 
 function kindRank(kind: MapRegionKind): number {

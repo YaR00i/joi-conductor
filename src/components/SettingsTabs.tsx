@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { Children, useEffect, useState, type ReactNode } from "react";
 
 /**
  * Lightweight tabbed container for SettingsPage.
@@ -7,11 +7,18 @@ import { useEffect, useState, type ReactNode } from "react";
  * the user's place. Mirrors the look of `.contracts-page__mode-toggle`.
  */
 
-export type SettingsTabId = "profile" | "voice" | "media" | "gameplay" | "debug";
+export type SettingsTabId =
+  | "profile"
+  | "brain"
+  | "voice"
+  | "media"
+  | "gameplay"
+  | "debug";
 
 const STORAGE_KEY = "joi-settings-tab-v1";
 const VALID_TABS: SettingsTabId[] = [
   "profile",
+  "brain",
   "voice",
   "media",
   "gameplay",
@@ -33,7 +40,7 @@ function loadInitialTab(): SettingsTabId {
   } catch {
     /* ignore */
   }
-  return "voice";
+  return "brain";
 }
 
 export function SettingsTabs({
@@ -55,7 +62,9 @@ export function SettingsTabs({
   }, [active]);
 
   // Map children to tabs by index (caller must keep them aligned).
-  const childArray = Array.isArray(children) ? children : [children];
+  const childArray = Children.toArray(children).filter(
+    (child) => typeof child !== "string" && typeof child !== "number",
+  );
   const activeIndex = Math.max(
     0,
     tabs.findIndex((t) => t.id === active),

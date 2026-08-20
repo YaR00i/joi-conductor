@@ -1894,6 +1894,8 @@ export class ArenaScene extends Phaser.Scene {
 
   getApi(): EmberGameApi {
     return {
+      ready: Promise.resolve(),
+      lockLook: () => undefined,
       pause: () => this.pauseLogic(),
       resume: () => this.resumeLogic(),
       applyLoot: (itemId: string) => this.applyLoot(itemId),

@@ -1,0 +1,24 @@
+---
+description: Архитектурный контракт движка и редактора Ember
+globs: "{src/game/**,src/components/ember/**,src/pages/Ember*.tsx,content/ember/**,docs/EMBER*.md}"
+alwaysApply: false
+---
+
+# Ember Engine Contract
+
+Перед изменениями прочитай `docs/EMBER_AI_HANDOFF.md`. Подробная продуктовая спецификация и roadmap находятся в `docs/EMBER_ANOMALY.md`.
+
+- Цель: единый Unity/Blender-подобный редактор кубичного/воксельного мира и надёжный Three.js runtime. Не создавай отдельную логику для тайлов, вокселей, света и регионов, если её можно выразить через общий WorldObject + Components + Modifiers.
+- Активный runtime — `src/game/three/EmberThreeWorld.ts`. `src/game/phaser/` считается legacy и не должен становиться второй реализацией новых систем.
+- Координаты данных: X/Y — плоскость карты, Z — высота. В Three.js это X/Z — земля, Y — вверх. Используй существующие функции преобразования, не переставляй оси вручную.
+- `position.z: null` означает наследование высоты поверхности. Scale X/Y/Z обязан одинаково учитываться renderer, collider, outline, light pivot и placement preview.
+- Коллизии объёмные по вертикали: блок мешает только при пересечении вертикальных spans тела и collider. Игрок должен проходить под достаточно высоким блоком.
+- Инспектор строится из компонентных схем и различает asset default, instance override и removed component. Изменения редактора должны поддерживать preview, undo/redo и сохранение одним контрактом.
+- Библиотека и viewport используют один placement/selection/inspector pipeline; не добавляй обходные UI-only записи в JSON.
+- Локальные PointLight-тени запекаются только для статического слоя 0. Игроки и враги находятся на dynamic layer 1 и исключены. Не возвращай fake/projected actor shadows без прямого запроса.
+- Полный static shadow bake выполняется через `beginStaticPointShadowBake`; ручная команда редактора — `rebuildStaticShadows()`. После изменения статической геометрии или света обязательно инвалидируй bake.
+- Сохраняй оптимизации: terrain chunks/workers, instancing, pooling, spatial hash, fixed-step AI/physics и streaming light budgets. Не добавляй per-frame `scene.traverse`, массовые allocations или динамические PointLight cube maps.
+- Сначала проверяй local overrides: браузерный override имеет приоритет над `content/ember`. Пустой файл на диске не доказывает отсутствие данных.
+- Рабочее дерево может быть сильно изменено пользователем. Не reset/checkout и не перезаписывай несвязанные файлы.
+- После изменений: targeted tests → `npm test` → `npm run build`; визуальные задачи проверяй в редакторе и игре, производительность — через F3, crowd stress — F4/Shift+F4.
+- Обновляй `docs/EMBER_AI_HANDOFF.md`, если меняется архитектурный контракт или ближайший план.
