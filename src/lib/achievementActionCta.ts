@@ -5,7 +5,8 @@ export type AchievementActionNav =
   | "roulette"
   | "session"
   | "shop"
-  | "contracts";
+  | "contracts"
+  | "minigames";
 
 export type AchievementActionCta = {
   nav: AchievementActionNav;
@@ -64,6 +65,11 @@ export function achievementActionCta(
     case "dares":
     case "promises":
       return { nav: "roulette", labelRu: "Открыть рулетку" };
+    case "runner_boss":
+    case "runner_wins":
+    case "runner_clean":
+    case "runner_crowd":
+      return { nav: "minigames", labelRu: "Открыть мини-игры" };
     default: {
       const _exhaustive: never = id;
       return _exhaustive;

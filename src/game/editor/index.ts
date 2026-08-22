@@ -4,6 +4,7 @@ export * from "./EditorDocumentStore";
 export * from "./EditorSelectionService";
 export * from "./EditorPickCycle";
 export * from "./EditorSelectionFilter";
+export * from "./mapPlanarMarquee";
 export * from "./EditorSceneState";
 export * from "./EditorToolRegistry";
 export * from "./world";

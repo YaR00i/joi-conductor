@@ -33,7 +33,13 @@ import {
   toys as catalogToys,
 } from "./lib/catalog";
 import { buildQueue } from "./lib/conductor";
-import { scoreFromMood } from "./lib/moodEngine";
+import {
+  applyProposalToParams,
+  CONTROL_CHANGED_EVENT,
+  loadControlState,
+  saveControlMood,
+} from "./lib/soul/control";
+import { moodFromScore, scoreFromMood } from "./lib/moodEngine";
 import { setCageLock } from "./lib/cageTimer";
 import { notifyCageLockChanged } from "./components/CageLockPill";
 import { notifyDenialQuestChanged } from "./components/DenialQuestPill";
@@ -191,6 +197,7 @@ import { ContractMediaDrillHud } from "./components/ContractMediaDrillHud";
 import { ContractsPage } from "./pages/ContractsPage";
 import { DiaryPage } from "./pages/DiaryPage";
 import { ChatPage } from "./pages/ChatPage";
+import { chatCheckInOverdue } from "./components/CheckInPill";
 import { StatsPage } from "./pages/StatsPage";
 import { RoulettePage } from "./pages/RoulettePage";
 import { SessionPage, type SessionSpeech } from "./pages/SessionPage";
@@ -781,6 +788,7 @@ export function App() {
   const [contractsOpenCount, setContractsOpenCount] = useState(() =>
     countOpenContracts(ensureDailyContractBoard()),
   );
+  const [chatWaiting, setChatWaiting] = useState(() => chatCheckInOverdue());
   const [contractsRevision, setContractsRevision] = useState(0);
   const [mediaDrillRevision, setMediaDrillRevision] = useState(0);
   const [sessionSeedRevision, setSessionSeedRevision] = useState(0);
@@ -1006,6 +1014,17 @@ export function App() {
     });
     runtimeRef.current?.setUnlocks(wallet.unlocks);
   }, [effectiveToys, wallet.unlocks]);
+
+  useEffect(() => {
+    const sync = () => setChatWaiting(chatCheckInOverdue());
+    sync();
+    const id = window.setInterval(sync, 15_000);
+    window.addEventListener(CONTROL_CHANGED_EVENT, sync);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener(CONTROL_CHANGED_EVENT, sync);
+    };
+  }, []);
 
   const fnById = useMemo(
     () => new Map(functions.map((f) => [f.id, f] as const)),
@@ -2513,7 +2532,10 @@ export function App() {
     setMediaDrillRevision((n) => n + 1);
   }
 
-  function startSessionSeed(contract: ContractInstance) {
+  function startSessionSeed(
+    contract: ContractInstance,
+    opts?: { navigate?: boolean },
+  ) {
     const started = startSessionSeedFromContract(contract);
     if (!started) return;
 
@@ -2545,7 +2567,9 @@ export function App() {
     setContractsRevision((n) => n + 1);
     rebuild(applySessionSeedToParams(params, seed));
     setActivePresetId(null);
-    setNav(plan.nav);
+    if (opts?.navigate !== false) {
+      setNav(plan.nav);
+    }
     setContractSessionFlash(plan.flashRu);
     window.setTimeout(() => setContractSessionFlash(null), 4200);
   }
@@ -2735,12 +2759,13 @@ export function App() {
     }
   }
 
-  async function startSession() {
+  async function startSession(overrideParams?: SessionParams) {
     await primeMetronome();
     setSessionMediaOverlay(null);
 
+    if (overrideParams) setParams(overrideParams);
     const seeded = applySessionSeedToParams(
-      params,
+      overrideParams ?? params,
       loadActiveSessionSeed(),
     );
     const sanitized = applyUnlockSanitize(
@@ -2794,7 +2819,7 @@ export function App() {
     setParams(sessionParams);
 
     const moodFix = sanitizeMoodForUnlocks(
-      getActiveMoodLines().defaultMood,
+      moodFromScore(loadControlState(getActiveMistress().id).moodScore),
       afterCum.state.unlocks,
     );
     const startMood = moodFix.mood;
@@ -2868,6 +2893,7 @@ export function App() {
       result.mood,
       walletRef.current.unlocks,
     );
+    saveControlMood(getActiveMistress().id, result.moodScore);
     if (sanitized.notice || moodFix.fixed) {
       setUnlockNotice(
         formatSanitizeMessage({
@@ -3228,6 +3254,7 @@ export function App() {
           cindersBalance={wallet.balance}
           diaryCount={diaryCount}
           contractsOpenCount={contractsOpenCount}
+          chatWaiting={chatWaiting}
           fullscreen={fullscreen}
           onToggleFullscreen={toggleFullscreen}
           onToggleCollapsed={() => {
@@ -3499,13 +3526,58 @@ export function App() {
               }}
             />
           ) : nav === "chat" ? (
-            <ChatPage tts={ttsRef.current} sessionLive={sessionLive} />
+            <ChatPage
+              tts={ttsRef.current}
+              sessionLive={sessionLive}
+              ttsVolume={voiceSettings.ttsVolume}
+              onTtsVolume={(v) =>
+                setVoiceSettings((s) =>
+                  setMistressVoiceTuning(s, getActiveMistress().id, {
+                    ttsVolume: v,
+                  }),
+                )
+              }
+              onStartHerSession={(proposal) => {
+                const next = applyProposalToParams(
+                  params,
+                  proposal.kind,
+                  proposal.durationSec,
+                  proposal.edgesTarget,
+                  proposal.finalePolicy,
+                  proposal.mode,
+                );
+                void startSession(next);
+              }}
+              onStartAssembledSession={(result) => {
+                void mistressDecide(result);
+              }}
+              onAcceptContract={(contract) => {
+                startSessionSeed(contract, { navigate: false });
+              }}
+              onPatchQueue={(edit) => {
+                if (!sessionLive) return false;
+                const st = state;
+                const rt = runtimeRef.current;
+                if (!st || !rt) return false;
+                if (edit === "drop_next") {
+                  rt.dropUpcomingBlock(st.index + 1);
+                  return true;
+                }
+                rt.insertRestAfter(st.index);
+                return true;
+              }}
+            />
           ) : nav === "minigames" ? (
             <MinigamesPage
               onReward={(n) => {
                 if (n <= 0) return;
                 setWallet((w) => creditCinders(w, n));
               }}
+              onSpend={(n) => {
+                if (n <= 0) return;
+                setWallet((w) => (w.balance >= n ? debitCinders(w, n) : w));
+              }}
+              walletBalance={wallet.balance}
             />
           ) : (
             <SessionPage

@@ -191,6 +191,44 @@ export function isWearTimerContractDefId(defId: string): boolean {
   return WEAR_TIMER_SEEDABLE.has(defId);
 }
 
+export const CONTRACT_PLAY_LANES = ["session", "live", "task"] as const;
+export type ContractPlayLane = (typeof CONTRACT_PLAY_LANES)[number];
+
+/** Where accepting this contract plays out. */
+export function contractPlayLane(defId: string): ContractPlayLane {
+  if (
+    defId === "session_deny_tomorrow" ||
+    defId === "chastity_night" ||
+    isWearTimerContractDefId(defId)
+  ) {
+    return "live";
+  }
+  if (
+    SESSION_MOD_SEEDABLE.has(defId) ||
+    EDGE_SEEDABLE.has(defId) ||
+    LIVE_GOAL_SEEDABLE.has(defId) ||
+    CBT_QUEST_SEEDABLE.has(defId)
+  ) {
+    return "session";
+  }
+  return "task";
+}
+
+export function contractPlayLaneLabelRu(lane: ContractPlayLane): string {
+  switch (lane) {
+    case "session":
+      return "Сессия Conductor";
+    case "live":
+      return "Вне сессии · таймер";
+    case "task":
+      return "Вне сессии · задание";
+    default: {
+      const _exhaustive: never = lane;
+      return _exhaustive;
+    }
+  }
+}
+
 export function wearTimerKindForDefId(
   defId: string,
 ): "cage" | "plug" | null {

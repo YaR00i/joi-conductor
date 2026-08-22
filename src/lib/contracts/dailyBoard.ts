@@ -210,11 +210,12 @@ function instantiate(
   dayKey: string,
   mistressId: MistressId,
   rng: () => number,
+  paramOverrides?: Record<string, string | number>,
 ): ContractInstance {
   if (def.kind === "media_drill") {
     return instantiateMediaDrill(def, dayKey, mistressId, rng);
   }
-  const params = rollParams(def, rng);
+  const params = { ...rollParams(def, rng), ...paramOverrides };
   if (def.kind === "finish_debrief" && def.finishDebriefPreset) {
     params.finishDebriefPreset = def.finishDebriefPreset;
   }
@@ -622,6 +623,39 @@ export function findContract(
 ): ContractInstance | null {
   const board = ensureDailyContractBoard();
   return board.contracts.find((c) => c.instanceId === instanceId) ?? null;
+}
+
+/** Put a program-assigned contract on today's board with fixed params. */
+export function assignProgramContract(
+  defId: string,
+  paramOverrides: Record<string, string | number> = {},
+  titleRu?: string,
+): ContractInstance | null {
+  const def = getContractDef(defId);
+  if (!def) return null;
+  const board = ensureDailyContractBoard();
+  const rng = mulberry32(
+    hashSeed(`${board.dayKey}|${defId}|program|${Date.now()}`),
+  );
+  const instance = instantiate(
+    def,
+    board.dayKey,
+    board.mistressId,
+    rng,
+    paramOverrides,
+  );
+  const named = titleRu ? { ...instance, titleRu } : instance;
+  const replaceAt = board.contracts.findIndex(
+    (c) => c.status === "open" && c.acceptedAtMs == null && c.defId !== defId,
+  );
+  const contracts = board.contracts.slice();
+  if (replaceAt >= 0) {
+    contracts[replaceAt] = named;
+  } else {
+    contracts.push(named);
+  }
+  saveContractBoard({ ...board, contracts });
+  return named;
 }
 
 export function categoryLabelRu(cat: ContractCategory): string {

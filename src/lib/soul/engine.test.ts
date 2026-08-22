@@ -23,13 +23,13 @@ function scriptedClient(replies: string[]): SoulLlmClient {
     async complete() {
       const next = queue.shift();
       if (next == null) throw new Error("no scripted reply");
-      return next;
+      return { text: next };
     },
   };
 }
 
 describe("soul chat engine", () => {
-  it("keeps the chat prompt off the session queue", () => {
+  it("injects compact mistress OS and allows action JSON, not the conductor", () => {
     const state = emptyMistressState(bible.nameRu, bible.tone);
     const withUser = {
       ...state,
@@ -44,13 +44,18 @@ describe("soul chat engine", () => {
     };
     const messages = buildChatMessages(bible, withUser, "Привет, как тебя зовут?");
     const system = messages[0]?.content ?? "";
-    expect(system).toContain("does not control the JOI queue");
-    expect(system).not.toMatch(/edgesTarget|block_start|"text":"..."/);
+    expect(system).not.toContain("does not control the JOI queue");
+    expect(system).toContain("CONTROL");
+    expect(system).toContain("Do not output JSON");
+    expect(system).not.toMatch(/block_start|"text":"..."/);
     expect(system).toContain("MEMORY.md");
     expect(system).toContain("Russian in → Russian out");
-    expect(system).toContain("/no_think");
+    expect(system).toContain("/think");
+    expect(system).not.toContain("/no_think");
     expect(system).not.toContain("You are the CONDUCTOR");
     expect(system).not.toMatch(/Reply with ONLY one JSON/);
+    expect(system).toContain("THIS TURN");
+    expect(system).not.toContain("Trigger:");
   });
 
   it("drops the session conductor/JSON recipe from the chat persona", () => {
@@ -84,6 +89,44 @@ describe("soul chat engine", () => {
     expect(result.state.messages).toHaveLength(2);
     expect(result.state.pendingSinceRouter).toBe(2);
     expect(soulNeedsSync(result.state)).toBe(false);
+  });
+
+  it("does not duplicate a user line already on the thread", async () => {
+    const client = scriptedClient(["Хе-хе."]);
+    const seeded = emptyMistressState(bible.nameRu, bible.tone);
+    seeded.messages = [
+      { id: "u1", role: "user", text: "Привет", atMs: 1 },
+    ];
+    const result = await sendSoulChatTurn({
+      state: seeded,
+      bible,
+      userText: "Привет",
+      client,
+      nowMs: 1000,
+    });
+    expect(result.state.messages.filter((m) => m.role === "user")).toHaveLength(
+      1,
+    );
+    expect(result.state.messages).toHaveLength(2);
+  });
+
+  it("stores think on the assistant bubble without speaking it", async () => {
+    const client: SoulLlmClient = {
+      async complete() {
+        return { text: "Привет, глупыш.", think: "He just said hi. Greet back." };
+      },
+    };
+    const result = await sendSoulChatTurn({
+      state: emptyMistressState(bible.nameRu, bible.tone),
+      bible,
+      userText: "Привет",
+      client,
+    });
+    expect(result.reply).toBe("Привет, глупыш.");
+    expect(result.state.messages[1]?.text).toBe("Привет, глупыш.");
+    expect(result.state.messages[1]?.think).toBe(
+      "He just said hi. Greet back.",
+    );
   });
 
   it("keeps the user line if the model fails", async () => {
@@ -128,6 +171,74 @@ describe("soul chat engine", () => {
     expect(reroll.reply).toBe("Новый ответ.");
     expect(reroll.state.messages).toHaveLength(2);
     expect(reroll.state.messages[1]?.text).toBe("Новый ответ.");
+  });
+
+  it("strips trailing control JSON from the stored bubble", async () => {
+    const result = await sendSoulChatTurn({
+      state: emptyMistressState(bible.nameRu, bible.tone),
+      bible,
+      userText: "Запирай",
+      client: scriptedClient([
+        'Клетка. {"actions":[{"op":"set_wear","kind":"cage","hours":2}]}',
+      ]),
+      nowMs: 5,
+    });
+    expect(result.reply).toBe("Клетка.");
+    expect(result.actions[0]?.op).toBe("set_wear");
+    expect(result.state.messages[1]?.text).toBe("Клетка.");
+    expect(result.state.messages[1]?.text).not.toContain("actions");
+  });
+
+  it("asks a follow-up JSON call when speech implies a session", async () => {
+    const result = await sendSoulChatTurn({
+      state: emptyMistressState(bible.nameRu, bible.tone),
+      bible,
+      userText: "Я сделал утренние упражнения и побрился",
+      client: scriptedClient([
+        "Молодец, Серёжа. Сессия будет.",
+        '{"actions":[{"op":"propose_session","kind":"edges","durationSec":1800,"edgesTarget":5,"finalePolicy":"ruin_norm"}]}',
+      ]),
+      nowMs: 8,
+    });
+    expect(result.reply).toBe("Молодец, Серёжа. Сессия будет.");
+    expect(result.reply).not.toContain("actions");
+    expect(result.actions).toEqual([]);
+  });
+
+  it("does not extract control from a hello that mentions an existing cage", async () => {
+    let calls = 0;
+    const client: SoulLlmClient = {
+      async complete() {
+        calls += 1;
+        if (calls === 1) {
+          return { text: "Привет, Серёжа. Ты уже носишь клетку на ночь." };
+        }
+        return {
+          text: '{"actions":[{"op":"propose_session","kind":"edges","durationSec":600,"edgesTarget":5,"finalePolicy":"ruin_norm"}]}',
+        };
+      },
+    };
+    const result = await sendSoulChatTurn({
+      state: emptyMistressState(bible.nameRu, bible.tone),
+      bible,
+      userText: "Привет, Хутао",
+      client,
+    });
+    expect(calls).toBe(1);
+    expect(result.actions).toEqual([]);
+  });
+
+  it("drops a leaked session seed on a greeting", async () => {
+    const result = await sendSoulChatTurn({
+      state: emptyMistressState(bible.nameRu, bible.tone),
+      bible,
+      userText: "Привет",
+      client: scriptedClient([
+        'Привет. {"actions":[{"op":"propose_session","kind":"edges","durationSec":600,"edgesTarget":5,"finalePolicy":"ruin_norm"}]}',
+      ]),
+    });
+    expect(result.reply).toBe("Привет.");
+    expect(result.actions).toEqual([]);
   });
 
   it("runs router + diary after four messages and writes a topic", async () => {

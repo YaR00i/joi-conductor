@@ -27,6 +27,8 @@ interface SideNavProps {
   diaryCount?: number;
   /** Open contracts remaining today */
   contractsOpenCount?: number;
+  /** Mistress check-in overdue */
+  chatWaiting?: boolean;
   fullscreen?: boolean;
   onToggleFullscreen?: () => void;
 }
@@ -41,6 +43,7 @@ export function SideNav({
   cindersBalance = 0,
   diaryCount = 0,
   contractsOpenCount = 0,
+  chatWaiting = false,
   fullscreen = false,
   onToggleFullscreen,
 }: SideNavProps) {
@@ -93,6 +96,11 @@ export function SideNav({
       >
         <ChatIcon />
         <span>Чат</span>
+        {chatWaiting ? (
+          <span className="side-nav__badge" title="Она ждёт отчёт">
+            !
+          </span>
+        ) : null}
       </button>
 
       <button

@@ -1,13 +1,23 @@
 import type { CharacterBible } from "../character";
+import type { MistressId } from "../mistress/types";
 import { appendDiaryEntry, clampTopicBody } from "./markdown";
 import type { SoulLlmClient } from "./client";
 import {
   buildArchivistPrompt,
   buildChatMessages,
+  buildControlExtractPrompt,
   buildDiaryPrompt,
   buildRouterPrompt,
   formatSoulTranscript,
 } from "./prompts";
+import {
+  applyRouterControlHint,
+  looksLikeControlIntent,
+  parseControlActions,
+  splitControlReply,
+  filterControlActions,
+} from "./control/actions";
+import { parseJsonObject } from "./json";
 import {
   applySoulRouterPatch,
   parseSoulRouterOutput,
@@ -24,12 +34,68 @@ import {
   soulUsesTopics,
   type SoulMistressState,
 } from "./types";
+import type { ControlAction } from "./control/types";
 
 export type SoulTurnResult = {
   state: SoulMistressState;
   reply: string;
+  actions: ControlAction[];
   error?: string;
 };
+
+function mistressIdFromBible(bible: CharacterBible): MistressId {
+  switch (bible.id) {
+    case "hu_tao":
+    case "furina":
+    case "sunna":
+    case "sparkle":
+      return bible.id;
+    default:
+      return "hu_tao";
+  }
+}
+
+async function resolveControlFromReply(opts: {
+  raw: string;
+  userText: string;
+  bible: CharacterBible;
+  client: SoulLlmClient;
+  signal?: AbortSignal;
+}): Promise<{ speech: string; actions: ControlAction[] }> {
+  const split = splitControlReply(opts.raw);
+  const keep = (speech: string, actions: ControlAction[]) => ({
+    speech,
+    actions: filterControlActions(actions, opts.userText, speech),
+  });
+  if (split.actions.length > 0) return keep(split.speech, split.actions);
+  if (!looksLikeControlIntent(opts.userText, split.speech)) return keep(split.speech, []);
+  try {
+    const extracted = (
+      await opts.client.complete({
+        messages: [
+          {
+            role: "user",
+            content: buildControlExtractPrompt(
+              opts.bible,
+              opts.userText,
+              split.speech,
+            ),
+          },
+        ],
+        maxTokens: 400,
+        temperature: 0.1,
+        signal: opts.signal,
+      })
+    ).text;
+    const fromJson = parseControlActions(parseJsonObject(extracted) ?? {});
+    if (fromJson.length > 0) return keep(split.speech, fromJson);
+    const second = splitControlReply(extracted);
+    return keep(split.speech, second.actions);
+  } catch (err) {
+    if ((err as { name?: string }).name === "AbortError") throw err;
+    return keep(split.speech, []);
+  }
+}
 
 async function writeTopicFile(
   client: SoulLlmClient,
@@ -41,23 +107,25 @@ async function writeTopicFile(
   const resolved = resolveTopicActionTarget(state.topics, action);
   const previous =
     state.topics.find((t) => t.filename === resolved.filename)?.body ?? "";
-  const body = await client.complete({
-    messages: [
-      {
-        role: "user",
-        content: buildArchivistPrompt(
-          bible,
-          resolved.filename,
-          resolved.reason,
-          previous,
-          formatSoulTranscript(state.messages, 10),
-        ),
-      },
-    ],
-    maxTokens: 700,
-    temperature: 0.55,
-    signal,
-  });
+  const body = (
+    await client.complete({
+      messages: [
+        {
+          role: "user",
+          content: buildArchivistPrompt(
+            bible,
+            resolved.filename,
+            resolved.reason,
+            previous,
+            formatSoulTranscript(state.messages, 10),
+          ),
+        },
+      ],
+      maxTokens: 700,
+      temperature: 0.55,
+      signal,
+    })
+  ).text;
   return {
     ...state,
     topics: upsertSoulTopic(
@@ -82,23 +150,26 @@ export async function syncSoulMemory(
   let next = { ...state, pendingSinceRouter: 0 };
 
   if (soulUsesRouter(state.mode)) {
-    const raw = await client.complete({
-      messages: [
-        {
-          role: "user",
-          content: buildRouterPrompt(
-            bible,
-            state,
-            soulRouterLite(state.mode),
-          ),
-        },
-      ],
-      maxTokens: 1400,
-      temperature: 0.15,
-      signal,
-    });
+    const raw = (
+      await client.complete({
+        messages: [
+          {
+            role: "user",
+            content: buildRouterPrompt(
+              bible,
+              state,
+              soulRouterLite(state.mode),
+            ),
+          },
+        ],
+        maxTokens: 1400,
+        temperature: 0.15,
+        signal,
+      })
+    ).text;
     const parsed = parseSoulRouterOutput(raw, state);
     if (parsed) next = applySoulRouterPatch(next, parsed);
+    applyRouterControlHint(mistressIdFromBible(bible), parseJsonObject(raw));
     if (
       parsed?.kind === "patch" &&
       soulUsesTopics(state.mode) &&
@@ -111,12 +182,14 @@ export async function syncSoulMemory(
   }
 
   if (soulUsesDiary(state.mode)) {
-    const diary = await client.complete({
-      messages: [{ role: "user", content: buildDiaryPrompt(bible, next) }],
-      maxTokens: 420,
-      temperature: 0.7,
-      signal,
-    });
+    const diary = (
+      await client.complete({
+        messages: [{ role: "user", content: buildDiaryPrompt(bible, next) }],
+        maxTokens: 420,
+        temperature: 0.7,
+        signal,
+      })
+    ).text;
     next = {
       ...next,
       diaryMd: appendDiaryEntry(next.diaryMd, diary, nowMs),
@@ -124,6 +197,19 @@ export async function syncSoulMemory(
   }
 
   return next;
+}
+
+function appendUserIfNeeded(
+  state: SoulMistressState,
+  text: string,
+  nowMs: number,
+): SoulMistressState {
+  const last = state.messages[state.messages.length - 1];
+  if (last?.role === "user" && last.text === text) return state;
+  return {
+    ...state,
+    messages: [...state.messages, newSoulMessage("user", text, nowMs)],
+  };
 }
 
 export async function sendSoulChatTurn(opts: {
@@ -136,28 +222,36 @@ export async function sendSoulChatTurn(opts: {
 }): Promise<SoulTurnResult> {
   const text = opts.userText.trim();
   if (!text) {
-    return { state: opts.state, reply: "" };
+    return { state: opts.state, reply: "", actions: [] };
   }
   const nowMs = opts.nowMs ?? Date.now();
-  const withUser: SoulMistressState = {
-    ...opts.state,
-    messages: [...opts.state.messages, newSoulMessage("user", text, nowMs)],
-  };
+  const withUser = appendUserIfNeeded(opts.state, text, nowMs);
   const messages = buildChatMessages(opts.bible, withUser, text);
   try {
     const reply = await opts.client.complete({
       messages,
       signal: opts.signal,
+      think: true,
+    });
+    const { speech, actions } = await resolveControlFromReply({
+      raw: reply.text,
+      userText: text,
+      bible: opts.bible,
+      client: opts.client,
+      signal: opts.signal,
     });
     return {
-      reply,
+      reply: speech,
+      actions,
       state: {
         ...withUser,
-        messages: [
-          ...withUser.messages,
-          newSoulMessage("assistant", reply, nowMs + 1),
-        ],
-        pendingSinceRouter: withUser.pendingSinceRouter + 2,
+        messages: speech
+          ? [
+              ...withUser.messages,
+              newSoulMessage("assistant", speech, nowMs + 1, reply.think),
+            ]
+          : withUser.messages,
+        pendingSinceRouter: withUser.pendingSinceRouter + (speech ? 2 : 1),
       },
     };
   } catch (err) {
@@ -165,6 +259,7 @@ export async function sendSoulChatTurn(opts: {
     return {
       state: withUser,
       reply: "",
+      actions: [],
       error: err instanceof Error ? err.message : "модель не ответила",
     };
   }
@@ -217,11 +312,11 @@ export async function regenerateSoulReply(opts: {
 }): Promise<SoulTurnResult> {
   const sliced = truncateForRegenerate(opts.state, opts.messageId);
   if (!sliced) {
-    return { state: opts.state, reply: "", error: "нечего перегенерировать" };
+    return { state: opts.state, reply: "", actions: [], error: "нечего перегенерировать" };
   }
   const userText = lastSoulUserText(sliced);
   if (!userText) {
-    return { state: opts.state, reply: "", error: "нет реплики, от которой крутить" };
+    return { state: opts.state, reply: "", actions: [], error: "нет реплики, от которой крутить" };
   }
   const nowMs = opts.nowMs ?? Date.now();
   const messages = buildChatMessages(opts.bible, sliced, userText);
@@ -229,15 +324,26 @@ export async function regenerateSoulReply(opts: {
     const reply = await opts.client.complete({
       messages,
       signal: opts.signal,
+      think: true,
+    });
+    const { speech, actions } = await resolveControlFromReply({
+      raw: reply.text,
+      userText,
+      bible: opts.bible,
+      client: opts.client,
+      signal: opts.signal,
     });
     return {
-      reply,
+      reply: speech,
+      actions,
       state: {
         ...sliced,
-        messages: [
-          ...sliced.messages,
-          newSoulMessage("assistant", reply, nowMs),
-        ],
+        messages: speech
+          ? [
+              ...sliced.messages,
+              newSoulMessage("assistant", speech, nowMs, reply.think),
+            ]
+          : sliced.messages,
       },
     };
   } catch (err) {
@@ -245,6 +351,7 @@ export async function regenerateSoulReply(opts: {
     return {
       state: opts.state,
       reply: "",
+      actions: [],
       error: err instanceof Error ? err.message : "модель не ответила",
     };
   }

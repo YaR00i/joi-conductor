@@ -12,6 +12,7 @@ export type SoulChatMessage = {
   role: SoulChatRole;
   text: string;
   atMs: number;
+  think?: string;
 };
 
 export type SoulTopicFile = {
@@ -70,7 +71,7 @@ export function emptyCharacterMemory(
     psychologicalTension: "First contact — watching him.",
     emotionalDecayCounter: 0,
     activeAgenda: "Learn who he is without giving the session away.",
-    immediateFocus: "This conversation, not the queue.",
+    immediateFocus: "This conversation, and the constraints she sets.",
     cognitiveDissonance: "None",
   };
 }

@@ -133,6 +133,83 @@ function pushBoxEdges(
   }
 }
 
+/** Live Shift+LMB group frame on one work-plane story (not terrain-following). */
+export type PlanarMarqueeMark = {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  elev: number;
+};
+
+export function addPlanarMarqueeOutline(
+  root: THREE.Object3D,
+  map: EmberMap,
+  mark: PlanarMarqueeMark,
+): void {
+  if (mark.x1 < mark.x0 || mark.y1 < mark.y0) return;
+  const ts = map.tileSize;
+  const storyH = blockStoryHeight(ts);
+  const { y0, y1 } = elevStoryWorldSpan(mark.elev, storyH);
+  const pad = 0.22;
+  const minX = mark.x0 * ts - pad;
+  const maxX = (mark.x1 + 1) * ts + pad;
+  const minZ = mark.y0 * ts - pad;
+  const maxZ = (mark.y1 + 1) * ts + pad;
+  const y = y1 + 0.18;
+  const positions: number[] = [];
+  const corners: [number, number][] = [
+    [minX, minZ],
+    [maxX, minZ],
+    [maxX, maxZ],
+    [minX, maxZ],
+  ];
+  for (let i = 0; i < 4; i++) {
+    const a = corners[i]!;
+    const b = corners[(i + 1) % 4]!;
+    positions.push(a[0], y, a[1], b[0], y, b[1]);
+  }
+  const post = Math.max(2.4, storyH * 0.4);
+  for (const [x, z] of corners) {
+    positions.push(x, y0 - 0.1, z, x, y, z);
+    positions.push(x, y, z, x, y + post * 0.15, z);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  const lines = new THREE.LineSegments(
+    geo,
+    new THREE.LineBasicMaterial({
+      color: 0x7ec8ff,
+      transparent: true,
+      opacity: 0.96,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+    }),
+  );
+  lines.renderOrder = 34;
+  lines.frustumCulled = false;
+  root.add(lines);
+
+  const fill = new THREE.Mesh(
+    new THREE.PlaneGeometry(maxX - minX, maxZ - minZ),
+    new THREE.MeshBasicMaterial({
+      color: 0x5aa8e8,
+      transparent: true,
+      opacity: 0.16,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  fill.rotation.x = -Math.PI / 2;
+  fill.position.set((minX + maxX) * 0.5, y, (minZ + maxZ) * 0.5);
+  fill.renderOrder = 33;
+  fill.frustumCulled = false;
+  root.add(fill);
+}
+
 /** Single AABB outline for a region rect (camera_bound / large zones). */
 export function addRegionBoundsOutline(
   root: THREE.Object3D,

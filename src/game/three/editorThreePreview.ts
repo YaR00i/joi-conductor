@@ -69,6 +69,7 @@ import {
   addLampRangeRing,
   addObjectBoundaryOutline,
   addPlacePreviewOutline,
+  addPlanarMarqueeOutline,
   addRegionBoundsOutline,
   addTileCellOutlines,
   clearOutlineRoot,
@@ -79,6 +80,7 @@ import {
   type LampRangeMark,
   type OutlineTone,
   type PlacePreviewMark,
+  type PlanarMarqueeMark,
 } from "./selectionOutline";
 
 export type { PlacePreviewMark } from "./selectionOutline";
@@ -174,6 +176,8 @@ export type EditorOverlayMarks = {
   selectedMany?: ReadonlyArray<EditorPick> | null;
   /** Active paint / fill drag cells. */
   selectTiles?: ReadonlyArray<{ tx: number; ty: number }> | null;
+  /** Shift+LMB group frame on the locked Z plane. */
+  planarMarquee?: PlanarMarqueeMark | null;
   /** Library drag-over / click-place preview tile. */
   libTile?: { tx: number; ty: number } | null;
   /** Minecraft-like brush place ghost (tx/ty + locked elev). */
@@ -517,6 +521,7 @@ export function createEditorThreePreview(
     selected: EditorPick | null;
     selectedMany: EditorPick[];
     selectTiles: { tx: number; ty: number }[];
+    planarMarquee: PlanarMarqueeMark | null;
     libTile: { tx: number; ty: number } | null;
     placePreview: PlacePreviewMark | null;
     elevGizmoTarget: PlacePreviewMark | null;
@@ -529,6 +534,7 @@ export function createEditorThreePreview(
     selected: null,
     selectedMany: [],
     selectTiles: [],
+    planarMarquee: null,
     libTile: null,
     placePreview: null,
     elevGizmoTarget: null,
@@ -1007,6 +1013,9 @@ export function createEditorThreePreview(
       );
     }
     tileBatch(overlayMarks.selectTiles, "select");
+    if (overlayMarks.planarMarquee) {
+      addPlanarMarqueeOutline(outlineRoot, map, overlayMarks.planarMarquee);
+    }
     if (overlayMarks.libTile) {
       tileBatch([overlayMarks.libTile], "lib");
     }
@@ -2067,6 +2076,11 @@ export function createEditorThreePreview(
         overlayMarks.selectTiles = marks.selectTiles
           ? marks.selectTiles.map((c) => ({ tx: c.tx, ty: c.ty }))
           : [];
+      }
+      if (marks.planarMarquee !== undefined) {
+        overlayMarks.planarMarquee = marks.planarMarquee
+          ? { ...marks.planarMarquee }
+          : null;
       }
       if (marks.libTile !== undefined) overlayMarks.libTile = marks.libTile;
       if (marks.placePreview !== undefined) {

@@ -29,6 +29,8 @@ import {
   advanceEditorPickCycle,
   filterEditorSelectionStack,
   includeRegionInViewportPick,
+  collectPlanarMarqueeHits,
+  normalizePlanarMarqueeRect,
   normalizeEditorSelectionFilter,
   EditorSceneState,
   emberWorldObjectRefKey,
@@ -168,7 +170,7 @@ import {
   pairTeleportRegions,
   replaceRegion,
 } from "./MapRegionEditor";
-import { makeRegionAt } from "./mapRegionHelpers";
+import { makeRegionAt, newRegionId } from "./mapRegionHelpers";
 import { MapRegionsPanel } from "./MapRegionsPanel";
 import { MapSpawnEditor } from "./MapSpawnEditor";
 import { MapStageForm } from "./MapStageForm";
@@ -404,7 +406,7 @@ const TOOLS: Array<{
   {
     id: "select",
     labelRu: "Выбор",
-    hint: "Клик — объект / тайл → гизмо · G — перенос · R — поворот · S — масштаб",
+    hint: "Клик — объект / тайл · Shift+ЛКМ — рамка на Z · Ctrl+клик — мультивыбор · G/R/S",
     glyph: "V",
   },
   {
@@ -1191,8 +1193,14 @@ export function MapEditorPanel({
   const wallPaintDelta = useRef<number | null>(null);
   const dragStartRef = useRef<TilePos | null>(null);
   const dragEndRef = useRef<TilePos | null>(null);
+  const marqueeing = useRef(false);
+  const marqueeAddRef = useRef(false);
+  const marqueeElevRef = useRef(0);
+  const marqueeStartRef = useRef<TilePos | null>(null);
+  const marqueeEndRef = useRef<TilePos | null>(null);
   const toolRef = useRef<Tool>("select");
   const mapRef = useRef(map);
+  const packRef = useRef(pack);
   const onChangeRef = useRef(onChange);
   const editorCoreRef = useRef<
     EditorCore<EmberMap, MapSelection, Tool> | null
@@ -1339,6 +1347,13 @@ export function MapEditorPanel({
   const [showAtmosphereFx, setShowAtmosphereFx] = useState(true);
   /** Editor viewport only — authored night/bloom/grade/lamps (off = clean day look). */
   const [showLookFx, setShowLookFx] = useState(true);
+  const [showEditorHints, setShowEditorHints] = useState(() => {
+    try {
+      return sessionStorage.getItem("ember-map-show-hints") !== "0";
+    } catch {
+      return true;
+    }
+  });
   const [viewMode, setViewMode] = useState<MapViewMode>("top");
   const viewModeRef = useRef(viewMode);
   viewModeRef.current = viewMode;
@@ -1490,6 +1505,16 @@ export function MapEditorPanel({
         .map((item) => selectionToPick(item, lamps, mapRef.current.regions))
         .filter((pick): pick is EditorPick => pick != null),
       selectTiles: dragCells(dragSelRef.current),
+      planarMarquee: marqueeSelRef.current
+        ? {
+            ...normalizePlanarMarqueeRect(
+              marqueeSelRef.current.start,
+              marqueeSelRef.current.end,
+              mapRef.current,
+            ),
+            elev: marqueeSelRef.current.elev,
+          }
+        : null,
       libTile: lib ? { tx: lib.x, ty: lib.y } : null,
       placePreview: placePreviewRef.current,
       // Hook for a future axis gizmo — currently only tracks selected cell elev.
@@ -1632,6 +1657,17 @@ export function MapEditorPanel({
   ]);
   syncThreeOverlaysRef.current = syncThreeOverlays;
 
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        "ember-map-show-hints",
+        showEditorHints ? "1" : "0",
+      );
+    } catch {
+      /* private mode / quota */
+    }
+  }, [showEditorHints]);
+
   const stagesForMap = useMemo(() => {
     const all = Object.values(pack.stages);
     const linked = all.filter((s) => s.mapId === map.id);
@@ -1698,6 +1734,14 @@ export function MapEditorPanel({
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      if (marqueeing.current) {
+        marqueeing.current = false;
+        marqueeAddRef.current = false;
+        marqueeStartRef.current = null;
+        marqueeEndRef.current = null;
+        setMarqueeSel(null);
+        return;
+      }
       if (objectGrabRef.current) {
         setObjectGrab(null);
         return;
@@ -1740,8 +1784,13 @@ export function MapEditorPanel({
     const center = btnRect.left + btnRect.width / 2 - barRect.left;
     const half = popW / 2;
     const pad = 8;
+    const main = bar.parentElement;
+    const outliner = main?.querySelector(".ember-outliner");
+    const outlinerW =
+      outliner instanceof HTMLElement ? outliner.getBoundingClientRect().width : 0;
+    const minCenter = outlinerW + half + pad + 6;
     const left = Math.max(
-      half + pad,
+      Math.max(half + pad, minCenter),
       Math.min(barRect.width - half - pad, center),
     );
     setDockPopStyle({
@@ -1780,6 +1829,14 @@ export function MapEditorPanel({
     start: TilePos;
     end: TilePos;
   } | null>(null);
+  const [marqueeSel, setMarqueeSel] = useState<{
+    start: TilePos;
+    end: TilePos;
+    elev: number;
+    add: boolean;
+  } | null>(null);
+  const marqueeSelRef = useRef(marqueeSel);
+  marqueeSelRef.current = marqueeSel;
   toolRef.current = tool;
 
   const tileset: EmberTileset | undefined = pack.tilesets[map.tilesetId];
@@ -1898,6 +1955,7 @@ export function MapEditorPanel({
   );
 
   mapRef.current = map;
+  packRef.current = pack;
   onChangeRef.current = onChange;
 
   useEffect(() => {
@@ -2241,6 +2299,7 @@ export function MapEditorPanel({
     };
   }, [
     dragSel,
+    marqueeSel,
     libHoverTile,
     libSelected,
     libRegionDraft,
@@ -2327,35 +2386,61 @@ export function MapEditorPanel({
   const deleteWorldSelection = useCallback(
     (objects: readonly EmberWorldObject[]) => {
       const editable = objects.filter((object) => !sceneState.isLocked(object.key));
-      if (editable.length === 0) {
-        onSaved("Выбранные объекты заблокированы в Outliner.");
+      const tileItems = selectionService
+        .getState()
+        .items.filter(
+          (item): item is Extract<MapSelection, { kind: "tile" }> =>
+            item.kind === "tile",
+        );
+      if (editable.length === 0 && tileItems.length === 0) {
+        if (objects.length > 0) {
+          onSaved("Выбранные объекты заблокированы в Outliner.");
+        }
         return;
       }
       const current = mapRef.current;
-      pushHistory(current, `Удалить ${editable.length} объектов`);
+      const parts: string[] = [];
+      if (editable.length > 0) parts.push(`${editable.length} объектов`);
+      if (tileItems.length > 0) parts.push(`${tileItems.length} блоков`);
+      pushHistory(current, `Удалить ${parts.join(" и ")}`);
       const refs = editable.map((object) => object.ref);
       const lightRefs = refs.filter(
         (ref): ref is Extract<EmberWorldObjectRef, { kind: "light" }> =>
           ref.kind === "light",
       );
-      let next = removeEmberWorldObjects(
-        current,
-        refs.filter((ref) => ref.kind !== "light"),
-      );
+      let next =
+        editable.length > 0
+          ? removeEmberWorldObjects(
+              current,
+              refs.filter((ref) => ref.kind !== "light"),
+            )
+          : current;
       if (tileset) {
         for (const ref of lightRefs) {
           next = removeLanternSource(next, tileset, pack.sprites, ref.id);
         }
-        next = normalizeEmberSceneHierarchy(next);
+        if (lightRefs.length > 0) {
+          next = normalizeEmberSceneHierarchy(next);
+        }
       } else if (lightRefs.length > 0) {
         next = removeEmberWorldObjects(next, lightRefs);
       }
+      if (tileItems.length > 0) {
+        next = ensureMapLayers(cloneMap(next));
+        for (const tile of tileItems) {
+          const elev =
+            tile.elev ?? topOccupiedElevAt(next, tile.tx, tile.ty);
+          if (elev == null) continue;
+          clearElevTile(next, tile.tx, tile.ty, elev);
+        }
+      }
       publishMap(next);
       selectionService.clear();
+      const skipped = objects.length - editable.length;
       onSaved(
-        editable.length === objects.length
-          ? `Удалено объектов: ${editable.length}`
-          : `Удалено ${editable.length}; заблокированные пропущены.`,
+        skipped > 0
+          ? `Удалено ${parts.join(" и ")}; заблокированные пропущены.`
+          : `Удалено: ${parts.join(" и ")}`,
       );
     },
     [
@@ -2367,6 +2452,75 @@ export function MapEditorPanel({
       selectionService,
       tileset,
     ],
+  );
+
+  const duplicateWorldSelection = useCallback(
+    (objects: readonly EmberWorldObject[]) => {
+      const editable = objects.filter(
+        (object) => !sceneState.isLocked(object.key) && object.kind !== "tile",
+      );
+      if (editable.length === 0) {
+        onSaved("Нечего дублировать — выбери объект или разблокируй его.");
+        return;
+      }
+      const current = mapRef.current;
+      pushHistory(current, `Дублировать ${editable.length} объектов`);
+      const next = cloneMap(current);
+      const created: MapSelection[] = [];
+      const stamp = Date.now().toString(36);
+      const bumpX = (x: number) => Math.min(next.width - 1, x + 1);
+      for (const [index, object] of editable.entries()) {
+        if (object.kind === "voxel") {
+          const src = (next.voxelProps ?? []).find((p) => p.id === object.id);
+          if (!src) continue;
+          const newId = `vx_${stamp}_${index}`;
+          next.voxelProps = [
+            ...(next.voxelProps ?? []),
+            { ...src, id: newId, x: bumpX(src.x) },
+          ];
+          created.push({ kind: "voxel", id: newId });
+        } else if (object.kind === "sprite") {
+          const src = (next.sprites ?? []).find((p) => p.id === object.id);
+          if (!src) continue;
+          const newId = `sp_${stamp}_${index}`;
+          next.sprites = [
+            ...(next.sprites ?? []),
+            { ...src, id: newId, x: bumpX(src.x) },
+          ];
+          created.push({ kind: "sprite", id: newId });
+        } else if (object.kind === "light") {
+          const src = (next.lights ?? []).find((p) => p.id === object.id);
+          if (!src) continue;
+          const newId = `light_${stamp}_${index}`;
+          next.lights = [
+            ...(next.lights ?? []),
+            { ...src, id: newId, x: bumpX(src.x) },
+          ];
+          created.push({ kind: "light", id: newId });
+        } else if (object.kind === "region") {
+          const src = next.regions.find((p) => p.id === object.id);
+          if (!src) continue;
+          const newId = newRegionId(next.regions, src.kind);
+          next.regions = [
+            ...next.regions,
+            {
+              ...src,
+              id: newId,
+              x: Math.min(next.width - src.w, src.x + 1),
+            },
+          ];
+          created.push({ kind: "region", id: newId });
+        }
+      }
+      if (created.length === 0) {
+        onSaved("Эти объекты нельзя дублировать (нет авторской копии).");
+        return;
+      }
+      publishMap(normalizeEmberSceneHierarchy(next));
+      selectionService.replaceMany(created, created.at(-1) ?? null);
+      onSaved(`Продублировано: ${created.length}`);
+    },
+    [onSaved, publishMap, pushHistory, sceneState, selectionService],
   );
 
   const setWorldSelectionElevation = useCallback(
@@ -4563,6 +4717,16 @@ export function MapEditorPanel({
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;
+      if (e.code === "Escape" && marqueeing.current) {
+        e.preventDefault();
+        e.stopPropagation();
+        marqueeing.current = false;
+        marqueeAddRef.current = false;
+        marqueeStartRef.current = null;
+        marqueeEndRef.current = null;
+        setMarqueeSel(null);
+        return;
+      }
       if (e.code === "Escape" && objectGrabRef.current) {
         e.preventDefault();
         e.stopPropagation();
@@ -4573,7 +4737,10 @@ export function MapEditorPanel({
         const sel = selectionRef.current;
         const three = threePreviewRef.current;
         if (e.code === "Delete" || e.code === "Backspace") {
-          if (selectedSceneObjects.length > 0) {
+          if (
+            selectedSceneObjects.length > 0 ||
+            selectionItemsRef.current.some((item) => item.kind === "tile")
+          ) {
             e.preventDefault();
             e.stopPropagation();
             deleteWorldSelection(selectedSceneObjects);
@@ -4623,6 +4790,57 @@ export function MapEditorPanel({
           setObjectGrab(null);
           three?.setTransformMode("scale");
           return;
+        }
+        if (e.code === "F1") {
+          e.preventDefault();
+          setShowEditorHints((v) => !v);
+          return;
+        }
+        if (e.code === "KeyH" && selectedSceneObjects.length > 0) {
+          e.preventDefault();
+          const allHidden = selectedSceneObjects.every((object) =>
+            sceneState.isHidden(object.key),
+          );
+          sceneState.setHiddenMany(
+            selectedSceneObjects.map((object) => object.key),
+            !allHidden,
+          );
+          return;
+        }
+        if (e.code === "Period" || e.code === "NumpadDecimal") {
+          const focusObj = selectedSceneObjects[0];
+          if (focusObj) {
+            e.preventDefault();
+            three?.focusTile(
+              focusObj.transform.position.x,
+              focusObj.transform.position.y,
+            );
+            return;
+          }
+          if (sel?.kind === "tile") {
+            e.preventDefault();
+            three?.focusTile(sel.tx, sel.ty);
+            return;
+          }
+          if (sel?.kind === "region") {
+            const region = mapRef.current.regions.find((r) => r.id === sel.id);
+            if (region) {
+              e.preventDefault();
+              three?.focusTile(region.x, region.y);
+            }
+            return;
+          }
+        }
+        if (e.shiftKey && selectedSceneObjects.length > 0) {
+          const dx =
+            e.code === "ArrowLeft" ? -1 : e.code === "ArrowRight" ? 1 : 0;
+          const dy =
+            e.code === "ArrowUp" ? -1 : e.code === "ArrowDown" ? 1 : 0;
+          if (dx !== 0 || dy !== 0) {
+            e.preventDefault();
+            translateWorldSelection(selectedSceneObjects, dx, dy);
+            return;
+          }
         }
         // Selected tile: [ ] move top story up/down (Minecraft column nudge).
         if (sel?.kind === "tile") {
@@ -4688,6 +4906,30 @@ export function MapEditorPanel({
         }
       }
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      if (e.code === "KeyD") {
+        e.preventDefault();
+        e.stopPropagation();
+        const sel = selectionRef.current;
+        if (sel?.kind === "group") duplicateSceneGroup(sel.id);
+        else if (selectedSceneObjects.length > 0) {
+          duplicateWorldSelection(selectedSceneObjects);
+        }
+        return;
+      }
+      if (e.code === "KeyG" && selectedSceneObjects.length > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        const current = mapRef.current;
+        const result = createEmberSceneGroup(
+          current,
+          selectedSceneObjects.map((object) => object.key),
+        );
+        if (!result.group) return;
+        pushHistory(current, `Создать ${result.group.name}`);
+        publishMap(result.map);
+        onSaved(`${result.group.name}: ${selectedSceneObjects.length} объектов`);
+        return;
+      }
       const isUndo = e.code === "KeyZ" && !e.shiftKey;
       const isRedo =
         e.code === "KeyY" || (e.code === "KeyZ" && e.shiftKey);
@@ -4713,6 +4955,11 @@ export function MapEditorPanel({
     deleteLightSource,
     deleteWorldSelection,
     selectedSceneObjects,
+    duplicateWorldSelection,
+    duplicateSceneGroup,
+    translateWorldSelection,
+    sceneState,
+    onSaved,
   ]);
 
   const paintTileCell = (
@@ -4903,6 +5150,52 @@ export function MapEditorPanel({
       publishMap(next);
   };
 
+  const cancelMarquee = () => {
+    marqueeing.current = false;
+    marqueeAddRef.current = false;
+    marqueeStartRef.current = null;
+    marqueeEndRef.current = null;
+    setMarqueeSel(null);
+  };
+
+  const finishMarquee = () => {
+    if (!marqueeing.current) return;
+    const start = marqueeStartRef.current;
+    const end = marqueeEndRef.current ?? start;
+    const elev = marqueeElevRef.current;
+    const add = marqueeAddRef.current;
+    cancelMarquee();
+    if (!start || !end) return;
+    const packNow = packRef.current;
+    const mapNow = mapRef.current;
+    const hits = collectPlanarMarqueeHits({
+      map: mapNow,
+      start,
+      end,
+      elev,
+      filter: selectionFilterRef.current,
+      voxelModels: packNow.voxelModels,
+      tileset: packNow.tilesets[mapNow.tilesetId],
+      sprites: packNow.sprites,
+      isHidden: (key) => sceneState.isHidden(key),
+      isLocked: (key) => sceneState.isLocked(key),
+    });
+    const primary =
+      hits.find((hit) => hit.kind !== "tile") ?? hits[0] ?? null;
+    if (add) {
+      selectionService.replaceMany(
+        [...selectionService.getState().items, ...hits],
+        primary,
+      );
+    } else {
+      selectionService.replaceMany(hits, primary);
+    }
+    const nextPrimary = selectionService.getPrimary();
+    setSelectedRegionId(
+      nextPrimary?.kind === "region" ? nextPrimary.id : null,
+    );
+  };
+
   const finishDrag = () => {
     if (!painting.current) return;
     const start = dragStartRef.current;
@@ -4940,6 +5233,19 @@ export function MapEditorPanel({
         pan.lastY = e.clientY;
         threePreviewRef.current?.panScreen(dx, dy);
         blitBaseAndOverlay();
+        return;
+      }
+      if (marqueeing.current && marqueeStartRef.current) {
+        const place = clientToPlaceTarget(e.clientX, e.clientY);
+        if (!place) return;
+        const tile = { x: place.tx, y: place.ty };
+        marqueeEndRef.current = tile;
+        setMarqueeSel({
+          start: marqueeStartRef.current,
+          end: tile,
+          elev: marqueeElevRef.current,
+          add: marqueeAddRef.current,
+        });
         return;
       }
       if (painting.current && dragStartRef.current) {
@@ -5115,6 +5421,7 @@ export function MapEditorPanel({
         setIsPanning(false);
         if (e.button === 1) return;
       }
+      finishMarquee();
       finishDrag();
     };
     window.addEventListener("mousemove", onMove);
@@ -5478,9 +5785,8 @@ export function MapEditorPanel({
       <div className="ember-editor-panel-head">
         <h2>Карта</h2>
         <p>
-          По умолчанию Выбор (V): клик — объект или тайл · G/R — перенос/поворот
-          · B — кисть · ПКМ — орбита · СКМ — пан · библиотека слева — поставить
-          объекты
+          Выбор (V) · G/R/S гизмо · Ctrl+D дубль · H скрыть · F1 подсказки · B
+          кисть · ПКМ орбита
         </p>
       </div>
       <div className="ember-map-workspace ember-map-workspace--chrome">
@@ -5806,6 +6112,37 @@ export function MapEditorPanel({
                   </button>
                   <button
                     type="button"
+                    className={`ember-map-iconbtn ${showEditorHints ? "is-on" : ""}`}
+                    aria-pressed={showEditorHints}
+                    title="Подсказки и шорткаты на карте (F1). Не зависит от превью атмосферы."
+                    aria-label="Подсказки редактора"
+                    onClick={() => setShowEditorHints((v) => !v)}
+                  >
+                    <svg
+                      className="ember-map-iconbtn__svg"
+                      viewBox="0 0 16 16"
+                      aria-hidden
+                    >
+                      <circle
+                        cx="8"
+                        cy="8"
+                        r="5.4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.35"
+                      />
+                      <path
+                        d="M6.4 6.2a1.65 1.65 0 1 1 2.4 1.48c-.5.28-.8.62-.8 1.22V9.4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.35"
+                        strokeLinecap="round"
+                      />
+                      <circle cx="8" cy="11.35" r="0.7" fill="currentColor" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
                     className="ember-map-iconbtn"
                     title="Перезапечь полные статические тени до максимальной границы мерцающего света"
                     aria-label="Пересчитать статические тени"
@@ -5880,6 +6217,8 @@ export function MapEditorPanel({
                     ? "ember-map-dock__pop--wide"
                     : ""
                 } ${
+                  dockPanel === "tools" ? "ember-map-dock__pop--tools" : ""
+                } ${
                   dockPanel === "spawn" ||
                   dockPanel === "stage" ||
                   dockPanel === "light" ||
@@ -5922,44 +6261,10 @@ export function MapEditorPanel({
                     </div>
 
                     {tool === "select" ? (
-                      <div className="ember-map-panel__block">
-                        <div className="ember-map-selection-filter__head">
-                          <h4 className="ember-map-panel__sub">
-                            Фильтр выбора
-                          </h4>
-                          <button
-                            type="button"
-                            className="ghost ember-map-selection-filter__all"
-                            onClick={enableAllSelectionFilters}
-                            disabled={EDITOR_VIEWPORT_SELECTION_KINDS.every(
-                              (kind) => selectionFilter[kind],
-                            )}
-                          >
-                            Все
-                          </button>
-                        </div>
-                        <div
-                          className="ember-chip-row"
-                          role="group"
-                          aria-label="Типы объектов для выбора на карте"
-                        >
-                          {EDITOR_VIEWPORT_SELECTION_KINDS.map((kind) => (
-                            <button
-                              key={kind}
-                              type="button"
-                              className={`ember-chip ember-chip--sm ${selectionFilter[kind] ? "is-active" : ""}`}
-                              aria-pressed={selectionFilter[kind]}
-                              onClick={() => toggleSelectionFilter(kind)}
-                            >
-                              {VIEWPORT_SELECTION_LABEL[kind]}
-                            </button>
-                          ))}
-                        </div>
-                        <p className="muted ember-hint">
-                          Выключенный тип не перехватывает клик. Lock-объекты
-                          выбираются только через Иерархию.
-                        </p>
-                      </div>
+                      <p className="muted ember-hint">
+                        Фильтр выбора — панель внизу карты. Lock — только через
+                        Иерархию.
+                      </p>
                     ) : null}
 
                     <div className="ember-map-panel__block">
@@ -6300,7 +6605,7 @@ export function MapEditorPanel({
             ) : null}
           </div>
 
-          <div className="ember-map-stage">
+          <div className="ember-map-stage ember-map-stage--viewport">
             <MapSceneOutliner
               objects={sceneObjects}
               selectedKeys={selectedObjectKeys}
@@ -6353,6 +6658,7 @@ export function MapEditorPanel({
               }}
               onTranslate={translateWorldSelection}
               onDelete={deleteWorldSelection}
+              onDuplicate={duplicateWorldSelection}
               onCreateGroup={(objects) => {
                 const current = mapRef.current;
                 const result = createEmberSceneGroup(
@@ -6370,6 +6676,7 @@ export function MapEditorPanel({
               onReparentObjects={reparentSceneObjects}
               onReparentGroup={reparentSceneGroup}
             />
+          <div className="ember-map-stage__view">
           <div
             ref={canvasWrapRef}
             className={[
@@ -6398,7 +6705,7 @@ export function MapEditorPanel({
               className={[
                 "ember-ed-map__canvas",
                 "is-three-overlay",
-                dragSel ? "is-selecting" : "",
+                dragSel || marqueeSel ? "is-selecting" : "",
                 isPanning ? "is-panning" : "",
                 tool === "lightpick" ? "is-lightpick" : "",
                 libSelected || libDragActive ? "is-lib-place" : "",
@@ -6463,6 +6770,27 @@ export function MapEditorPanel({
                 );
                 if (toolRef.current === "select") {
                   e.preventDefault();
+                  if (e.shiftKey) {
+                    const place = clientToPlaceTarget(e.clientX, e.clientY);
+                    const tile = place
+                      ? { x: place.tx, y: place.ty }
+                      : clientToTile(e.clientX, e.clientY);
+                    if (!tile) return;
+                    const elev = brushElevRef.current;
+                    marqueeing.current = true;
+                    marqueeAddRef.current = e.ctrlKey || e.metaKey;
+                    marqueeStartRef.current = tile;
+                    marqueeEndRef.current = tile;
+                    marqueeElevRef.current = elev;
+                    hoverPickRef.current = null;
+                    setMarqueeSel({
+                      start: tile,
+                      end: tile,
+                      elev,
+                      add: marqueeAddRef.current,
+                    });
+                    return;
+                  }
                   selectFromPointerStack(
                     pointerStack,
                     e.clientX,
@@ -6642,7 +6970,20 @@ export function MapEditorPanel({
                 setDragSel({ start: tile, end: tile });
               }}
             />
-            {dragSel ? (
+            {marqueeSel ? (
+              <div className="ember-ed-map__drag-hint muted ember-hint">
+                {(() => {
+                  const r = normalizePlanarMarqueeRect(
+                    marqueeSel.start,
+                    marqueeSel.end,
+                    map,
+                  );
+                  const w = r.x1 - r.x0 + 1;
+                  const h = r.y1 - r.y0 + 1;
+                  return `${w}×${h} · плоскость Z${marqueeSel.elev} · отпусти — ${marqueeSel.add ? "добавить в выбор" : "выделить"} · Esc — отмена`;
+                })()}
+              </div>
+            ) : dragSel ? (
               <div className="ember-ed-map__sel-hint muted">
                 {(() => {
                   const r = normalizeRect(dragSel.start, dragSel.end);
@@ -6660,27 +7001,28 @@ export function MapEditorPanel({
                 Поворот (R): наведи направление · клик — зафиксировать · Esc —
                 отмена
               </p>
-            ) : libSelected ? (
+            ) : libSelected &&
+              (showEditorHints || libPlacementCheck?.valid === false) ? (
               <p className="muted ember-hint ember-ed-map__drag-hint">
                 {libPlacementCheck && !libPlacementCheck.valid
                   ? `Нельзя поставить: ${libPlacementCheck.reason}`
                   : "Библиотека: зелёный ghost — клик для установки · ПКМ / Esc — отмена"}
               </p>
-            ) : tool === "select" ? (
+            ) : showEditorHints && tool === "select" ? (
               <p className="muted ember-hint ember-ed-map__drag-hint">
                 {hoverSelectionStack.length > 1
                   ? `Под курсором: ${hoverSelectionStack
                       .slice(0, 4)
                       .map(mapSelectionShortLabel)
                       .join(" → ")}${hoverSelectionStack.length > 4 ? ` · ещё ${hoverSelectionStack.length - 4}` : ""}. Повторный клик — следующий · Ctrl+клик — добавить/убрать.`
-                  : "Выбор (V): клик — объект или тайл · Ctrl+клик — мультивыбор · G — перенос · R — поворот · Esc — снять"}
+                  : "Выбор (V): клик — объект или тайл · Shift+ЛКМ — рамка на Z · Ctrl+клик — мультивыбор · G — перенос · R — поворот · Esc — снять"}
               </p>
-            ) : tool === "lightpick" ? (
+            ) : showEditorHints && tool === "lightpick" ? (
               <p className="muted ember-hint ember-ed-map__drag-hint">
                 Режим света (L): клик по фонарю — настройки справа · пустая
                 клетка — новый · Esc — снять · панель «Свет» — глобально
               </p>
-            ) : (
+            ) : showEditorHints ? (
               <p className="muted ember-hint ember-ed-map__drag-hint">
                 {tool === "erase" ? (
                   <>
@@ -6696,7 +7038,35 @@ export function MapEditorPanel({
                   </>
                 )}
               </p>
-            )}
+            ) : null}
+
+            {showEditorHints ? (
+              <aside className="ember-ed-map__cheat" aria-label="Шорткаты карты">
+                <p className="ember-ed-map__cheat-title">Шорткаты · F1</p>
+                <dl className="ember-ed-map__cheat-grid">
+                  <dt>G / R / S</dt>
+                  <dd>перенос · поворот · масштаб</dd>
+                  <dt>Ctrl+D</dt>
+                  <dd>дублировать объект</dd>
+                  <dt>H · Del</dt>
+                  <dd>скрыть · удалить</dd>
+                  <dt>Shift+ЛКМ</dt>
+                  <dd>рамка на плоскости Z</dd>
+                  <dt>Shift+стрелки</dt>
+                  <dd>сдвиг на клетку</dd>
+                  <dt>. · Ctrl+G</dt>
+                  <dd>кадр на объект · группа</dd>
+                  <dt className="ember-ed-map__cheat-sep" aria-hidden />
+                  <dd className="ember-ed-map__cheat-sep" aria-hidden />
+                  <dt>V B E F</dt>
+                  <dd>выбор · кисть · ластик · заливка</dd>
+                  <dt>I Z W L</dt>
+                  <dd>пипетка · Z · стены · свет</dd>
+                  <dt>ПКМ · СКМ</dt>
+                  <dd>орбита · пан</dd>
+                </dl>
+              </aside>
+            ) : null}
 
             {libSelected ||
             tool === "select" ||
@@ -6804,10 +7174,23 @@ export function MapEditorPanel({
                           {VIEWPORT_SELECTION_LABEL[kind]}
                         </button>
                       ))}
+                      <button
+                        type="button"
+                        className="ghost ember-map-selection-filter__all"
+                        onClick={enableAllSelectionFilters}
+                        disabled={EDITOR_VIEWPORT_SELECTION_KINDS.every(
+                          (kind) => selectionFilter[kind],
+                        )}
+                      >
+                        Все
+                      </button>
                     </div>
-                    <p className="muted ember-ed-map__tool-hud-hint">
-                      Повторный клик — следующий под курсором · Ctrl — добавить
-                    </p>
+                    {showEditorHints ? (
+                      <p className="muted ember-ed-map__tool-hud-hint">
+                        Повторный клик — следующий · Shift+ЛКМ — рамка на Z ·
+                        Ctrl — добавить · Del — удалить всё в выборе
+                      </p>
+                    ) : null}
                   </>
                 ) : null}
 
@@ -6974,8 +7357,6 @@ export function MapEditorPanel({
                 ) : null}
               </div>
             ) : null}
-          </div>
-
           </div>
 
           {selection ? (
@@ -7171,6 +7552,8 @@ export function MapEditorPanel({
               onOpenVoxelSculptLibrary={openVoxelSculptLibrary}
             />
           ) : null}
+          </div>
+          </div>
 
           <MapLibraryTray
             pack={pack}

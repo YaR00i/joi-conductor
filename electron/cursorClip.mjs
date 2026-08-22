@@ -117,9 +117,18 @@ function ensureHelperExe() {
   return built.status === 0 && existsSync(exe) ? exe : null;
 }
 
+function ignoreClosedPipe(stream) {
+  if (!stream || typeof stream.on !== "function") return;
+  stream.on("error", () => {
+    /* EPIPE / destroyed pipe while quitting the grab helper */
+  });
+}
+
 function ensureHelper() {
   if (process.platform !== "win32") return null;
-  if (helper && !helper.killed && helper.stdin?.writable) return helper;
+  if (helper && !helper.killed && helper.stdin && !helper.stdin.destroyed) {
+    return helper;
+  }
   const exe = ensureHelperExe();
   if (!exe) return null;
   helper = spawn(exe, [], {
@@ -127,6 +136,10 @@ function ensureHelper() {
     stdio: ["pipe", "pipe", "pipe"],
   });
   helper.stdin.setDefaultEncoding("utf8");
+  ignoreClosedPipe(helper);
+  ignoreClosedPipe(helper.stdin);
+  ignoreClosedPipe(helper.stdout);
+  ignoreClosedPipe(helper.stderr);
   helper.stdout?.resume();
   helper.stderr?.resume();
   helper.on("exit", () => {
@@ -143,17 +156,24 @@ function hwndOf(win) {
   }
 }
 
-function sendCmd(line) {
-  const proc = ensureHelper();
-  if (!proc?.stdin?.writable) return false;
-  return proc.stdin.write(`${line}\n`);
+function sendCmd(line, startIfMissing = false) {
+  const proc = startIfMissing ? ensureHelper() : helper;
+  const stdin = proc?.stdin;
+  if (!proc || proc.killed || !stdin || stdin.destroyed || !stdin.writable) {
+    return false;
+  }
+  try {
+    return stdin.write(`${line}\n`);
+  } catch {
+    return false;
+  }
 }
 
 export function releaseCursorClip() {
   grabActive = false;
   lastWin = null;
-  const ok = sendCmd("unclip") || process.platform !== "win32";
-  return { ok };
+  sendCmd("unclip");
+  return { ok: true };
 }
 
 export function applyCursorClip(win) {
@@ -162,7 +182,8 @@ export function applyCursorClip(win) {
   grabActive = true;
   const hwnd = hwndOf(win);
   if (!hwnd) return { ok: process.platform !== "win32" };
-  const ok = sendCmd(`cliphwnd ${hwnd}`) && sendCmd(`warpcenter ${hwnd}`);
+  const ok =
+    sendCmd(`cliphwnd ${hwnd}`, true) && sendCmd(`warpcenter ${hwnd}`);
   return { ok: ok || process.platform !== "win32" };
 }
 
@@ -171,7 +192,7 @@ export function warpCursorToWindow(win = lastWin) {
   if (!target || target.isDestroyed?.()) return { ok: false };
   const hwnd = hwndOf(target);
   if (!hwnd) return { ok: false };
-  return { ok: sendCmd(`warpcenter ${hwnd}`) };
+  return { ok: sendCmd(`warpcenter ${hwnd}`, true) };
 }
 
 export function reapplyCursorClip() {
@@ -182,12 +203,25 @@ export function reapplyCursorClip() {
 export function stopCursorGrab() {
   grabActive = false;
   lastWin = null;
-  if (!helper) return;
+  const proc = helper;
+  helper = null;
+  if (!proc) return;
+  const stdin = proc.stdin;
+  if (stdin && !stdin.destroyed) {
+    ignoreClosedPipe(stdin);
+    try {
+      stdin.end();
+    } catch {
+      try {
+        stdin.destroy();
+      } catch {
+        /* already gone */
+      }
+    }
+  }
   try {
-    helper.stdin.write("quit\n");
+    proc.kill();
   } catch {
     /* already gone */
   }
-  helper.kill();
-  helper = null;
 }

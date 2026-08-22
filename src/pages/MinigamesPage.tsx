@@ -7,11 +7,14 @@ import { RunnerGame } from "./runner/RunnerGame";
 
 interface Props {
   onReward: (cinders: number) => void;
+  /** Deduct a wager from the wallet (no-op when unaffordable). */
+  onSpend?: (cinders: number) => void;
+  walletBalance?: number;
 }
 
 type View = "catalog" | "puzzle" | "tasks" | "runner" | "doodle";
 
-export function MinigamesPage({ onReward }: Props) {
+export function MinigamesPage({ onReward, onSpend, walletBalance }: Props) {
   const [view, setView] = useState<View>("catalog");
   const isSandbox = getActiveSaveSlot() === "sandbox";
 
@@ -25,7 +28,12 @@ export function MinigamesPage({ onReward }: Props) {
   if (view === "runner") {
     return (
       <div className="page page--minigames">
-        <RunnerGame onReward={onReward} onExit={() => setView("catalog")} />
+        <RunnerGame
+          onReward={onReward}
+          onSpend={onSpend}
+          walletBalance={walletBalance}
+          onExit={() => setView("catalog")}
+        />
       </div>
     );
   }

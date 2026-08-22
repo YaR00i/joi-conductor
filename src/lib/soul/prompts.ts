@@ -1,7 +1,11 @@
 import type { CharacterBible } from "../character";
+import type { MistressId } from "../mistress/types";
 import { pickSoulTopics } from "./rag";
 import { characterMemoryToMd, userMemoryToMd } from "./markdown";
 import type { SoulChatMessage, SoulMistressState, SoulTopicFile } from "./types";
+import { buildControlPromptSlice } from "./control/slice";
+import { controlLiveSnapshot } from "./control/live";
+import { loadControlState } from "./control/store";
 
 export type SoulChatTurn = {
   role: "system" | "user" | "assistant";
@@ -51,23 +55,43 @@ export function chatPersonaFromBible(bible: CharacterBible): string {
     .trim();
 }
 
-/** Free chat — bible persona + Soul Memory. Never drives the session queue. */
+function mistressIdFromBible(bible: CharacterBible): MistressId {
+  switch (bible.id) {
+    case "hu_tao":
+    case "furina":
+    case "sunna":
+    case "sparkle":
+      return bible.id;
+    default:
+      return "hu_tao";
+  }
+}
+
+/** Free chat — bible persona + compact mistress OS + live control slices. */
 export function buildChatSystemPrompt(
   bible: CharacterBible,
   state: SoulMistressState,
   retrieved: readonly SoulTopicFile[],
+  userText = "",
 ): string {
   const emoji = bible.emojiAllowed
     ? "Emoji: at most 1–2 if they fit this mistress."
     : "No emoji.";
   const guide = bible.llmVoiceGuide?.trim() || "";
   const nicknames = bible.diminutives.slice(0, 4).join(", ");
+  const mistressId = mistressIdFromBible(bible);
+  const control = loadControlState(mistressId);
+  const slice = buildControlPromptSlice(
+    mistressId,
+    control,
+    controlLiveSnapshot(control),
+    userText,
+  );
   return [
     chatPersonaFromBible(bible),
     "",
-    `You are ${bible.nameRu} in a private chat, not a session.`,
-    "This conversation does not control the JOI queue, conductor, edges, ruins, toys, or media deck.",
-    "Do not output JSON. Do not invent session commands. Do not recite a trainer checklist.",
+    `You are ${bible.nameRu} in a private chat that can set real constraints and seed a session.`,
+    "Spoken words only. Do not output JSON, action blocks, or markdown fences.",
     "Reply in the same language as the user's last message. Russian in → Russian out.",
     `Tone: ${bible.tone.join("; ")}.`,
     `Taboos: ${bible.taboo.filter((t) => !/finale_|BPM|edges|JSON/i.test(t)).join("; ") || "stay in character"}.`,
@@ -75,9 +99,10 @@ export function buildChatSystemPrompt(
     guide ? `Voice guide: ${guide}` : "",
     emoji,
     "",
-    "Output ONLY her spoken words. No <think>, no 示例, no examples, no rule recap.",
-    "A short hello gets a short in-character hello back. Do not ask his name unless he asked yours.",
-    "/no_think",
+    slice,
+    "",
+    "Output spoken words only. No JSON, no 示例, no examples, no rule recap.",
+    "Do not repeat a line. Stop after the spoken reply.",
     "",
     "--- MEMORY.md ---",
     state.memoryMd.trim() || characterMemoryToMd(state.character),
@@ -89,6 +114,9 @@ export function buildChatSystemPrompt(
     formatRetrievedTopics(retrieved),
     "",
     "Stay in character. Speak as her, first person. Keep replies to 1–4 short paragraphs.",
+    "THIS TURN: answer his last message first. A greeting or small talk gets a short in-character reply — do not recap cage, check-in, or standing rules, and do not seed a session.",
+    "Ask his name only if he asked yours.",
+    "/think",
   ]
     .filter((line) => line !== "")
     .join("\n");
@@ -107,7 +135,7 @@ export function buildChatMessages(
   return [
     {
       role: "system",
-      content: buildChatSystemPrompt(bible, state, retrieved),
+      content: buildChatSystemPrompt(bible, state, retrieved, userText),
     },
     ...history,
   ];
@@ -125,7 +153,7 @@ export function buildRouterPrompt(
   return [
     `You are the Soul Memory Router for ${bible.nameRu}.`,
     "Read the recent chat and rewrite memory files only when something lasting changed.",
-    "This is out-of-session chat. Ignore any JOI queue, beats, or toys.",
+    "You may note a control hint, but do not invent cage/denial timers — those are written by her action JSON.",
     extra,
     "Reply with ONLY one JSON object. No markdown fences.",
     "If nothing lasting changed, return {\"no_significant_change\": true}.",
@@ -162,6 +190,7 @@ export function buildRouterPrompt(
       topic_plan: {
         actions: [{ action: "create", filename: "topic.md", reason: "why" }],
       },
+      control: { bump_id: "cage", note: "optional lasting progression note" },
     }),
     "",
     "Current MEMORY.md:",
@@ -224,6 +253,31 @@ export function buildDiaryPrompt(
     "",
     "Reply with the diary text only. Start immediately with her first diary sentence.",
     "No 'okay let's see', no restating these rules, no <think>.",
+    "/no_think",
+  ].join("\n");
+}
+
+/** Second pass: speech already happened; pull typed orders without mixing them into the bubble. */
+export function buildControlExtractPrompt(
+  bible: CharacterBible,
+  userText: string,
+  speech: string,
+): string {
+  return [
+    `Extract control actions for ${bible.nameRu} after she already spoke.`,
+    "Reply with ONLY one JSON object. No speech, no markdown fences, no <think>.",
+    'Default: {"actions":[]}',
+    "Use the field op, never id, for the action name.",
+    "ops: set_wear, clear_wear, set_denial, clear_denial, clear_checkin, set_clothing, clear_clothing, bump_progression, note_trigger, patch_queue.",
+    "set_wear needs kind cage|plug and hours.",
+    "Do not emit propose_session or set_checkin — the app offers sessions and morning reports as chat commands.",
+    "If the user refused a session, return {\"actions\":[]}. Punishment is already a contract chip.",
+    "If she did not issue a new timer, clothing, or denial, return {\"actions\":[]}.",
+    "",
+    `User: ${userText.trim()}`,
+    `Her spoken reply: ${speech.trim()}`,
+    "",
+    "JSON only.",
     "/no_think",
   ].join("\n");
 }

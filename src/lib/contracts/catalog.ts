@@ -828,6 +828,19 @@ export const CONTRACT_CATALOG: ContractDef[] = [
     requireActivityDebrief: true,
   },
   {
+    id: "body_smooth_shave",
+    category: "body",
+    nameRu: "Гладкость",
+    briefRu: "Бритьё по правилу",
+    instructionRu:
+      "Побрей ноги и пах (как минимум то, что она требует гладким). Без ссадин ради геройства. Отметь, когда закончил — следующий срок через два дня.",
+    difficulty: 1,
+    durationHintMin: 20,
+    rewardMin: 8,
+    rewardMax: 14,
+    biasHints: ["body", "smooth"],
+  },
+  {
     id: "body_nipples_x3",
     category: "body",
     nameRu: "Соски ×3",
@@ -1243,6 +1256,7 @@ for (const def of CONTRACT_CATALOG) {
 /** Daily habits: exercise / cage / plug. Forced onto the 5-contract board. */
 export const HABIT_CONTRACT_IDS: ReadonlySet<string> = new Set([
   "body_daily_exercise",
+  "body_smooth_shave",
   "role_brat_pushups",
   "anal_workout_plug",
   "anal_walk_plug",

@@ -12,15 +12,25 @@ import {
  *  - task              full special-piece task (edge/spank/hold/rest/vibe)
  *  - pertouch_announce intro card before a per_touch modifier takes effect
  *  - pertouch_prompt   one per-touch action required for a single grabbed piece
+ *
+ * vibeMode selects how tasks with a stimulus component drive vibration:
+ *  - device (default) the connected device runs the level (existing behavior)
+ *  - manual            the device is NOT touched; the player performs the
+ *                      vibration by hand following an on-screen instruction
+ *                      (used by the runner when only manual vibes are enabled)
  */
 
 export type TaskRunnerMode = "task" | "pertouch_announce" | "pertouch_prompt";
+export type TaskVibeMode = "device" | "manual";
 
 interface Props {
   mode: TaskRunnerMode;
   task: PuzzleTask;
   /** For pertouch_prompt: remaining pieces after this one resolves. */
   remaining?: number;
+  vibeMode?: TaskVibeMode;
+  /** Sandbox-only skip: dismiss without the usual fail path. */
+  allowCancel?: boolean;
   onComplete: (success: boolean) => void;
 }
 
@@ -63,15 +73,23 @@ function timeoutIsSuccess(mode: TaskRunnerMode, task: PuzzleTask): boolean {
   return task.kind === "vibe";
 }
 
-export function PuzzleTaskRunner({ mode, task, remaining, onComplete }: Props) {
+export function PuzzleTaskRunner({
+  mode,
+  task,
+  remaining,
+  vibeMode = "device",
+  allowCancel = false,
+  onComplete,
+}: Props) {
   const total = timerFor(mode, task);
   const [left, setLeft] = useState(total);
   const resolvedRef = useRef(false);
   const totalRef = useRef(total);
   totalRef.current = total;
 
-  // device stimulus
+  // device stimulus (skipped in manual mode — the player vibrates by hand)
   useEffect(() => {
+    if (vibeMode === "manual") return;
     const lvl = vibeFor(mode, task);
     let active = false;
     if (lvl > 0) {
@@ -81,7 +99,7 @@ export function PuzzleTaskRunner({ mode, task, remaining, onComplete }: Props) {
     return () => {
       if (active) void stopDevice();
     };
-  }, [mode, task]);
+  }, [mode, task, vibeMode]);
 
   // countdown
   useEffect(() => {
@@ -145,6 +163,13 @@ export function PuzzleTaskRunner({ mode, task, remaining, onComplete }: Props) {
               : task.instructionRu}
         </p>
 
+        {vibeMode === "manual" && vibeFor(mode, task) > 0 ? (
+          <p className="puzzle-task__manual-note">
+            Ручной режим: без устройства — делай вибрацию сам, уровень{" "}
+            {vibeFor(mode, task)} из 5, пока идёт таймер.
+          </p>
+        ) : null}
+
         {showTimer ? (
           <div
             className={`puzzle-task__timer ${left <= 5 ? "is-low" : ""}`}
@@ -194,6 +219,15 @@ export function PuzzleTaskRunner({ mode, task, remaining, onComplete }: Props) {
               </button>
             </>
           )}
+          {allowCancel ? (
+            <button
+              type="button"
+              className="puzzle-task__cancel"
+              onClick={() => resolve(true)}
+            >
+              Отменить
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

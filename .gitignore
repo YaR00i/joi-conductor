@@ -13,3 +13,4 @@ scripts/.tmp-*/
 __pycache__/
 *.pyc
 *.lnk
+*.tsbuildinfo

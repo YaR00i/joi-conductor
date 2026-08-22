@@ -1,3 +1,4 @@
+import { seedSoulFactsIfEmpty } from "./control/seed";
 import type { CharacterBible } from "../character";
 import type { MistressId } from "../mistress/types";
 import { characterMemoryToMd, userMemoryToMd } from "./markdown";
@@ -28,6 +29,9 @@ function asMessages(raw: unknown): SoulChatMessage[] {
       role: rec.role,
       text: rec.text,
       atMs: typeof rec.atMs === "number" ? rec.atMs : 0,
+      ...(typeof rec.think === "string" && rec.think.trim()
+        ? { think: rec.think.trim().slice(0, 8000) }
+        : {}),
     });
   }
   return out.slice(-200);
@@ -118,7 +122,10 @@ export function loadSoulState(
   bible: CharacterBible,
 ): SoulMistressState {
   const file = readStore();
-  return parseMistressState(file.byMistress[mistressId], bible);
+  const parsed = parseMistressState(file.byMistress[mistressId], bible);
+  const seeded = seedSoulFactsIfEmpty(mistressId, parsed);
+  if (seeded !== parsed) saveSoulState(mistressId, seeded);
+  return seeded;
 }
 
 export function saveSoulState(
@@ -134,12 +141,15 @@ export function newSoulMessage(
   role: SoulChatMessage["role"],
   text: string,
   atMs = Date.now(),
+  think?: string,
 ): SoulChatMessage {
+  const thought = think?.trim().slice(0, 8000);
   return {
     id: `${atMs.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     role,
     text: text.trim(),
     atMs,
+    ...(thought ? { think: thought } : {}),
   };
 }
 

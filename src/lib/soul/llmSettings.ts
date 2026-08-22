@@ -277,30 +277,35 @@ export type ChatCompletionBody = {
 export function buildChatCompletionBody(
   resolved: ResolvedChatLlm,
   messages: Array<{ role: string; content: string }>,
-  override?: { maxTokens?: number; temperature?: number },
+  override?: { maxTokens?: number; temperature?: number; think?: boolean },
 ): ChatCompletionBody {
   const sampling = resolved.sampling;
   const temperature = override?.temperature ?? sampling.temperature;
+  const think = Boolean(override?.think);
   const maxTokens = override?.maxTokens ?? sampling.maxTokens;
   const body: ChatCompletionBody = {
     model: resolved.model,
     temperature,
     top_p: sampling.topP,
     max_tokens: maxTokens,
-    frequency_penalty: sampling.frequencyPenalty,
+    frequency_penalty: think
+      ? Math.max(sampling.frequencyPenalty, 0.55)
+      : sampling.frequencyPenalty,
     presence_penalty: sampling.presencePenalty,
     messages,
-    stop: ["<|im_end|>"],
+    stop: ["<|im_end|>", "<|endoftext|>"],
   };
+  if (think) body.think = true;
   if (resolved.provider === "ollama") {
-    // Qwen3 / R1 default to a visible chain-of-thought. Chat must not show it.
-    body.think = false;
+    if (!think) body.think = false;
     body.options = {
       temperature,
       top_p: sampling.topP,
       min_p: sampling.minP,
       top_k: sampling.topK,
-      repeat_penalty: sampling.repeatPenalty,
+      repeat_penalty: think
+        ? Math.max(sampling.repeatPenalty, 1.22)
+        : sampling.repeatPenalty,
       num_predict: maxTokens,
     };
   }
@@ -396,6 +401,203 @@ export function stripThinkBlocks(raw: string): string {
     .replace(/<\/?think(?:ing)?>/gi, "")
     .trim();
   return stripTaskPreamble(text);
+}
+
+/** Pull <think> / leftover </think> dumps. Speech is stripThinkBlocks(raw). */
+export function splitThinkFromRaw(raw: string): { think: string; speech: string } {
+  const text = String(raw ?? "");
+  const blocks: string[] = [];
+  const re = /<think(?:ing)?>([\s\S]*?)<\/think(?:ing)?>/gi;
+  let tagged = text;
+  tagged = tagged.replace(re, (_whole, inner: string) => {
+    const bit = String(inner ?? "").trim();
+    if (bit) blocks.push(bit);
+    return "\n";
+  });
+  const close = tagged.lastIndexOf("</think>");
+  if (close >= 0 && !/<think(?:ing)?>/i.test(tagged.slice(0, close))) {
+    const lead = tagged
+      .slice(0, close)
+      .replace(/<\/?think(?:ing)?>/gi, "")
+      .trim();
+    if (lead) blocks.push(lead);
+  }
+  const openUnclosed = tagged.search(/<think(?:ing)?>/i);
+  if (openUnclosed >= 0) {
+    const inner = tagged
+      .slice(openUnclosed)
+      .replace(/<think(?:ing)?>/i, "")
+      .replace(/<\/think(?:ing)?>/gi, "")
+      .trim();
+    if (inner) blocks.push(inner);
+  }
+  return {
+    think: blocks.join("\n\n").trim(),
+    speech: stripThinkBlocks(text),
+  };
+}
+
+function stringFromUnknown(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (value && typeof value === "object" && "content" in value) {
+    const inner = (value as { content?: unknown }).content;
+    if (typeof inner === "string") return inner.trim();
+  }
+  return "";
+}
+
+function isThinkPartType(type: string): boolean {
+  return /^(thinking|reasoning|reason)$/i.test(type);
+}
+
+function contentPartText(part: Record<string, unknown>): string {
+  for (const key of ["text", "thinking", "reasoning", "content"]) {
+    const value = part[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function uniqueJoin(parts: string[]): string {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of parts) {
+    const bit = part.trim();
+    if (!bit || seen.has(bit)) continue;
+    seen.add(bit);
+    out.push(bit);
+  }
+  return out.join("\n\n").trim();
+}
+
+/** Cut Qwen/Ollama loops that paste the same 2–4 sentences until max_tokens. */
+export function collapseRepeatedSpeech(raw: string): string {
+  const text = String(raw ?? "").trim();
+  if (text.length < 80) return text;
+  const sentences = text
+    .split(/(?<=[.!?…])(?:\s+|$)/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (sentences.length >= 6) {
+    const maxCycle = Math.min(8, Math.floor(sentences.length / 3));
+    for (let n = 1; n <= maxCycle; n++) {
+      const unit = sentences.slice(0, n);
+      const key = unit.join(" ").replace(/\s+/g, " ");
+      let repeats = 0;
+      let i = 0;
+      while (i + n <= sentences.length) {
+        const chunk = sentences.slice(i, i + n).join(" ").replace(/\s+/g, " ");
+        if (chunk !== key) break;
+        repeats += 1;
+        i += n;
+      }
+      if (repeats >= 3 && i >= sentences.length * 0.65) {
+        return unit.join(" ");
+      }
+    }
+  }
+  return text;
+}
+
+export function clipSpokenReply(raw: string, maxChars = 900): string {
+  const collapsed = collapseRepeatedSpeech(raw);
+  if (collapsed.length <= maxChars) return collapsed;
+  const cut = collapsed.slice(0, maxChars);
+  const last = Math.max(
+    cut.lastIndexOf("."),
+    cut.lastIndexOf("!"),
+    cut.lastIndexOf("?"),
+    cut.lastIndexOf("…"),
+  );
+  return (last >= 60 ? cut.slice(0, last + 1) : cut).trim();
+}
+
+function harvestMessage(message: Record<string, unknown>): {
+  think: string[];
+  speech: string[];
+} {
+  const think: string[] = [];
+  const speech: string[] = [];
+  const field = uniqueJoin(
+    ["reasoning_content", "reasoning", "thinking", "think"].map((key) =>
+      stringFromUnknown(message[key]),
+    ),
+  );
+  if (field) think.push(field);
+  const content = message.content;
+  if (typeof content === "string") {
+    const tagged = splitThinkFromRaw(content);
+    if (tagged.think) think.push(tagged.think);
+    if (tagged.speech) speech.push(tagged.speech);
+    return { think, speech };
+  }
+  if (Array.isArray(content)) {
+    for (const item of content) {
+      if (typeof item === "string") {
+        const tagged = splitThinkFromRaw(item);
+        if (tagged.think) think.push(tagged.think);
+        if (tagged.speech) speech.push(tagged.speech);
+        continue;
+      }
+      if (!item || typeof item !== "object") continue;
+      const part = item as Record<string, unknown>;
+      const type = typeof part.type === "string" ? part.type : "";
+      const bit = contentPartText(part);
+      if (!bit) continue;
+      if (isThinkPartType(type)) think.push(bit);
+      else {
+        const tagged = splitThinkFromRaw(bit);
+        if (tagged.think) think.push(tagged.think);
+        if (tagged.speech) speech.push(tagged.speech);
+      }
+    }
+  }
+  return { think, speech };
+}
+
+export function harvestChatCompletion(data: unknown): {
+  think: string;
+  speech: string;
+} {
+  const thinkBits: string[] = [];
+  const speechBits: string[] = [];
+  if (data && typeof data === "object") {
+    const rec = data as Record<string, unknown>;
+    if (rec.message && typeof rec.message === "object") {
+      const harvested = harvestMessage(rec.message as Record<string, unknown>);
+      thinkBits.push(...harvested.think);
+      speechBits.push(...harvested.speech);
+    }
+    const choices = rec.choices;
+    if (Array.isArray(choices) && choices[0] && typeof choices[0] === "object") {
+      const message = (choices[0] as { message?: unknown }).message;
+      if (message && typeof message === "object") {
+        const harvested = harvestMessage(message as Record<string, unknown>);
+        thinkBits.push(...harvested.think);
+        speechBits.push(...harvested.speech);
+      }
+    }
+  }
+  let think = collapseRepeatedSpeech(uniqueJoin(thinkBits));
+  let speech = clipSpokenReply(uniqueJoin(speechBits));
+  if (!speech && think) {
+    speech = clipSpokenReply(think);
+  }
+  if (think && speech && think === speech) think = "";
+  return { think, speech };
+}
+
+export function splitThinkFromCompletion(data: unknown, content: string): {
+  think: string;
+  speech: string;
+} {
+  const fromPayload = harvestChatCompletion(data);
+  if (fromPayload.speech || fromPayload.think) return fromPayload;
+  const tagged = splitThinkFromRaw(content);
+  return {
+    think: collapseRepeatedSpeech(tagged.think),
+    speech: clipSpokenReply(tagged.speech),
+  };
 }
 
 export function chatCompletionHeaders(

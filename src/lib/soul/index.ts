@@ -21,6 +21,13 @@ export {
   editSoulMessage,
   truncateForRegenerate,
 } from "./engine";
+export { splitControlReply, applyControlActions } from "./control/actions";
+export {
+  loadControlState,
+  CONTROL_STORAGE_KEY,
+  CONTROL_CHANGED_EVENT,
+} from "./control";
+export type { ControlAction, MistressSessionProposal } from "./control";
 export { createOllamaSoulClient, createSoulChatClient } from "./client";
 export {
   loadChatLlmSettings,

@@ -6,6 +6,7 @@ import {
 } from "../lib/ollamaClient";
 import { isQwenTtsProvider, type TtsProviderSetting } from "../lib/voiceSettings";
 import { CageLockPill } from "./CageLockPill";
+import { CheckInPill } from "./CheckInPill";
 import { DenialQuestPill } from "./DenialQuestPill";
 
 export function isDesktopShell(): boolean {
@@ -317,6 +318,7 @@ export function TitleBar({
         </span>
         <CageLockPill />
         <DenialQuestPill />
+        <CheckInPill />
         <span className="titlebar__phase" title="Фаза программы">
           Phase 2
         </span>

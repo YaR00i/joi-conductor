@@ -13,6 +13,8 @@ type Props = {
   disabled?: boolean;
   title?: string;
   onChange: (value: number) => void;
+  /** Fired on slider release / typed commit — use for undo-friendly flush. */
+  onCommit?: () => void;
   /** Digits after decimal when displaying (default 0). */
   decimals?: number;
 };
@@ -38,6 +40,7 @@ export function EditableRange({
   disabled = false,
   title,
   onChange,
+  onCommit,
   decimals = 0,
 }: Props) {
   const id = useId();
@@ -59,6 +62,7 @@ export function EditableRange({
     const snapped =
       step >= 1 ? Math.round(n / step) * step : Math.round(n / step) * step;
     onChange(clamp(snapped, min, max));
+    onCommit?.();
   };
 
   const pct = max === min ? 0 : ((clamp(value, min, max) - min) / (max - min)) * 100;
@@ -121,6 +125,8 @@ export function EditableRange({
         value={clamp(value, min, max)}
         style={{ ["--range-pct" as string]: `${pct}%` }}
         onChange={(e) => onChange(Number(e.target.value))}
+        onPointerUp={() => onCommit?.()}
+        onKeyUp={() => onCommit?.()}
       />
     </label>
   );

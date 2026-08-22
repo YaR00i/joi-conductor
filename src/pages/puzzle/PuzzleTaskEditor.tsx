@@ -6,10 +6,12 @@ import {
   PUZZLE_TASK_KIND_LABELS,
   puzzleTaskSpec,
   savePuzzleTasks,
+  taskRequiresVibe,
   type PerTouchAction,
   type PuzzleTask,
   type PuzzleTaskKind,
 } from "../../lib/puzzleTasks";
+import { UiCheck } from "../../components/UiCheck";
 
 interface Props {
   onExit: () => void;
@@ -110,6 +112,11 @@ export function PuzzleTaskEditor({ onExit }: Props) {
                   {PUZZLE_TASK_KIND_LABELS[t.kind]} · {puzzleTaskSpec(t)}
                 </span>
                 <span className="puzzle-editor__row-reward">
+                  {taskRequiresVibe(t) ? (
+                    <span className="puzzle-editor__vibe-badge" title="Задание с вибрацией">
+                      〰
+                    </span>
+                  ) : null}
                   +{t.rewardBonus} / −{t.failPenalty}
                 </span>
               </button>
@@ -232,31 +239,44 @@ function TaskForm({ task, onChange, onPerTouchKind, onPerTouchChange }: TaskForm
         </label>
       ) : null}
 
-      {!showVibe ? (
-        <label className="puzzle-form__field">
-          <span>Стимул устройством во время задания (0 = выкл)</span>
-          <input
-            type="number"
-            min={0}
-            max={5}
-            value={task.vibeLevel ?? 0}
-            onChange={(e) => onChange({ vibeLevel: clampInt(e.target.value, 0, 5) })}
-          />
-        </label>
-      ) : null}
-
       {showVibe ? (
         <label className="puzzle-form__field">
-          <span>Уровень вибрации (0..5)</span>
+          <span>Уровень вибрации (1..5)</span>
           <input
             type="number"
-            min={0}
+            min={1}
             max={5}
             value={task.vibeLevel ?? 3}
-            onChange={(e) => onChange({ vibeLevel: clampInt(e.target.value, 0, 5) })}
+            onChange={(e) => onChange({ vibeLevel: clampInt(e.target.value, 1, 5) })}
           />
         </label>
-      ) : null}
+      ) : (
+        <div className="puzzle-form__group puzzle-form__group--vibe">
+          <UiCheck
+            checked={(task.vibeLevel ?? 0) > 0}
+            onChange={(on) => onChange({ vibeLevel: on ? 3 : 0 })}
+          >
+            <span className="puzzle-form__check-text">
+              <strong>С вибрацией</strong>
+              <span className="muted">
+                стимул устройства работает, пока задание активно
+              </span>
+            </span>
+          </UiCheck>
+          {(task.vibeLevel ?? 0) > 0 ? (
+            <label className="puzzle-form__field">
+              <span>Уровень вибрации (1..5)</span>
+              <input
+                type="number"
+                min={1}
+                max={5}
+                value={task.vibeLevel ?? 3}
+                onChange={(e) => onChange({ vibeLevel: clampInt(e.target.value, 1, 5) })}
+              />
+            </label>
+          ) : null}
+        </div>
+      )}
 
       {showPerTouch ? (
         <div className="puzzle-form__group">

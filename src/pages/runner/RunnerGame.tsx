@@ -10,26 +10,76 @@ import {
 } from "../../lib/runnerReward";
 import { loadPuzzleTasks, type PuzzleTask } from "../../lib/puzzleTasks";
 import {
+  filterTasksForRunner,
+  loadRunnerSettings,
+  saveRunnerSettings,
+  type RunnerSettings,
+} from "../../lib/runnerSettings";
+import {
+  runnerStimCancel,
+  runnerStimPulse,
+  runnerStimYield,
+  type RunnerStimEvent,
+} from "../../lib/runnerStim";
+import {
   getFavoriteRecord,
   listFavoriteMetadata,
   type FavoriteMetadata,
 } from "../../lib/mediaFavorites";
 import { PuzzleTaskRunner } from "../puzzle/PuzzleTaskRunner";
 import { CindersGlyph } from "../../components/CindersGlyph";
-import { RunnerTrack, type RunnerOutcome } from "./RunnerTrack";
+import { UiCheck } from "../../components/UiCheck";
+import {
+  buildTrack,
+  RunnerTrack,
+  type RunnerGameEvent,
+  type RunnerOutcome,
+  type RunnerTrackData,
+} from "./RunnerTrack";
+import {
+  drawRunnerRule,
+  ruleHonored,
+  ruleStatusLabel,
+  type RunnerLive,
+  type RunnerRule,
+} from "../../lib/runnerRules";
+import {
+  pickMistressLine,
+  runnerMistressName,
+  type MistressLineEvent,
+} from "./runnerMistress";
+import { WAGER_OPTIONS, wagerVerdict } from "../../lib/runnerWager";
+import {
+  applyStage,
+  loadRunnerProgress,
+  RUNNER_STAGE_MAX,
+  stageOf,
+  unlockNextStage,
+} from "../../lib/runnerProgress";
+import {
+  applyRunnerRun,
+  loadAchievements,
+  saveAchievements,
+} from "../../lib/achievements";
+import { getActiveSaveSlot } from "../../lib/saveSlots";
 
 /**
  * Minigames → Runner: gate-runner shell around the RunnerTrack canvas.
  *
- * Phases: intro (rules + difficulty) → play (canvas + task/pause overlays +
- * boss trophy) → result (reward breakdown + trophy, puzzle-style claim flow).
+ * Phases: intro (rules + difficulty + mistress rule for the next run) →
+ * play (canvas + task/pause overlays + boss trophy + mistress toasts) →
+ * result (reward breakdown + rule verdict + trophy, puzzle-style claim flow).
  *
- * Favorite images double as boss trophies: a small pool is preloaded when the
- * run starts, so the slide-in card at the boss fight shows instantly.
+ * The track and the mistress rule are drawn together as one "run plan", so
+ * the rule shown on the intro is always completable on the track you run.
+ * Favorite images double as boss trophies, preloaded when the run starts.
  */
 
 interface Props {
   onReward: (cinders: number) => void;
+  /** Deduct the wager from the wallet at run start. */
+  onSpend?: (cinders: number) => void;
+  walletBalance?: number;
   onExit: () => void;
 }
 
@@ -40,7 +90,21 @@ interface TrophyImg {
   label: string;
 }
 
+/** Track + mistress rule calibrated against that exact track. */
+interface RunPlan {
+  track: RunnerTrackData;
+  rule: RunnerRule;
+}
+
 const TROPHY_POOL_SIZE = 6;
+
+/** gameplay events that also fire a device stimulus pulse */
+const STIM_EVENTS: ReadonlySet<RunnerGameEvent> = new Set([
+  "redGate",
+  "fightWin",
+  "bossWin",
+  "death",
+] as const);
 
 const DEATH_TEXT: Record<NonNullable<RunnerOutcome["deathCause"]>, string> = {
   gates: "Красные врата сожгли толпу дотла.",
@@ -67,7 +131,7 @@ function isImageMeta(m: FavoriteMetadata): boolean {
   return true;
 }
 
-export function RunnerGame({ onReward, onExit }: Props) {
+export function RunnerGame({ onReward, onSpend, walletBalance, onExit }: Props) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [diffId, setDiffId] = useState<RunnerDifficultyId>("run");
   const [runSeq, setRunSeq] = useState(0);
@@ -91,23 +155,108 @@ export function RunnerGame({ onReward, onExit }: Props) {
   /** Sequential id per fire-gate overlay, drives the "inspiration" pick. */
   const taskSeqRef = useRef(0);
 
+  /** Live rule progress from the track (throttled there ~0.4s). */
+  const [live, setLive] = useState<RunnerLive | null>(null);
+  /** Rule verdict filled at the outcome for the result screen. */
+  const [ruleVerdict, setRuleVerdict] = useState<{ honored: boolean; line: string } | null>(
+    null,
+  );
+  /** Mistress toast: {seq, name, text}, auto-hides. */
+  const [quip, setQuip] = useState<{ seq: number; name: string; text: string } | null>(
+    null,
+  );
+  const quipSeqRef = useRef(0);
+  const quipTimerRef = useRef<number | null>(null);
+  const lastFightQuipRef = useRef(0);
+  const showQuip = useCallback((event: MistressLineEvent) => {
+    if (quipTimerRef.current) window.clearTimeout(quipTimerRef.current);
+    const seq = ++quipSeqRef.current;
+    setQuip({ seq, name: runnerMistressName(), text: pickMistressLine(event) });
+    quipTimerRef.current = window.setTimeout(() => {
+      // a newer quip may have replaced this one already
+      setQuip((cur) => (cur && cur.seq === seq ? null : cur));
+    }, 3000);
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (quipTimerRef.current) window.clearTimeout(quipTimerRef.current);
+    };
+  }, []);
+
   const difficulty = useMemo(() => getRunnerDifficulty(diffId), [diffId]);
-  // Fire gates use the shared task library; puzzle-only kinds make no sense here.
-  const tasks = useMemo(
-    () =>
-      loadPuzzleTasks().filter(
-        (t) => t.kind !== "per_touch" && t.kind !== "ghost_hint",
-      ),
+  // Stage ladder: beating the boss unlocks the next stage of this difficulty.
+  const [progress, setProgress] = useState(() => loadRunnerProgress());
+  const stage = stageOf(progress, diffId);
+  const effDifficulty = useMemo(() => applyStage(difficulty, stage), [difficulty, stage]);
+  /** Committed wager for the current run (deducted at start). */
+  const [stake, setStake] = useState(0);
+  const stakeRef = useRef(0);
+  stakeRef.current = stake;
+  /** Wager verdict filled at the outcome for the result screen. */
+  const [wager, setWager] = useState<ReturnType<typeof wagerVerdict> | null>(null);
+  /** New stage number to announce on the result screen (null = none). */
+  const [stageUnlocked, setStageUnlocked] = useState<number | null>(null);
+  // Vibration channels (Ловенс / вручную), persisted between runs.
+  const [feel, setFeel] = useState<RunnerSettings>(() => loadRunnerSettings());
+  const feelRef = useRef(feel);
+  feelRef.current = feel;
+  const setFeelKey = useCallback(
+    <K extends keyof RunnerSettings>(key: K, value: RunnerSettings[K]) => {
+      setFeel((prev) => {
+        const next = { ...prev, [key]: value };
+        saveRunnerSettings(next);
+        return next;
+      });
+    },
     [],
   );
+  // Fire gates use the shared task library; puzzle-only kinds make no sense
+  // here, and vibration tasks drop out when both channels are off.
+  const tasks = useMemo(
+    () =>
+      filterTasksForRunner(
+        loadPuzzleTasks().filter(
+          (t) => t.kind !== "per_touch" && t.kind !== "ghost_hint",
+        ),
+        feel,
+      ),
+    [feel],
+  );
+  /** Fire-gate vibe tasks drive the device, or fall back to by-hand
+   *  instructions when only the manual channel is enabled. */
+  const vibeMode = feel.lovenseVibe ? "device" : "manual";
+
+  /** Track + mistress rule for the upcoming run (kept in sync so the intro
+   *  preview and the actual run always use the same plan). */
+  const makePlan = useCallback((): RunPlan => {
+    const track = buildTrack(effDifficulty, tasks);
+    const rule = drawRunnerRule(
+      { fireRows: track.fireRows, typCrowd: track.typCrowd },
+      effDifficulty,
+    );
+    return { track, rule };
+  }, [effDifficulty, tasks]);
+  const planRef = useRef<RunPlan | null>(null);
+  const [plan, setPlan] = useState<RunPlan | null>(null);
+  const rollPlan = useCallback(() => {
+    const next = makePlan();
+    planRef.current = next;
+    setPlan(next);
+  }, [makePlan]);
+  // re-roll whenever difficulty or the task pool (vibration settings) changes
+  useEffect(() => {
+    rollPlan();
+  }, [rollPlan]);
 
   const taskGateRef = useRef(taskGate);
   taskGateRef.current = taskGate;
 
-  // revoke any outstanding trophy object URLs on unmount
+  // revoke any outstanding trophy object URLs on unmount; stop any stimulus
+  // pulse the run left in flight
   useEffect(() => {
     const pool = trophyPoolRef.current;
     return () => {
+      runnerStimCancel();
       for (const t of pool) URL.revokeObjectURL(t.url);
     };
   }, []);
@@ -148,23 +297,53 @@ export function RunnerGame({ onReward, onExit }: Props) {
     if (gen === trophyGenRef.current) setTrophyCount(trophyPoolRef.current.length);
   }, []);
 
-  const startRun = useCallback(() => {
-    setOutcome(null);
-    setResult(null);
-    setTaskGate(null);
-    setPaused(false);
-    setBossTrophy(null);
-    setRunSeq((s) => s + 1);
-    setPhase("play");
-    void preloadTrophies();
-  }, [preloadTrophies]);
+  const startRun = useCallback(
+    (fresh = false) => {
+      if (fresh || !planRef.current) {
+        const next = makePlan();
+        planRef.current = next;
+        setPlan(next);
+      }
+      // commit the wager: deducted now, doubled back only on a survived run
+      const wanted = feelRef.current.wager;
+      const affordable = wanted > 0 && (walletBalance ?? 0) >= wanted && onSpend;
+      if (affordable) {
+        onSpend!(wanted);
+        setStake(wanted);
+      } else {
+        setStake(0);
+      }
+      setStageUnlocked(null);
+      setOutcome(null);
+      setResult(null);
+      setTaskGate(null);
+      setPaused(false);
+      setBossTrophy(null);
+      setLive(null);
+      setRunSeq((s) => s + 1);
+      setPhase("play");
+      void preloadTrophies();
+    },
+    [makePlan, preloadTrophies, onSpend, walletBalance],
+  );
+
+  // announce the run with a mistress line once the canvas is up
+  useEffect(() => {
+    if (phase !== "play") return;
+    const t = window.setTimeout(() => showQuip("runStart"), 650);
+    return () => window.clearTimeout(t);
+  }, [phase, runSeq, showQuip]);
 
   const handleTaskGate = useCallback(
     (task: PuzzleTask) =>
       new Promise<boolean>((resolve) => {
+        // the task overlay owns stimulation while it is up — drop our pulse
+        // without stopping the device so a vibe task can take over cleanly
+        runnerStimYield();
+        showQuip("fireGate");
         setTaskGate({ task, resolve, seq: ++taskSeqRef.current });
       }),
-    [],
+    [showQuip],
   );
 
   const finishTaskGate = useCallback((success: boolean) => {
@@ -180,6 +359,42 @@ export function RunnerGame({ onReward, onExit }: Props) {
     setBossTrophy(pool[Math.floor(Math.random() * pool.length)]);
   }, []);
 
+  /** Unified gameplay-event bus: device pulses (Lovense channel only, the
+   *  pulse helper itself backs off when a session owns the toy) + mistress
+   *  toasts with throttling for the chatty events. */
+  const handleGameEvent = useCallback(
+    (event: RunnerGameEvent) => {
+      if (STIM_EVENTS.has(event) && feelRef.current.lovenseVibe) {
+        runnerStimPulse(event as RunnerStimEvent);
+      }
+      const now = Date.now();
+      switch (event) {
+        case "death":
+        case "bossWin":
+        case "finish":
+          showQuip(event);
+          break;
+        case "fightWin":
+          if (now - lastFightQuipRef.current > 8000 && Math.random() < 0.35) {
+            lastFightQuipRef.current = now;
+            showQuip("fightWin");
+          }
+          break;
+        case "taskFail":
+          if (now - lastFightQuipRef.current > 8000 && Math.random() < 0.3) {
+            lastFightQuipRef.current = now;
+            showQuip("taskFail");
+          }
+          break;
+        default:
+          break;
+      }
+    },
+    [showQuip],
+  );
+
+  const handleLive = useCallback((next: RunnerLive) => setLive(next), []);
+
   /** Random favorite image shown beside the fire-gate task overlay. Derived
    *  from the preloaded pool; trophyCount is a dep so the pick appears even
    *  when the pool finishes loading after the overlay opened. */
@@ -193,21 +408,61 @@ export function RunnerGame({ onReward, onExit }: Props) {
 
   const handleOutcome = useCallback(
     (o: RunnerOutcome) => {
+      runnerStimCancel();
+      const curPlan = planRef.current;
+      const honored = curPlan
+        ? ruleHonored(
+            curPlan.rule,
+            {
+              survived: o.survived,
+              finalCrowd: o.finalCrowd,
+              redHits: o.redHits,
+              fireSeen: o.fireSeen,
+              fireDone: o.fireDone,
+            },
+            curPlan.track.fireRows,
+          )
+        : false;
+      const ruleBonus = honored ? curPlan!.rule.bonus : 0;
       const res = calcRunnerReward({
-        difficulty,
+        difficulty: effDifficulty,
         finalCrowd: o.finalCrowd,
         survived: o.survived,
         taskReward: o.taskReward,
         taskPenalty: o.taskPenalty,
+        ruleBonus,
       });
       setOutcome(o);
       setResult(res);
+      setRuleVerdict({ honored, line: pickMistressLine(honored ? "ruleDone" : "ruleFail") });
+      setWager(wagerVerdict(stakeRef.current, o.survived));
+      // lifetime mini-game counters
+      try {
+        saveAchievements(
+          applyRunnerRun(loadAchievements(), {
+            survived: o.survived,
+            bossDefeated: o.bossDefeated,
+            clean: o.survived && o.redHits === 0,
+            crowd: o.finalCrowd,
+          }),
+        );
+      } catch {
+        // achievements storage unavailable — the run still pays out
+      }
+      // stage ladder advance
+      if (o.survived) {
+        const { advanced, stage: newStage, progress: next } = unlockNextStage(diffId);
+        if (advanced) {
+          setStageUnlocked(newStage);
+          setProgress(next);
+        }
+      }
       setBest(
         saveRunnerBestIfBetter(diffId, { crowd: o.finalCrowd, total: res.total }),
       );
       setPhase("result");
     },
-    [difficulty, diffId],
+    [effDifficulty, diffId],
   );
 
   // Escape toggles the pause menu (unless a fire-gate task is up).
@@ -285,6 +540,35 @@ export function RunnerGame({ onReward, onExit }: Props) {
             </div>
           </div>
 
+          <div className="runner-intro__feel">
+            <span className="runner-intro__feel-title">Ощущения</span>
+            <UiCheck
+              checked={feel.lovenseVibe}
+              onChange={(v) => setFeelKey("lovenseVibe", v)}
+            >
+              <span className="runner-intro__feel-text">
+                <strong>С вибратором Lovense</strong>
+                <span className="muted">
+                  игра сама включает мотор: импульсы на красных вратах,
+                  схватках и боссе; задания со стимулом крутят устройство
+                </span>
+              </span>
+            </UiCheck>
+            <UiCheck
+              checked={feel.manualVibe}
+              onChange={(v) => setFeelKey("manualVibe", v)}
+            >
+              <span className="runner-intro__feel-text">
+                <strong>С ручной вибрацией</strong>
+                <span className="muted">
+                  задания со стимулом можно делать руками по инструкции —
+                  работает без Lovense. Выключи — и вибрационных заданий не
+                  будет вовсе
+                </span>
+              </span>
+            </UiCheck>
+          </div>
+
           <div className="runner-intro__diffs" role="radiogroup" aria-label="Сложность">
             {RUNNER_DIFFICULTIES.map((d) => (
               <button
@@ -303,6 +587,18 @@ export function RunnerGame({ onReward, onExit }: Props) {
                 <span className="runner-diff__meta muted">
                   база {d.base} · бонус ×{d.crowdMult}
                 </span>
+                <span
+                  className="runner-diff__stage"
+                  title={`Этап ${stageOf(progress, d.id)} из ${RUNNER_STAGE_MAX} — открывается победой над боссом`}
+                >
+                  {Array.from({ length: RUNNER_STAGE_MAX }, (_, i) => (
+                    <i
+                      key={i}
+                      className={`runner-diff__pip ${i < stageOf(progress, d.id) ? "is-on" : ""}`}
+                    />
+                  ))}
+                  <span className="muted">этап {stageOf(progress, d.id)}/{RUNNER_STAGE_MAX}</span>
+                </span>
                 {best[d.id] ? (
                   <span className="runner-diff__best">
                     <CindersGlyph className="runner-diff__best-glyph" />
@@ -313,8 +609,49 @@ export function RunnerGame({ onReward, onExit }: Props) {
             ))}
           </div>
 
+          <div className="runner-intro__wager">
+            <span className="runner-intro__feel-title">Ставка на забег</span>
+            <div className="runner-wager__opts">
+              {WAGER_OPTIONS.map((n) => {
+                const disabled = n > 0 && (walletBalance ?? 0) < n;
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    className={`runner-wager__opt ${feel.wager === n ? "is-active" : ""}`}
+                    disabled={disabled}
+                    onClick={() => setFeelKey("wager", n)}
+                  >
+                    {n === 0 ? "Без ставки" : n}
+                  </button>
+                );
+              })}
+            </div>
+            <span className="muted runner-wager__note">
+              Ставка списывается на старте. Довёл толпу до финиша — вернётся
+              вдвое, сгорела — сгорела. Баланс: {walletBalance ?? 0}{" "}
+              <CindersGlyph className="runner-inline-glyph" />
+            </span>
+          </div>
+
+          {plan ? (
+            <div className="runner-intro__rule">
+              <span className="runner-intro__rule-kicker">
+                {runnerMistressName()} ставит правило на забег
+              </span>
+              <div className="runner-intro__rule-row">
+                <strong>{plan.rule.labelRu}</strong>
+                <span className="runner-intro__rule-bonus">
+                  <CindersGlyph className="runner-inline-glyph" />+
+                  {plan.rule.bonus}
+                </span>
+              </div>
+              <span className="muted runner-intro__rule-hint">{plan.rule.hintRu}</span>
+            </div>
+          ) : null}
+
           <div className="runner-intro__footer">
-            <button type="button" className="puzzle-config__start" onClick={startRun}>
+            <button type="button" className="puzzle-config__start" onClick={() => startRun()}>
               ▶ Начать забег
             </button>
             <p className="muted runner-intro__hint">
@@ -371,11 +708,56 @@ export function RunnerGame({ onReward, onExit }: Props) {
             )
           ) : null}
 
+          {stageUnlocked != null ? (
+            <div className="runner-result__stage">
+              🏁 Открыт <strong>этап {stageUnlocked}/{RUNNER_STAGE_MAX}</strong> на
+              «{difficulty.labelRu}» — трасса длиннее, награда жирнее.
+            </div>
+          ) : null}
+
+          {wager && wager.stake > 0 ? (
+            <div className={`runner-result__wager ${wager.won ? "is-ok" : "is-fail"}`}>
+              {wager.won
+                ? `Ставка ${wager.stake} сыграла — вернётся ×2 (+${wager.payout})`
+                : `Ставка ${wager.stake} сгорела вместе с толпой`}
+            </div>
+          ) : null}
+
+          {ruleVerdict && plan ? (
+            <div
+              className={`runner-result__rule ${ruleVerdict.honored ? "is-ok" : "is-fail"}`}
+            >
+              <span className="runner-result__rule-state">
+                {ruleVerdict.honored ? "✓" : "✗"}
+              </span>
+              <span>
+                Правило госпожи: <strong>{plan.rule.labelRu}</strong>
+              </span>
+              <span className="runner-result__rule-line">«{ruleVerdict.line}»</span>
+            </div>
+          ) : null}
+
           <ul className="puzzle-result__breakdown">
             <li>
               <span>База за сложность</span>
               <span className="puzzle-result__num">{result.base}</span>
             </li>
+            {result.ruleBonus > 0 ? (
+              <li>
+                <span>Правило госпожи</span>
+                <span className="puzzle-result__num puzzle-result__num--plus">
+                  +{result.ruleBonus}
+                </span>
+              </li>
+            ) : null}
+            {wager && wager.won ? (
+              <li>
+                <span>Ставка ×2</span>
+                <span className="puzzle-result__num puzzle-result__num--plus">
+                  +{wager.payout}
+                </span>
+              </li>
+            ) : null}
             <li>
               <span>{outcome.survived ? "Бонус за толпу" : "Обгоревший бонус за толпу"}</span>
               <span
@@ -418,14 +800,15 @@ export function RunnerGame({ onReward, onExit }: Props) {
               type="button"
               className="puzzle-config__start"
               onClick={() => {
-                onReward(result.total);
+                const payout = wager?.payout ?? 0;
+                onReward(result.total + payout);
                 onExit();
               }}
             >
               <CindersGlyph className="puzzle-result__btn-glyph" />
-              Забрать {result.total}
+              Забрать {result.total + (wager?.payout ?? 0)}
             </button>
-            <button type="button" className="puzzle-btn" onClick={startRun}>
+            <button type="button" className="puzzle-btn" onClick={() => startRun(true)}>
               Новый забег
             </button>
             <button
@@ -446,6 +829,8 @@ export function RunnerGame({ onReward, onExit }: Props) {
   }
 
   // ----- play -----
+  const ruleStatus =
+    plan && live ? ruleStatusLabel(plan.rule, live, plan.track.fireRows) : null;
   return (
     <div className="runner-play">
       <div className="puzzle-hud">
@@ -461,8 +846,22 @@ export function RunnerGame({ onReward, onExit }: Props) {
           <span>Пробег</span>
           <span className="puzzle-hud__crumb">
             {DIFF_ICONS[diffId]} {difficulty.labelRu}
+            {stage > 1 ? ` · этап ${stage}/${RUNNER_STAGE_MAX}` : ""}
           </span>
         </div>
+        {plan ? (
+          <span
+            className={`runner-rulechip ${ruleStatus ? `is-${ruleStatus.state}` : ""}`}
+            title={plan.rule.hintRu}
+          >
+            <span className="runner-rulechip__label" title={plan.rule.labelRu}>
+              {plan.rule.labelRu}
+            </span>
+            {ruleStatus ? (
+              <span className="runner-rulechip__state">{ruleStatus.text}</span>
+            ) : null}
+          </span>
+        ) : null}
         <div className="puzzle-hud__actions">
           <button
             type="button"
@@ -475,15 +874,38 @@ export function RunnerGame({ onReward, onExit }: Props) {
         </div>
       </div>
 
-      <RunnerTrack
-        key={runSeq}
-        difficulty={difficulty}
-        tasks={tasks}
-        paused={paused || taskGate !== null}
-        onTaskGate={handleTaskGate}
-        onBossDefeated={handleBossDefeated}
-        onOutcome={handleOutcome}
-      />
+      {plan ? (
+        <>
+          <RunnerTrack
+            key={runSeq}
+            track={plan.track}
+            paused={paused || taskGate !== null}
+            onTaskGate={handleTaskGate}
+            onBossDefeated={handleBossDefeated}
+            onGameEvent={handleGameEvent}
+            onLive={handleLive}
+            onOutcome={handleOutcome}
+          />
+
+          {/* rule banner — plays once per run, then hides itself via CSS */}
+          <div className="runner-rulebanner" key={`rb-${runSeq}`} aria-hidden>
+            <span className="runner-rulebanner__kicker">
+              {runnerMistressName()} ставит правило
+            </span>
+            <strong>{plan.rule.labelRu}</strong>
+            <span className="runner-rulebanner__bonus">
+              <CindersGlyph className="runner-inline-glyph" />+{plan.rule.bonus}
+            </span>
+          </div>
+
+          {quip ? (
+            <div className="runner-quip" key={quip.seq} role="status">
+              <span className="runner-quip__name">{quip.name}</span>
+              <span className="runner-quip__text">«{quip.text}»</span>
+            </div>
+          ) : null}
+        </>
+      ) : null}
 
       {bossTrophy ? (
         <figure className="runner-trophy runner-trophy--slide" key={runSeq}>
@@ -505,6 +927,8 @@ export function RunnerGame({ onReward, onExit }: Props) {
           <PuzzleTaskRunner
             mode="task"
             task={taskGate.task}
+            vibeMode={vibeMode}
+            allowCancel={getActiveSaveSlot() === "sandbox"}
             onComplete={finishTaskGate}
           />
         </div>

@@ -47,6 +47,7 @@ export const PROGRESS_STORAGE_KEYS = [
   "joi-contract-media-drill-v1",
   "joi-contract-session-seed-v1",
   "joi-soul-v1",
+  "joi-soul-control-v1",
 ] as const;
 
 export type ProgressSnapshot = Partial<

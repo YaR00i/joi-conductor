@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { RUNNER_CROWD_CAP, type RunnerDifficulty } from "../../lib/runnerReward";
+import type { RunnerLive } from "../../lib/runnerRules";
 import type { PuzzleTask } from "../../lib/puzzleTasks";
 
 /**
@@ -22,19 +23,39 @@ export interface RunnerOutcome {
   taskPenalty: number;
   gatesGood: number;
   gatesBad: number;
+  /** Red (−/÷) gates taken — mistress rule "no red". */
+  redHits: number;
+  /** Fire gates crossed / completed successfully. */
+  fireSeen: number;
+  fireDone: number;
   bossDefeated: boolean;
   deathCause: "gates" | "fight" | "boss" | null;
   trackPct: number;
 }
 
+/** Sparse gameplay events for the shell: mistress lines, stim pulses,
+ *  rule progress — one stream instead of a pile of narrow callbacks. */
+export type RunnerGameEvent =
+  | "redGate"
+  | "fightWin"
+  | "bossWin"
+  | "death"
+  | "finish"
+  | "taskOk"
+  | "taskFail";
+
 interface Props {
-  difficulty: RunnerDifficulty;
-  tasks: PuzzleTask[];
+  /** Pre-generated track (built by the shell so mistress rules can be
+   *  calibrated against the actual layout before the run starts). */
+  track: RunnerTrackData;
   paused: boolean;
   /** Resolve with true when the fire-gate task succeeded. */
   onTaskGate: (task: PuzzleTask) => Promise<boolean>;
   /** Fired once when the boss crowd is beaten (visual trophy trigger). */
   onBossDefeated?: () => void;
+  onGameEvent?: (event: RunnerGameEvent) => void;
+  /** Throttled (~0.4s + after events) snapshot for the rule chip. */
+  onLive?: (live: RunnerLive) => void;
   onOutcome: (o: RunnerOutcome) => void;
 }
 
@@ -68,6 +89,12 @@ const PLAYER_MARGIN = 36;
 const RAIL_H = 16;
 
 type GateKind = "add" | "mul" | "sub" | "div" | "task";
+
+export interface RunnerTrackData {
+  rows: GateRow[];
+  enemies: Enemy[];
+  finishZ: number;
+}
 
 export interface GateCol {
   cx: number;
@@ -126,6 +153,10 @@ interface World {
   taskReward: number;
   taskPenalty: number;
   bossDefeated: boolean;
+  /** Mistress-rule counters: red gates taken, fire gates met/completed. */
+  redHits: number;
+  fireSeen: number;
+  fireDone: number;
   phase: "run" | "dying" | "finish";
   phaseT: number;
   deathCause: RunnerOutcome["deathCause"];
@@ -179,11 +210,22 @@ export function applyGate(c: number, col: GateCol): number {
   }
 }
 
+export interface RunnerTrackData {
+  rows: GateRow[];
+  enemies: Enemy[];
+  finishZ: number;
+  /** How many gate rows carry a fire (task) column. */
+  fireRows: number;
+  /** "Typical player" crowd size at the boss after all tolls — used to set
+   *  feasible mistress-rule targets. */
+  typCrowd: number;
+}
+
 export function buildTrack(
   diff: RunnerDifficulty,
   tasks: PuzzleTask[],
   rng: () => number = Math.random,
-) {
+): RunnerTrackData {
   const rows: GateRow[] = [];
   let z = 360;
   let lastTask = false;
@@ -270,7 +312,10 @@ export function buildTrack(
   const bossCount = Math.max(5, Math.round(typ * diff.bossFactor * (1 + rng() * 0.15)));
   const bossZ = (rows.length ? rows[rows.length - 1].z : diff.trackLen) + ROW_SPACING * 0.8;
   enemies.push({ z: bossZ, count: bossCount, boss: true, dead: false });
-  return { rows, enemies, finishZ: bossZ + 140 };
+  const fireRows = rows.filter(
+    (r) => r.cols[0].kind === "task" || r.cols[1].kind === "task",
+  ).length;
+  return { rows, enemies, finishZ: bossZ + 140, fireRows, typCrowd: typ };
 }
 
 /** Deterministic small-seed RNG so balance simulations are reproducible. */
@@ -302,11 +347,12 @@ const ENEMY_BODIES = ["#d14b40", "#b23a31", "#8f2f28", "#c4453a", "#a33329"];
 const ENEMY_HEADS = ["#2e100c", "#3a1510", "#261009"];
 
 export function RunnerTrack({
-  difficulty,
-  tasks,
+  track: trackProp,
   paused,
   onTaskGate,
   onBossDefeated,
+  onGameEvent,
+  onLive,
   onOutcome,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -318,6 +364,12 @@ export function RunnerTrack({
   onTaskGateRef.current = onTaskGate;
   const onBossDefeatedRef = useRef(onBossDefeated);
   onBossDefeatedRef.current = onBossDefeated;
+  const onGameEventRef = useRef(onGameEvent);
+  onGameEventRef.current = onGameEvent;
+  const onLiveRef = useRef(onLive);
+  onLiveRef.current = onLive;
+  const trackPropRef = useRef(trackProp);
+  trackPropRef.current = trackProp;
   const onOutcomeRef = useRef(onOutcome);
   onOutcomeRef.current = onOutcome;
 
@@ -332,7 +384,7 @@ export function RunnerTrack({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const track = buildTrack(difficulty, tasks);
+    const track = trackPropRef.current;
     const world: World = {
       rows: track.rows,
       enemies: track.enemies,
@@ -348,6 +400,9 @@ export function RunnerTrack({
       taskReward: 0,
       taskPenalty: 0,
       bossDefeated: false,
+      redHits: 0,
+      fireSeen: 0,
+      fireDone: 0,
       phase: "run",
       phaseT: 0,
       deathCause: null,
@@ -443,11 +498,23 @@ export function RunnerTrack({
         });
       }
     };
+    const emitLive = () => {
+      onLiveRef.current?.({
+        crowd: world.crowd,
+        redHits: world.redHits,
+        fireSeen: world.fireSeen,
+        fireDone: world.fireDone,
+        survived: world.phase === "finish",
+        dead: world.phase === "dying",
+      });
+    };
+
     const startDying = (cause: RunnerOutcome["deathCause"]) => {
       world.phase = "dying";
       world.phaseT = 0;
       world.deathCause = cause;
       world.deadCrowd = world.crowd;
+      onGameEventRef.current?.("death");
       world.shake = 1.4;
       world.flash = { color: "255,70,50", t: 1 };
       world.crowd = 0;
@@ -463,6 +530,9 @@ export function RunnerTrack({
         taskPenalty: world.taskPenalty,
         gatesGood: world.gatesGood,
         gatesBad: world.gatesBad,
+        redHits: world.redHits,
+        fireSeen: world.fireSeen,
+        fireDone: world.fireDone,
         bossDefeated: world.bossDefeated,
         deathCause: world.phase === "dying" ? world.deathCause : null,
         trackPct: clamp(world.playerZ / world.finishZ, 0, 1),
@@ -473,6 +543,7 @@ export function RunnerTrack({
       if (col.kind === "task" && col.task) {
         const task = col.task;
         world.pendingTask = task;
+        world.fireSeen++;
         void onTaskGateRef.current(task).then((success) => {
           if (world.done || world.pendingTask !== task) return;
           world.pendingTask = null;
@@ -481,8 +552,10 @@ export function RunnerTrack({
             world.crowd = Math.min(RUNNER_CROWD_CAP, world.crowd + gain);
             world.taskReward += task.rewardBonus;
             world.gatesGood++;
+            world.fireDone++;
             addFloater(`+${gain}`, "#3dd68c");
             world.flash = { color: "61,214,140", t: 0.5 };
+            onGameEventRef.current?.("taskOk");
           } else {
             const loss = Math.max(1, Math.round(world.crowd * 0.2));
             world.crowd = Math.max(1, world.crowd - loss); // a failed task never wipes the run
@@ -491,7 +564,9 @@ export function RunnerTrack({
             addFloater(`−${loss}`, "#ff5a4e");
             world.shake = 0.7;
             world.flash = { color: "255,90,78", t: 0.6 };
+            onGameEventRef.current?.("taskFail");
           }
+          emitLive();
         });
         return;
       }
@@ -504,9 +579,11 @@ export function RunnerTrack({
         world.flash = { color: "61,214,140", t: 0.35 };
       } else {
         world.gatesBad++;
+        world.redHits++;
         addFloater(`−${Math.abs(delta)}`, "#ff5a4e");
         world.shake = 0.5;
         world.flash = { color: "255,90,78", t: 0.45 };
+        onGameEventRef.current?.("redGate");
       }
       if (world.crowd <= 0) startDying("gates");
     };
@@ -519,6 +596,7 @@ export function RunnerTrack({
         world.shake = 1;
         burst(0, e.z, 34, ENEMY_BODIES);
         addFloater(`−${e.count}`, "#ff9a55", 22);
+        onGameEventRef.current?.(e.boss ? "bossWin" : "fightWin");
         if (e.boss) {
           world.bossDefeated = true;
           world.flash = { color: "255,210,62", t: 0.8 };
@@ -531,8 +609,14 @@ export function RunnerTrack({
     };
 
     // ---- update ----
+    let liveAcc = 0;
     const step = (dt: number) => {
       world.time += dt;
+      liveAcc += dt;
+      if (liveAcc >= 0.4) {
+        liveAcc = 0;
+        emitLive();
+      }
       if (world.shake > 0) world.shake = Math.max(0, world.shake - dt * 2.4);
       if (world.flash) {
         world.flash.t -= dt * 2.4;
@@ -606,6 +690,7 @@ export function RunnerTrack({
         if (world.phase === "run" && world.playerZ >= world.finishZ) {
           world.phase = "finish";
           world.phaseT = 0;
+          onGameEventRef.current?.("finish");
           addFloater("ФИНИШ!", "#ffd23e", 36);
           burst(world.x, world.finishZ, 40, ["#ffd23e", "#ff8a4a", "#3dd68c"]);
         }

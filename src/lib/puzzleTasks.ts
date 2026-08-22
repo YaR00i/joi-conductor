@@ -59,15 +59,17 @@ export const PUZZLE_TASK_KIND_LABELS: Record<PuzzleTaskKind, string> = {
 
 /** Human readable one-line spec of a task, used in lists / cards. */
 export function puzzleTaskSpec(t: PuzzleTask): string {
+  const vibeNote =
+    t.kind !== "vibe" && (t.vibeLevel ?? 0) > 0 ? ` · вибро ур.${t.vibeLevel}` : "";
   switch (t.kind) {
     case "edge":
-      return `Дойти до края за ${t.durationSec ?? 60}с`;
+      return `Дойти до края за ${t.durationSec ?? 60}с${vibeNote}`;
     case "spank":
-      return `${t.count ?? 20} шлепков за ${t.durationSec ?? 90}с`;
+      return `${t.count ?? 20} шлепков за ${t.durationSec ?? 90}с${vibeNote}`;
     case "hold":
-      return `Удерживать ${t.durationSec ?? 45}с`;
+      return `Удерживать ${t.durationSec ?? 45}с${vibeNote}`;
     case "rest":
-      return `Пауза / не трогать ${t.durationSec ?? 30}с`;
+      return `Пауза / не трогать ${t.durationSec ?? 30}с${vibeNote}`;
     case "vibe":
       return `Уровень ${t.vibeLevel ?? 3} на ${t.durationSec ?? 30}с`;
     case "ghost_hint":
@@ -90,6 +92,17 @@ export function puzzleTaskSpec(t: PuzzleTask): string {
       return "";
     }
   }
+}
+
+/**
+ * A task requires vibration when it is a device-stimulus task, carries a
+ * stimulus add-on (vibeLevel > 0) or its per-touch action is a vibe burst.
+ * Games with vibration disabled filter such tasks out of their pools.
+ */
+export function taskRequiresVibe(t: PuzzleTask): boolean {
+  if (t.kind === "vibe") return true;
+  if ((t.vibeLevel ?? 0) > 0) return true;
+  return t.perTouchAction?.kind === "vibe";
 }
 
 function builtinTasks(): PuzzleTask[] {

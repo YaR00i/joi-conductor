@@ -32,6 +32,7 @@ export function ChatMessageActions({
         onClick={() => tap(onRegenerate)}
       >
         <RegenerateIcon />
+        <span>ещё</span>
       </button>
       <button
         type="button"
@@ -41,6 +42,7 @@ export function ChatMessageActions({
         onClick={() => tap(onEdit)}
       >
         <EditIcon />
+        <span>править</span>
       </button>
       <button
         type="button"
@@ -50,6 +52,7 @@ export function ChatMessageActions({
         onClick={() => tap(onSpeak)}
       >
         <SpeakIcon />
+        <span>голос</span>
       </button>
     </div>
   );

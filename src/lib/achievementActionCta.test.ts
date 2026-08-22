@@ -7,7 +7,7 @@ describe("achievementActionCta", () => {
     for (const def of ACHIEVEMENT_DEFS) {
       const cta = achievementActionCta(def.id);
       expect(cta.labelRu.length).toBeGreaterThan(0);
-      expect(["roulette", "session", "shop", "contracts"]).toContain(cta.nav);
+      expect(["roulette", "session", "shop", "contracts", "minigames"]).toContain(cta.nav);
     }
   });
 

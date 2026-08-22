@@ -19,6 +19,7 @@ import { PuzzleSourcePicker, type PickedImage } from "./PuzzleSourcePicker";
 import { PuzzleTaskRunner, type TaskRunnerMode } from "./PuzzleTaskRunner";
 import { CindersGlyph } from "../../components/CindersGlyph";
 import { UiCheck } from "../../components/UiCheck";
+import { getActiveSaveSlot } from "../../lib/saveSlots";
 
 interface Props {
   onReward: (cinders: number) => void;
@@ -645,6 +646,7 @@ export function PuzzleGame({ onReward, onExit }: Props) {
           mode={overlay.mode as TaskRunnerMode}
           task={overlay.task}
           remaining={perTouch?.remaining}
+          allowCancel={getActiveSaveSlot() === "sandbox"}
           onComplete={onOverlayComplete}
         />
       ) : null}

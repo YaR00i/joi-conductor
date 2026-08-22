@@ -27,10 +27,11 @@ export function extractChatContent(data: unknown): string | null {
     const parts = content
       .map((part) => {
         if (typeof part === "string") return part;
-        if (part && typeof part === "object" && "text" in part) {
-          const t = (part as { text?: unknown }).text;
-          return typeof t === "string" ? t : "";
-        }
+        if (!part || typeof part !== "object") return "";
+        const rec = part as { type?: unknown; text?: unknown };
+        const type = typeof rec.type === "string" ? rec.type : "";
+        if (/^(thinking|reasoning|reason)$/i.test(type)) return "";
+        if (typeof rec.text === "string") return rec.text;
         return "";
       })
       .filter(Boolean);

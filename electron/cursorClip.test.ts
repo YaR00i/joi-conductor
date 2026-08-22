@@ -3,6 +3,7 @@ import {
   contentCssToDipRect,
   nativeHandleToHwnd,
   releaseCursorClip,
+  stopCursorGrab,
 } from "./cursorClip.mjs";
 
 describe("cursor clip rect", () => {
@@ -32,5 +33,7 @@ describe("cursor clip rect", () => {
 
   it("can release the OS cursor clip", () => {
     expect(releaseCursorClip().ok).toBe(true);
+    expect(() => stopCursorGrab()).not.toThrow();
+    expect(() => stopCursorGrab()).not.toThrow();
   });
 });

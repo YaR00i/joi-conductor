@@ -33,6 +33,8 @@ import {
   type ResolvedMapGrade,
   type ResolvedMapLight,
 } from "../../../game/tile/mapUtils";
+import { EditableRange } from "./EditableRange";
+import { EditorHint } from "./EditorHint";
 
 type Props = {
   globalLight: ResolvedMapLight;
@@ -210,7 +212,13 @@ export function MapSettingsPanel({
       <header className="ember-map-settings__head">
         <div>
           <p className="ember-map-settings__eyebrow">Карта</p>
-          <h3 className="ember-map-settings__title">Настройки карты</h3>
+          <div className="ember-map-settings__title-row">
+            <h3 className="ember-map-settings__title">Настройки карты</h3>
+            <EditorHint text="Ночь, солнце, картинка и атмосфера всей сцены. Фонари — вкладка «Свет». Превью атмосферы на карте — отдельная кнопка «?» / F1 в шапке, не эта панель." />
+          </div>
+          <p className="ember-map-settings__intro">
+            Сначала образ, затем свет и погода.
+          </p>
         </div>
         <button
           type="button"
@@ -230,20 +238,14 @@ export function MapSettingsPanel({
         </button>
       </header>
 
-      <p className="muted ember-hint">
-        Ночь, солнце, картинка и атмосфера всей сцены. Фонари — вкладка «Свет».
-      </p>
-
       {onCommitPlayProfile ? (
-        <section className="ember-map-settings__section">
-          <div className="ember-map-settings__section-head">
+        <section className="ember-map-settings__section ember-map-settings__section--play">
+          <div className="ember-map-settings__playhead">
             <h4>Режим игры</h4>
+            <EditorHint text="Арена — бой и толпа. Исследование — деревня, свет, мало NPC. Если автоатака выключена, удар/выстрел — ЛКМ. В «Исследовании» автоатака по умолчанию выкл." />
           </div>
-          <p className="muted ember-hint">
-            Арена — бой и толпа. Исследование — деревня, свет, мало NPC.
-          </p>
           <div
-            className="ember-map-settings__presets"
+            className="ember-map-settings__seg"
             role="group"
             aria-label="Режим карты"
           >
@@ -265,34 +267,26 @@ export function MapSettingsPanel({
             </button>
           </div>
           {onCommitAutoAttack ? (
-            <>
-              <label className="ember-map-settings__field ember-map-settings__field--full">
-                <span>Автоатака оружием</span>
-                <input
-                  type="checkbox"
-                  checked={resolvedAutoAttack}
-                  onChange={(event) =>
-                    onCommitAutoAttack(event.target.checked)
-                  }
-                />
-                <strong>{resolvedAutoAttack ? "вкл" : "выкл"}</strong>
-              </label>
-              <p className="muted ember-hint">
-                Если выключено, выстрел или удар выполняется вручную по ЛКМ.
-                Для «Исследования» автоатака по умолчанию выключена.
-              </p>
-            </>
+            <label className="ember-map-settings__toggle">
+              <input
+                type="checkbox"
+                checked={resolvedAutoAttack}
+                onChange={(event) =>
+                  onCommitAutoAttack(event.target.checked)
+                }
+              />
+              <span>Автоатака оружием</span>
+              <strong>{resolvedAutoAttack ? "вкл" : "выкл"}</strong>
+            </label>
           ) : null}
         </section>
       ) : null}
 
-      <section className="ember-map-settings__section">
+      <section className="ember-map-settings__section ember-map-settings__section--looks">
         <div className="ember-map-settings__section-head">
           <h4>Образы</h4>
+          <EditorHint text="Снимок заливки, солнца, bloom, грейда и атмосферы. Фонари не входят." />
         </div>
-        <p className="muted ember-hint">
-          Снимок заливки, солнца, bloom, грейда и атмосферы. Фонари не входят.
-        </p>
         <div className="ember-map-settings__presets" role="group" aria-label="Быстрые образы">
           <button
             type="button"
@@ -436,7 +430,7 @@ export function MapSettingsPanel({
         ) : null}
       </section>
 
-      <section className="ember-map-settings__section">
+      <section className="ember-map-settings__section ember-map-settings__section--tune ember-map-settings__section--night">
         <h4>Ночь и заливка</h4>
         <label className="ember-map-settings__field">
           <span>Цвет ночи · глубина</span>
@@ -462,27 +456,24 @@ export function MapSettingsPanel({
           </div>
         </label>
         <label className="ember-map-settings__field ember-map-settings__field--full">
-          <span>Сила заливки</span>
-          <input
-            type="range"
+          <EditableRange
+            label="Сила заливки"
+            value={draft.fillIntensity}
             min={0}
             max={3}
             step={0.01}
-            value={draft.fillIntensity}
-            onChange={onGlobalRange("fillIntensity")}
-            onPointerUp={flushGlobal}
-            onKeyUp={flushGlobal}
+            decimals={2}
+            onChange={(v) => patchGlobal({ fillIntensity: v })}
+            onCommit={flushGlobal}
           />
-          <strong>{fmtNum(draft.fillIntensity)}</strong>
         </label>
       </section>
 
-      <section className="ember-map-settings__section">
-        <h4>Мерцание факелов</h4>
-        <p className="muted ember-hint">
-          Глобально дышат радиусы кругов света у фонарей (не сила). У каждого
-          света можно выключить отдельно во вкладке «Свет».
-        </p>
+      <section className="ember-map-settings__section ember-map-settings__section--tune ember-map-settings__section--extra">
+        <div className="ember-map-settings__section-head">
+          <h4>Мерцание факелов</h4>
+          <EditorHint text="Глобально дышат радиусы кругов света у фонарей (не сила). У каждого света можно выключить отдельно во вкладке «Свет»." />
+        </div>
         <label className="ember-map-settings__field ember-map-settings__field--full">
           <span>Размах</span>
           <input
@@ -525,12 +516,11 @@ export function MapSettingsPanel({
         </label>
       </section>
 
-      <section className="ember-map-settings__section">
-        <h4>Воксельный свет</h4>
-        <p className="muted ember-hint">
-          Сэмплы света и теней привязываются к центрам вокселей — круги ламп и
-          тени от солнца читаются ступенями, а не гладким градиентом.
-        </p>
+      <section className="ember-map-settings__section ember-map-settings__section--tune ember-map-settings__section--extra">
+        <div className="ember-map-settings__section-head">
+          <h4>Воксельный свет</h4>
+          <EditorHint text="Сэмплы света и теней привязываются к центрам вокселей — круги ламп и тени читаются ступенями." />
+        </div>
         <label className="ember-map-settings__field ember-map-settings__field--full">
           <span>Квантовать по вокселям</span>
           <input
@@ -544,11 +534,11 @@ export function MapSettingsPanel({
         </label>
       </section>
 
-      <section className="ember-map-settings__section">
-        <h4>Солнце</h4>
-        <p className="muted ember-hint">
-          Низкий угол — длинные тени. Цвет и сила влияют на key-light.
-        </p>
+      <section className="ember-map-settings__section ember-map-settings__section--tune ember-map-settings__section--sun">
+        <div className="ember-map-settings__section-head">
+          <h4>Солнце</h4>
+          <EditorHint text="Низкий угол — длинные тени. Цвет и сила влияют на key-light." />
+        </div>
         <label className="ember-map-settings__field">
           <span>Цвет · сила</span>
           <div className="ember-map-settings__colorrow">
@@ -602,7 +592,7 @@ export function MapSettingsPanel({
         </label>
       </section>
 
-      <section className="ember-map-settings__section">
+      <section className="ember-map-settings__section ember-map-settings__section--tune ember-map-settings__section--bloom">
         <h4>Bloom</h4>
         <label className="ember-map-settings__field ember-map-settings__field--full">
           <span>Сила</span>
@@ -648,7 +638,7 @@ export function MapSettingsPanel({
         </label>
       </section>
 
-      <section className="ember-map-settings__section">
+      <section className="ember-map-settings__section ember-map-settings__section--tune ember-map-settings__section--grade">
         <h4>Картинка</h4>
         <label className="ember-map-settings__field ember-map-settings__field--full">
           <span>Тон (холод ↔ тепло)</span>
@@ -708,9 +698,10 @@ export function MapSettingsPanel({
         </label>
       </section>
 
-      <section className="ember-map-settings__section">
+      <section className="ember-map-settings__section ember-map-settings__section--tune ember-map-settings__section--atm">
         <div className="ember-map-settings__section-head">
           <h4>Атмосфера</h4>
+          <EditorHint text="Туман, дымка, дождь, облака, пыль, блик солнца и светлячки. Превью на карте — облачко в шапке, не эта кнопка." />
           <button
             type="button"
             className="ghost"
@@ -723,9 +714,6 @@ export function MapSettingsPanel({
             Выкл
           </button>
         </div>
-        <p className="muted ember-hint">
-          Туман, дымка, дождь, облака, пыль, блик солнца и светлячки.
-        </p>
 
         <label className="ember-map-settings__field">
           <span>Туман · цвет</span>

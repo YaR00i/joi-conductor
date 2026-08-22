@@ -18,6 +18,7 @@ import { setDeviceVibeLevel, stopDevice } from "../../lib/device/deviceClient";
 import { PuzzleTaskRunner } from "../puzzle/PuzzleTaskRunner";
 import { CindersGlyph } from "../../components/CindersGlyph";
 import { DoodleTrack, type DoodleOutcome } from "./DoodleTrack";
+import { getActiveSaveSlot } from "../../lib/saveSlots";
 
 /**
  * Minigames → Doodle jump: shell around the DoodleTrack canvas.
@@ -520,6 +521,7 @@ export function DoodleGame({ onReward, onExit }: Props) {
           <PuzzleTaskRunner
             mode="task"
             task={taskGate.task}
+            allowCancel={getActiveSaveSlot() === "sandbox"}
             onComplete={finishTaskGate}
           />
         </div>

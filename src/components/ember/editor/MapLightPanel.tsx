@@ -35,6 +35,8 @@ import {
   hasLampClipboard,
   peekLampClipboard,
 } from "./lightClipboard";
+import { EditableRange } from "./EditableRange";
+import { EditorHint } from "./EditorHint";
 
 type Props = {
   pack: EmberPack;
@@ -745,51 +747,56 @@ export function MapLightPanel({
     onCommitGlobal(omitUnsetLightBudget(patchGlobal(partial)));
   };
 
-  const onGlobalRange =
-    (key: keyof EmberMapLight) => (e: ChangeEvent<HTMLInputElement>) => {
-      const raw = Number(e.target.value) || 0;
-      if (
-        key === "lampRange" ||
-        key === "lampDiscCore" ||
+  const setGlobalNumber = (key: keyof EmberMapLight, raw: number) => {
+    if (
+      key === "lampRange" ||
+      key === "lampDiscCore" ||
+      key === "lampDiscMid"
+    ) {
+      const cur = draftRef.current;
+      const nextRange =
+        key === "lampRange"
+          ? Math.max(1, Math.min(MAP_LIGHT_RANGE_MAX, Math.round(raw)))
+          : cur.lampRange;
+      const nextCore =
+        key === "lampDiscCore"
+          ? Math.max(1, Math.min(MAP_LIGHT_RANGE_MAX, Math.round(raw)))
+          : cur.lampDiscCore;
+      const nextMid =
         key === "lampDiscMid"
-      ) {
-        const cur = draftRef.current;
-        const nextRange =
-          key === "lampRange"
-            ? Math.max(1, Math.min(MAP_LIGHT_RANGE_MAX, Math.round(raw)))
-            : cur.lampRange;
-        const nextCore =
-          key === "lampDiscCore"
-            ? Math.max(1, Math.min(MAP_LIGHT_RANGE_MAX, Math.round(raw)))
-            : cur.lampDiscCore;
-        const nextMid =
-          key === "lampDiscMid"
-            ? Math.max(1, Math.min(MAP_LIGHT_RANGE_MAX, Math.round(raw)))
-            : cur.lampDiscMid;
-        const discs = clampLampDiscRadii(nextCore, nextMid, nextRange);
-        patchGlobal({
-          lampRange: discs.range,
-          lampDiscCore: discs.core,
-          lampDiscMid: discs.mid,
-        });
-        return;
-      }
-      patchGlobal({ [key]: raw });
-    };
+          ? Math.max(1, Math.min(MAP_LIGHT_RANGE_MAX, Math.round(raw)))
+          : cur.lampDiscMid;
+      const discs = clampLampDiscRadii(nextCore, nextMid, nextRange);
+      patchGlobal({
+        lampRange: discs.range,
+        lampDiscCore: discs.core,
+        lampDiscMid: discs.mid,
+      });
+      return;
+    }
+    patchGlobal({ [key]: raw });
+  };
 
   return (
     <div className="ember-map-lightpanel">
       <header className="ember-map-lightpanel__head">
         <div>
           <p className="ember-map-lightpanel__eyebrow">Освещение</p>
-          <h3 className="ember-map-lightpanel__title">Фонари</h3>
+          <div className="ember-map-settings__title-row">
+            <h3 className="ember-map-lightpanel__title">Фонари</h3>
+            <EditorHint text="Источники на карте и дефолты ламп. Ночь, bloom и атмосфера — вкладка «Настройки»." />
+          </div>
         </div>
       </header>
 
-      <p className="muted ember-hint">
-        Источники на карте и дефолты ламп. Ночь, bloom и атмосфера — вкладка
-        «Настройки».
-      </p>
+      <dl className="ember-map-lightpanel__keys">
+        <dt>L</dt>
+        <dd>режим выбора / постановки</dd>
+        <dt>G</dt>
+        <dd>перенос выбранного</dd>
+        <dt>Ctrl+D · Del</dt>
+        <dd>дублировать · удалить</dd>
+      </dl>
 
       <button
         type="button"
@@ -834,123 +841,99 @@ export function MapLightPanel({
               }
             />
           </label>
-          <label className="ember-map-lightpanel__field">
-            <span>Ядро по умолч.</span>
-            <input
-              type="range"
-              min={1}
-              max={MAP_LIGHT_RANGE_MAX}
-              step={1}
-              value={draft.lampDiscCore}
-              onChange={onGlobalRange("lampDiscCore")}
-              onPointerUp={flushGlobal}
-              onKeyUp={flushGlobal}
-            />
-            <strong>{draft.lampDiscCore}</strong>
-          </label>
-          <label className="ember-map-lightpanel__field">
-            <span>Кольцо по умолч.</span>
-            <input
-              type="range"
-              min={1}
-              max={MAP_LIGHT_RANGE_MAX}
-              step={1}
-              value={draft.lampDiscMid}
-              onChange={onGlobalRange("lampDiscMid")}
-              onPointerUp={flushGlobal}
-              onKeyUp={flushGlobal}
-            />
-            <strong>{draft.lampDiscMid}</strong>
-          </label>
-          <label className="ember-map-lightpanel__field">
-            <span>Край / дальность</span>
-            <input
-              type="range"
-              min={1}
-              max={MAP_LIGHT_RANGE_MAX}
-              step={1}
-              value={draft.lampRange}
-              onChange={onGlobalRange("lampRange")}
-              onPointerUp={flushGlobal}
-              onKeyUp={flushGlobal}
-            />
-            <strong>{draft.lampRange}</strong>
-          </label>
-          <label className="ember-map-lightpanel__field">
-            <span>Высота по умолч.</span>
-            <input
-              type="range"
-              min={0.2}
-              max={3}
-              step={0.05}
-              value={draft.lampHeight}
-              onChange={onGlobalRange("lampHeight")}
-              onPointerUp={flushGlobal}
-              onKeyUp={flushGlobal}
-            />
-            <strong>{fmtNum(draft.lampHeight)}</strong>
-          </label>
-          <label className="ember-map-lightpanel__field">
-            <span>Точка света</span>
-            <input
-              type="checkbox"
-              checked={draft.lampShowCore}
-              onChange={(e) =>
-                patchAndCommitGlobal({ lampShowCore: e.target.checked })
-              }
-            />
-            <strong>{draft.lampShowCore ? "видн." : "скрыта"}</strong>
-          </label>
-          <label className="ember-map-lightpanel__field">
-            <span>Мерцание по умолч.</span>
-            <input
-              type="checkbox"
-              checked={draft.lampTorchFlicker}
-              onChange={(e) =>
-                patchAndCommitGlobal({ lampTorchFlicker: e.target.checked })
-              }
-            />
-            <strong>{draft.lampTorchFlicker ? "вкл" : "выкл"}</strong>
-          </label>
-          <label className="ember-map-lightpanel__field">
-            <span>Сила в центре</span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={draft.lampStrength0}
-              onChange={onGlobalRange("lampStrength0")}
-              onPointerUp={flushGlobal}
-              onKeyUp={flushGlobal}
-            />
-            <strong>{fmtNum(draft.lampStrength0)}</strong>
-          </label>
-          <label className="ember-map-lightpanel__field ember-map-lightpanel__field--full">
-            <span>Мощность ламп (Three)</span>
-            <input
-              type="range"
-              min={0}
-              max={4}
-              step={0.01}
-              value={draft.lampPower}
-              onChange={onGlobalRange("lampPower")}
-              onPointerUp={flushGlobal}
-              onKeyUp={flushGlobal}
-            />
-            <strong>{fmtNum(draft.lampPower)}</strong>
-          </label>
+          <EditableRange
+            label="Ядро по умолч."
+            value={draft.lampDiscCore}
+            min={1}
+            max={MAP_LIGHT_RANGE_MAX}
+            step={1}
+            title="Радиус яркого диска"
+            onChange={(v) => setGlobalNumber("lampDiscCore", v)}
+            onCommit={flushGlobal}
+          />
+          <EditableRange
+            label="Кольцо по умолч."
+            value={draft.lampDiscMid}
+            min={1}
+            max={MAP_LIGHT_RANGE_MAX}
+            step={1}
+            title="Среднее кольцо свечения"
+            onChange={(v) => setGlobalNumber("lampDiscMid", v)}
+            onCommit={flushGlobal}
+          />
+          <EditableRange
+            label="Край / дальность"
+            value={draft.lampRange}
+            min={1}
+            max={MAP_LIGHT_RANGE_MAX}
+            step={1}
+            title="Полный радиус света в клетках"
+            onChange={(v) => setGlobalNumber("lampRange", v)}
+            onCommit={flushGlobal}
+          />
+          <EditableRange
+            label="Высота по умолч."
+            value={draft.lampHeight}
+            min={0.2}
+            max={3}
+            step={0.05}
+            decimals={2}
+            title="Высота точки света над полом"
+            onChange={(v) => setGlobalNumber("lampHeight", v)}
+            onCommit={flushGlobal}
+          />
+          <div className="ember-map-lightpanel__checks">
+            <label className="ember-map-lightpanel__toggle">
+              <input
+                type="checkbox"
+                checked={draft.lampShowCore}
+                onChange={(e) =>
+                  patchAndCommitGlobal({ lampShowCore: e.target.checked })
+                }
+              />
+              <span>Точка света</span>
+              <strong>{draft.lampShowCore ? "видн." : "скрыта"}</strong>
+            </label>
+            <label className="ember-map-lightpanel__toggle">
+              <input
+                type="checkbox"
+                checked={draft.lampTorchFlicker}
+                onChange={(e) =>
+                  patchAndCommitGlobal({ lampTorchFlicker: e.target.checked })
+                }
+              />
+              <span>Мерцание</span>
+              <strong>{draft.lampTorchFlicker ? "вкл" : "выкл"}</strong>
+            </label>
+          </div>
+          <EditableRange
+            label="Сила в центре"
+            value={draft.lampStrength0}
+            min={0}
+            max={1}
+            step={0.01}
+            decimals={2}
+            onChange={(v) => setGlobalNumber("lampStrength0", v)}
+            onCommit={flushGlobal}
+          />
+          <EditableRange
+            label="Мощность ламп (Three)"
+            value={draft.lampPower}
+            min={0}
+            max={4}
+            step={0.01}
+            decimals={2}
+            onChange={(v) => setGlobalNumber("lampPower", v)}
+            onCommit={flushGlobal}
+          />
         </div>
       </section>
 
       <section className="ember-map-lightpanel__section">
-        <h4>На экране</h4>
-        <p className="muted ember-hint">
-          Сколько PointLight видно сразу. «Теней (cube)» в режиме авто равно
-          числу объектов со светом на карте. «По объектам» записывает это
-          число и для динамических кубов. «Динамических рядом» — живые кубы
-          с актёрами (до числа объектов на карте).
-        </p>
+        <div className="ember-map-lightpanel__section-head">
+          <h4>На экране</h4>
+          <EditorHint text="Сколько PointLight видно сразу. «Теней (cube)» в авто равно числу светящихся объектов. «По объектам» записывает это число. «Динамических рядом» — живые кубы с актёрами." />
+        </div>
         <div className="ember-map-lightpanel__grid">
           <label className="ember-map-lightpanel__field ember-map-lightpanel__field--full">
             <span>Источников на экране</span>

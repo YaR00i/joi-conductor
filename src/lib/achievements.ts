@@ -86,6 +86,16 @@ export type LifetimeCounters = {
   sessionsProne: number;
   /** Sessions lasting ≥ 40 minutes */
   marathonSessions: number;
+  /** Runner mini-game: runs started */
+  runnerRuns: number;
+  /** Runner mini-game: runs finished (boss beaten) */
+  runnerWins: number;
+  /** Runner mini-game: bosses defeated */
+  runnerBosses: number;
+  /** Runner mini-game: finished runs with zero red gates */
+  runnerCleanRuns: number;
+  /** Runner mini-game: largest crowd delivered to the finish */
+  runnerBestCrowd: number;
 };
 
 export type AchievementId =
@@ -129,7 +139,11 @@ export type AchievementId =
   | "mode_anal"
   | "mode_onahole"
   | "mode_prone"
-  | "marathon";
+  | "marathon"
+  | "runner_boss"
+  | "runner_wins"
+  | "runner_clean"
+  | "runner_crowd";
 
 /**
  * Showcase groups (UI order):
@@ -140,7 +154,8 @@ export type AchievementSet =
   | "control"
   | "modes"
   | "ritual"
-  | "mistress";
+  | "mistress"
+  | "minigames";
 
 export type AchievementDef = {
   id: AchievementId;
@@ -234,6 +249,11 @@ export function emptyCounters(): LifetimeCounters {
     sessionsOnahole: 0,
     sessionsProne: 0,
     marathonSessions: 0,
+    runnerRuns: 0,
+    runnerWins: 0,
+    runnerBosses: 0,
+    runnerCleanRuns: 0,
+    runnerBestCrowd: 0,
   };
 }
 
@@ -708,6 +728,51 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     accent: "#3dd68c",
     set: "mistress",
   },
+  // —— Мини-игры (раннер) ——
+  {
+    id: "runner_boss",
+    nameRu: "Первая кровь босса",
+    blurbRu: "Боссы, смешанные с асфальтом в пробеге толпы",
+    counter: "runnerBosses",
+    tiers: [1, 5, 15, 40],
+    unit: "count",
+    glyph: "☠",
+    accent: "#ff5a4e",
+    set: "minigames",
+  },
+  {
+    id: "runner_wins",
+    nameRu: "Доставщик толпы",
+    blurbRu: "Забеги, доведённые до финиша",
+    counter: "runnerWins",
+    tiers: [1, 10, 25, 60],
+    unit: "count",
+    glyph: "🏃",
+    accent: "#ff8a4a",
+    set: "minigames",
+  },
+  {
+    id: "runner_clean",
+    nameRu: "Чистый пробег",
+    blurbRu: "Финиши без единого красного ворот",
+    counter: "runnerCleanRuns",
+    tiers: [1, 5, 15],
+    unit: "count",
+    glyph: "✨",
+    accent: "#3dd68c",
+    set: "minigames",
+  },
+  {
+    id: "runner_crowd",
+    nameRu: "Толпа-легенда",
+    blurbRu: "Самая большая толпа, доведённая до финиша",
+    counter: "runnerBestCrowd",
+    tiers: [25, 75, 150],
+    unit: "count",
+    glyph: "👥",
+    accent: "#ffd23e",
+    set: "minigames",
+  },
 ];
 
 /** UI group titles + order for the achievements page. */
@@ -720,6 +785,7 @@ export const ACHIEVEMENT_SET_ORDER: {
   { id: "modes", titleRu: "Режимы и ритм" },
   { id: "ritual", titleRu: "Финал и ритуалы" },
   { id: "mistress", titleRu: "Госпожи и задания" },
+  { id: "minigames", titleRu: "Мини-игры" },
 ];
 
 function normalizeCounters(raw: unknown): LifetimeCounters {
@@ -757,6 +823,38 @@ export function saveAchievements(state: AchievementsState): void {
   } catch {
     /* ignore quota */
   }
+}
+
+/** Facts about one finished runner run, for the mini-game counters. */
+export interface RunnerRunFacts {
+  /** Run reached the finish line (boss beaten). */
+  survived: boolean;
+  /** Boss crowd was defeated this run. */
+  bossDefeated: boolean;
+  /** Survived with zero red gates taken. */
+  clean: boolean;
+  /** Crowd size delivered at the finish (0 when wiped). */
+  crowd: number;
+}
+
+/** Fold a finished runner run into the achievements state (pure). */
+export function applyRunnerRun(
+  state: AchievementsState,
+  r: RunnerRunFacts,
+): AchievementsState {
+  const clean = r.survived && r.clean;
+  const crowd = r.survived ? Math.max(0, Math.floor(r.crowd)) : 0;
+  return {
+    ...state,
+    counters: {
+      ...state.counters,
+      runnerRuns: state.counters.runnerRuns + 1,
+      runnerWins: state.counters.runnerWins + (r.survived ? 1 : 0),
+      runnerBosses: state.counters.runnerBosses + (r.bossDefeated ? 1 : 0),
+      runnerCleanRuns: state.counters.runnerCleanRuns + (clean ? 1 : 0),
+      runnerBestCrowd: Math.max(state.counters.runnerBestCrowd, crowd),
+    },
+  };
 }
 
 function addCounters(

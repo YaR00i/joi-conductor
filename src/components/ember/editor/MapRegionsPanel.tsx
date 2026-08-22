@@ -16,6 +16,7 @@ import {
   MAP_REGION_KIND_LABEL,
   MAP_REGION_KIND_ORDER,
 } from "./mapRegionHelpers";
+import { EditorHint } from "./EditorHint";
 
 type RegionFilter = "all" | MapRegionKind;
 
@@ -134,14 +135,27 @@ export function MapRegionsPanel({
 
   return (
     <div className="ember-map-popform ember-map-regions">
-      <div className="ember-ed-card__head">
-        <h3 className="ember-ed-card__title">Регионы</h3>
-        <span className="muted">{map.regions.length}</span>
+      <div className="ember-map-regions__head">
+        <div className="ember-map-regions__head-text">
+          <div className="ember-ed-card__head">
+            <h3 className="ember-ed-card__title">Регионы</h3>
+            <span className="muted">{map.regions.length}</span>
+          </div>
+          <p className="ember-map-regions__lead">
+            Игровые зоны на карте
+            <EditorHint text="Старт, спавн, сундуки, телепорты и триггеры работают в игре. «Кам*» — только оверлей редактора." />
+          </p>
+        </div>
       </div>
-      <p className="muted ember-hint">
-        Старт, спавн, сундуки, телепорты, триггеры — работают в игре. «Кам*» —
-        только оверлей в редакторе. Оверлей — иконка справа на панели.
-      </p>
+
+      <dl className="ember-map-regions__keys">
+        <dt>Клик в списке</dt>
+        <dd>выбрать и кадрировать</dd>
+        <dt>Del · Ctrl+D</dt>
+        <dd>удалить · дублировать зону</dd>
+        <dt>G · Shift+стрелки</dt>
+        <dd>перенос · сдвиг на клетку</dd>
+      </dl>
 
       <div className="ember-map-regions__toolbar">
         <button
@@ -153,6 +167,9 @@ export function MapRegionsPanel({
           Оверлей {showOverlay ? "вкл" : "выкл"}
         </button>
         <div className="ember-map-regions__add">
+          <button type="button" className="ghost" onClick={() => addRegion("player_start")}>
+            + Старт
+          </button>
           <button type="button" className="ghost" onClick={() => addRegion("spawn")}>
             + Спавн
           </button>
@@ -165,6 +182,9 @@ export function MapRegionsPanel({
             onClick={() => addRegion("teleport")}
           >
             + ТП
+          </button>
+          <button type="button" className="ghost" onClick={() => addRegion("trigger")}>
+            + Триггер
           </button>
         </div>
       </div>

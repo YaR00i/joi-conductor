@@ -3,23 +3,30 @@ import type { SoulChatTurn } from "./prompts";
 import {
   buildChatCompletionBody,
   chatCompletionHeaders,
-  stripThinkBlocks,
+  harvestChatCompletion,
+  splitThinkFromCompletion,
   type ResolvedChatLlm,
 } from "./llmSettings";
+
+export type SoulLlmReply = {
+  text: string;
+  think?: string;
+};
 
 export type SoulLlmClient = {
   complete: (opts: {
     messages: SoulChatTurn[];
     maxTokens?: number;
     temperature?: number;
+    think?: boolean;
     signal?: AbortSignal;
-  }) => Promise<string>;
+  }) => Promise<SoulLlmReply>;
 };
 
 export function createSoulChatClient(resolved: ResolvedChatLlm): SoulLlmClient {
   const timeoutMs = resolved.sampling.timeoutMs;
   return {
-    async complete({ messages, maxTokens, temperature, signal }) {
+    async complete({ messages, maxTokens, temperature, think, signal }) {
       const abort = new AbortController();
       const timer = globalThis.setTimeout(() => abort.abort(), timeoutMs);
       const onParentAbort = () => abort.abort();
@@ -33,6 +40,7 @@ export function createSoulChatClient(resolved: ResolvedChatLlm): SoulLlmClient {
             buildChatCompletionBody(resolved, messages, {
               maxTokens,
               temperature,
+              think,
             }),
           ),
         });
@@ -44,9 +52,11 @@ export function createSoulChatClient(resolved: ResolvedChatLlm): SoulLlmClient {
         }
         const data: unknown = await res.json();
         const content = extractChatContent(data);
-        const cleaned = stripThinkBlocks(content ?? "");
-        if (!cleaned) throw new Error("Пустой ответ модели");
-        return cleaned;
+        const split = splitThinkFromCompletion(data, content ?? "");
+        if (!split.speech) throw new Error("Пустой ответ модели");
+        return split.think
+          ? { text: split.speech, think: split.think }
+          : { text: split.speech };
       } finally {
         globalThis.clearTimeout(timer);
         signal?.removeEventListener("abort", onParentAbort);
@@ -68,9 +78,9 @@ export function createOllamaSoulClient(opts: {
     apiKey: "",
     sampling: {
       temperature: 0.8,
-      topP: 0.7,
-      minP: 0.07,
-      topK: 40,
+      top_p: 0.7,
+      min_p: 0.07,
+      top_k: 40,
       maxTokens: 1000,
       frequencyPenalty: 0.4,
       presencePenalty: 0.3,

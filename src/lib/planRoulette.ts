@@ -21,7 +21,9 @@ import {
 } from "./mistress/rouletteBias";
 import { getActiveMistress } from "./mistress";
 import { isModeAllowedForMistress } from "./mistress/mistressUnlocks";
-import { scoreFromMood } from "./moodEngine";
+import { scoreFromMood, moodFromScore, isHarshMood } from "./moodEngine";
+import { filterOptionsByLiveMode, readLiveWearGate } from "./sessionLiveGates";
+import { loadControlState } from "./soul/control/store";
 import {
   countBandFromOption,
   filterByEnabled,
@@ -153,6 +155,17 @@ function optionsFromPool(
   unlocks: ContentUnlockLists,
 ): RouletteOption[] {
   const pool = resolveParamPool(group, settings);
+  const live = group === "mode" ? readLiveWearGate() : null;
+  let currentMoodId: string | null = null;
+  if (group === "mood") {
+    try {
+      currentMoodId = moodFromScore(
+        loadControlState(getActiveMistress().id).moodScore,
+      );
+    } catch {
+      currentMoodId = null;
+    }
+  }
   const mapped: RouletteOption[] = pool.map((opt, i) => {
     let unlocked = true;
     if (group === "mood") {
@@ -162,18 +175,30 @@ function optionsFromPool(
         isModeUnlocked(opt.id as SessionMode, unlocks) &&
         isModeAllowedForMistress(opt.id, getActiveMistress().id);
     }
+    let weight = (opt.weight ?? 1) * (group === "mode" ? modeWeightMultiplier(opt.id) : 1);
+    if (group === "mood" && currentMoodId) {
+      if (opt.id === currentMoodId) weight *= 2.2;
+      else if (
+        isHarshMood(currentMoodId as SessionMood) &&
+        (opt.id === "cruel" || opt.id === "chaotic")
+      ) {
+        weight *= 1.35;
+      }
+    }
     return {
       id: opt.id,
       labelRu: unlocked ? opt.labelRu : `${opt.labelRu} · закрыто`,
-      weight:
-        (opt.weight ?? 1) *
-        (group === "mode" ? modeWeightMultiplier(opt.id) : 1),
+      weight,
       color: unlocked ? colorAt(i) : "#3a3a3a",
       payload: payloadForParam(group, opt),
       unlocked,
     };
   });
-  return filterByEnabled(mapped, settings, group);
+  const enabled = filterByEnabled(mapped, settings, group);
+  if (group === "mode" && live) {
+    return filterOptionsByLiveMode(enabled, live);
+  }
+  return enabled;
 }
 
 /** Ordered spins Hu Tao runs when she decides the session. */

@@ -78,6 +78,8 @@ export interface RunnerRewardInput {
   survived: boolean;
   taskReward: number; // Σ rewardBonus of succeeded fire-gate tasks
   taskPenalty: number; // Σ failPenalty of failed fire-gate tasks
+  /** Mistress rule honored this run (see runnerRules). */
+  ruleBonus?: number;
 }
 
 export interface RunnerRewardResult {
@@ -85,11 +87,13 @@ export interface RunnerRewardResult {
   crowdBonus: number;
   taskReward: number;
   taskPenalty: number;
+  ruleBonus: number;
   total: number;
 }
 
 export function calcRunnerReward(input: RunnerRewardInput): RunnerRewardResult {
   const { difficulty, finalCrowd, survived, taskReward, taskPenalty } = input;
+  const ruleBonus = Math.max(0, Math.round(input.ruleBonus ?? 0));
   const crowd = Math.max(0, Math.min(RUNNER_CROWD_CAP, finalCrowd));
   // Wiped crowd keeps only ~40% of the crowd bonus: runners that died on the
   // road still count, but nowhere near a full finish.
@@ -99,9 +103,16 @@ export function calcRunnerReward(input: RunnerRewardInput): RunnerRewardResult {
   );
   const total = Math.max(
     0,
-    difficulty.base + crowdBonus + taskReward - taskPenalty,
+    difficulty.base + crowdBonus + taskReward - taskPenalty + ruleBonus,
   );
-  return { base: difficulty.base, crowdBonus, taskReward, taskPenalty, total };
+  return {
+    base: difficulty.base,
+    crowdBonus,
+    taskReward,
+    taskPenalty,
+    ruleBonus,
+    total,
+  };
 }
 
 // ---- best-run persistence (per difficulty) ----

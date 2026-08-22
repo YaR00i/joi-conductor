@@ -12,6 +12,9 @@ import {
   resolveChatLlm,
   saveChatLlmSettings,
   stripThinkBlocks,
+  splitThinkFromRaw,
+  collapseRepeatedSpeech,
+  harvestChatCompletion,
   OPENROUTER_CHAT_URL,
 } from "./llmSettings";
 
@@ -76,8 +79,29 @@ describe("chat llm settings", () => {
     expect(body.think).toBe(false);
   });
 
+  it("turns Ollama think on for a spoken chat turn", () => {
+    const body = buildChatCompletionBody(
+      {
+        provider: "ollama",
+        model: "qwen2.5:14b",
+        endpoint: "/api/ollama/v1/chat/completions",
+        apiKey: "",
+        sampling: { ...DEFAULT_CHAT_SAMPLING },
+      },
+      [{ role: "user", content: "hi" }],
+      { think: true },
+    );
+    expect(body.think).toBe(true);
+    expect(body.max_tokens).toBe(DEFAULT_CHAT_SAMPLING.maxTokens);
+    expect(body.options?.repeat_penalty).toBeGreaterThanOrEqual(1.22);
+  });
+
   it("strips reasoning blocks", () => {
     expect(stripThinkBlocks("<think>secret</think>\nПривет")).toBe("Привет");
+    expect(splitThinkFromRaw("<think>secret</think>\nПривет")).toEqual({
+      think: "secret",
+      speech: "Привет",
+    });
   });
 
   it("keeps the spoken line after a leaked Qwen3 think dump", () => {
@@ -110,6 +134,29 @@ describe("chat llm settings", () => {
         "Okay, let's see. I need to write Hu Tao's private diary entry about the latest chat. The diary should be 4-6 sentences.",
       ),
     ).toBe("");
+  });
+
+  it("collapses a looping spoken reply to one cycle", () => {
+    const unit =
+      "(Смех) Ты опоздал. Я уже в игре. Ты не отчитался — значит, я могу тебя наказать.";
+    const loop = Array(12).fill(unit).join(" ");
+    expect(collapseRepeatedSpeech(loop)).toBe(unit);
+  });
+
+  it("reads Ollama thinking out of the message field", () => {
+    const harvested = harvestChatCompletion({
+      choices: [
+        {
+          message: {
+            role: "assistant",
+            thinking: "He said hi. Greet him, don't dump the cage.",
+            content: "Привет, Серёжа.",
+          },
+        },
+      ],
+    });
+    expect(harvested.speech).toBe("Привет, Серёжа.");
+    expect(harvested.think).toContain("Greet him");
   });
 
   it("round-trips settings", () => {

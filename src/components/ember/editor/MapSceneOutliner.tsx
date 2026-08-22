@@ -35,6 +35,7 @@ type Props = {
   onSetLocked: (objects: readonly EmberWorldObject[], locked: boolean) => void;
   onTranslate: (objects: readonly EmberWorldObject[], dx: number, dy: number) => void;
   onDelete: (objects: readonly EmberWorldObject[]) => void;
+  onDuplicate: (objects: readonly EmberWorldObject[]) => void;
   onCreateGroup: (objects: readonly EmberWorldObject[]) => void;
   onRemoveGroup: (id: string) => void;
   onRenameGroup: (id: string, name: string) => void;
@@ -77,6 +78,7 @@ export function MapSceneOutliner({
   onSetLocked,
   onTranslate,
   onDelete,
+  onDuplicate,
   onCreateGroup,
   onRemoveGroup,
   onRenameGroup,
@@ -608,8 +610,9 @@ export function MapSceneOutliner({
             if (!object) return null;
             return (
               <>
-                <button type="button" role="menuitem" onClick={() => { onFocus(object); setContextMenu(null); }}>Фокусировать</button>
-                <button type="button" role="menuitem" onClick={() => { onToggleHidden(object); setContextMenu(null); }}>{hiddenKeys.has(object.key) ? "Показать" : "Скрыть"}</button>
+                <button type="button" role="menuitem" onClick={() => { onFocus(object); setContextMenu(null); }}>Фокусировать <kbd>.</kbd></button>
+                <button type="button" role="menuitem" onClick={() => { onDuplicate([object]); setContextMenu(null); }}>Дублировать <kbd>Ctrl+D</kbd></button>
+                <button type="button" role="menuitem" onClick={() => { onToggleHidden(object); setContextMenu(null); }}>{hiddenKeys.has(object.key) ? "Показать" : "Скрыть"} <kbd>H</kbd></button>
                 <button type="button" role="menuitem" onClick={() => { onToggleLocked(object); setContextMenu(null); }}>{lockedKeys.has(object.key) ? "Разблокировать" : "Заблокировать"}</button>
                 {groupedKeys.has(object.key) ? (
                   <button type="button" role="menuitem" onClick={() => { onReparentObjects([object.key]); setContextMenu(null); }}>Переместить в Scene Root</button>
@@ -622,7 +625,7 @@ export function MapSceneOutliner({
 
       <footer className="ember-outliner__foot">
         <span>{visibleObjects.length} объектов</span>
-        <span>Ctrl / Shift — мультивыбор</span>
+        <span>Ctrl / Shift — мультивыбор · Ctrl+D дубль · H скрыть</span>
       </footer>
     </aside>
   );
