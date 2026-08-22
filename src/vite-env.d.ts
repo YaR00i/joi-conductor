@@ -376,6 +376,9 @@ interface JoiDesktopEmberApi {
     relPath: string,
     text: string,
   ) => Promise<{ ok: boolean; detail?: string }>;
+  readBytes: (
+    relPath: string,
+  ) => Promise<{ ok: boolean; base64?: string; detail?: string }>;
   writeBytes: (
     relPath: string,
     base64: string,
@@ -386,6 +389,14 @@ interface JoiDesktopEmberApi {
   list: (
     relDir: string,
   ) => Promise<{ ok: boolean; names?: string[]; detail?: string }>;
+  openPath: (
+    relPath: string,
+  ) => Promise<{ ok: boolean; detail?: string }>;
+  watch: (relPath: string) => Promise<{ ok: boolean; detail?: string }>;
+  unwatch: () => Promise<{ ok: boolean; detail?: string }>;
+  onFileChanged: (
+    cb: (payload: { rel: string; eventType?: string }) => void,
+  ) => () => void;
 }
 
 type DeviceBackendId = "mock" | "lovense" | "buttplug";

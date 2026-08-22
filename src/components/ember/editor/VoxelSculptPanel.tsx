@@ -2,13 +2,21 @@
  * 3D per-voxel sculptor: hover highlight, paint / add / erase / emit / shine / fill / pick.
  * Pattern follows three.js interactive voxelpainter (raycast + orbit).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import * as THREE from "three";
 import type {
   EmberPack,
   EmberVoxelModel,
 } from "../../../game/content/types";
+import {
+  formatEmberLibraryTags,
+  libraryAssetMatchesQuery,
+  normalizeEmberLibraryTags,
+} from "../../../game/content/libraryTags";
+import { countLibraryAssetReferences } from "../../../game/editor/emberLibraryIndex";
 import { EDITOR_ISO_POLAR } from "../../../game/three/editorThreePreview";
+import { createPlayerCapsuleOverlay } from "../../../game/three/playerCapsuleOverlay";
+import { DEFAULT_WORLD_BODY } from "../../../game/world/worldPhysics";
 import {
   EMBER_ENV_VOXEL_MULTS,
   getEmberEnvMap,
@@ -80,11 +88,38 @@ import {
   type VoxelSelection,
   type VoxelSelectionSet,
 } from "../../../game/voxel/voxelModel";
+import {
+  cellsForVoxelShape,
+  cellsToUnitSelection,
+  duplicateVoxelSelection,
+  rotateVoxelSelection,
+  stampVoxelShape,
+  type VoxelRotateAxis,
+  type VoxelShapeBrush,
+} from "../../../game/voxel/voxelShapeBrush";
+import {
+  countVoxelPaletteUsage,
+  replaceVoxelPaletteIndex,
+} from "../../../game/voxel/voxelPaletteOps";
 import { VOXELS_PER_BLOCK } from "../../../game/voxel/constants";
+import { readEmberBytes } from "../../../game/content/io";
 import {
   packWithVoxels,
   writeVoxelRegistry,
 } from "../../../game/voxel/voxelRegistry";
+import {
+  assignVoxelShard,
+  formatVoxelShardLabel,
+  voxelVoxRel,
+} from "../../../game/voxel/voxelLibrary";
+import {
+  applyVoxBytesToEmberModel,
+  decodeVoxToEmberModel,
+  encodeEmberModelToVox,
+  nameRuFromVoxFileName,
+  voxDocumentExceedsEmberGrid,
+  voxelOccupancyFingerprint,
+} from "../../../game/voxel/emberVoxCodec";
 import {
   ensureVoxelScenes,
   findChildJoint,
@@ -168,6 +203,7 @@ type SculptTool =
   | "shine"
   | "transparency"
   | "fill"
+  | "replace"
   | "pick"
   | "inspect"
   | "select"
@@ -239,6 +275,8 @@ type SceneApi = {
     } | null,
   ) => void;
   frameCamera: () => void;
+  frameExploreCamera: () => void;
+  setPlayerCapsule: (visible: boolean) => void;
   dispose: () => void;
 };
 
@@ -247,12 +285,38 @@ const PITCH_MIN = 0.08;
 const PITCH_MAX = Math.PI - 0.08;
 
 const VOXEL_GRID_STORAGE_KEY = "ember-voxel-sculpt-grid";
+const VOXEL_CAPSULE_STORAGE_KEY = "ember-voxel-sculpt-capsule";
 const VOXEL_PREVIEW_LIGHT_STORAGE_KEY = "ember-voxel-sculpt-preview-light";
 const RMB_DOUBLE_MS = 320;
+function waitMs(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function downloadVoxBytes(fileName: string, bytes: Uint8Array): void {
+  const blob = new Blob([new Uint8Array(bytes)], {
+    type: "application/octet-stream",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName.endsWith(".vox") ? fileName : `${fileName}.vox`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function loadShowVoxelGrid(): boolean {
   try {
     return sessionStorage.getItem(VOXEL_GRID_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function loadShowPlayerCapsule(): boolean {
+  try {
+    return sessionStorage.getItem(VOXEL_CAPSULE_STORAGE_KEY) === "1";
   } catch {
     return false;
   }
@@ -718,6 +782,7 @@ function applyTool(
       );
     case "fill":
       return floodFillPaint(model, cell.x, cell.y, cell.z, paletteIndex);
+    case "replace":
     case "pick":
     case "inspect":
     case "select":
@@ -781,6 +846,7 @@ const HOVER_COLOR: Record<SculptTool, number> = {
   shine: 0xc8e8f0,
   transparency: 0xa0e8ff,
   fill: 0xc080ff,
+  replace: 0xff80b0,
   pick: 0xffffff,
   inspect: 0x70e0d0,
   select: 0x60c0ff,
@@ -795,11 +861,11 @@ const TOOL_BUTTONS: ReadonlyArray<{
   /** Shown on the tool chip (letter / digit). */
   key: string;
 }> = [
-  { id: "add", label: "Куб", tip: "Добавить воксель · B / 1", key: "B" },
+  { id: "add", label: "Куб", tip: "Добавить воксель · B / 1 · N — форма (точка/линия/коробка/сфера)", key: "B" },
   {
     id: "erase",
     label: "Ластик",
-    tip: "Стереть · X / 2 · Shift+ЛКМ · Del — выделение",
+    tip: "Стереть · X / 2 · Shift+ЛКМ · Del — выделение · N — форма",
     key: "X",
   },
   {
@@ -813,6 +879,12 @@ const TOOL_BUTTONS: ReadonlyArray<{
     label: "Заливка",
     tip: "Заливка связных · G / 4 · при выделении — залить группу",
     key: "G",
+  },
+  {
+    id: "replace",
+    label: "Замена",
+    tip: "Все клетки этого цвета палитры → текущий слот · P · Shift — стереть цвет · Alt+клик в палитре",
+    key: "P",
   },
   { id: "pick", label: "Пипетка", tip: "Взять цвет · I / 5", key: "I" },
   {
@@ -857,6 +929,17 @@ const TOOL_BUTTONS: ReadonlyArray<{
     tip: "Пивоты петли: клик по родителю, затем по дочернему объекту",
     key: "J",
   },
+];
+
+const SHAPE_BRUSHES: ReadonlyArray<{
+  id: VoxelShapeBrush;
+  label: string;
+  tip: string;
+}> = [
+  { id: "voxel", label: "Точка", tip: "Один воксель, как сейчас · N переключает форму" },
+  { id: "line", label: "Линия", tip: "ЛКМ-drag: линия от точки до точки" },
+  { id: "box", label: "Коробка", tip: "ЛКМ-drag: заполненный прямоугольник" },
+  { id: "sphere", label: "Сфера", tip: "ЛКМ-drag: сфера вписанная в рамку" },
 ];
 
 const SELECT_MODES: ReadonlyArray<{
@@ -918,6 +1001,15 @@ export function VoxelSculptPanel({
   const apiRef = useRef<SceneApi | null>(null);
   const draftRef = useRef<EmberVoxelModel | null>(null);
   const toolRef = useRef<SculptTool>("add");
+  const shapeBrushRef = useRef<VoxelShapeBrush>("voxel");
+  const shapeDragRef = useRef<{
+    start: HitCell;
+    end: HitCell;
+    erase: boolean;
+  } | null>(null);
+  const onShapeCommitRef = useRef<
+    (start: HitCell, end: HitCell, erase: boolean) => void
+  >(() => {});
   const paletteRef = useRef(1);
   const emitRef = useRef(180);
   const shineRef = useRef(180);
@@ -931,6 +1023,11 @@ export function VoxelSculptPanel({
   const undoStackRef = useRef<VoxelHistEntry[]>([]);
   const redoStackRef = useRef<VoxelHistEntry[]>([]);
   const beginEditRef = useRef<() => void>(() => {});
+  const voxFileRef = useRef<HTMLInputElement | null>(null);
+  const voxImportModeRef = useRef<"replace" | "new">("replace");
+  const ignoreVoxWatchUntilRef = useRef(0);
+  const skipVoxWriteOnceRef = useRef<string | null>(null);
+  const applyEditRef = useRef<(next: EmberVoxelModel) => void>(() => {});
   const onPickColorRef = useRef<(pi: number) => void>(() => {});
   const onPickLightOriginRef = useRef<(cell: HitCell) => void>(() => {});
   const onMoveLightOffsetRef = useRef<
@@ -1004,6 +1101,9 @@ export function VoxelSculptPanel({
     getEmberEnvMapVoxelMult(),
   );
   const [showVoxelGrid, setShowVoxelGrid] = useState(loadShowVoxelGrid);
+  const [showPlayerCapsule, setShowPlayerCapsule] = useState(
+    loadShowPlayerCapsule,
+  );
   const [showPreviewEmissiveLight, setShowPreviewEmissiveLight] = useState(
     loadShowPreviewEmissiveLight,
   );
@@ -1062,13 +1162,18 @@ export function VoxelSculptPanel({
     return m ? normalizeVoxelModel(m) : null;
   });
   const [pickerQuery, setPickerQuery] = useState("");
+  const [tagsDraft, setTagsDraft] = useState("");
   const [browsePicker, setBrowsePicker] = useState(false);
+  useEffect(() => {
+    setTagsDraft(formatEmberLibraryTags(draft?.tags));
+  }, [draft?.id, draft?.tags]);
   const showOpenPicker =
     !variantMode &&
     !onClose &&
     Object.keys(pack.voxelModels).length > 0 &&
     (browsePicker || !activeId);
   const [tool, setTool] = useState<SculptTool>("add");
+  const [shapeBrush, setShapeBrush] = useState<VoxelShapeBrush>("voxel");
   const [selectMode, setSelectMode] = useState<SelectMode>("box");
   /** Select deleted / air cells instead of solid groups. */
   const [selectEmpty, setSelectEmpty] = useState(false);
@@ -1110,6 +1215,7 @@ export function VoxelSculptPanel({
 
   draftRef.current = draft;
   toolRef.current = tool;
+  shapeBrushRef.current = shapeBrush;
   paletteRef.current = paletteIndex;
   emitRef.current = emitAmount;
   shineRef.current = shineAmount;
@@ -1406,6 +1512,10 @@ export function VoxelSculptPanel({
     () => Object.values(pack.voxelModels ?? {}),
     [pack.voxelModels],
   );
+  const paletteUsage = useMemo(
+    () => (draft ? countVoxelPaletteUsage(draft) : []),
+    [draft],
+  );
 
   const pickerItems = useMemo(() => {
     const q = pickerQuery.trim().toLowerCase();
@@ -1414,20 +1524,28 @@ export function VoxelSculptPanel({
       .sort((a, b) =>
         (a.nameRu || a.id).localeCompare(b.nameRu || b.id, "ru"),
       )
-      .filter((m) => {
-        if (!q) return true;
-        const name = (m.nameRu || "").toLowerCase();
-        return name.includes(q) || m.id.toLowerCase().includes(q);
-      });
+      .filter((m) => libraryAssetMatchesQuery(m, q));
     return list.map((m) => {
       const g = voxelGridSize(m);
       const solids = m.voxels.reduce((n, v) => n + (v > 0 ? 1 : 0), 0);
       const scene = voxelScenes[m.id];
       const useScene = scene != null && scene.objects.length > 1;
+      const usage = countLibraryAssetReferences(pack, "voxel", m.id);
       return {
         id: m.id,
         label: m.nameRu?.trim() || m.id,
-        title: `${m.nameRu?.trim() || m.id} · ${m.id}`,
+        title: [
+          m.nameRu?.trim() || m.id,
+          m.id,
+          ...(m.tags ?? []),
+          formatVoxelShardLabel(
+            pack.voxelLibraryFiles?.[m.id] ??
+              assignVoxelShard(m.id, pack.voxelLibraryFiles ?? {}),
+          ),
+          usage ? `${usage} на картах` : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
         badges: [`${g.sx}×${g.sy}×${g.sz}`, `${solids} вкс`],
         thumb: useScene ? (
           <EmberVoxelSceneThumb
@@ -1440,7 +1558,7 @@ export function VoxelSculptPanel({
         ),
       };
     });
-  }, [models, pickerQuery, voxelScenes, pack.voxelModels]);
+  }, [models, pickerQuery, voxelScenes, pack]);
 
   // Persistent Three scene.
   useEffect(() => {
@@ -1591,6 +1709,18 @@ export function VoxelSculptPanel({
     const mirrorRoot = new THREE.Group();
     mirrorRoot.name = "vox-mirror";
     editOverlayRoot.add(mirrorRoot);
+
+    const playerCapsule = createPlayerCapsuleOverlay(
+      DEFAULT_WORLD_BODY.radiusVoxels,
+      DEFAULT_WORLD_BODY.heightVoxels,
+    );
+    playerCapsule.visible = false;
+    playerCapsule.position.set(
+      -DEFAULT_WORLD_BODY.radiusVoxels - 1.5,
+      DEFAULT_WORLD_BODY.heightVoxels * 0.5,
+      DEFAULT_WORLD_BODY.radiusVoxels,
+    );
+    editOverlayRoot.add(playerCapsule);
 
     const clearGridRoot = () => {
       while (gridRoot.children.length) {
@@ -1937,6 +2067,15 @@ export function VoxelSculptPanel({
         api.dist = THREE.MathUtils.clamp(fit * PAD, 22, 240);
         api.applyCam();
       },
+      frameExploreCamera() {
+        api.yaw = Math.PI * 0.25;
+        api.pitch = EDITOR_ISO_POLAR;
+        api.frameCamera();
+      },
+      setPlayerCapsule(visible) {
+        playerCapsule.visible = visible;
+        api.render();
+      },
       dispose() {
         /* filled after listeners attach */
       },
@@ -1961,7 +2100,14 @@ export function VoxelSculptPanel({
 
     const activeTool = (): SculptTool => {
       // Shift+select = multi-add, not erase.
-      if (shiftEraseRef.current && toolRef.current !== "select") return "erase";
+      // Replace uses Shift to erase that palette index globally.
+      if (
+        shiftEraseRef.current &&
+        toolRef.current !== "select" &&
+        toolRef.current !== "replace"
+      ) {
+        return "erase";
+      }
       return toolRef.current;
     };
 
@@ -2134,7 +2280,17 @@ export function VoxelSculptPanel({
       // hover is parented under editOverlayRoot (= content pose).
       hover.position.set(cell.x + 0.5, cell.y + 0.5, cell.z + 0.5);
       hover.visible = true;
-      setHoverLabel(`${cell.x}, ${cell.y}, ${cell.z}`);
+      if (activeTool() === "replace") {
+        const from = getVoxel(draftRef.current, cell.x, cell.y, cell.z);
+        const to = shiftEraseRef.current ? 0 : paletteRef.current;
+        setHoverLabel(
+          from > 0
+            ? `замена #${from} → ${to === 0 ? "пусто" : `#${to}`}`
+            : `${cell.x}, ${cell.y}, ${cell.z}`,
+        );
+      } else {
+        setHoverLabel(`${cell.x}, ${cell.y}, ${cell.z}`);
+      }
       api.render();
     };
 
@@ -2260,6 +2416,24 @@ export function VoxelSculptPanel({
       if (t === "pick") {
         const pi = getVoxel(draftRef.current, cell.x, cell.y, cell.z);
         onPickColorRef.current(pi);
+        return;
+      }
+      if (t === "replace") {
+        if (!once) return;
+        const from = getVoxel(draftRef.current, cell.x, cell.y, cell.z);
+        if (from <= 0) return;
+        const to = shiftEraseRef.current ? 0 : paletteRef.current;
+        beginEditRef.current();
+        const next = replaceVoxelPaletteIndex(
+          draftRef.current,
+          from,
+          to,
+          selectionRef.current,
+        );
+        if (next !== draftRef.current) {
+          draftRef.current = next;
+          setDraft(next);
+        }
         return;
       }
       // Fill is click-once (not a drag stroke).
@@ -2453,6 +2627,23 @@ export function VoxelSculptPanel({
           ? [...(selectionRef.current ?? [])]
           : [];
       el.setPointerCapture(e.pointerId);
+      const t = toolRef.current;
+      if (
+        (t === "add" || t === "erase") &&
+        shapeBrushRef.current !== "voxel"
+      ) {
+        const cell = pick(e);
+        if (cell) {
+          shapeDragRef.current = {
+            start: cell,
+            end: cell,
+            erase: t === "erase" || shiftEraseRef.current,
+          };
+          showHover(cell);
+          api.setSelection(cellsToUnitSelection([cell]));
+        }
+        return;
+      }
       stroke(e, true);
     };
 
@@ -2534,6 +2725,34 @@ export function VoxelSculptPanel({
         return;
       }
       if (paintingRef.current) {
+        const t = toolRef.current;
+        const kind = shapeBrushRef.current;
+        if ((t === "add" || t === "erase") && kind !== "voxel") {
+          const cell = pick(e);
+          showHover(cell);
+          if (cell) {
+            if (!shapeDragRef.current) {
+              shapeDragRef.current = {
+                start: cell,
+                end: cell,
+                erase: t === "erase" || shiftEraseRef.current,
+              };
+            } else {
+              shapeDragRef.current.end = cell;
+            }
+            const drag = shapeDragRef.current;
+            if (kind === "box") {
+              api.setSelection([normalizeVoxelSelection(drag.start, cell)]);
+            } else {
+              api.setSelection(
+                cellsToUnitSelection(
+                  cellsForVoxelShape(drag.start, cell, kind),
+                ),
+              );
+            }
+          }
+          return;
+        }
         if (!paintDragStarted) {
           const moved = Math.hypot(
             e.clientX - pointerStartX,
@@ -2599,6 +2818,13 @@ export function VoxelSculptPanel({
         hingeDrag.active = false;
         hingeGizmo.setHighlight(false);
         el.style.cursor = "";
+      }
+      const shapeDrag = shapeDragRef.current;
+      shapeDragRef.current = null;
+      if (shapeDrag) {
+        const end = shapeDrag.end ?? lastHoverCellRef.current ?? shapeDrag.start;
+        onShapeCommitRef.current(shapeDrag.start, end, shapeDrag.erase);
+        api.setSelection(selectionRef.current);
       }
       orbitingRef.current = false;
       panningRef.current = false;
@@ -3089,6 +3315,18 @@ export function VoxelSculptPanel({
   useEffect(() => {
     try {
       sessionStorage.setItem(
+        VOXEL_CAPSULE_STORAGE_KEY,
+        showPlayerCapsule ? "1" : "0",
+      );
+    } catch {
+      /* ignore */
+    }
+    apiRef.current?.setPlayerCapsule(showPlayerCapsule);
+  }, [showPlayerCapsule]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
         VOXEL_PREVIEW_LIGHT_STORAGE_KEY,
         showPreviewEmissiveLight ? "1" : "0",
       );
@@ -3106,6 +3344,22 @@ export function VoxelSculptPanel({
     editSnapRef.current = false;
     setDraft(next);
     persistHistSession(next);
+  };
+  applyEditRef.current = applyEdit;
+  onShapeCommitRef.current = (start, end, erase) => {
+    const current = draftRef.current;
+    const kind = shapeBrushRef.current;
+    if (!current || kind === "voxel") return;
+    const next = stampVoxelShape(current, start, end, kind, {
+      paletteIndex: paletteRef.current,
+      erase,
+      mirror: mirrorAxesRef.current,
+    });
+    if (next !== current) applyEdit(next);
+  };
+
+  const noteOwnVoxWrite = () => {
+    ignoreVoxWatchUntilRef.current = Date.now() + 2000;
   };
 
   // Debounced autosave to library + session history.
@@ -3131,7 +3385,16 @@ export function VoxelSculptPanel({
           ...(packRef.current.voxelScenes ?? voxelScenes),
           ...voxelScenes,
         };
-        const res = await writeVoxelRegistry(modelsMap, scenesMap);
+        const skipVox =
+          skipVoxWriteOnceRef.current === normalized.id
+            ? [normalized.id]
+            : undefined;
+        skipVoxWriteOnceRef.current = null;
+        if (!skipVox) noteOwnVoxWrite();
+        const res = await writeVoxelRegistry(modelsMap, scenesMap, {
+          dirtyIds: [normalized.id],
+          skipVoxWrite: skipVox,
+        });
         if (gen !== autoSaveGenRef.current) return;
         if (!res.ok) {
           setAutoSaveNote(`Ошибка авто: ${res.error}`);
@@ -3159,6 +3422,67 @@ export function VoxelSculptPanel({
     persistHistSession,
     voxelScenes,
   ]);
+
+  useEffect(() => {
+    if (variantMode || !draft?.id) return;
+    const desktop = window.joiDesktop?.ember;
+    if (!desktop?.watch || !desktop.onFileChanged || !desktop.unwatch) return;
+    const modelId = draft.id;
+    const rel = voxelVoxRel(modelId);
+    let cancelled = false;
+    void desktop.watch(rel);
+    const unsub = desktop.onFileChanged((payload) => {
+      if (cancelled || payload.rel !== rel) return;
+      if (Date.now() < ignoreVoxWatchUntilRef.current) return;
+      void (async () => {
+        let bytes: Uint8Array | null = null;
+        for (let attempt = 0; attempt < 4; attempt++) {
+          if (cancelled) return;
+          const res = await readEmberBytes(rel);
+          if (res.ok) {
+            bytes = res.data;
+            break;
+          }
+          await waitMs(160);
+        }
+        if (!bytes || cancelled) return;
+        const current = draftRef.current;
+        if (!current || current.id !== modelId) return;
+        let next: EmberVoxelModel;
+        try {
+          next = applyVoxBytesToEmberModel(current, bytes);
+        } catch {
+          await waitMs(200);
+          if (cancelled) return;
+          const retry = await readEmberBytes(rel);
+          if (!retry.ok) return;
+          try {
+            next = applyVoxBytesToEmberModel(current, retry.data);
+          } catch {
+            onSaved?.("MagicaVoxel: не удалось прочитать сохранённый .vox");
+            return;
+          }
+        }
+        if (cancelled) return;
+        if (
+          voxelOccupancyFingerprint(current) ===
+          voxelOccupancyFingerprint(next)
+        ) {
+          return;
+        }
+        skipVoxWriteOnceRef.current = modelId;
+        applyEditRef.current(next);
+        onSaved?.(
+          `Сетка из MagicaVoxel → «${next.nameRu ?? next.id}» (свет в JSON)`,
+        );
+      })();
+    });
+    return () => {
+      cancelled = true;
+      unsub();
+      void desktop.unwatch();
+    };
+  }, [draft?.id, variantMode, onSaved]);
 
   const applySelectionOp = (op: SelectionEditOp) => {
     const model = draftRef.current;
@@ -3252,6 +3576,29 @@ export function VoxelSculptPanel({
     if (draftRef.current) persistHistSession(draftRef.current);
   };
 
+  const transformSelection = (op: "dup" | VoxelRotateAxis) => {
+    const model = draftRef.current;
+    const sel = selectionRef.current;
+    if (!model || !sel?.length) return;
+    const result =
+      op === "dup"
+        ? duplicateVoxelSelection(model, sel)
+        : rotateVoxelSelection(model, sel, op);
+    if (!result) return;
+    applyEdit(result.model);
+    changeSelection(result.selection);
+  };
+
+  const cycleShapeBrush = () => {
+    setShapeBrush((cur) => {
+      const i = SHAPE_BRUSHES.findIndex((b) => b.id === cur);
+      return SHAPE_BRUSHES[(i + 1) % SHAPE_BRUSHES.length]!.id;
+    });
+    if (toolRef.current !== "add" && toolRef.current !== "erase") {
+      setTool("add");
+    }
+  };
+
   const frameCamera = () => {
     const api = apiRef.current;
     if (!api) return;
@@ -3295,6 +3642,11 @@ export function VoxelSculptPanel({
           changeSelection(all ? [all] : null);
         }
         setTool("select");
+        return;
+      }
+      if (mod && code === "KeyD") {
+        e.preventDefault();
+        transformSelection("dup");
         return;
       }
 
@@ -3347,6 +3699,11 @@ export function VoxelSculptPanel({
         changeSelection(null);
         return;
       }
+      if (code === "KeyF" && !mod && shift) {
+        e.preventDefault();
+        apiRef.current?.frameExploreCamera();
+        return;
+      }
       if (code === "KeyF" && !mod && !shift) {
         e.preventDefault();
         frameCamera();
@@ -3394,6 +3751,12 @@ export function VoxelSculptPanel({
             clearHingeRef.current();
             setTool("fill");
           }
+          return;
+        }
+        if (code === "KeyP") {
+          e.preventDefault();
+          clearHingeRef.current();
+          setTool("replace");
           return;
         }
         if (code === "KeyI" || code === "Digit5" || code === "Numpad5") {
@@ -3453,6 +3816,26 @@ export function VoxelSculptPanel({
           startHingeJoint();
           return;
         }
+        if (code === "KeyN") {
+          e.preventDefault();
+          cycleShapeBrush();
+          return;
+        }
+        if (code === "BracketRight") {
+          e.preventDefault();
+          transformSelection("y");
+          return;
+        }
+        if (code === "BracketLeft") {
+          e.preventDefault();
+          transformSelection("x");
+          return;
+        }
+      }
+      if (shift && !mod && code === "BracketRight") {
+        e.preventDefault();
+        transformSelection("z");
+        return;
       }
     };
     window.addEventListener("keydown", onKey);
@@ -3574,6 +3957,7 @@ export function VoxelSculptPanel({
     const scenesMap = { ...voxelScenes, [scene.id]: scene };
     setBrowsePicker(false);
     onPackChange(packWithVoxels(pack, modelsMap, scenesMap));
+    void writeVoxelRegistry(modelsMap, scenesMap, { dirtyIds: [id] });
     setActiveId(scene.id);
     setActiveObjectId(scene.objects[0]!.id);
     setLibLoadId(id);
@@ -3581,6 +3965,133 @@ export function VoxelSculptPanel({
     markEditorOpened("voxel", scene.id);
     onActiveModelChange?.(id);
     resetHistory();
+  };
+
+  const exportDraftVox = () => {
+    if (!draft) return;
+    try {
+      downloadVoxBytes(`${draft.id}.vox`, encodeEmberModelToVox(draft));
+      onSaved?.(
+        `Экспорт MagicaVoxel: ${draft.id}.vox (форма и палитра; свет остаётся в JSON)`,
+      );
+    } catch (err) {
+      onSaved?.(
+        `Экспорт .vox: ${err instanceof Error ? err.message : "ошибка"}`,
+      );
+    }
+  };
+
+  const importVoxFile = async (
+    file: File,
+    mode: "replace" | "new",
+  ) => {
+    let bytes: Uint8Array;
+    try {
+      bytes = new Uint8Array(await file.arrayBuffer());
+    } catch (err) {
+      onSaved?.(
+        `Импорт .vox: ${err instanceof Error ? err.message : "не удалось прочитать файл"}`,
+      );
+      return;
+    }
+    try {
+      if (voxDocumentExceedsEmberGrid(bytes)) {
+        const ok = window.confirm(
+          `«${file.name}» больше лимита Ember (128³). Лишние воксели обрежутся. Продолжить?`,
+        );
+        if (!ok) return;
+      }
+    } catch (err) {
+      onSaved?.(
+        `Импорт .vox: ${err instanceof Error ? err.message : "файл не читается"}`,
+      );
+      return;
+    }
+
+    const replaceCurrent = mode === "replace" && draft && !variantMode;
+    const replaceVariant = mode === "replace" && draft && variantMode;
+    if (replaceCurrent || replaceVariant) {
+      const srcName = draft.nameRu?.trim() || draft.id;
+      const ok = window.confirm(
+        `Заменить сетку «${srcName}» из MagicaVoxel?\n` +
+          `Коллизия и свет объекта сохранятся. Форма и палитра — из .vox.`,
+      );
+      if (!ok) return;
+      try {
+        const next = applyVoxBytesToEmberModel(draft, bytes);
+        applyEdit(next);
+        setSelection(null);
+        onSaved?.(`Импорт .vox → «${next.nameRu ?? next.id}»`);
+      } catch (err) {
+        onSaved?.(
+          `Импорт .vox: ${err instanceof Error ? err.message : "ошибка"}`,
+        );
+      }
+      return;
+    }
+
+    if (variantMode && session.mode === "placementVariant") {
+      try {
+        const next = applyVoxBytesToEmberModel(
+          draft ??
+            createEmptyVoxelModel(
+              `_variant_${session.placementId}`,
+              { x: 1, y: 1, z: 1 },
+              "Новый вариант",
+            ),
+          bytes,
+        );
+        resetHistory();
+        setDraft(next);
+        setSelection(null);
+        onSaved?.(`Импорт .vox → вариант «${next.nameRu ?? next.id}»`);
+      } catch (err) {
+        onSaved?.(
+          `Импорт .vox: ${err instanceof Error ? err.message : "ошибка"}`,
+        );
+      }
+      return;
+    }
+
+    try {
+      const id = `vox_${Date.now().toString(36)}`;
+      const nameRu = nameRuFromVoxFileName(file.name);
+      const created = normalizeVoxelModel({
+        ...decodeVoxToEmberModel(bytes, id, nameRu),
+        physical: true,
+      });
+      const scene = sceneFromSingleModel(id, nameRu, id);
+      const modelsMap = { ...pack.voxelModels, [id]: created };
+      const scenesMap = { ...voxelScenes, [scene.id]: scene };
+      setBrowsePicker(false);
+      onPackChange(packWithVoxels(pack, modelsMap, scenesMap));
+      void writeVoxelRegistry(modelsMap, scenesMap, { dirtyIds: [id] });
+      setActiveId(scene.id);
+      setActiveObjectId(scene.objects[0]!.id);
+      setLibLoadId(id);
+      setDraft(created);
+      markEditorOpened("voxel", scene.id);
+      onActiveModelChange?.(id);
+      resetHistory();
+      setSelection(null);
+      onSaved?.(`Импорт .vox → «${nameRu}»`);
+    } catch (err) {
+      onSaved?.(
+        `Импорт .vox: ${err instanceof Error ? err.message : "ошибка"}`,
+      );
+    }
+  };
+
+  const onVoxFileChosen = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    void importVoxFile(file, voxImportModeRef.current);
+  };
+
+  const openVoxImporter = (mode: "replace" | "new") => {
+    voxImportModeRef.current = mode;
+    voxFileRef.current?.click();
   };
 
   const commitScene = (nextScene: EmberVoxelScene, modelsExtra?: Record<string, EmberVoxelModel>) => {
@@ -3591,7 +4102,13 @@ export function VoxelSculptPanel({
     };
     const scenesMap = { ...voxelScenes, [nextScene.id]: nextScene };
     onPackChange(packWithVoxels(pack, modelsMap, scenesMap));
-    void writeVoxelRegistry(modelsMap, scenesMap).then((res) => {
+    void writeVoxelRegistry(modelsMap, scenesMap, {
+      dirtyIds: [
+        nextScene.id,
+        ...nextScene.objects.map((object) => object.modelId),
+        ...(draft ? [draft.id] : []),
+      ],
+    }).then((res) => {
       if (!res.ok) onSaved?.(`Сцена: ошибка — ${res.error}`);
     });
   };
@@ -3877,7 +4394,9 @@ export function VoxelSculptPanel({
     skipPackSyncRef.current = true;
     lastSavedJsonRef.current = JSON.stringify(normalizeVoxelModel(erased));
     onPackChange(packWithVoxels(pack, modelsMap, scenesMap));
-    void writeVoxelRegistry(modelsMap, scenesMap);
+    void writeVoxelRegistry(modelsMap, scenesMap, {
+      dirtyIds: [erased.id, extracted.model.id, nextScene.id],
+    });
     setActiveObjectId(objId);
     setDraft(extracted.model);
     lastSavedJsonRef.current = JSON.stringify(
@@ -3914,6 +4433,17 @@ export function VoxelSculptPanel({
     applyEdit({ ...draft, palette });
   };
 
+  const remapPaletteIndex = (fromIndex: number, toIndex: number) => {
+    if (!draft) return;
+    const next = replaceVoxelPaletteIndex(
+      draft,
+      fromIndex,
+      toIndex,
+      selection,
+    );
+    if (next !== draft) applyEdit(next);
+  };
+
   const previewPaletteColor = (index: number, hex: string) => {
     apiRef.current?.previewPaletteColor(index, hex);
   };
@@ -3930,8 +4460,8 @@ export function VoxelSculptPanel({
   const canUndo = undoStackRef.current.length > 0;
   const canRedo = redoStackRef.current.length > 0;
 
-  const save = async () => {
-    if (!draft) return;
+  const save = async (): Promise<boolean> => {
+    if (!draft) return false;
     setSaving(true);
     const currentPack = packRef.current;
     if (session.mode === "placementVariant") {
@@ -3947,11 +4477,13 @@ export function VoxelSculptPanel({
         [newId]: saved,
       };
       const scenesMap = ensureVoxelScenes(modelsMap, currentPack.voxelScenes);
-      const res = await writeVoxelRegistry(modelsMap, scenesMap);
+      const res = await writeVoxelRegistry(modelsMap, scenesMap, {
+        dirtyIds: [newId],
+      });
       setSaving(false);
       if (!res.ok) {
         onSaved?.(`Воксели: ошибка сохранения — ${res.error}`);
-        return;
+        return false;
       }
       onPackChange(packWithVoxels(currentPack, modelsMap, scenesMap));
       onSavedVariant?.({ model: saved, placementId: session.placementId });
@@ -3959,7 +4491,7 @@ export function VoxelSculptPanel({
         `Вариант «${saved.nameRu ?? saved.id}» сохранён в библиотеку`,
       );
       onClose?.();
-      return;
+      return true;
     }
 
     const normalized = normalizeVoxelModel(draft);
@@ -3968,11 +4500,14 @@ export function VoxelSculptPanel({
       [normalized.id]: normalized,
     };
     const scenesMap = { ...voxelScenes };
-    const res = await writeVoxelRegistry(modelsMap, scenesMap);
+    noteOwnVoxWrite();
+    const res = await writeVoxelRegistry(modelsMap, scenesMap, {
+      dirtyIds: [normalized.id],
+    });
     setSaving(false);
     if (!res.ok) {
       onSaved?.(`Воксели: ошибка сохранения — ${res.error}`);
-      return;
+      return false;
     }
     lastSavedJsonRef.current = JSON.stringify(normalized);
     skipPackSyncRef.current = true;
@@ -3980,10 +4515,49 @@ export function VoxelSculptPanel({
     onPackChange(packWithVoxels(currentPack, modelsMap, scenesMap));
     setAutoSaveNote("Сохранено");
     onSaved?.(`Воксели «${normalized.nameRu ?? normalized.id}» сохранены`);
+    return true;
+  };
+
+  const canOpenMagicaVoxel = Boolean(window.joiDesktop?.ember?.openPath);
+
+  const openInMagicaVoxel = async () => {
+    if (!draft || variantMode) return;
+    const desktop = window.joiDesktop?.ember;
+    if (!desktop?.openPath) {
+      onSaved?.(
+        "Открыть MagicaVoxel можно в приложении Electron. Назначьте .vox на MagicaVoxel.",
+      );
+      return;
+    }
+    const ok = await save();
+    if (!ok) return;
+    const rel = voxelVoxRel(draft.id);
+    const exists = await readEmberBytes(rel);
+    if (!exists.ok) {
+      onSaved?.(
+        `Нет файла ${rel} — сохраните модель, затем откройте снова`,
+      );
+      return;
+    }
+    noteOwnVoxWrite();
+    const res = await desktop.openPath(rel);
+    if (!res.ok) {
+      onSaved?.(
+        `Не открылся ${rel}: ${res.detail ?? "ошибка"}. Назначьте MagicaVoxel программой по умолчанию для .vox`,
+      );
+      return;
+    }
+    onSaved?.(
+      "MagicaVoxel: сохрани там .vox — Ember подхватит сетку, свет останется в JSON",
+    );
   };
 
   const grid = draft ? voxelGridSize(draft) : null;
   const activeColor = draft?.palette[paletteIndex] || "#888888";
+  const libraryRel = draft
+    ? pack.voxelLibraryFiles?.[draft.id] ??
+      assignVoxelShard(draft.id, pack.voxelLibraryFiles ?? {})
+    : null;
 
   const openPickedModel = (id: string) => {
     if (!pack.voxelModels[id]) return;
@@ -4001,6 +4575,13 @@ export function VoxelSculptPanel({
         onClose ? "ember-voxel-sculpt--modal" : "ember-voxel-sculpt--page",
       ].join(" ")}
     >
+      <input
+        ref={voxFileRef}
+        type="file"
+        accept=".vox,application/octet-stream"
+        hidden
+        onChange={onVoxFileChosen}
+      />
       {showOpenPicker ? (
         <div className="ember-ed-open-picker ember-ed-open-picker--overlay">
           <div className="ember-ed-open-picker__shell">
@@ -4025,6 +4606,14 @@ export function VoxelSculptPanel({
                 ) : null}
                 <button
                   type="button"
+                  className="ghost"
+                  title="Новый объект из MagicaVoxel .vox"
+                  onClick={() => openVoxImporter("new")}
+                >
+                  Импорт .vox
+                </button>
+                <button
+                  type="button"
                   className="primary ember-ed-open-picker__create"
                   onClick={() => {
                     setBrowsePicker(false);
@@ -4039,7 +4628,7 @@ export function VoxelSculptPanel({
             <label className="ember-ed-open-picker__search">
               <input
                 type="search"
-                placeholder="Поиск по имени или id…"
+                    placeholder="Поиск по имени, id или тегу…"
                 value={pickerQuery}
                 onChange={(e) => setPickerQuery(e.target.value)}
                 autoFocus
@@ -4074,6 +4663,14 @@ export function VoxelSculptPanel({
               ? "Вариант объекта на карте"
               : "Редактор вокселей"}
           </h3>
+          {libraryRel ? (
+            <p
+              className="muted ember-voxel-sculpt__head-file"
+              title={libraryRel}
+            >
+              файл: {formatVoxelShardLabel(libraryRel)}
+            </p>
+          ) : null}
         </div>
 
         <div
@@ -4111,6 +4708,15 @@ export function VoxelSculptPanel({
             </button>
             <button
               type="button"
+              className="ghost"
+              disabled={!draft}
+              title="Камера как в explore play: iso 0.95, юго-восток (Shift+F)"
+              onClick={() => apiRef.current?.frameExploreCamera()}
+            >
+              Игра
+            </button>
+            <button
+              type="button"
               className={`ghost ${showVoxelGrid ? "is-on" : ""}`}
               disabled={!draft}
               aria-pressed={showVoxelGrid}
@@ -4118,6 +4724,20 @@ export function VoxelSculptPanel({
               onClick={() => setShowVoxelGrid((v) => !v)}
             >
               Сетка
+            </button>
+            <button
+              type="button"
+              className={`ghost ${showPlayerCapsule ? "is-on" : ""}`}
+              disabled={!draft}
+              aria-pressed={showPlayerCapsule}
+              title={
+                draft?.physical === false
+                  ? "Капсула игрока (2.5×12 vx) · модель walk-through"
+                  : "Капсула игрока (2.5×12 vx) рядом с моделью"
+              }
+              onClick={() => setShowPlayerCapsule((v) => !v)}
+            >
+              Капсула
             </button>
             <button
               type="button"
@@ -4261,15 +4881,56 @@ export function VoxelSculptPanel({
           ) : null}
           <div className="ember-voxel-sculpt__chrome-actions">
             {!variantMode && !onClose && models.length > 0 ? (
-              <button
-                type="button"
-                className="ghost"
-                title="Вернуться к меню выбора объекта"
-                onClick={() => setBrowsePicker(true)}
-              >
-                Меню
-              </button>
+            <button
+              type="button"
+              className="ghost"
+              title="Вернуться к меню выбора объекта"
+              onClick={() => setBrowsePicker(true)}
+            >
+              Меню
+            </button>
             ) : null}
+            {!variantMode ? (
+            <button
+              type="button"
+              className="ghost"
+              title="Новый объект из MagicaVoxel .vox (форма и палитра)"
+              onClick={() => openVoxImporter("new")}
+            >
+              Импорт
+            </button>
+            ) : null}
+            <button
+              type="button"
+              className="ghost"
+              disabled={!draft}
+              title="Заменить сетку текущего объекта из MagicaVoxel .vox. Коллизия и свет сохраняются."
+              onClick={() => openVoxImporter("replace")}
+            >
+              Из .vox
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={!draft}
+              title="Скачать MagicaVoxel .vox (форма и палитра; свет остаётся в JSON)"
+              onClick={exportDraftVox}
+            >
+              В .vox
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={!draft || variantMode || !canOpenMagicaVoxel}
+              title={
+                canOpenMagicaVoxel
+                  ? "Открыть voxels/models/<id>.vox в MagicaVoxel (или программе по умолчанию). Сохрани там — Ember подхватит сетку."
+                  : "Только в Electron: откроет .vox в MagicaVoxel и будет следить за файлом"
+              }
+              onClick={() => void openInMagicaVoxel()}
+            >
+              MagicaVoxel
+            </button>
             <button
               type="button"
               className="primary"
@@ -4352,6 +5013,25 @@ export function VoxelSculptPanel({
                     if (next !== activeScene) commitScene(next);
                   }}
                   title="Имя активного меша · тоже обновляет имя сцены, если оно совпадало"
+                />
+              </label>
+              <label className="ember-voxel-sculpt__field--name">
+                Теги
+                <input
+                  value={tagsDraft}
+                  placeholder="village, street"
+                  title="Через запятую. Префиксы vox_vil_ / vox_fan_ ищутся и без явных тегов"
+                  onChange={(e) => setTagsDraft(e.target.value)}
+                  onBlur={() => {
+                    const tags = normalizeEmberLibraryTags(tagsDraft);
+                    setTagsDraft(formatEmberLibraryTags(tags));
+                    setDraft({ ...draft, tags });
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
                 />
               </label>
               <label>
@@ -4490,6 +5170,30 @@ export function VoxelSculptPanel({
             ))}
           </div>
 
+          {tool === "add" || tool === "erase" ? (
+            <>
+              <p className="ember-voxel-sculpt__section">Форма</p>
+              <div className="ember-voxel-sculpt__modes" role="toolbar">
+                {SHAPE_BRUSHES.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    className={shapeBrush === b.id ? "is-active" : ""}
+                    title={b.tip}
+                    onClick={() => setShapeBrush(b.id)}
+                  >
+                    {b.label}
+                  </button>
+                ))}
+              </div>
+              <p className="muted ember-voxel-sculpt__group-hint">
+                {shapeBrush === "voxel"
+                  ? "Точка: клик / drag как раньше · N — следующая форма"
+                  : "ЛКМ-drag от клетки до клетки · Shift+ЛКМ — стереть · N — форма"}
+              </p>
+            </>
+          ) : null}
+
           {tool === "move" ? (
             <p className="muted ember-hint">
               Стрелки: XZ · Shift+↑↓: Y · или Δ в параметрах объекта
@@ -4556,8 +5260,21 @@ export function VoxelSculptPanel({
                       type="button"
                       className={paletteIndex === i ? "is-active" : ""}
                       style={{ background: c || "#444" }}
-                      title={`#${i}`}
-                      onClick={() => {
+                      title={
+                        `#${i}` +
+                        (paletteUsage[i]
+                          ? ` · ${paletteUsage[i]} кл.`
+                          : " · пусто") +
+                        " · Alt+клик — заменить текущий цвет этим"
+                      }
+                      onClick={(e) => {
+                        if (e.altKey) {
+                          e.preventDefault();
+                          if (i === paletteIndex) return;
+                          remapPaletteIndex(paletteIndex, i);
+                          setPaletteIndex(i);
+                          return;
+                        }
                         setPaletteIndex(i);
                         if (tool === "pick") setTool("paint");
                       }}
@@ -4581,6 +5298,15 @@ export function VoxelSculptPanel({
                   onCommit={(hex) => setPaletteColor(paletteIndex, hex)}
                 />
               </label>
+              <p className="muted ember-voxel-sculpt__group-hint">
+                {tool === "replace"
+                  ? selection?.length
+                    ? "Клик по вокселю — этот цвет палитры в выделении станет текущим слотом · Shift — стереть цвет"
+                    : "Клик по вокселю — все клетки этого цвета станут текущим слотом · Shift — стереть цвет"
+                  : selection?.length
+                    ? "Alt+клик по слоту — клетки текущего цвета в выделении станут им · P — кисть замены"
+                    : "Alt+клик по слоту — все клетки текущего цвета станут им · P — кисть замены"}
+              </p>
             </>
           ) : null}
 
@@ -4714,6 +5440,42 @@ export function VoxelSculptPanel({
               onClick={() => changeSelection(null)}
             >
               Снять
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={!draft || !selection?.length}
+              title="Поворот 90° вокруг X · ["
+              onClick={() => transformSelection("x")}
+            >
+              ↻X
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={!draft || !selection?.length}
+              title="Поворот 90° вокруг Y (yaw) · ]"
+              onClick={() => transformSelection("y")}
+            >
+              ↻Y
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={!draft || !selection?.length}
+              title="Поворот 90° вокруг Z · Shift+]"
+              onClick={() => transformSelection("z")}
+            >
+              ↻Z
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={!draft || !selection?.length}
+              title="Дублировать выделение со сдвигом +X · Ctrl+D"
+              onClick={() => transformSelection("dup")}
+            >
+              Дубль
             </button>
           </div>
         </aside>

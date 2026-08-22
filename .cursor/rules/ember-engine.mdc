@@ -18,7 +18,8 @@ alwaysApply: false
 - Локальные PointLight-тени запекаются только для статического слоя 0. Игроки и враги находятся на dynamic layer 1 и исключены. Не возвращай fake/projected actor shadows без прямого запроса.
 - Полный static shadow bake выполняется через `beginStaticPointShadowBake`; ручная команда редактора — `rebuildStaticShadows()`. После изменения статической геометрии или света обязательно инвалидируй bake.
 - Сохраняй оптимизации: terrain chunks/workers, instancing, pooling, spatial hash, fixed-step AI/physics и streaming light budgets. Не добавляй per-frame `scene.traverse`, массовые allocations или динамические PointLight cube maps.
-- Сначала проверяй local overrides: браузерный override имеет приоритет над `content/ember`. Пустой файл на диске не доказывает отсутствие данных.
-- Рабочее дерево может быть сильно изменено пользователем. Не reset/checkout и не перезаписывай несвязанные файлы.
+- Сначала проверяй local overrides: браузерный override имеет приоритет над `content/ember`, **кроме** пустого/тонкого voxel override — он игнорируется. Пустой файл на диске не доказывает отсутствие данных; смотри `.bak`.
+- Воксельная библиотека — пара `content/ember/voxels/models/<id>.json` + `<id>.vox`. Сетка — MagicaVoxel `.vox` (`emberVoxCodec.ts`); JSON держит компоненты и extra channels. Сохранение только через `writeVoxelRegistry` с `dirtyIds`. Импорт/экспорт `.vox` в скульпторе не должен терять collider/light. Кнопка MagicaVoxel открывает sibling `.vox` через `shell.openPath` и следит за файлом; внешний save не должен затирать Ember JSON. Не дампить каталог в `registry.json`. Отсутствие модели в памяти не удаляет её с диска.
+- Рабочее дерево может быть сильно изменено пользователем. Не reset/checkout и не перезаписывай несвязанные файлы. Никогда не git reset Ember JSON.
 - После изменений: targeted tests → `npm test` → `npm run build`; визуальные задачи проверяй в редакторе и игре, производительность — через F3, crowd stress — F4/Shift+F4.
 - Обновляй `docs/EMBER_AI_HANDOFF.md`, если меняется архитектурный контракт или ближайший план.

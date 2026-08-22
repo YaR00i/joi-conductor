@@ -625,7 +625,7 @@ export function MapSceneOutliner({
 
       <footer className="ember-outliner__foot">
         <span>{visibleObjects.length} объектов</span>
-        <span>Ctrl / Shift — мультивыбор · Ctrl+D дубль · H скрыть</span>
+        <span>Ctrl / Shift — мультивыбор · Ctrl+D дубль · H скрыть · Shift+H изоляция</span>
       </footer>
     </aside>
   );

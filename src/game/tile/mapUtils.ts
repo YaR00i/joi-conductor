@@ -1015,6 +1015,45 @@ function voxelPropFootprint(
   };
 }
 
+export type PhysicalVoxelCollisionAabb = {
+  minX: number;
+  minY: number;
+  minZ: number;
+  maxX: number;
+  maxY: number;
+  maxZ: number;
+};
+
+/** World-space AABBs of voxel props that actually block movement. */
+export function listPhysicalVoxelCollisionAabbs(
+  map: EmberMap,
+  voxelModels?: EmberVoxelModelLib,
+  voxelScenes?: EmberVoxelSceneLib,
+): PhysicalVoxelCollisionAabb[] {
+  if (!voxelModels) return [];
+  const storyH = blockStoryHeight(map.tileSize);
+  const out: PhysicalVoxelCollisionAabb[] = [];
+  for (const place of buildPhysicalVoxelPropPlacements(
+    map,
+    voxelModels,
+    voxelScenes,
+  )) {
+    const model = voxelModels[place.modelId];
+    if (!model) continue;
+    const fp = voxelPropFootprint(map, place, model);
+    if (!fp) continue;
+    out.push({
+      minX: fp.left,
+      maxX: fp.right,
+      minZ: fp.top,
+      maxZ: fp.bottom,
+      minY: fp.baseElev * storyH,
+      maxY: Math.max(fp.baseElev, fp.topElev) * storyH,
+    });
+  }
+  return out;
+}
+
 /**
  * Broad-phase bounds include every legal horizontal scale. This keeps direct
  * inspector mutations correct even before the editor publishes a new map

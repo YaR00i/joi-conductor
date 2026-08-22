@@ -1,3 +1,4 @@
+import { normalizeEmberLibraryTags } from "./libraryTags";
 import type {
   EmberEmissiveAnim,
   EmberEmissiveTriggerWhen,
@@ -374,6 +375,7 @@ export function serializePixelSprite(sprite: EmberPixelSprite): EmberPixelSprite
   return {
     id: n.id,
     nameRu: n.nameRu,
+    tags: n.tags,
     componentStates: n.componentStates
       ? { ...n.componentStates }
       : undefined,
@@ -417,6 +419,7 @@ export function normalizePixelSprite(raw: LegacySprite): EmberPixelSprite {
   const color = raw.color || "#c45c26";
   const roles = raw.roles?.length ? [...raw.roles] : undefined;
   const nameRu = raw.nameRu;
+  const tags = normalizeEmberLibraryTags(raw.tags);
   const componentStates = raw.componentStates
     ? { ...raw.componentStates }
     : undefined;
@@ -503,6 +506,7 @@ export function normalizePixelSprite(raw: LegacySprite): EmberPixelSprite {
     return {
       id,
       nameRu,
+      tags,
       componentStates,
       width,
       topHeight,
@@ -553,6 +557,7 @@ export function normalizePixelSprite(raw: LegacySprite): EmberPixelSprite {
     return {
       id,
       nameRu,
+      tags,
       componentStates,
       width: size,
       topHeight: size,
@@ -594,6 +599,7 @@ export function normalizePixelSprite(raw: LegacySprite): EmberPixelSprite {
   return {
     id,
     nameRu,
+    tags,
     componentStates,
     width: size,
     topHeight: size,

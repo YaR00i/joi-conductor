@@ -1,6 +1,6 @@
 # Ember — инструкция и handoff для ИИ
 
-Актуально на 20 августа 2026 года. Этот документ — рабочий контекст для Cursor/Codex при продолжении разработки Ember. Он описывает не только существующий код, но и намерение системы: чего добивались, какие решения уже приняты и куда двигаться дальше.
+Актуально на 22 августа 2026 года. Этот документ — рабочий контекст для Cursor/Codex при продолжении разработки Ember. Он описывает не только существующий код, но и намерение системы: чего добивались, какие решения уже приняты и куда двигаться дальше.
 
 Для задач Ember этот handoff имеет приоритет над старой пометкой «Ember не трогаем» в общем `docs/IMPROVEMENTS.md`: пользователь явно продолжает разработку Ember.
 
@@ -48,7 +48,7 @@ Ember — встроенная в JOI Conductor игра и редактор к�
 
 ### Главный редактор карты
 
-- `src/components/ember/editor/MapEditorPanel.tsx` — orchestration UI карты. Сейчас крупный монолит; новые алгоритмы желательно выносить в сервисы/хуки, а не увеличивать файл бесконечно.
+- `src/components/ember/editor/MapEditorPanel.tsx` — orchestration UI карты. Сейчас крупный монолит; новые алгоритмы желательно выносить в сервисы/хуки, а не увеличивать файл бесконечно. Изоляция: Shift+H / `/` (Alt+H показать все). Collision overlay: стены + AABB физических вокселей + капсула игрока на spawn. **Explore · Q** — камера как в play.
 - `src/game/three/editorThreePreview.ts` — Three.js viewport редактора: сцена, pick, placement preview, gizmo, overlays, свет и shadow bake.
 - `src/components/ember/editor/MapSceneOutliner.tsx` — иерархия объектов карты.
 - `src/components/ember/editor/MapObjectInspector.tsx` и `WorldObjectSchemaInspector.tsx` — Inspector.
@@ -71,8 +71,13 @@ Ember — встроенная в JOI Conductor игра и редактор к�
 - `maps/` — карты (`loadEmberPack` читает всю директорию; fallback — `hu_tao_yard`);
 - `tilesets/` — тайлы, материалы, физика и семантика (директория; fallback — `graveyard_16`);
 - `sprites/registry.json` — пиксельные спрайты;
-- `voxels/registry.json` — воксельные модели и voxel scenes;
-- `voxels/village.json` — модели деревни, мержатся по id и не затирают registry;
+- `voxels/models/<id>.json` + `voxels/models/<id>.vox` — пара prefab: JSON (id, теги, коллизия, свет, extra channels), MagicaVoxel `.vox` (форма + палитра). `writeVoxelRegistry` пишет оба файла; `loadEmberPack` склеивает пару. Старые JSON с `model.voxels` ещё читаются до первого save;
+- обмен с внешним миром: `.vox` (форма + палитра), Ember JSON (коллизия/свет/id). Кодек: `src/game/voxel/vox/voxFile.ts`, `emberVoxCodec.ts`. Оси: MagicaVoxel Z-up → Ember Y-up (`ember(x,y,z) = vox(x,z,y)`). В скульпторе: **Импорт** / **Из .vox** / **В .vox** / **MagicaVoxel** (открыть файл и watch: save в MV → сетка в Ember, JSON не затирается); extra channels не ездят через MagicaVoxel. Куб/ластик: форма точка/линия/коробка/сфера (N, drag), выделение ↻X/Y/Z и Дубль (`voxelShapeBrush.ts`). Палитра: **Замена** (P) и Alt+клик слота — remap индекса по всей модели или выделению (`voxelPaletteOps.ts`);
+- библиотека карты: поиск по имени/id/тегу и чипы тегов (`libraryTags.ts`, `emberLibraryIndex.ts`). Теги пишутся на prefab (`tags` у модели и обёртки JSON) и спрайте; префиксы `vox_vil_` / `vox_fan_` дают search-only `village` / `fantasy`, пока автор не сохранит явный список. Find References считает voxelProps, chest `closedModelId`/`sceneId` и чужие voxel-сцены; **К размещению** прыгает по открытой карте;
+- `voxels/scenes/<id>.json` — только multi-object workspace, если сцена не совпадает с id модели;
+- `loadEmberPack` читает `voxels/models/*.json` (и leftover `registry.json` / `village.json`, если они ещё лежат в корне), затем соседний `.vox` если `mesh.file` задан и occupancy в JSON пустая;
+- сохранение через `writeVoxelRegistry(..., { dirtyIds })` пишет **только** изменённую пару json+`.vox`; отсутствие в памяти ≠ удаление;
+- старые монолиты после сплита: `voxels/_legacy/` (локальный бэкап, не в git);
 - `lights/registry.json`, `looks/registry.json` — пресеты света и внешнего вида;
 - `stages/` — правила забега;
 - `spawns/` — волны врагов;
@@ -92,7 +97,9 @@ Ember — встроенная в JOI Conductor игра и редактор к�
 3. `/ember/...` через Vite/fetch;
 4. `.bak`, если основной JSON повреждён.
 
-Поэтому заголовок редактора `override×N` означает, что открытая карта/реестр может отличаться от файла на диске. Нельзя считать пустой `content/ember/voxels/registry.json` доказательством отсутствия вокселей и нельзя затирать override пустым файлом. Перед диагностикой проверять `listLocalOverrides()` и источник результата `readEmberJson()`.
+Поэтому заголовок редактора `override×N` / `voxel override` означает, что открытая карта/реестр может отличаться от файла на диске. Нельзя считать пустой `content/ember/voxels/registry.json` доказательством отсутствия вокселей и нельзя затирать диск пустым файлом. Пустой или «тонкий» voxel override игнорируется при чтении. Перед диагностикой проверять `listLocalOverrides()` и источник результата `readEmberJson()`. Кнопка **Voxel disk** сбрасывает только voxel override.
+
+Не складывать модели обратно в один `registry.json`. Генераторы пишут `voxels/models/<id>.json`. Для MagicaVoxel/бота сетка — `.vox` или `model.voxels` в JSON, не glTF. Инструкция контент-бота (Grok / Voxel bro): `docs/EMBER_VOXEL_BOT.md`. Визуальный просмотр стиля: [Sketchfab tag magicavoxel](https://sketchfab.com/tags/magicavoxel) — смотреть, не импортировать glTF.
 
 ## 4. Система координат и высот
 
@@ -307,6 +314,15 @@ F3 показывает `Point cubes static N dynamic M [source ids]`, чтоб�
 4. Убедиться, что Library placement, Outliner selection и Inspector дают одинаковый объект и одинаковые undo/redo операции.
 5. В play проверить map-wide sun bake (тени объектов за игроком не обрываются) и свет ламп внутри солнечной умбры. Дальние лампы не должны пересобирать cube maps. F3 и F4.
 
+### Скульптор (MagicaVoxel-паритет)
+
+1. Watch `.vox` / открыть MagicaVoxel — **сделано**.
+2. Shape brushes (линия/коробка/сфера) + поворот/дубль выделения — **сделано** (`voxelShapeBrush.ts`, N / ] / [ / Ctrl+D).
+3. Replace-color по палитре — **сделано** (`voxelPaletteOps.ts`: инструмент **Замена**/P, Alt+клик слота, Shift стирает цвет; выделение ограничивает область).
+4. Isolation + overlay коллизии + preview explore-камеры — **сделано**: Shift+H / `/` изоляция, Alt+H показать все; collision overlay рисует AABB физических вокселей и капсулу игрока на `player_start`; Q / Explore — камера как в play; в скульпторе **Капсула** и **Игра** (Shift+F).
+5. Library tags + Find References — **сделано**: теги на voxel/sprite, поиск и чипы в лотке библиотеки, Find References в инспекторе (**К размещению** на открытой карте).
+6. Creative Mode — **позже**, не в работе сейчас. Контент-боту Grok его не давать.
+
 ### Затем — Creative Mode
 
 Цель: Minecraft-подобное редактирование от первого лица поверх той же системы данных, а не второй редактор.
@@ -327,7 +343,7 @@ F3 показывает `Point cubes static N dynamic M [source ids]`, чтоб�
 2. Asset Library 2.0: tags/categories, usage references, safe rename/import, bulk actions.
 3. Balance editors: enemies, weapons, pools, stages и playtest from editor.
 4. Декомпозиция `MapEditorPanel.tsx` на editor services/hooks без изменения поведения.
-5. `loadEmberPack` уже грузит `maps/`, `stages/`, `tilesets/`, `spawns/` как директории (fallback на старые одиночные файлы). Воксели: `voxels/registry.json` + sidecar `voxels/village.json`. Explore-карта `hu_tao_village`, стадия `village_stroll` (default stage остаётся ареной).
+5. `loadEmberPack` уже грузит `maps/`, `stages/`, `tilesets/`, `spawns/` и `voxels/models/*.json` как директории. Один воксельный объект = json+`.vox`; save пишет только dirty id. Explore-карта `hu_tao_village`, стадия `village_stroll` (default stage остаётся ареной).
 6. Решить судьбу Phaser legacy после достижения feature parity Three runtime.
 
 ## 12. Критерии готовности изменений
@@ -348,7 +364,7 @@ F3 показывает `Point cubes static N dynamic M [source ids]`, чтоб�
 
 ## 13. Рабочий процесс для следующего ИИ
 
-1. Прочитать этот файл и релевантный раздел `docs/EMBER_ANOMALY.md`.
+1. Прочитать этот файл и релевантный раздел `docs/EMBER_ANOMALY.md`. Если задача — **воксельные модельки для Grok / Voxel bro**, вместо движка читать `docs/EMBER_VOXEL_BOT.md`.
 2. Выполнить `git status --short`. Рабочее дерево содержит пользовательские и предыдущие незакоммиченные изменения — не применять reset/checkout и не удалять несвязанные файлы.
 3. Проверить browser overrides перед правкой content JSON.
 4. Найти существующий общий контракт до добавления нового поля или helper.
@@ -368,7 +384,7 @@ npm run build
 
 ## 14. Что не делать
 
-- Не создавать третий renderer или отдельную collision-систему для Creative Mode.
+- Не создавать третий renderer или отдельную collision-систему для Creative Mode (сам режим отложен).
 - Не чинить editor отдельно от runtime копированием формул.
 - Не возвращать глобальную 2D solid-проверку, игнорирующую высоту.
 - Не поднимать point shadow map выше 256 и sun map выше 1024 без замера F3.
@@ -382,6 +398,9 @@ npm run build
 - Не сохранять промежуточное значение тяжёлого input до commit/Enter.
 - Не смешивать authored X/Y/Z с Three X/Y/Z напрямую.
 - Не затирать local override содержимым пустого disk registry.
+- Не дампить весь voxel-каталог в один JSON. Один объект = `voxels/models/<id>.json` + `<id>.vox`; отсутствие в памяти не удаляет диск.
+- Не считать пустой `voxels/*.json` на диске доказательством, что вокселей нет (сначала `voxels/models/`, override и `.bak`).
+- Не делать git reset/checkout Ember JSON.
 - Не считать задачу исправленной только по unit-тесту, если дефект визуальный.
 
 ## 15. Главный принцип

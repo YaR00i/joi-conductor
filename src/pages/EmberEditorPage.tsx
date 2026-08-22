@@ -16,6 +16,7 @@ import type {
 } from "../components/ember/editor/ArtsEditorPanel";
 import {
   clearAllLocalOverrides,
+  clearLocalOverride,
   listLocalOverrides,
   writeEmberJson,
 } from "../game/content/io";
@@ -413,6 +414,12 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
     setOpenMenu((cur) => (cur === groupId ? null : groupId));
   };
 
+  const voxelOverrides = overrides.filter((rel) => rel.startsWith("voxels/"));
+  const voxelBakIssue = issues.some(
+    (issue) =>
+      issue.path.startsWith("voxels/") && issue.message.includes("резервн"),
+  );
+
   return (
     <div className="page page--ember-editor">
       <nav
@@ -530,7 +537,22 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
               · {status}
             </span>
           ) : null}
-          {overrides.length > 0 ? (
+          {voxelBakIssue ? (
+            <span
+              className="ember-menubar__status ember-menubar__status--warn"
+              title="Воксельный JSON на диске пустой или битый — открыта резервная копия .bak"
+            >
+              · voxel .bak
+            </span>
+          ) : null}
+          {voxelOverrides.length > 0 ? (
+            <span
+              className="ember-menubar__status ember-menubar__status--warn"
+              title={voxelOverrides.join(", ")}
+            >
+              · voxel override×{voxelOverrides.length}
+            </span>
+          ) : overrides.length > 0 ? (
             <span
               className="ember-menubar__status muted"
               title={overrides.join(", ")}
@@ -547,6 +569,21 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
           <button type="button" className="ghost" onClick={() => void reload()}>
             Reload
           </button>
+          {voxelOverrides.length > 0 ? (
+            <button
+              type="button"
+              className="ghost"
+              title="Убрать браузерный кэш вокселей и перечитать диск / .bak"
+              onClick={() => {
+                for (const rel of voxelOverrides) clearLocalOverride(rel);
+                setOverrides(listLocalOverrides());
+                void reload();
+                setStatus("Voxel override сброшен");
+              }}
+            >
+              Voxel disk
+            </button>
+          ) : null}
           <button
             type="button"
             className="ghost"

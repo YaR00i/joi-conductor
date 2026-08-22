@@ -394,6 +394,8 @@ export type EmberBodyModifier = {
 export type EmberPixelSprite = {
   id: string;
   nameRu?: string;
+  /** Author tags for library search (`village`, `street`). Inferred prefixes stay search-only. */
+  tags?: string[];
   /** Explicit optional components on this reusable library asset. */
   componentStates?: Partial<Record<"collider", boolean>>;
   /** Width of all bands (px), 4…64. */
@@ -509,6 +511,8 @@ export type EmberTileInstanceModifier = {
 export type EmberVoxelModel = {
   id: string;
   nameRu?: string;
+  /** Author tags for library search (`village`, `street`). Inferred prefixes stay search-only. */
+  tags?: string[];
   /** Explicit optional-component presence for the shared library asset. */
   componentStates?: Partial<Record<"collider" | "voxel-light", boolean>>;
   sizeBlocks: { x: number; y: number; z: number };
@@ -636,6 +640,29 @@ export type EmberVoxelsFile = {
   models: EmberVoxelModel[];
   /** Voxel editor scenes (multi-object). Omitted in older packs. */
   scenes?: EmberVoxelScene[];
+};
+
+/**
+ * Optional MagicaVoxel mesh beside the prefab (`voxels/models/<id>.vox`).
+ * Shape + palette live there; collider/light stay on `model`.
+ */
+export type EmberVoxelMeshRef = {
+  kind: "vox";
+  file: string;
+};
+
+/**
+ * One Unity-like voxel prefab on disk (`voxels/models/<id>.json`).
+ * `model` holds mesh + component defaults; `scene` is the editor workspace
+ * when the prefab has children / joints / clips.
+ */
+export type EmberVoxelAssetFile = {
+  id: string;
+  nameRu?: string;
+  tags?: string[];
+  mesh?: EmberVoxelMeshRef;
+  model: EmberVoxelModel;
+  scene?: EmberVoxelScene;
 };
 
 /**
@@ -1290,6 +1317,11 @@ export type EmberPack = {
    * Auto-filled from lone models when missing.
    */
   voxelScenes: Record<string, EmberVoxelScene>;
+  /**
+   * Runtime-only: voxel model id → prefab path (`voxels/models/<id>.json`).
+   * Not serialized into pack.json.
+   */
+  voxelLibraryFiles?: Record<string, string>;
   /** Named lamp looks for the map library / light editor. */
   lightPresets: Record<string, EmberLightPreset>;
   /** Named atmosphere + fill looks for map settings. */

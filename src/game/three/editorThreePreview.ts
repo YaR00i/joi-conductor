@@ -200,8 +200,13 @@ export type EditorOverlayMarks = {
   lampRange?: LampRangeMark | null;
 };
 
-/** Polar angle from +Y (0 = top-down). Locked isometric pitch. */
+/** Polar angle from +Y (0 = top-down). Locked isometric pitch — same as play. */
 export const EDITOR_ISO_POLAR = 0.95;
+
+/** Play follow distance for the explore-camera preview. */
+export function exploreFollowDist(tileSize: number): number {
+  return THREE.MathUtils.clamp(tileSize * 7.5, 96, 160);
+}
 
 const YAW_PRESET: Record<MapViewMode, number> = {
   top: Math.PI * 0.25, // SE quarter-view (not flat top)
@@ -312,6 +317,11 @@ export type EditorThreePreview = {
   rebuildStaticShadows: () => void;
   /** Pan orbit target to a map tile (world center of cell). */
   focusTile: (tx: number, ty: number) => void;
+  /**
+   * Snap to play explore camera: iso polar, SE yaw, follow distance,
+   * optional tile focus (selection or player_start).
+   */
+  setExploreCamera: (tx?: number, ty?: number) => void;
   projectTile: (
     tx: number,
     ty: number,
@@ -973,7 +983,14 @@ export function createEditorThreePreview(
       clearDebugOverlayRoot(debugRoot);
       return;
     }
-    rebuildEditorDebugOverlays(debugRoot, map, debugFlags, lastTileset);
+    rebuildEditorDebugOverlays(
+      debugRoot,
+      map,
+      debugFlags,
+      lastTileset,
+      lastPack?.voxelModels,
+      lastPack?.voxelScenes,
+    );
   };
 
   const applyCamera = () => {
@@ -1990,7 +2007,9 @@ export function createEditorThreePreview(
       }
 
       outlinesNeedRebuild = true;
-      if (terrainDirty) rebuildDebug();
+      if (terrainDirty || propsStructDirty || packAssetsDirty || propsMissing) {
+        rebuildDebug();
+      }
 
       parent.style.top = "0";
       parent.style.left = "0";
@@ -2168,6 +2187,28 @@ export function createEditorThreePreview(
         elev * blockStoryHeight(map.tileSize) + 1,
         (ty + 0.5) * map.tileSize,
       );
+      requestRender();
+    },
+    setExploreCamera(tx, ty) {
+      yaw = YAW_PRESET.top;
+      if (map) {
+        zoomDist = exploreFollowDist(map.tileSize);
+        if (
+          tx != null &&
+          ty != null &&
+          tx >= 0 &&
+          ty >= 0 &&
+          tx < map.width &&
+          ty < map.height
+        ) {
+          const elev = tileSurfaceElev(map, tx, ty);
+          target.set(
+            (tx + 0.5) * map.tileSize,
+            elev * blockStoryHeight(map.tileSize) + 6,
+            (ty + 0.5) * map.tileSize,
+          );
+        }
+      }
       requestRender();
     },
     projectTile(tx, ty, elev = 0) {

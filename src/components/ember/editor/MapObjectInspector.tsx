@@ -18,6 +18,11 @@ import { MAX_ELEVATION, MIN_ELEVATION } from "../../../game/content/types";
 import { normalizePixelSprite } from "../../../game/content/pixelSprite";
 import { normalizeLampParams } from "../../../game/content/lightPresets";
 import {
+  findLibraryAssetReferences,
+  type EmberAssetReference,
+} from "../../../game/editor/emberLibraryIndex";
+import { EmberLibraryTagsField, EmberLibraryUsageLine } from "./EmberLibraryMeta";
+import {
   elevationAt,
   elevTileIdAt,
   heightVoxelsAt,
@@ -221,6 +226,12 @@ export type MapObjectInspectorProps = {
     },
   ) => void;
   onRenameVoxelModel: (modelId: string, nameRu: string) => void;
+  onSetVoxelModelTags?: (
+    modelId: string,
+    tags: string[] | undefined,
+  ) => void;
+  onSetSpriteTags?: (spriteId: string, tags: string[] | undefined) => void;
+  onFocusLibraryReference?: (ref: EmberAssetReference) => void;
   onPatchVoxelModelLight?: (
     modelId: string,
     patch: {
@@ -398,6 +409,8 @@ function VoxelBody({
   onPatch,
   onPatchModelLight,
   onRenameModel,
+  onSetModelTags,
+  onFocusLibraryReference,
   onEditVoxels,
   onCreateVariant,
   showCoreComponents = true,
@@ -431,6 +444,8 @@ function VoxelBody({
     emissiveSuppressHostShadow?: boolean | null;
   }) => void;
   onRenameModel: (nameRu: string) => void;
+  onSetModelTags?: (tags: string[] | undefined) => void;
+  onFocusLibraryReference?: (ref: EmberAssetReference) => void;
   onEditVoxels: () => void;
   onCreateVariant?: () => void;
   showCoreComponents?: boolean;
@@ -937,6 +952,18 @@ function VoxelBody({
             onChange={(e) => onRenameModel(e.target.value)}
           />
         </label>
+        {onSetModelTags ? (
+          <EmberLibraryTagsField
+            tags={model?.tags}
+            disabled={!model}
+            onCommit={onSetModelTags}
+          />
+        ) : null}
+        <EmberLibraryUsageLine
+          refs={findLibraryAssetReferences(pack, "voxel", place.modelId)}
+          currentMapId={map.id}
+          onFocus={onFocusLibraryReference}
+        />
       </section>
 
     </div>
@@ -956,6 +983,9 @@ function LibBody({
   onCloneTile,
   onOpenVoxelSculptLibrary,
   onOpenVoxelScene,
+  onSetVoxelModelTags,
+  onSetSpriteTags,
+  onFocusLibraryReference,
 }: {
   payload: MapLibPayload;
   map: EmberMap;
@@ -969,6 +999,12 @@ function LibBody({
   onCloneTile?: (tileId: number) => void;
   onOpenVoxelSculptLibrary?: () => void;
   onOpenVoxelScene?: (sceneId: string) => void;
+  onSetVoxelModelTags?: (
+    modelId: string,
+    tags: string[] | undefined,
+  ) => void;
+  onSetSpriteTags?: (spriteId: string, tags: string[] | undefined) => void;
+  onFocusLibraryReference?: (ref: EmberAssetReference) => void;
 }) {
   const placeHint =
     "Клик или перетаскивание на карту — поставить. Настройки ниже применятся при постановке (зоны) или сразу после.";
@@ -1047,6 +1083,18 @@ function LibBody({
                 </div>
               ) : null}
             </dl>
+            {onSetSpriteTags ? (
+              <EmberLibraryTagsField
+                tags={spr?.tags}
+                disabled={!spr}
+                onCommit={(tags) => onSetSpriteTags(payload.spriteId, tags)}
+              />
+            ) : null}
+            <EmberLibraryUsageLine
+              refs={findLibraryAssetReferences(pack, "sprite", payload.spriteId)}
+              currentMapId={map.id}
+              onFocus={onFocusLibraryReference}
+            />
           </section>
           <p className="muted ember-map-inspector__hint ember-map-inspector__hint--box">
             {placeHint}
@@ -1089,6 +1137,18 @@ function LibBody({
                 </div>
               ) : null}
             </dl>
+            {onSetVoxelModelTags ? (
+              <EmberLibraryTagsField
+                tags={model?.tags}
+                disabled={!model}
+                onCommit={(tags) => onSetVoxelModelTags(payload.modelId, tags)}
+              />
+            ) : null}
+            <EmberLibraryUsageLine
+              refs={findLibraryAssetReferences(pack, "voxel", payload.modelId)}
+              currentMapId={map.id}
+              onFocus={onFocusLibraryReference}
+            />
           </section>
           <p className="muted ember-map-inspector__hint ember-map-inspector__hint--box">
             {placeHint}
@@ -1990,6 +2050,13 @@ export function MapObjectInspector(props: MapObjectInspectorProps) {
             onRenameModel={(nameRu) =>
               props.onRenameVoxelModel(voxelPlace.modelId, nameRu)
             }
+            onSetModelTags={
+              props.onSetVoxelModelTags
+                ? (tags) =>
+                    props.onSetVoxelModelTags?.(voxelPlace.modelId, tags)
+                : undefined
+            }
+            onFocusLibraryReference={props.onFocusLibraryReference}
             onEditVoxels={() => props.onOpenVoxelSculpt(voxelPlace.id)}
             onCreateVariant={
               props.onOpenVoxelSculptVariant
@@ -2064,6 +2131,9 @@ export function MapObjectInspector(props: MapObjectInspectorProps) {
             onCloneTile={props.onCloneTile}
             onOpenVoxelSculptLibrary={props.onOpenVoxelSculptLibrary}
             onOpenVoxelScene={props.onOpenVoxelScene}
+            onSetVoxelModelTags={props.onSetVoxelModelTags}
+            onSetSpriteTags={props.onSetSpriteTags}
+            onFocusLibraryReference={props.onFocusLibraryReference}
           />
         ) : null}
 

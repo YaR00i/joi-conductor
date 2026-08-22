@@ -1,3 +1,4 @@
+import { normalizeEmberLibraryTags } from "../content/libraryTags";
 import type { EmberMaterialKind, EmberVoxelModel } from "../content/types";
 import {
   resolveEmissiveLightRange,
@@ -1257,6 +1258,7 @@ export function normalizeVoxelModel(raw: EmberVoxelModel): EmberVoxelModel {
   return {
     id: raw.id,
     nameRu: raw.nameRu,
+    tags: normalizeEmberLibraryTags(raw.tags),
     componentStates: raw.componentStates
       ? {
           ...(raw.componentStates.collider != null

@@ -14,6 +14,7 @@ import {
   createEmptyMap,
   ensureMapLayers,
   layerData,
+  listPhysicalVoxelCollisionAabbs,
   moveElevTile,
   setElevTileId,
   tryMoveWithElevation,
@@ -377,5 +378,22 @@ describe("sprite and tile instance collider overrides", () => {
     expect(map.tileModifiers?.[0]).toMatchObject({ elev: 1 });
     clearElevTile(map, 4, 4, 1);
     expect(map.tileModifiers).toEqual([]);
+  });
+
+  it("lists world AABBs only for physical voxel props", () => {
+    const map = openYard();
+    map.voxelProps = [
+      { id: "solid", modelId: "block", x: 4, y: 4, elev: 0 },
+      { id: "ghost", modelId: "air", x: 6, y: 4, elev: 0 },
+    ];
+    const boxes = listPhysicalVoxelCollisionAabbs(map, {
+      block: solidCube("block"),
+      air: solidCube("air", false),
+    });
+    expect(boxes).toHaveLength(1);
+    const box = boxes[0]!;
+    expect(box.maxX - box.minX).toBeCloseTo(map.tileSize);
+    expect(box.maxZ - box.minZ).toBeCloseTo(map.tileSize);
+    expect(box.maxY - box.minY).toBeCloseTo(map.tileSize);
   });
 });

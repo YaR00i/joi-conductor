@@ -8,6 +8,8 @@ export {
   listEmberDir,
   listLocalOverrides,
   readEmberJson,
+  readEmberJsonFromDisk,
+  readEmberBytes,
   writeEmberBytes,
   writeEmberJson,
   writeEmberText,

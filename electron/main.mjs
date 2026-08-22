@@ -8,6 +8,7 @@ import {
   renameSync,
   statSync,
   unlinkSync,
+  watch,
   writeFileSync,
 } from "node:fs";
 import os from "node:os";
@@ -33,6 +34,11 @@ import {
   synthesizePiperTts,
 } from "./piper.mjs";
 import { pingSovits, synthesizeSovitsTts } from "./sovits.mjs";
+import {
+  shouldRefreshJsonBak,
+  voxelLibraryWriteGuard,
+} from "./emberVoxelWriteGuard.mjs";
+import { emberWatchEventMatches } from "./emberVoxWatch.mjs";
 import { getQwenStatus, synthesizeQwenTts } from "./qwen.mjs";
 import {
   getQwenInstallStatus,
@@ -273,15 +279,20 @@ let emberWriteNonce = 0;
  * actual content file half-written/truncated. JSON files also keep one last
  * known-good sibling backup (`.bak`).
  */
-function writeEmberFileAtomic(abs, data, encoding) {
+function writeEmberFileAtomic(abs, data, encoding, relPath) {
   mkdirSync(path.dirname(abs), { recursive: true });
   const temp = `${abs}.tmp-${process.pid}-${Date.now()}-${emberWriteNonce++}`;
   try {
     writeFileSync(temp, data, encoding);
     if (existsSync(abs) && abs.toLowerCase().endsWith(".json")) {
       try {
-        JSON.parse(readFileSync(abs, "utf8"));
-        copyFileSync(abs, `${abs}.bak`);
+        const current = readFileSync(abs, "utf8");
+        JSON.parse(current);
+        const bakPath = `${abs}.bak`;
+        const bakText = existsSync(bakPath) ? readFileSync(bakPath, "utf8") : null;
+        if (shouldRefreshJsonBak(relPath ?? abs, current, bakText)) {
+          copyFileSync(abs, bakPath);
+        }
       } catch {
         // Never overwrite a known-good backup with a corrupt current file.
       }
@@ -311,6 +322,20 @@ ipcMain.handle("ember:read-text", async (_e, relPath) => {
   }
 });
 
+ipcMain.handle("ember:read-bytes", async (_e, relPath) => {
+  const abs = resolveEmberPath(relPath);
+  if (!abs) return { ok: false, detail: "bad path" };
+  if (!existsSync(abs)) return { ok: false, detail: "not found" };
+  try {
+    return { ok: true, base64: readFileSync(abs).toString("base64") };
+  } catch (err) {
+    return {
+      ok: false,
+      detail: err instanceof Error ? err.message : "read failed",
+    };
+  }
+});
+
 ipcMain.handle("ember:write-text", async (_e, relPath, text) => {
   const abs = resolveEmberPath(relPath);
   if (!abs) return { ok: false, detail: "bad path" };
@@ -325,8 +350,18 @@ ipcMain.handle("ember:write-text", async (_e, relPath, text) => {
           detail: `invalid JSON: ${err instanceof Error ? err.message : "parse"}`,
         };
       }
+      if (existsSync(abs)) {
+        let prev = "";
+        try {
+          prev = readFileSync(abs, "utf8");
+        } catch {
+          prev = "";
+        }
+        const guard = voxelLibraryWriteGuard(relPath, text, prev);
+        if (!guard.ok) return { ok: false, detail: guard.detail };
+      }
     }
-    writeEmberFileAtomic(abs, text, "utf8");
+    writeEmberFileAtomic(abs, text, "utf8", relPath);
     return { ok: true };
   } catch (err) {
     return {
@@ -391,6 +426,82 @@ ipcMain.handle("ember:list", async (_e, relDir) => {
       detail: err instanceof Error ? err.message : "list failed",
     };
   }
+});
+
+/** One directory watcher per renderer, filtered by the watched pack-relative file. */
+const emberFileWatches = new Map();
+
+function stopEmberFileWatch(webContentsId) {
+  const entry = emberFileWatches.get(webContentsId);
+  if (!entry) return;
+  try {
+    entry.watcher.close();
+  } catch {
+    // ignore
+  }
+  if (entry.timer) clearTimeout(entry.timer);
+  emberFileWatches.delete(webContentsId);
+}
+
+ipcMain.handle("ember:open-path", async (_e, relPath) => {
+  const abs = resolveEmberPath(relPath);
+  if (!abs) return { ok: false, detail: "bad path" };
+  if (!existsSync(abs)) return { ok: false, detail: "not found" };
+  try {
+    const err = await shell.openPath(abs);
+    if (err) return { ok: false, detail: err };
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      detail: err instanceof Error ? err.message : "open failed",
+    };
+  }
+});
+
+ipcMain.handle("ember:watch", async (event, relPath) => {
+  const abs = resolveEmberPath(relPath);
+  if (!abs) return { ok: false, detail: "bad path" };
+  const wc = event.sender;
+  const wcId = wc.id;
+  stopEmberFileWatch(wcId);
+  const dir = path.dirname(abs);
+  try {
+    mkdirSync(dir, { recursive: true });
+  } catch {
+    return { ok: false, detail: "mkdir failed" };
+  }
+  const rel = String(relPath).replace(/\\/g, "/").replace(/^\/+/, "");
+  let timer = null;
+  let watcher;
+  try {
+    watcher = watch(dir, (eventType, filename) => {
+      if (!emberWatchEventMatches(rel, filename ?? "")) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        const current = emberFileWatches.get(wcId);
+        if (current) current.timer = null;
+        if (wc.isDestroyed()) return;
+        wc.send("ember:file-changed", { rel, eventType });
+      }, 450);
+      const current = emberFileWatches.get(wcId);
+      if (current) current.timer = timer;
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      detail: err instanceof Error ? err.message : "watch failed",
+    };
+  }
+  emberFileWatches.set(wcId, { watcher, rel, timer });
+  wc.once("destroyed", () => stopEmberFileWatch(wcId));
+  return { ok: true };
+});
+
+ipcMain.handle("ember:unwatch", async (event) => {
+  stopEmberFileWatch(event.sender.id);
+  return { ok: true };
 });
 
 ipcMain.handle("shell:show-temp-file", async (_e, payload) => {
@@ -777,6 +888,7 @@ ipcMain.handle("device:set-intensity", async (_e, intensity, level) =>
 );
 
 app.on("before-quit", () => {
+  for (const id of [...emberFileWatches.keys()]) stopEmberFileWatch(id);
   stopCursorGrab();
   deviceStopOnQuit();
   stopOllamaOnQuit();

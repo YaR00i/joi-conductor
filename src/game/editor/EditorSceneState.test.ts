@@ -31,6 +31,28 @@ describe("EditorSceneState", () => {
     });
   });
 
+  it("isolates a selection and restores the previous hide set", () => {
+    const state = new EditorSceneState();
+    state.setHidden("voxel:keep-hidden", true);
+    state.isolate(["voxel:lamp"], ["voxel:lamp", "voxel:house", "voxel:keep-hidden"]);
+    expect(state.isIsolated()).toBe(true);
+    expect(state.getSnapshot()).toMatchObject({
+      isolated: true,
+      hiddenKeys: ["voxel:house", "voxel:keep-hidden"],
+    });
+    state.exitIsolate();
+    expect(state.isIsolated()).toBe(false);
+    expect(state.getSnapshot().hiddenKeys).toEqual(["voxel:keep-hidden"]);
+  });
+
+  it("revealAll leaves isolate and shows every object", () => {
+    const state = new EditorSceneState();
+    state.isolate(["voxel:a"], ["voxel:a", "voxel:b"]);
+    state.revealAll();
+    expect(state.isIsolated()).toBe(false);
+    expect(state.getSnapshot().hiddenKeys).toEqual([]);
+  });
+
   it("publishes batch states once", () => {
     const state = new EditorSceneState();
     const listener = vi.fn();

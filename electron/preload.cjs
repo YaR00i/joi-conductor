@@ -48,12 +48,22 @@ contextBridge.exposeInMainWorld("joiDesktop", {
   },
   ember: {
     readText: (relPath) => ipcRenderer.invoke("ember:read-text", relPath),
+    readBytes: (relPath) => ipcRenderer.invoke("ember:read-bytes", relPath),
     writeText: (relPath, text) =>
       ipcRenderer.invoke("ember:write-text", relPath, text),
     writeBytes: (relPath, base64) =>
       ipcRenderer.invoke("ember:write-bytes", relPath, base64),
     delete: (relPath) => ipcRenderer.invoke("ember:delete", relPath),
     list: (relDir) => ipcRenderer.invoke("ember:list", relDir),
+    openPath: (relPath) => ipcRenderer.invoke("ember:open-path", relPath),
+    watch: (relPath) => ipcRenderer.invoke("ember:watch", relPath),
+    unwatch: () => ipcRenderer.invoke("ember:unwatch"),
+    onFileChanged: (cb) => {
+      const handler = (_e, payload) => cb(payload);
+      ipcRenderer.on("ember:file-changed", handler);
+      return () =>
+        ipcRenderer.removeListener("ember:file-changed", handler);
+    },
   },
   tts: {
     voices: () => ipcRenderer.invoke("tts:voices"),

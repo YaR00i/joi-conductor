@@ -1,8 +1,9 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { mergeVoxelFiles } from "./loadPack";
+import { parseVoxelLibraryDocument } from "../voxel/voxelLibrary";
 import {
   resolveMapAutoAttack,
   resolveMapPlayProfile,
@@ -32,7 +33,20 @@ function readJson<T>(rel: string): T {
 describe("hu_tao_village explore content", () => {
   const map = ensureMapLayers(readJson<EmberMap>("maps/hu_tao_village.json"));
   const tileset = readJson<EmberTileset>("tilesets/village_16.json");
-  const voxels = readJson<EmberVoxelsFile>("voxels/village.json");
+  const voxels = (() => {
+    const dir = path.join(emberRoot, "voxels", "models");
+    try {
+      const names = readdirSync(dir).filter((name) => name.endsWith(".json"));
+      const models = names.flatMap((name) => {
+        const raw = JSON.parse(readFileSync(path.join(dir, name), "utf8"));
+        return parseVoxelLibraryDocument(raw).models;
+      });
+      if (models.length > 0) return { models };
+    } catch {
+      // fall through to leftover shard
+    }
+    return readJson<EmberVoxelsFile>("voxels/village.json");
+  })();
   const stage = readJson<EmberStage>("stages/village_stroll.json");
   const spawn = readJson<EmberSpawnTable>("spawns/village_stroll.json");
 

@@ -36,6 +36,15 @@ import {
   ensureVoxelScenes,
   normalizeVoxelScene,
 } from "../voxel/voxelScene";
+import {
+  defaultVoxelShardNames,
+  parseVoxelLibraryDocument,
+  voxelMeshFileFromRaw,
+  VOXEL_LEGACY_SHARD_NAMES,
+  VOXEL_MODELS_DIR,
+  VOXEL_SCENES_DIR,
+} from "../voxel/voxelLibrary";
+import { hydrateVoxelPrefab } from "../voxel/voxelRegistry";
 
 async function loadJson<T>(rel: string): Promise<T> {
   const res = await readEmberJson<T>(rel);
@@ -130,6 +139,84 @@ export function mergeVoxelFiles(
   return { models, scenes };
 }
 
+async function loadVoxelLibraries(): Promise<{
+  file: EmberVoxelsFile;
+  issues: ValidationIssue[];
+  sources: Record<string, string>;
+}> {
+  const [modelList, sceneList, rootList] = await Promise.all([
+    listEmberDir(VOXEL_MODELS_DIR),
+    listEmberDir(VOXEL_SCENES_DIR),
+    listEmberDir("voxels"),
+  ]);
+  let merged: EmberVoxelsFile = { models: [], scenes: [] };
+  const sources: Record<string, string> = {};
+  const issues: ValidationIssue[] = [];
+
+  const ingest = async (
+    rel: string,
+    data: unknown,
+    issue?: ValidationIssue,
+  ) => {
+    if (issue) issues.push(issue);
+    const parsed = parseVoxelLibraryDocument(data);
+    const models = [];
+    for (const model of parsed.models ?? []) {
+      if (!model?.id) continue;
+      if (!sources[model.id]) sources[model.id] = rel;
+      let next = await hydrateVoxelPrefab(model, data);
+      next = normalizeVoxelModel(next);
+      const meshFile = voxelMeshFileFromRaw(data);
+      if (!next.voxels.some((value) => value > 0)) {
+        if (meshFile) {
+          issues.push({
+            level: "warn",
+            path: meshFile,
+            message: `Не загружена сетка MagicaVoxel для ${model.id}`,
+          });
+        } else {
+          next = stampSolidBlock(next, 1);
+        }
+      }
+      models.push(next);
+    }
+    merged = mergeVoxelFiles(merged, {
+      models,
+      scenes: parsed.scenes,
+    });
+  };
+
+  const modelNames = (modelList.ok ? modelList.data : []).filter((name) =>
+    name.endsWith(".json"),
+  );
+  for (const name of modelNames) {
+    const rel = `${VOXEL_MODELS_DIR}/${name}`;
+    const loaded = await loadJsonOptionalReported<unknown>(rel, {});
+    await ingest(rel, loaded.data, loaded.issue);
+  }
+
+  const sceneNames = (sceneList.ok ? sceneList.data : []).filter((name) =>
+    name.endsWith(".json"),
+  );
+  for (const name of sceneNames) {
+    const rel = `${VOXEL_SCENES_DIR}/${name}`;
+    const data = await loadJsonOptional<unknown>(rel, {});
+    await ingest(rel, data);
+  }
+
+  const leftover = defaultVoxelShardNames(rootList.ok ? rootList.data : []).filter(
+    (name) =>
+      (VOXEL_LEGACY_SHARD_NAMES as readonly string[]).includes(name),
+  );
+  for (const name of leftover) {
+    const rel = `voxels/${name}`;
+    const data = await loadJsonOptional<EmberVoxelsFile>(rel, { models: [] });
+    await ingest(rel, data);
+  }
+
+  return { file: merged, issues, sources };
+}
+
 export async function loadEmberPack(): Promise<{
   pack: EmberPack;
   issues: ReturnType<typeof validatePack>;
@@ -150,8 +237,7 @@ export async function loadEmberPack(): Promise<{
     artsFile,
     portraits,
     spritesLoad,
-    voxelsLoad,
-    villageVoxels,
+    voxelLibs,
     lightsLoad,
     looksLoad,
   ] = await Promise.all([
@@ -173,12 +259,7 @@ export async function loadEmberPack(): Promise<{
       paletteFavorites: [],
       sprites: [],
     }),
-    loadJsonOptionalReported<EmberVoxelsFile>("voxels/registry.json", {
-      models: [],
-    }),
-    loadJsonOptional<EmberVoxelsFile>("voxels/village.json", {
-      models: [],
-    }),
+    loadVoxelLibraries(),
     loadJsonOptionalReported<EmberLightsFile>("lights/registry.json", {
       presets: [],
     }),
@@ -188,7 +269,7 @@ export async function loadEmberPack(): Promise<{
   ]);
 
   const spritesFile = spritesLoad.data;
-  const voxelsFile = mergeVoxelFiles(voxelsLoad.data, villageVoxels);
+  const voxelsFile = voxelLibs.file;
   const lightsFile = lightsLoad.data;
   const looksFile = looksLoad.data;
 
@@ -233,11 +314,7 @@ export async function loadEmberPack(): Promise<{
 
   const voxelModels: EmberPack["voxelModels"] = {};
   for (const raw of voxelsFile.models ?? []) {
-    let m = normalizeVoxelModel(raw);
-    if (!m.voxels.some((v) => v > 0)) {
-      m = stampSolidBlock(m, 1);
-    }
-    voxelModels[m.id] = m;
+    voxelModels[raw.id] = normalizeVoxelModel(raw);
   }
 
   const voxelScenesRaw: EmberPack["voxelScenes"] = {};
@@ -266,6 +343,7 @@ export async function loadEmberPack(): Promise<{
     sprites,
     voxelModels,
     voxelScenes,
+    voxelLibraryFiles: voxelLibs.sources,
     lightPresets,
     lookPresets,
     paletteFavorites: spritesFile.paletteFavorites ?? [],
@@ -273,7 +351,7 @@ export async function loadEmberPack(): Promise<{
 
   const loadIssues = [
     spritesLoad.issue,
-    voxelsLoad.issue,
+    ...voxelLibs.issues,
     lightsLoad.issue,
     looksLoad.issue,
   ].filter((issue): issue is ValidationIssue => Boolean(issue));

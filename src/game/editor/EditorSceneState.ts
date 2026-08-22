@@ -2,6 +2,7 @@ export type EditorSceneStateSnapshot = Readonly<{
   revision: number;
   hiddenKeys: readonly string[];
   lockedKeys: readonly string[];
+  isolated: boolean;
 }>;
 
 type Listener = () => void;
@@ -12,10 +13,12 @@ export class EditorSceneState {
   private locked = new Set<string>();
   private listeners = new Set<Listener>();
   private revision = 0;
+  private isolateBackup: Set<string> | null = null;
   private snapshot: EditorSceneStateSnapshot = {
     revision: 0,
     hiddenKeys: [],
     lockedKeys: [],
+    isolated: false,
   };
 
   readonly subscribe = (listener: Listener): (() => void) => {
@@ -31,6 +34,42 @@ export class EditorSceneState {
 
   isLocked(key: string): boolean {
     return this.locked.has(key);
+  }
+
+  isIsolated(): boolean {
+    return this.isolateBackup !== null;
+  }
+
+  /**
+   * Hide every object not in `keepKeys` (Blender Shift+H).
+   * The previous hidden set is restored by `exitIsolate`.
+   */
+  isolate(keepKeys: Iterable<string>, allKeys: Iterable<string>): void {
+    const keep = new Set(keepKeys);
+    if (keep.size === 0) return;
+    if (!this.isolateBackup) this.isolateBackup = new Set(this.hidden);
+    const next = new Set<string>();
+    for (const key of allKeys) {
+      if (!keep.has(key)) next.add(key);
+    }
+    this.hidden = next;
+    this.publish();
+  }
+
+  exitIsolate(): void {
+    if (!this.isolateBackup) return;
+    this.hidden = this.isolateBackup;
+    this.isolateBackup = null;
+    this.publish();
+  }
+
+  /** Alt+H: show every object and leave isolate. */
+  revealAll(): void {
+    const hadIsolate = this.isolateBackup !== null;
+    this.isolateBackup = null;
+    if (this.hidden.size === 0 && !hadIsolate) return;
+    this.hidden.clear();
+    this.publish();
   }
 
   setHidden(key: string, hidden: boolean): void {
@@ -65,23 +104,41 @@ export class EditorSceneState {
     const valid = new Set(validKeys);
     const hidden = new Set([...this.hidden].filter((key) => valid.has(key)));
     const locked = new Set([...this.locked].filter((key) => valid.has(key)));
+    const backup = this.isolateBackup
+      ? new Set([...this.isolateBackup].filter((key) => valid.has(key)))
+      : null;
+    const backupSame =
+      (backup === null && this.isolateBackup === null) ||
+      (backup !== null &&
+        this.isolateBackup !== null &&
+        backup.size === this.isolateBackup.size &&
+        [...backup].every((key) => this.isolateBackup!.has(key)));
     if (
       hidden.size === this.hidden.size &&
       locked.size === this.locked.size &&
       [...hidden].every((key) => this.hidden.has(key)) &&
-      [...locked].every((key) => this.locked.has(key))
+      [...locked].every((key) => this.locked.has(key)) &&
+      backupSame
     ) {
       return;
     }
     this.hidden = hidden;
     this.locked = locked;
+    this.isolateBackup = backup;
     this.publish();
   }
 
   clear(): void {
-    if (this.hidden.size === 0 && this.locked.size === 0) return;
+    if (
+      this.hidden.size === 0 &&
+      this.locked.size === 0 &&
+      this.isolateBackup === null
+    ) {
+      return;
+    }
     this.hidden.clear();
     this.locked.clear();
+    this.isolateBackup = null;
     this.publish();
   }
 
@@ -115,6 +172,7 @@ export class EditorSceneState {
       revision: this.revision,
       hiddenKeys: [...this.hidden].sort(),
       lockedKeys: [...this.locked].sort(),
+      isolated: this.isolateBackup !== null,
     };
     for (const listener of this.listeners) listener();
   }

@@ -10,6 +10,11 @@ import type {
   EmberTileset,
   MapRegionKind,
 } from "../../../game/content/types";
+import {
+  countLibraryAssetReferences,
+  filterLibraryAssets,
+  uniqueLibraryTags,
+} from "../../../game/editor/emberLibraryIndex";
 import { VOXELS_PER_BLOCK } from "../../../game/voxel/constants";
 import { EmberSpriteThumb, EmberTileSwatch, EmberVoxelSceneThumb, EmberVoxelThumb } from "./EmberThumbGrid";
 import {
@@ -180,6 +185,7 @@ type TrayItem = {
   label: string;
   title: string;
   thumb: ReactNode;
+  usage?: number;
 };
 
 export function MapLibraryTray({
@@ -193,49 +199,65 @@ export function MapLibraryTray({
   onOpenVoxelSculpt,
 }: Props) {
   const [category, setCategory] = useState<MapLibCategory>("sprites");
+  const [query, setQuery] = useState("");
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const voxelModels = pack.voxelModels ?? {};
+  const libraryTags = useMemo(() => uniqueLibraryTags(pack), [pack]);
 
   const items = useMemo((): TrayItem[] => {
     switch (category) {
       case "sprites":
-        return Object.values(pack.sprites).map((raw) => {
-          const s = normalizePixelSprite(raw);
+        return filterLibraryAssets(
+          Object.values(pack.sprites).map((raw) => normalizePixelSprite(raw)),
+          query,
+          tagFilter,
+        ).map((s) => {
+          const usage = countLibraryAssetReferences(pack, "sprite", s.id);
           return {
             key: `sprite:${s.id}`,
-            payload: { kind: "sprite", spriteId: s.id },
+            payload: { kind: "sprite" as const, spriteId: s.id },
             label: s.nameRu?.trim() || s.id,
-            title: `${s.nameRu ?? s.id} — перетащи на карту`,
+            title: `${s.nameRu ?? s.id}${s.tags?.length ? ` · ${s.tags.join(", ")}` : ""}${usage ? ` · ${usage} на картах` : ""} — перетащи на карту`,
+            usage,
             thumb: <EmberSpriteThumb sprite={s} size={48} />,
           };
         });
       case "voxels": {
         const scenes = pack.voxelScenes ?? {};
-        return Object.values(voxelModels).map((m) => {
-          // Prefer composed scene thumb when this model is the scene hub
-          // (or when a multi-object scene uses the same id).
+        return filterLibraryAssets(Object.values(voxelModels), query, tagFilter).map(
+          (m) => {
             const scene = scenes[m.id];
-          const useScene = scene != null && scene.objects.length > 1;
-          return {
-            key: `voxel:${m.id}`,
-            payload: { kind: "voxel" as const, modelId: m.id },
-            label: m.nameRu?.trim() || m.id,
-            title: `${m.nameRu ?? m.id} · ${m.sizeBlocks.x}×${m.sizeBlocks.y}×${m.sizeBlocks.z} бл. (${VOXELS_PER_BLOCK}³)`,
-            thumb: useScene ? (
-              <EmberVoxelSceneThumb
-                scene={scene}
-                models={voxelModels}
-                size={48}
-              />
-            ) : (
-              <EmberVoxelThumb model={m} size={48} />
-            ),
-          };
-        });
+            const useScene = scene != null && scene.objects.length > 1;
+            const usage = countLibraryAssetReferences(pack, "voxel", m.id);
+            return {
+              key: `voxel:${m.id}`,
+              payload: { kind: "voxel" as const, modelId: m.id },
+              label: m.nameRu?.trim() || m.id,
+              title: `${m.nameRu ?? m.id} · ${m.sizeBlocks.x}×${m.sizeBlocks.y}×${m.sizeBlocks.z} бл. (${VOXELS_PER_BLOCK}³)${m.tags?.length ? ` · ${m.tags.join(", ")}` : ""}${usage ? ` · ${usage} на картах` : ""}`,
+              usage,
+              thumb: useScene ? (
+                <EmberVoxelSceneThumb
+                  scene={scene}
+                  models={voxelModels}
+                  size={48}
+                />
+              ) : (
+                <EmberVoxelThumb model={m} size={48} />
+              ),
+            };
+          },
+        );
       }
       case "tiles": {
+        const q = query.trim().toLowerCase();
         const tiles = tileset?.tiles ?? [];
         return tiles
           .filter((t) => t.id !== 0 && !t.stair)
+          .filter((t) => {
+            if (!q) return true;
+            const hay = `${t.name ?? ""} #${t.id}`.toLowerCase();
+            return hay.includes(q);
+          })
           .map((t) => ({
             key: `tile:${t.id}`,
             payload: { kind: "tile" as const, tileId: t.id },
@@ -251,6 +273,7 @@ export function MapLibraryTray({
           }));
       }
       case "lights": {
+        const q = query.trim().toLowerCase();
         const builtins = BUILTIN_LIGHT_PRESETS.map((p) => ({
           key: `light:${p.id}`,
           payload: { kind: "light" as const, presetId: p.id },
@@ -284,9 +307,13 @@ export function MapLibraryTray({
               </span>
             ),
           }));
-        return [...builtins, ...custom];
+        return [...builtins, ...custom].filter((item) => {
+          if (!q) return true;
+          return `${item.label} ${item.title}`.toLowerCase().includes(q);
+        });
       }
-      case "regions":
+      case "regions": {
+        const q = query.trim().toLowerCase();
         return MAP_REGION_KIND_ORDER.map((kind) => {
           const accent = MAP_REGION_KIND_COLOR[kind];
           return {
@@ -308,13 +335,27 @@ export function MapLibraryTray({
               </span>
             ),
           };
+        }).filter((item) => {
+          if (!q) return true;
+          return `${item.label} ${item.title}`.toLowerCase().includes(q);
         });
+      }
       default: {
         const _n: never = category;
         return _n;
       }
     }
-  }, [category, pack.sprites, pack.voxelScenes, tileset, voxelModels]);
+  }, [
+    category,
+    pack,
+    pack.sprites,
+    pack.voxelScenes,
+    pack.lightPresets,
+    query,
+    tagFilter,
+    tileset,
+    voxelModels,
+  ]);
 
   const selectedKey = selected ? payloadKey(selected) : null;
 
@@ -399,9 +440,44 @@ export function MapLibraryTray({
 
       {!collapsed ? (
         <div className="ember-map-lib__body">
+          <div className="ember-map-lib__tools">
+            <input
+              type="search"
+              className="ember-map-lib__search"
+              value={query}
+              placeholder="Поиск по имени, id или тегу…"
+              aria-label="Поиск в библиотеке"
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            {category === "voxels" || category === "sprites" ? (
+              <div className="ember-map-lib__tags" role="list" aria-label="Теги">
+                <button
+                  type="button"
+                  className={`ember-map-lib__tag ${tagFilter == null ? "is-active" : ""}`}
+                  onClick={() => setTagFilter(null)}
+                >
+                  все
+                </button>
+                {libraryTags.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    className={`ember-map-lib__tag ${tagFilter === tag ? "is-active" : ""}`}
+                    onClick={() =>
+                      setTagFilter((cur) => (cur === tag ? null : tag))
+                    }
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
           {items.length === 0 ? (
             <p className="ember-map-lib__empty">
-              {category === "sprites"
+              {query.trim() || tagFilter
+                ? "Ничего не найдено"
+                : category === "sprites"
                 ? "Нет спрайтов в паке — создайте во вкладке «Спрайты»."
                 : category === "voxels"
                   ? "Нет воксель-моделей — открой «Скульптор»."
@@ -429,7 +505,12 @@ export function MapLibraryTray({
                       onDragEnd={endDrag}
                     >
                       <span className="ember-map-lib__thumb">{item.thumb}</span>
-                      <span className="ember-map-lib__label">{item.label}</span>
+                      <span className="ember-map-lib__label">
+                        {item.label}
+                        {item.usage ? (
+                          <span className="ember-map-lib__use"> · {item.usage}</span>
+                        ) : null}
+                      </span>
                     </button>
                   </li>
                 );

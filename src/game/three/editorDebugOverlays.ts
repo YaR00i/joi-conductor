@@ -15,8 +15,16 @@ import {
   heightAt,
   heightVoxelsAt,
   layerData,
+  listPhysicalVoxelCollisionAabbs,
+  regionCenter,
   tileSurfaceElev,
+  type EmberVoxelModelLib,
+  type EmberVoxelSceneLib,
 } from "../tile/mapUtils";
+import {
+  createPlayerCapsuleOverlay,
+  playerCapsuleWorldSize,
+} from "./playerCapsuleOverlay";
 
 export type EditorDebugOverlayFlags = {
   showCollision: boolean;
@@ -577,11 +585,28 @@ function addRegionRectEdges(
   addLineBatch(root, positions, color, 0.9);
 }
 
+function addPlayerStartCapsules(root: THREE.Object3D, map: EmberMap): void {
+  const { radius, height } = playerCapsuleWorldSize(map.tileSize);
+  const storyH = blockStoryHeight(map.tileSize);
+  for (const region of map.regions ?? []) {
+    if (region.kind !== "player_start") continue;
+    const pos = regionCenter(map, region);
+    const tx = Math.floor(pos.x / map.tileSize);
+    const ty = Math.floor(pos.y / map.tileSize);
+    const feetY = tileSurfaceElev(map, tx, ty) * storyH;
+    const cap = createPlayerCapsuleOverlay(radius, height);
+    cap.position.set(pos.x, feetY + height * 0.5, pos.y);
+    root.add(cap);
+  }
+}
+
 export function rebuildEditorDebugOverlays(
   root: THREE.Object3D,
   map: EmberMap,
   flags: EditorDebugOverlayFlags,
   tileset?: EmberTileset | null,
+  voxelModels?: EmberVoxelModelLib,
+  voxelScenes?: EmberVoxelSceneLib,
 ): void {
   clearDebugOverlayRoot(root);
   if (
@@ -629,6 +654,25 @@ export function rebuildEditorDebugOverlays(
     addFloorPads(root, map, pads);
     addLineBatch(root, topEdges, 0xff8a9a, 0.55);
     addWallHeightLabels(root, map, labels);
+
+    const propBoxes: number[] = [];
+    for (const box of listPhysicalVoxelCollisionAabbs(
+      map,
+      voxelModels,
+      voxelScenes,
+    )) {
+      pushBoxEdges(
+        propBoxes,
+        box.minX,
+        box.minY,
+        box.minZ,
+        box.maxX,
+        box.maxY,
+        box.maxZ,
+      );
+    }
+    addLineBatch(root, propBoxes, 0x66e0c8, 0.7);
+    addPlayerStartCapsules(root, map);
   }
 
   if (flags.showElevation) {

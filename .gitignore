@@ -14,3 +14,4 @@ __pycache__/
 *.pyc
 *.lnk
 *.tsbuildinfo
+content/ember/voxels/_legacy/

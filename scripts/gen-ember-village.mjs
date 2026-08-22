@@ -1081,7 +1081,13 @@ const stage = {
 const spawn = { id: "village_stroll", entries: [] };
 
 writeJson("tilesets/village_16.json", tileset);
-writeJson("voxels/village.json", { models });
+for (const model of models) {
+  writeJson(`voxels/models/${model.id}.json`, {
+    id: model.id,
+    nameRu: model.nameRu,
+    model,
+  });
+}
 writeJson("maps/hu_tao_village.json", map);
 writeJson("stages/village_stroll.json", stage);
 writeJson("spawns/village_stroll.json", spawn);

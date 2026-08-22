@@ -70,7 +70,12 @@ import {
   type EmberWorldTransformPatch,
   type EmberWorldTransformSpace,
 } from "../../../game/editor";
+import type { EmberAssetReference } from "../../../game/editor/emberLibraryIndex";
 import { writeEmberJson } from "../../../game/content/io";
+import {
+  packWithVoxels,
+  writeVoxelRegistry,
+} from "../../../game/voxel/voxelRegistry";
 import {
   resolveEmissiveLightRange,
   resolveEmissiveStrength,
@@ -1250,6 +1255,7 @@ export function MapEditorPanel({
     () => new Set(sceneStateSnapshot.hiddenKeys),
     [sceneStateSnapshot.hiddenKeys],
   );
+  const isolated = sceneStateSnapshot.isolated;
   const lockedObjectKeys = useMemo(
     () => new Set(sceneStateSnapshot.lockedKeys),
     [sceneStateSnapshot.lockedKeys],
@@ -2780,9 +2786,9 @@ export function MapEditorPanel({
         return;
       }
       const nextModels = { ...pack.voxelModels, [modelId]: nextModel };
-      onPackChange({ ...pack, voxelModels: nextModels });
-      void writeEmberJson("voxels/registry.json", {
-        models: Object.values(nextModels),
+      onPackChange(packWithVoxels(pack, nextModels, pack.voxelScenes));
+      void writeVoxelRegistry(nextModels, pack.voxelScenes ?? {}, {
+        dirtyIds: [modelId],
       }).then((result) => {
         onSaved(result.ok ? label : `Ошибка записи ассета: ${result.error}`);
       });
@@ -3110,10 +3116,10 @@ export function MapEditorPanel({
         ...pack.voxelModels,
         [model.id]: applied.model,
       };
-      onPackChange({ ...pack, voxelModels: nextModels });
+      onPackChange(packWithVoxels(pack, nextModels, pack.voxelScenes));
       publishMap(nextMap);
-      void writeEmberJson("voxels/registry.json", {
-        models: Object.values(nextModels),
+      void writeVoxelRegistry(nextModels, pack.voxelScenes ?? {}, {
+        dirtyIds: [model.id],
       }).then((result) => {
         onSaved(
           result.ok
@@ -4484,17 +4490,93 @@ export function MapEditorPanel({
         ...pack.voxelModels,
         [modelId]: { ...model, nameRu },
       };
-      onPackChange({
-        ...pack,
-        voxelModels: nextModels,
-      });
-      void writeEmberJson("voxels/registry.json", {
-        models: Object.values(nextModels),
+      onPackChange(packWithVoxels(pack, nextModels, pack.voxelScenes));
+      void writeVoxelRegistry(nextModels, pack.voxelScenes ?? {}, {
+        dirtyIds: [modelId],
       }).then((res) => {
         if (!res.ok) onSaved(`Имя вокселя: ошибка записи — ${res.error}`);
       });
     },
     [onPackChange, onSaved, pack],
+  );
+
+  const setVoxelModelTags = useCallback(
+    (modelId: string, tags: string[] | undefined) => {
+      if (!onPackChange) return;
+      const model = pack.voxelModels?.[modelId];
+      if (!model) return;
+      const nextModel = { ...model, tags };
+      if (!tags?.length) delete nextModel.tags;
+      const nextModels = {
+        ...pack.voxelModels,
+        [modelId]: nextModel,
+      };
+      onPackChange(packWithVoxels(pack, nextModels, pack.voxelScenes));
+      void writeVoxelRegistry(nextModels, pack.voxelScenes ?? {}, {
+        dirtyIds: [modelId],
+        skipVoxWrite: [modelId],
+      }).then((res) => {
+        if (!res.ok) onSaved(`Теги вокселя: ошибка записи — ${res.error}`);
+      });
+    },
+    [onPackChange, onSaved, pack],
+  );
+
+  const setSpriteTags = useCallback(
+    (spriteId: string, tags: string[] | undefined) => {
+      const sprite = pack.sprites[spriteId];
+      if (!sprite) return;
+      const next = { ...sprite, tags };
+      if (!tags?.length) delete next.tags;
+      saveLibrarySprite(
+        spriteId,
+        next,
+        `${sprite.nameRu?.trim() || sprite.id}: теги сохранены`,
+      );
+    },
+    [pack.sprites, saveLibrarySprite],
+  );
+
+  const focusLibraryReference = useCallback(
+    (ref: EmberAssetReference) => {
+      if (ref.mapId && ref.mapId !== mapRef.current.id) {
+        onSaved(
+          `На карте «${ref.mapNameRu?.trim() || ref.mapId}» — открой её, чтобы прыгнуть`,
+        );
+        return;
+      }
+      if (ref.sceneId && !ref.mapId) {
+        onSaved(
+          `В сцене «${ref.mapNameRu?.trim() || ref.sceneId}» — открой скульптор`,
+        );
+        return;
+      }
+      switch (ref.kind) {
+        case "sprite":
+          setSelection({ kind: "sprite", id: ref.objectId });
+          break;
+        case "voxelProp":
+          setSelection({ kind: "voxel", id: ref.objectId });
+          break;
+        case "chestModel":
+        case "chestScene":
+          setSelection({ kind: "region", id: ref.objectId });
+          break;
+        case "sceneObject":
+          onSaved(
+            `В сцене «${ref.mapNameRu?.trim() || ref.sceneId}» — открой скульптор`,
+          );
+          return;
+        default: {
+          const _never: never = ref.kind;
+          return _never;
+        }
+      }
+      if (ref.x != null && ref.y != null) {
+        threePreviewRef.current?.focusTile(ref.x, ref.y);
+      }
+    },
+    [onSaved, setSelection],
   );
 
   const patchVoxelModelLight = useCallback(
@@ -4574,9 +4656,9 @@ export function MapEditorPanel({
         }
       }
       const nextModels = { ...pack.voxelModels, [modelId]: next };
-      onPackChange({ ...pack, voxelModels: nextModels });
-      void writeEmberJson("voxels/registry.json", {
-        models: Object.values(nextModels),
+      onPackChange(packWithVoxels(pack, nextModels, pack.voxelScenes));
+      void writeVoxelRegistry(nextModels, pack.voxelScenes ?? {}, {
+        dirtyIds: [modelId],
       }).then((res) => {
         if (!res.ok) onSaved(`Свет вокселя: ошибка записи — ${res.error}`);
       });
@@ -4733,6 +4815,11 @@ export function MapEditorPanel({
         setObjectGrab(null);
         return;
       }
+      if (!e.ctrlKey && !e.metaKey && e.altKey && e.code === "KeyH") {
+        e.preventDefault();
+        sceneState.revealAll();
+        return;
+      }
       if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         const sel = selectionRef.current;
         const three = threePreviewRef.current;
@@ -4796,15 +4883,64 @@ export function MapEditorPanel({
           setShowEditorHints((v) => !v);
           return;
         }
-        if (e.code === "KeyH" && selectedSceneObjects.length > 0) {
+        if (e.code === "KeyH") {
           e.preventDefault();
-          const allHidden = selectedSceneObjects.every((object) =>
-            sceneState.isHidden(object.key),
-          );
-          sceneState.setHiddenMany(
-            selectedSceneObjects.map((object) => object.key),
-            !allHidden,
-          );
+          if (e.shiftKey) {
+            if (selectedSceneObjects.length > 0) {
+              sceneState.isolate(
+                selectedSceneObjects.map((object) => object.key),
+                sceneObjects.map((object) => object.key),
+              );
+              setObjectGrab(null);
+            }
+            return;
+          }
+          if (selectedSceneObjects.length > 0) {
+            const allHidden = selectedSceneObjects.every((object) =>
+              sceneState.isHidden(object.key),
+            );
+            sceneState.setHiddenMany(
+              selectedSceneObjects.map((object) => object.key),
+              !allHidden,
+            );
+          }
+          return;
+        }
+        if (e.code === "Slash" || e.code === "NumpadDivide") {
+          e.preventDefault();
+          if (sceneState.isIsolated()) {
+            sceneState.exitIsolate();
+          } else if (selectedSceneObjects.length > 0) {
+            sceneState.isolate(
+              selectedSceneObjects.map((object) => object.key),
+              sceneObjects.map((object) => object.key),
+            );
+            setObjectGrab(null);
+          }
+          return;
+        }
+        if (e.code === "KeyQ") {
+          e.preventDefault();
+          setViewMode("top");
+          const obj = selectedSceneObjects[0];
+          if (obj) {
+            three?.setExploreCamera(
+              obj.transform.position.x,
+              obj.transform.position.y,
+            );
+          } else if (sel?.kind === "tile") {
+            three?.setExploreCamera(sel.tx, sel.ty);
+          } else if (sel?.kind === "region") {
+            const region = mapRef.current.regions.find((r) => r.id === sel.id);
+            if (region) three?.setExploreCamera(region.x, region.y);
+            else three?.setExploreCamera();
+          } else {
+            const start = mapRef.current.regions.find(
+              (r) => r.kind === "player_start",
+            );
+            if (start) three?.setExploreCamera(start.x, start.y);
+            else three?.setExploreCamera();
+          }
           return;
         }
         if (e.code === "Period" || e.code === "NumpadDecimal") {
@@ -4955,6 +5091,7 @@ export function MapEditorPanel({
     deleteLightSource,
     deleteWorldSelection,
     selectedSceneObjects,
+    sceneObjects,
     duplicateWorldSelection,
     duplicateSceneGroup,
     translateWorldSelection,
@@ -5785,8 +5922,8 @@ export function MapEditorPanel({
       <div className="ember-editor-panel-head">
         <h2>Карта</h2>
         <p>
-          Выбор (V) · G/R/S гизмо · Ctrl+D дубль · H скрыть · F1 подсказки · B
-          кисть · ПКМ орбита
+          Выбор (V) · G/R/S гизмо · Ctrl+D дубль · H скрыть · Shift+H изоляция ·
+          Q explore-камера · F1 подсказки
         </p>
       </div>
       <div className="ember-map-workspace ember-map-workspace--chrome">
@@ -5923,7 +6060,7 @@ export function MapEditorPanel({
                     type="button"
                     className={`ember-map-iconbtn ${showCollision ? "is-on" : ""}`}
                     aria-pressed={showCollision}
-                    title="Оверлей стен: высота в вокселях (vx) на верху клетки"
+                    title="Оверлей коллизии: стены (vx), физические воксели, капсула игрока на spawn"
                     aria-label="Оверлей стен"
                     onClick={() => setShowCollision(!showCollision)}
                   >
@@ -5948,6 +6085,51 @@ export function MapEditorPanel({
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="1.35"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className={`ember-map-iconbtn ${isolated ? "is-on" : ""}`}
+                    aria-pressed={isolated}
+                    disabled={!isolated && selectedSceneObjects.length === 0}
+                    title={
+                      isolated
+                        ? "Выйти из изоляции ( / или Alt+H )"
+                        : "Изолировать выбранное (Shift+H / / )"
+                    }
+                    aria-label="Изоляция"
+                    onClick={() => {
+                      if (sceneState.isIsolated()) {
+                        sceneState.exitIsolate();
+                        return;
+                      }
+                      if (selectedSceneObjects.length === 0) return;
+                      sceneState.isolate(
+                        selectedSceneObjects.map((object) => object.key),
+                        sceneObjects.map((object) => object.key),
+                      );
+                      setObjectGrab(null);
+                    }}
+                  >
+                    <svg
+                      className="ember-map-iconbtn__svg"
+                      viewBox="0 0 16 16"
+                      aria-hidden
+                    >
+                      <circle
+                        cx="8"
+                        cy="8"
+                        r="5.2"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.35"
+                      />
+                      <circle
+                        cx="8"
+                        cy="8"
+                        r="2"
+                        fill="currentColor"
                       />
                     </svg>
                   </button>
@@ -6405,6 +6587,34 @@ export function MapEditorPanel({
                           </button>
                         ))}
                       </div>
+                      <p className="ember-map-view__hint">
+                        Q — камера как в explore: iso, дистанция следования,
+                        фокус на выбор или spawn
+                      </p>
+                      <button
+                        type="button"
+                        className="ember-map-view__scale"
+                        title="Камера как в игре (explore) · Q"
+                        onClick={() => {
+                          setViewMode("top");
+                          const three = threePreviewRef.current;
+                          const obj = selectedSceneObjects[0];
+                          if (obj) {
+                            three?.setExploreCamera(
+                              obj.transform.position.x,
+                              obj.transform.position.y,
+                            );
+                            return;
+                          }
+                          const start = map.regions.find(
+                            (r) => r.kind === "player_start",
+                          );
+                          if (start) three?.setExploreCamera(start.x, start.y);
+                          else three?.setExploreCamera();
+                        }}
+                      >
+                        Explore · Q
+                      </button>
                     </section>
 
                     <section className="ember-map-view__section">
@@ -7046,10 +7256,14 @@ export function MapEditorPanel({
                 <dl className="ember-ed-map__cheat-grid">
                   <dt>G / R / S</dt>
                   <dd>перенос · поворот · масштаб</dd>
+                  <dt>H · Shift+H · Alt+H</dt>
+                  <dd>скрыть · изоляция · показать все</dd>
                   <dt>Ctrl+D</dt>
                   <dd>дублировать объект</dd>
-                  <dt>H · Del</dt>
-                  <dd>скрыть · удалить</dd>
+                  <dt>/ · Q</dt>
+                  <dd>изоляция вкл/выкл · камера игры</dd>
+                  <dt>Del</dt>
+                  <dd>удалить</dd>
                   <dt>Shift+ЛКМ</dt>
                   <dd>рамка на плоскости Z</dd>
                   <dt>Shift+стрелки</dt>
@@ -7523,6 +7737,9 @@ export function MapEditorPanel({
               }}
               onPatchVoxelPlacement={patchVoxelPlacement}
               onRenameVoxelModel={renameVoxelModel}
+              onSetVoxelModelTags={setVoxelModelTags}
+              onSetSpriteTags={setSpriteTags}
+              onFocusLibraryReference={focusLibraryReference}
               onPatchVoxelModelLight={patchVoxelModelLight}
               onOpenVoxelSculpt={openVoxelSculptForPlacement}
               onOpenVoxelSculptVariant={openVoxelSculptVariantForPlacement}
