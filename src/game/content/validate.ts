@@ -1,8 +1,19 @@
-import type { EmberPack, ValidationIssue } from "./types";
+import type { EmberMap, EmberPack, ValidationIssue } from "./types";
+import {
+  isEmberDialogueUse,
+  isEmberQuestMarkerStatus,
+  isEmberScriptStepKind,
+} from "./emberScript";
+import {
+  isEmberInteractivityKind,
+  parseInteractivity,
+} from "./interactivity";
 import {
   autoAttackValidationMessage,
   playProfileValidationMessage,
 } from "./playProfile";
+import { validateChestLootIds, validateItemCatalog } from "./emberItem";
+import { validateShops } from "./emberShop";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
@@ -42,6 +53,67 @@ function validateOptionalNumber(
   }
   if (opts?.max != null && value > opts.max) {
     pushError(issues, path, `Число должно быть <= ${opts.max}`);
+  }
+}
+
+function validateInteractivity(
+  issues: ValidationIssue[],
+  path: string,
+  map: EmberMap,
+  raw: unknown,
+): void {
+  if (raw == null) return;
+  if (!isPlainObject(raw) || !isEmberInteractivityKind(raw.kind)) {
+    pushError(issues, path, "Ожидался объект interactivity с kind door|talk|quest_marker|shop|custom");
+    return;
+  }
+  const parsed = parseInteractivity(raw);
+  if (!parsed) {
+    pushError(issues, path, "Некорректный interactivity modifier");
+    return;
+  }
+  validateOptionalString(issues, `${path}.triggerId`, raw.triggerId);
+  validateOptionalString(issues, `${path}.scriptId`, raw.scriptId);
+  validateOptionalString(issues, `${path}.iconId`, raw.iconId);
+  validateOptionalString(issues, `${path}.shopId`, raw.shopId);
+  if (raw.questStatus != null && !isEmberQuestMarkerStatus(raw.questStatus)) {
+    pushError(
+      issues,
+      `${path}.questStatus`,
+      "Ожидался available|active|done",
+    );
+  }
+  if (parsed.triggerId && !map.regions.some((region) => region.id === parsed.triggerId)) {
+    issues.push({
+      level: "warn",
+      path: `${path}.triggerId`,
+      message: `Триггер «${parsed.triggerId}» не найден на карте`,
+    });
+  }
+}
+
+function validateShopBinding(
+  issues: ValidationIssue[],
+  path: string,
+  pack: EmberPack,
+  raw: unknown,
+): void {
+  const parsed = parseInteractivity(raw);
+  if (!parsed || parsed.kind !== "shop") return;
+  if (!parsed.shopId) {
+    issues.push({
+      level: "warn",
+      path: `${path}.shopId`,
+      message: "У магазина нет shopId из shops/catalog.json",
+    });
+    return;
+  }
+  if (!pack.shops?.[parsed.shopId]) {
+    issues.push({
+      level: "warn",
+      path: `${path}.shopId`,
+      message: `Магазин «${parsed.shopId}» не найден в каталоге`,
+    });
   }
 }
 
@@ -216,6 +288,11 @@ function validateTileSemantics(
 export function validatePack(pack: EmberPack): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
+  issues.push(
+    ...validateItemCatalog(pack.items ?? {}, pack.itemIcons ?? {}),
+    ...validateShops(pack.shops ?? {}, pack.items ?? {}),
+  );
+
   const stageId = pack.meta.defaultStageId;
   if (!pack.stages[stageId]) {
     issues.push({
@@ -319,10 +396,36 @@ export function validatePack(pack: EmberPack): ValidationIssue[] {
     }
     const missingVoxelPlacements = new Map<string, string[]>();
     for (const placement of map.voxelProps ?? []) {
+      validateInteractivity(
+        issues,
+        `${mapBase}.voxelProps.${placement.id}.interactivity`,
+        map,
+        placement.interactivity,
+      );
+      validateShopBinding(
+        issues,
+        `${mapBase}.voxelProps.${placement.id}.interactivity`,
+        pack,
+        placement.interactivity,
+      );
       if (pack.voxelModels[placement.modelId]) continue;
       const ids = missingVoxelPlacements.get(placement.modelId) ?? [];
       ids.push(placement.id);
       missingVoxelPlacements.set(placement.modelId, ids);
+    }
+    for (const placement of map.sprites ?? []) {
+      validateInteractivity(
+        issues,
+        `${mapBase}.sprites.${placement.id}.interactivity`,
+        map,
+        placement.interactivity,
+      );
+      validateShopBinding(
+        issues,
+        `${mapBase}.sprites.${placement.id}.interactivity`,
+        pack,
+        placement.interactivity,
+      );
     }
     for (const [modelId, placementIds] of missingVoxelPlacements) {
       issues.push({
@@ -349,6 +452,24 @@ export function validatePack(pack: EmberPack): ValidationIssue[] {
       });
     }
     for (const r of map.regions) {
+      if (r.kind === "chest") {
+        if (r.lootIds != null) {
+          issues.push(
+            ...validateChestLootIds(
+              r.lootIds,
+              pack.items,
+              `${mapBase}.regions.${r.id}.lootIds`,
+            ),
+          );
+        }
+        if (r.repeatable != null && typeof r.repeatable !== "boolean") {
+          issues.push({
+            level: "error",
+            path: `${mapBase}.regions.${r.id}.repeatable`,
+            message: "Ожидался boolean",
+          });
+        }
+      }
       if (r.closedModelId && !pack.voxelModels[r.closedModelId]) {
         issues.push({
           level: "error",
@@ -408,6 +529,33 @@ export function validatePack(pack: EmberPack): ValidationIssue[] {
           });
         }
       }
+      if (r.targetMapId && !pack.maps[r.targetMapId]) {
+        issues.push({
+          level: "error",
+          path: `${mapBase}.regions.${r.id}.targetMapId`,
+          message: `Карта «${r.targetMapId}» отсутствует в паке`,
+        });
+      } else if (r.targetMapId && r.targetRegionId) {
+        const dest = pack.maps[r.targetMapId];
+        if (dest && !dest.regions.some((o) => o.id === r.targetRegionId)) {
+          issues.push({
+            level: "error",
+            path: `${mapBase}.regions.${r.id}.targetRegionId`,
+            message: `Регион «${r.targetRegionId}» не найден на карте «${r.targetMapId}»`,
+          });
+        }
+      }
+      if (
+        r.boundObjectId &&
+        !(map.voxelProps ?? []).some((place) => place.id === r.boundObjectId) &&
+        !(map.sprites ?? []).some((place) => place.id === r.boundObjectId)
+      ) {
+        issues.push({
+          level: "warn",
+          path: `${mapBase}.regions.${r.id}.boundObjectId`,
+          message: `Объект «${r.boundObjectId}» не найден на карте`,
+        });
+      }
       if (r.kind === "npc_idle" || r.kind === "npc_wander") {
         if (!r.spriteId) {
           issues.push({
@@ -438,10 +586,31 @@ export function validatePack(pack: EmberPack): ValidationIssue[] {
       const hasRegion = Boolean(r.targetRegionId);
       if (!hasCoords && !hasRegion) {
         issues.push({
-          level: "error",
+          level: "warn",
           path: `maps/${map.id}.regions.${r.id}`,
           message:
-            "teleport нужен targetX/targetY или targetRegionId",
+            "Телепорт без цели — свяжи с другой зоной или укажи клетку (targetX/Y)",
+        });
+      } else if (
+        hasCoords &&
+        !hasRegion &&
+        r.targetX! >= r.x &&
+        r.targetX! < r.x + r.w &&
+        r.targetY! >= r.y &&
+        r.targetY! < r.y + r.h
+      ) {
+        issues.push({
+          level: "warn",
+          path: `maps/${map.id}.regions.${r.id}`,
+          message:
+            "Цель телепорта совпадает с этой зоной — в игре ничего не произойдёт",
+        });
+      }
+      if (hasRegion && r.targetRegionId === r.id) {
+        issues.push({
+          level: "warn",
+          path: `maps/${map.id}.regions.${r.id}.targetRegionId`,
+          message: "Телепорт указывает сам на себя",
         });
       }
       if (hasRegion && !map.regions.some((o) => o.id === r.targetRegionId)) {
@@ -479,6 +648,13 @@ export function validatePack(pack: EmberPack): ValidationIssue[] {
   }
 
   for (const scene of Object.values(pack.scenes)) {
+    if (scene.use != null && !isEmberDialogueUse(scene.use)) {
+      pushError(
+        issues,
+        `scenes/${scene.id}.use`,
+        "Ожидался cutscene|talk|shop_intro",
+      );
+    }
     const ids = new Set(scene.steps.map((s) => s.id));
     if (!ids.has(scene.startStepId)) {
       issues.push({
@@ -552,6 +728,70 @@ export function validatePack(pack: EmberPack): ValidationIssue[] {
         path: `events/${event.id}.sceneId`,
         message: `Сцена «${event.sceneId}» отсутствует`,
       });
+    }
+  }
+
+  for (const script of Object.values(pack.scripts ?? {})) {
+    for (const [i, step] of script.steps.entries()) {
+      const base = `scripts/${script.id}[${i}]`;
+      if (!isEmberScriptStepKind(step.type)) {
+        pushError(issues, `${base}.type`, "Неизвестный шаг цепочки");
+        continue;
+      }
+      switch (step.type) {
+        case "talk":
+          if (!pack.scenes[step.dialogueId]) {
+            issues.push({
+              level: "error",
+              path: `${base}.dialogueId`,
+              message: `Диалог «${step.dialogueId}» отсутствует`,
+            });
+          }
+          break;
+        case "change_map":
+          if (!pack.maps[step.targetMapId]) {
+            issues.push({
+              level: "warn",
+              path: `${base}.targetMapId`,
+              message: `Карта «${step.targetMapId}» не найдена`,
+            });
+          }
+          break;
+        case "open_shop":
+          if (!pack.shops[step.shopId]) {
+            issues.push({
+              level: "error",
+              path: `${base}.shopId`,
+              message: `Магазин «${step.shopId}» отсутствует`,
+            });
+          }
+          break;
+        case "give_item":
+          if (!pack.items[step.itemId]) {
+            issues.push({
+              level: "warn",
+              path: `${base}.itemId`,
+              message: `Предмет «${step.itemId}» отсутствует`,
+            });
+          }
+          break;
+        case "set_flag":
+        case "wait":
+          break;
+        case "run_script":
+          if (!pack.scripts?.[step.scriptId]) {
+            issues.push({
+              level: "error",
+              path: `${base}.scriptId`,
+              message: `Скрипт «${step.scriptId}» отсутствует`,
+            });
+          }
+          break;
+        default: {
+          const _never: never = step;
+          void _never;
+        }
+      }
     }
   }
 

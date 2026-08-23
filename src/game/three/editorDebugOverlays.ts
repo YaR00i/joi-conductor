@@ -17,6 +17,7 @@ import {
   layerData,
   listPhysicalVoxelCollisionAabbs,
   regionCenter,
+  regionVolumeElev,
   tileSurfaceElev,
   type EmberVoxelModelLib,
   type EmberVoxelSceneLib,
@@ -246,6 +247,7 @@ function addFloorPads(
     ty: number;
     color: number;
     opacity: number;
+    elev?: number;
   }>,
 ): void {
   if (cells.length === 0) return;
@@ -274,7 +276,7 @@ function addFloorPads(
       };
       buckets.set(key, b);
     }
-    const elev = tileSurfaceElev(map, c.tx, c.ty);
+    const elev = c.elev ?? tileSurfaceElev(map, c.tx, c.ty);
     // Sit clearly above the floor / wall top so near-camera depth precision can't hide pads.
     const y = elev * storyH + 1.25;
     const cx = (c.tx + 0.5) * ts;
@@ -570,11 +572,7 @@ function addRegionRectEdges(
 ): void {
   const ts = map.tileSize;
   const storyH = blockStoryHeight(ts);
-  const elev = tileSurfaceElev(
-    map,
-    Math.floor(r.x + r.w * 0.5),
-    Math.floor(r.y + r.h * 0.5),
-  );
+  const elev = regionVolumeElev(map, r);
   const y = elev * storyH + 1.2;
   const minX = r.x * ts;
   const maxX = (r.x + r.w) * ts;
@@ -591,9 +589,7 @@ function addPlayerStartCapsules(root: THREE.Object3D, map: EmberMap): void {
   for (const region of map.regions ?? []) {
     if (region.kind !== "player_start") continue;
     const pos = regionCenter(map, region);
-    const tx = Math.floor(pos.x / map.tileSize);
-    const ty = Math.floor(pos.y / map.tileSize);
-    const feetY = tileSurfaceElev(map, tx, ty) * storyH;
+    const feetY = regionVolumeElev(map, region) * storyH;
     const cap = createPlayerCapsuleOverlay(radius, height);
     cap.position.set(pos.x, feetY + height * 0.5, pos.y);
     root.add(cap);
@@ -730,8 +726,13 @@ export function rebuildEditorDebugOverlays(
   }
 
   if (flags.showRegions) {
-    const pads: { tx: number; ty: number; color: number; opacity: number }[] =
-      [];
+    const pads: {
+      tx: number;
+      ty: number;
+      color: number;
+      opacity: number;
+      elev?: number;
+    }[] = [];
     const edgeBuckets = new Map<number, number[]>();
     for (const r of map.regions) {
       const color = regionColor(r.kind);
@@ -744,15 +745,16 @@ export function rebuildEditorDebugOverlays(
         edges = [];
         edgeBuckets.set(color, edges);
       }
+      const volumeElev = regionVolumeElev(map, r);
       for (let j = 0; j < r.h; j++) {
         for (let i = 0; i < r.w; i++) {
           const tx = r.x + i;
           const ty = r.y + j;
           if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) continue;
-          pads.push({ tx, ty, color, opacity: 0.22 });
+          pads.push({ tx, ty, color, opacity: 0.22, elev: volumeElev });
           const ts = map.tileSize;
           const storyH = blockStoryHeight(ts);
-          const topY = tileSurfaceElev(map, tx, ty) * storyH;
+          const topY = volumeElev * storyH;
           const inflate = 0.1;
           pushBoxEdges(
             edges,

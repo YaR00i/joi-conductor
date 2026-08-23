@@ -1,0 +1,32 @@
+{
+  "id": "village_auntie_talk",
+  "nameRu": "Тётушка у скамьи",
+  "use": "talk",
+  "startStepId": "a",
+  "steps": [
+    {
+      "id": "a",
+      "type": "dialogue",
+      "speaker": "auntie",
+      "portraitKey": "neutral",
+      "nameRu": "Тётушка с площади",
+      "textRu": "Вечер хороший, чтобы не умирать. Хотя директриса бюро сказала бы наоборот.",
+      "next": "b"
+    },
+    {
+      "id": "b",
+      "type": "dialogue",
+      "speaker": "auntie",
+      "portraitKey": "neutral",
+      "nameRu": "Тётушка с площади",
+      "textRu": "Лавка в кирпичном доме, слева от ворот. А сундук у западных слив я, конечно, не видела.",
+      "next": "end"
+    },
+    { "id": "end", "type": "end" }
+  ],
+  "editorLayout": {
+    "a": { "x": 40, "y": 80 },
+    "b": { "x": 280, "y": 80 },
+    "end": { "x": 520, "y": 80 }
+  }
+}

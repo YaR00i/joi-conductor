@@ -132,6 +132,7 @@ import {
   suggestConnectorElevation,
   tileCanvasTopLeft,
   tileSurfaceElev,
+  regionVolumeElev,
   topOccupiedElevAt,
   type MapViewMode,
 } from "../../../game/tile/mapUtils";
@@ -167,6 +168,7 @@ import {
 } from "./MapLibraryTray";
 import {
   checkMapLibraryPlacement,
+  effectiveMapLibraryPlacementMode,
   resolveMapLibraryPlacementTarget,
   type MapLibraryPlacementMode,
   type MapLibraryPlacementTarget,
@@ -175,7 +177,12 @@ import {
   pairTeleportRegions,
   replaceRegion,
 } from "./MapRegionEditor";
-import { makeRegionAt, newRegionId } from "./mapRegionHelpers";
+import {
+  clampRegionOrigin,
+  makeRegionAt,
+  newRegionId,
+  regionFootprintCenter,
+} from "./mapRegionHelpers";
 import { MapRegionsPanel } from "./MapRegionsPanel";
 import { MapSpawnEditor } from "./MapSpawnEditor";
 import { MapStageForm } from "./MapStageForm";
@@ -784,7 +791,7 @@ function selectionTransformTarget(
     case "region": {
       const region = map.regions.find((candidate) => candidate.id === sel.id);
       if (!region) return null;
-      const elev = tileSurfaceElev(map, region.x, region.y);
+      const elev = regionVolumeElev(map, region);
       return {
         kind: "region",
         id: region.id,
@@ -1014,10 +1021,57 @@ function mapWithTransformPreview(
       {
         x: preview.position.x / ts - region.w / 2,
         y: preview.position.z / ts - region.h / 2,
+        z: clampElevation(elevFromWorldY(preview.position.y, storyH)),
       },
     );
   }
   return null;
+}
+
+/** Apply the in-flight gizmo pose so overlays follow before React commits displayMap. */
+function applyLiveRegionPose(
+  region: EmberMapRegion,
+  preview: EditorTransformPreview | null,
+  map: EmberMap,
+): EmberMapRegion {
+  if (!preview || preview.kind !== "region" || preview.id !== region.id) {
+    return region;
+  }
+  const ts = map.tileSize;
+  if (preview.mode === "translate") {
+    return {
+      ...region,
+      ...clampRegionOrigin(
+        preview.position.x / ts - region.w / 2,
+        preview.position.z / ts - region.h / 2,
+        region.w,
+        region.h,
+        map.width,
+        map.height,
+      ),
+      elev: clampElevation(
+        elevFromWorldY(preview.position.y, blockStoryHeight(ts)),
+      ),
+    };
+  }
+  if (preview.mode === "scale") {
+    const w = Math.max(1, Math.min(map.width, Math.round(preview.scale.x)));
+    const h = Math.max(1, Math.min(map.height, Math.round(preview.scale.y)));
+    return {
+      ...region,
+      w,
+      h,
+      ...clampRegionOrigin(
+        region.x,
+        region.y,
+        w,
+        h,
+        map.width,
+        map.height,
+      ),
+    };
+  }
+  return region;
 }
 
 const TOOL_HOTKEYS: Record<string, Tool> = {
@@ -1183,6 +1237,13 @@ export function MapEditorPanel({
   const panningRef = useRef<{ lastX: number; lastY: number } | null>(null);
   const orbitingRef = useRef<{ lastX: number; lastY: number } | null>(null);
   const [isPanning, setIsPanning] = useState(false);
+  const [worldLoad, setWorldLoad] = useState({
+    active: true,
+    ratio: 0.04,
+    labelRu: "Местность…",
+  });
+  const setWorldLoadRef = useRef(setWorldLoad);
+  setWorldLoadRef.current = setWorldLoad;
   const [voxelSculptSession, setVoxelSculptSession] =
     useState<VoxelSculptSession | null>(null);
   /** When opening sculptor from a chest scene, focus this scene/model id. */
@@ -1205,6 +1266,7 @@ export function MapEditorPanel({
   const marqueeEndRef = useRef<TilePos | null>(null);
   const toolRef = useRef<Tool>("select");
   const mapRef = useRef(map);
+  const displayMapRef = useRef(map);
   const packRef = useRef(pack);
   const onChangeRef = useRef(onChange);
   const editorCoreRef = useRef<
@@ -1424,31 +1486,42 @@ export function MapEditorPanel({
     (
       regionId: string | null,
     ): {
-      tiles: { tx: number; ty: number }[];
-      bounds: { x: number; y: number; w: number; h: number } | null;
+      tiles: { tx: number; ty: number; elev?: number }[];
+      bounds: { x: number; y: number; w: number; h: number; elev?: number } | null;
     } => {
       if (!regionId) return { tiles: [], bounds: null };
-      const region = mapRef.current.regions.find((r) => r.id === regionId);
-      if (!region) return { tiles: [], bounds: null };
+      const overlayMap = displayMapRef.current;
+      const found = overlayMap.regions.find((r) => r.id === regionId);
+      if (!found) return { tiles: [], bounds: null };
+      const region = applyLiveRegionPose(
+        found,
+        transformLivePreviewRef.current,
+        overlayMap,
+      );
+      const bounds = {
+        x: region.x,
+        y: region.y,
+        w: region.w,
+        h: region.h,
+        elev: regionVolumeElev(overlayMap, region),
+      };
       const area = Math.max(1, region.w) * Math.max(1, region.h);
-      // camera_bound / huge zones: one frame, not a grid over the whole map.
+      // camera_bound / huge zones: one frame, not a per-cell grid.
       if (region.kind === "camera_bound" || area > REGION_CELL_OUTLINE_MAX) {
-        return {
-          tiles: [],
-          bounds: { x: region.x, y: region.y, w: region.w, h: region.h },
-        };
+        return { tiles: [], bounds };
       }
-      const m = mapRef.current;
-      const cells: { tx: number; ty: number }[] = [];
+      const cells: { tx: number; ty: number; elev?: number }[] = [];
       for (let j = 0; j < region.h; j++) {
         for (let i = 0; i < region.w; i++) {
           const tx = region.x + i;
           const ty = region.y + j;
-          if (tx < 0 || ty < 0 || tx >= m.width || ty >= m.height) continue;
-          cells.push({ tx, ty });
+          if (tx < 0 || ty < 0 || tx >= overlayMap.width || ty >= overlayMap.height) {
+            continue;
+          }
+          cells.push({ tx, ty, elev: bounds.elev });
         }
       }
-      return { tiles: cells, bounds: null };
+      return { tiles: cells, bounds };
     },
     [],
   );
@@ -1861,10 +1934,14 @@ export function MapEditorPanel({
     if (!libSelectedRef.current) return;
     setLibHoverTile((current) => {
       if (!current) return current;
-      if (libraryPlacementMode === "surface") return null;
+      const mode = effectiveMapLibraryPlacementMode(
+        libSelectedRef.current?.kind,
+        libraryPlacementMode,
+      );
+      if (mode === "surface") return null;
       return resolveMapLibraryPlacementTarget(
         mapRef.current,
-        libraryPlacementMode,
+        mode,
         current,
         null,
         brushElevRef.current,
@@ -2002,10 +2079,9 @@ export function MapEditorPanel({
 
   const focusRegion = useCallback(
     (region: EmberMapRegion) => {
-      const cx = region.x + Math.max(0, (region.w - 1) / 2);
-      const cy = region.y + Math.max(0, (region.h - 1) / 2);
-      const tx = Math.round(cx);
-      const ty = Math.round(cy);
+      const { cx, cy } = regionFootprintCenter(region);
+      const tx = Math.max(0, Math.min(mapRef.current.width - 1, Math.floor(cx)));
+      const ty = Math.max(0, Math.min(mapRef.current.height - 1, Math.floor(cy)));
       threePreviewRef.current?.focusTile(tx, ty);
       const wrap = canvasWrapRef.current;
       if (!wrap) return;
@@ -2116,6 +2192,7 @@ export function MapEditorPanel({
     },
     [hiddenObjectKeys, map, objectGrab, transformMapPreview],
   );
+  displayMapRef.current = displayMap;
 
   // Three.js isometric viewport — fills the wrap (not a scrolled 2D bake).
   useEffect(() => {
@@ -2212,6 +2289,17 @@ export function MapEditorPanel({
           syncThreeOverlaysRef.current();
         });
       }
+      threePreviewRef.current.onLoadProgress((progress) => {
+        setWorldLoadRef.current(
+          progress.ratio >= 1
+            ? { active: false, ratio: 1, labelRu: progress.labelRu }
+            : {
+                active: true,
+                ratio: progress.ratio,
+                labelRu: progress.labelRu,
+              },
+        );
+      });
       threePreviewRef.current.setTransformPointerDom(canvas);
       threePreviewRef.current.setMap(
         ensureMapLayers(displayMap),
@@ -2246,6 +2334,10 @@ export function MapEditorPanel({
     threePreviewRef.current?.setViewPreset(viewMode);
     blitBaseAndOverlay();
   }, [viewMode, blitBaseAndOverlay]);
+
+  useLayoutEffect(() => {
+    setWorldLoad({ active: true, ratio: 0.04, labelRu: "Местность…" });
+  }, [map.id]);
 
   useEffect(() => {
     return () => {
@@ -2919,6 +3011,7 @@ export function MapEditorPanel({
 
   const setLibraryObjectComponent = useCallback(
     (component: EmberOptionalComponentType, present: boolean) => {
+      if (component === "interactivity") return;
       const selection = selectionRef.current;
       if (selection?.kind !== "lib") return;
       const payload = selection.payload;
@@ -3215,6 +3308,9 @@ export function MapEditorPanel({
       }
       setSelection({ kind: "lib", payload });
       if (payload.kind === "region") {
+        setLibraryPlacementMode((mode) =>
+          mode === "surface" ? "grid" : mode,
+        );
         setLibRegionDraft((cur) => {
           if (cur?.kind === payload.regionKind) return cur;
           return makeRegionAt(mapRef.current, payload.regionKind, 0, 0);
@@ -3386,8 +3482,9 @@ export function MapEditorPanel({
                   w: Math.max(1, Math.min(draft.w, m.width)),
                   h: Math.max(1, Math.min(draft.h, m.height)),
                   kind: payload.regionKind,
+                  elev: tile.elev,
                 }
-              : placed;
+              : { ...placed, elev: tile.elev };
           pushHistory(m, "Поставить регион");
           const next = cloneMap(m);
           next.regions = [...next.regions, region];
@@ -3706,12 +3803,21 @@ export function MapEditorPanel({
       if (!point) return null;
       const surface =
         threePreviewRef.current?.pickSurfaceTarget(point.sx, point.sy) ?? null;
-      const tile = clientToTile(clientX, clientY);
       const payload = libSelectedRef.current;
-      const mode =
-        payload?.kind === "light" || payload?.kind === "region"
-          ? "floor"
-          : libraryPlacementModeRef.current;
+      const mode = effectiveMapLibraryPlacementMode(
+        payload?.kind,
+        libraryPlacementModeRef.current,
+      );
+      let tile = clientToTile(clientX, clientY);
+      if (mode === "grid") {
+        const plane =
+          threePreviewRef.current?.pickPlaceTarget(
+            point.sx,
+            point.sy,
+            brushElevRef.current,
+          ) ?? null;
+        if (plane) tile = { x: plane.tx, y: plane.ty };
+      }
       return resolveMapLibraryPlacementTarget(
         mapRef.current,
         mode,
@@ -4443,7 +4549,8 @@ export function MapEditorPanel({
       if (!region) return;
       const x = Math.round(commit.position.x / ts - region.w / 2);
       const y = Math.round(commit.position.z / ts - region.h / 2);
-      if (region.x === x && region.y === y) {
+      const elev = clampElevation(elevFromWorldY(commit.position.y, storyH));
+      if (region.x === x && region.y === y && (region.elev ?? elev) === elev) {
         resync({ kind: "region", id: commit.id });
         return;
       }
@@ -4452,7 +4559,7 @@ export function MapEditorPanel({
         patchEmberWorldObjectTransform(
           m,
           { kind: "region", id: commit.id },
-          { x, y },
+          { x, y, z: elev },
         ),
       );
       setSelection({ kind: "region", id: commit.id });
@@ -4947,10 +5054,14 @@ export function MapEditorPanel({
           const focusObj = selectedSceneObjects[0];
           if (focusObj) {
             e.preventDefault();
-            three?.focusTile(
-              focusObj.transform.position.x,
-              focusObj.transform.position.y,
-            );
+            if (focusObj.source.kind === "region") {
+              focusRegion(focusObj.source.value);
+            } else {
+              three?.focusTile(
+                focusObj.transform.position.x,
+                focusObj.transform.position.y,
+              );
+            }
             return;
           }
           if (sel?.kind === "tile") {
@@ -4962,7 +5073,7 @@ export function MapEditorPanel({
             const region = mapRef.current.regions.find((r) => r.id === sel.id);
             if (region) {
               e.preventDefault();
-              three?.focusTile(region.x, region.y);
+              focusRegion(region);
             }
             return;
           }
@@ -5097,6 +5208,7 @@ export function MapEditorPanel({
     translateWorldSelection,
     sceneState,
     onSaved,
+    focusRegion,
   ]);
 
   const paintTileCell = (
@@ -6362,18 +6474,6 @@ export function MapEditorPanel({
                     </svg>
                   </button>
                 </div>
-                <span
-                  className={`ember-map-autosave is-${saveState}`}
-                  title="Карта сохраняется сама через ~1.5 с после правок"
-                >
-                  {saveState === "saving"
-                    ? "Сохранение…"
-                    : saveState === "dirty"
-                      ? "Автосохранение…"
-                      : saveState === "error"
-                        ? "Ошибка"
-                        : "Сохранено"}
-                </span>
                 <button
                   type="button"
                   className={
@@ -6764,6 +6864,7 @@ export function MapEditorPanel({
                     pack={pack}
                     selectedId={selectedRegionId}
                     showOverlay={showRegions}
+                    defaultElev={brushElev}
                     onSelect={(id) => {
                       setSelectedRegionId(id);
                       if (id) setSelection({ kind: "region", id });
@@ -6910,6 +7011,34 @@ export function MapEditorPanel({
               className="ember-ed-map__three-host"
               aria-hidden
             />
+            {worldLoad.active ? (
+              <div
+                className="ember-ed-map__boot"
+                role="status"
+                aria-live="polite"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(worldLoad.ratio * 100)}
+              >
+                <div className="ember-ed-map__boot-card">
+                  <p className="ember-play__kicker muted">Загрузка мира</p>
+                  <h2 className="ember-ed-map__boot-title">
+                    {map.nameRu?.trim() || map.id}
+                  </h2>
+                  <div className="ember-play__boot-track">
+                    <div
+                      className="ember-play__boot-fill"
+                      style={{
+                        width: `${Math.max(4, Math.min(100, worldLoad.ratio * 100))}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="muted ember-play__boot-label">
+                    {worldLoad.labelRu}
+                  </p>
+                </div>
+              </div>
+            ) : null}
             <canvas
               ref={canvasRef}
               className={[
@@ -7325,12 +7454,12 @@ export function MapEditorPanel({
                           ["grid", `Сетка Z${brushElev}`],
                         ] as const
                       ).map(([mode, label]) => {
-                        const floorOnly =
-                          libSelected.kind === "light" ||
-                          libSelected.kind === "region";
-                        const active = floorOnly
-                          ? mode === "floor"
-                          : libraryPlacementMode === mode;
+                        const floorOnly = libSelected.kind === "light";
+                        const effective = effectiveMapLibraryPlacementMode(
+                          libSelected.kind,
+                          libraryPlacementMode,
+                        );
+                        const active = effective === mode;
                         return (
                           <button
                             key={mode}
@@ -7345,6 +7474,12 @@ export function MapEditorPanel({
                         );
                       })}
                     </div>
+                    {libSelected.kind === "region" ? (
+                      <p className="ember-ed-map__tool-hud-hint">
+                        Зона на этаже кисти, как блоки. Iso бьёт в потолок —
+                        «К поверхности» = сетка Z. Drop to Floor — крыша колонки.
+                      </p>
+                    ) : null}
                     <p
                       className={`ember-ed-map__tool-hud-hint ${libPlacementCheck?.valid === false ? "is-invalid" : ""}`}
                     >
@@ -7371,6 +7506,42 @@ export function MapEditorPanel({
                         </button>
                       ) : null}
                     </div>
+                    {selectionState.items.length > 0 ? (
+                      <div className="ember-map-selection-hud__actions">
+                        <button
+                          type="button"
+                          className="ghost"
+                          disabled={selectedSceneObjects.length === 0}
+                          title="Дублировать выбранные объекты (Ctrl+D)"
+                          onClick={() =>
+                            duplicateWorldSelection(selectedSceneObjects)
+                          }
+                        >
+                          Дублировать
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost ember-danger"
+                          title="Удалить выбранное с карты (Delete). Можно отменить через Undo."
+                          onClick={() => {
+                            if (
+                              selectedSceneObjects.length > 0 ||
+                              selectionState.items.some(
+                                (item) => item.kind === "tile",
+                              )
+                            ) {
+                              deleteWorldSelection(selectedSceneObjects);
+                              return;
+                            }
+                            if (selection?.kind === "light") {
+                              deleteLightSource(selection.id);
+                            }
+                          }}
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    ) : null}
                     <div
                       className="ember-chip-row ember-map-selection-hud__filters"
                       role="group"
@@ -7604,6 +7775,15 @@ export function MapEditorPanel({
               onSetMultiLocked={setWorldSelectionLocked}
               onSetMultiHidden={setWorldSelectionHidden}
               onDeleteMulti={() => deleteWorldSelection(selectedSceneObjects)}
+              onDuplicateMulti={() =>
+                duplicateWorldSelection(selectedSceneObjects)
+              }
+              onDuplicateSelection={() =>
+                duplicateWorldSelection(selectedSceneObjects)
+              }
+              onDeleteSelection={() =>
+                deleteWorldSelection(selectedSceneObjects)
+              }
               locked={selectedObjectLocked}
               hidden={selectedObjectHidden}
               onToggleLocked={

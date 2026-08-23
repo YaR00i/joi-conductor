@@ -1,12 +1,15 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
-  type ReactNode,
 } from "react";
+import { dialogueUseOf } from "../../game/content/emberScript";
 import { emberAssetUrl } from "../../game/content/io";
 import type {
+  EmberDialogueUse,
   EmberPack,
   SceneActor,
   SceneStep,
@@ -24,7 +27,12 @@ type Props = {
   sceneId: string;
   onGrantCinders: (amount: number) => void;
   onClose: () => void;
+  /** play = overlay on the 3D world; stage = editor / after-clear host. */
+  variant?: "play" | "stage";
 };
+
+const TYPE_MS = 22;
+const AUTO_MS = 1600;
 
 function actorStyle(actor: SceneActor): CSSProperties {
   const scale = actor.scale ?? 1;
@@ -38,72 +46,61 @@ function actorStyle(actor: SceneActor): CSSProperties {
   };
 }
 
-function VnStage({
+function VnActors({
   pack,
-  bgPath,
   actors,
   dimOthers,
   activeSpeaker,
-  children,
 }: {
   pack: EmberPack;
-  bgPath: string | null;
   actors: SceneActor[];
   dimOthers?: boolean;
   activeSpeaker?: string;
-  children: ReactNode;
 }) {
   const sorted = useMemo(
     () => [...actors].sort((a, b) => (a.z ?? 0) - (b.z ?? 0)),
     [actors],
   );
-  const bgSrc = bgPath ? emberAssetUrl(bgPath) : "";
-  const [bgFailed, setBgFailed] = useState(false);
-
-  useEffect(() => {
-    setBgFailed(false);
-  }, [bgSrc]);
-
   return (
-    <div className="ember-vn">
-      <div className="ember-vn__stage">
-        {bgSrc && !bgFailed ? (
-          <img
-            className="ember-vn__bg"
-            src={bgSrc}
-            alt=""
-            onError={() => setBgFailed(true)}
-          />
-        ) : (
-          <div className="ember-vn__bg ember-vn__bg--empty" />
-        )}
-        <div className="ember-vn__actors">
-          {sorted.map((actor) => {
-            const path = actorPortraitUrl(pack, actor);
-            const src = path ? emberAssetUrl(path, PORTRAIT_ASSET_REV) : "";
-            const dim =
-              dimOthers &&
-              activeSpeaker &&
-              actor.speaker !== activeSpeaker;
-            return (
-              <div
-                key={actor.id}
-                className={`ember-vn__actor ${dim ? "is-dim" : ""}`}
-                style={actorStyle(actor)}
-              >
-                {src ? (
-                  <img src={src} alt="" draggable={false} />
-                ) : (
-                  <div className="ember-vn__actor-empty">?</div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        {children}
-      </div>
+    <div className="ember-vn__actors ember-dlg__actors">
+      {sorted.map((actor) => {
+        const path = actorPortraitUrl(pack, actor);
+        const src = path ? emberAssetUrl(path, PORTRAIT_ASSET_REV) : "";
+        if (!src) return null;
+        const dim =
+          dimOthers && activeSpeaker && actor.speaker !== activeSpeaker;
+        return (
+          <div
+            key={actor.id}
+            className={`ember-vn__actor ${dim ? "is-dim" : ""}`}
+            style={actorStyle(actor)}
+          >
+            <img src={src} alt="" draggable={false} />
+          </div>
+        );
+      })}
     </div>
   );
+}
+
+function lineText(step: SceneStep): string {
+  switch (step.type) {
+    case "dialogue":
+      return step.textRu;
+    case "splash":
+      return step.captionRu?.trim() || "…";
+    case "choice":
+      return step.promptRu;
+    case "grant_cinders":
+      return `+${step.amount} угольков`;
+    case "set_flag":
+    case "end":
+      return "";
+    default: {
+      const _never: never = step;
+      return _never;
+    }
+  }
 }
 
 export function ScenePlayer({
@@ -111,156 +108,237 @@ export function ScenePlayer({
   sceneId,
   onGrantCinders,
   onClose,
+  variant = "stage",
 }: Props) {
   const scene = pack.scenes[sceneId];
+  const use: EmberDialogueUse = dialogueUseOf(scene);
+  const cinematic = use === "cutscene";
   const steps = useMemo(() => {
     if (!scene) return new Map<string, SceneStep>();
     return new Map(scene.steps.map((s) => [s.id, s]));
   }, [scene]);
 
   const [stepId, setStepId] = useState(scene?.startStepId ?? "");
+  const [typed, setTyped] = useState(0);
+  const [auto, setAuto] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const autoTimer = useRef(0);
   const step = steps.get(stepId);
+  const fullText = step ? lineText(step) : "";
+  const shown = fullText.slice(0, typed);
+  const waiting = typed >= fullText.length;
+
+  const go = useCallback(
+    (next?: string) => {
+      if (!next) {
+        onClose();
+        return;
+      }
+      setStepId(next);
+    },
+    [onClose],
+  );
 
   useEffect(() => {
-    if (step?.type !== "set_flag") return;
-    if (step.next) setStepId(step.next);
-    else onClose();
+    setTyped(0);
+  }, [stepId, fullText]);
+
+  useEffect(() => {
+    if (!step) return;
+    if (step.type === "set_flag") {
+      if (step.next) setStepId(step.next);
+      else onClose();
+      return;
+    }
+    if (step.type === "end") {
+      onClose();
+    }
   }, [step, onClose]);
+
+  useEffect(() => {
+    if (!step || hidden || waiting) return;
+    if (step.type === "choice") {
+      setTyped(fullText.length);
+      return;
+    }
+    const id = window.setInterval(() => {
+      setTyped((n) => Math.min(fullText.length, n + 1));
+    }, TYPE_MS);
+    return () => window.clearInterval(id);
+  }, [step, hidden, waiting, fullText.length]);
+
+  const advance = useCallback(() => {
+    if (!step) {
+      onClose();
+      return;
+    }
+    if (hidden) {
+      setHidden(false);
+      return;
+    }
+    if (!waiting) {
+      setTyped(fullText.length);
+      return;
+    }
+    switch (step.type) {
+      case "dialogue":
+      case "splash":
+        go(step.next);
+        break;
+      case "choice":
+        break;
+      case "grant_cinders":
+        onGrantCinders(step.amount);
+        go(step.next);
+        break;
+      case "set_flag":
+        go(step.next);
+        break;
+      case "end":
+        onClose();
+        break;
+      default: {
+        const _never: never = step;
+        void _never;
+      }
+    }
+  }, [step, hidden, waiting, fullText.length, go, onClose, onGrantCinders]);
+
+  const skipAll = useCallback(() => {
+    onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!auto || !waiting || !step || hidden) return;
+    if (step.type === "choice") return;
+    autoTimer.current = window.setTimeout(() => advance(), AUTO_MS);
+    return () => window.clearTimeout(autoTimer.current);
+  }, [auto, waiting, step, hidden, advance]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+        return;
+      }
+      if (e.code === "Space" || e.code === "KeyF" || e.key === "Enter") {
+        e.preventDefault();
+        e.stopPropagation();
+        advance();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [advance, onClose]);
 
   if (!scene || !step) {
     return (
-      <div className="ember-vn ember-vn--empty">
-        <p className="muted">Сцена не найдена</p>
-        <button type="button" onClick={onClose}>
+      <div className="ember-dlg ember-dlg--empty">
+        <p>Сцена не найдена</p>
+        <button type="button" className="ember-dlg__text-btn" onClick={onClose}>
           Закрыть
         </button>
       </div>
     );
   }
 
-  const go = (next?: string) => {
-    if (!next) {
-      onClose();
-      return;
-    }
-    setStepId(next);
-  };
-
   const bgArtId = resolveStepBgArtId(step, scene);
-  const bgPath = bgArtId ? (pack.arts[bgArtId]?.path ?? null) : null;
+  const bgPath = cinematic && bgArtId ? (pack.arts[bgArtId]?.path ?? null) : null;
+  const bgSrc = bgPath ? emberAssetUrl(bgPath) : "";
+  const actors =
+    cinematic && step.type === "dialogue"
+      ? resolveDialogueActors(step)
+      : cinematic && step.type === "choice"
+        ? resolveChoiceActors(step, scene)
+        : [];
+  const showActors = cinematic && actors.length > 0;
+  const showCaret =
+    waiting &&
+    !hidden &&
+    step.type !== "choice" &&
+    step.type !== "end" &&
+    step.type !== "set_flag";
 
-  switch (step.type) {
-    case "dialogue": {
-      const actors = resolveDialogueActors(step);
-      const name = step.nameRu?.trim() || step.speaker;
-      return (
-        <VnStage
+  return (
+    <div
+      className={`ember-dlg ember-dlg--${use} ember-dlg--${variant}${hidden ? " is-hidden" : ""}`}
+      role="dialog"
+      aria-live="polite"
+      onClick={() => advance()}
+    >
+      {bgSrc ? (
+        <img className="ember-dlg__bg" src={bgSrc} alt="" />
+      ) : variant === "stage" && cinematic ? (
+        <div className="ember-dlg__bg ember-dlg__bg--empty" />
+      ) : null}
+      {showActors ? (
+        <VnActors
           pack={pack}
-          bgPath={bgPath}
           actors={actors}
-          dimOthers
-          activeSpeaker={step.speaker}
+          dimOthers={step.type === "dialogue"}
+          activeSpeaker={step.type === "dialogue" ? step.speaker : undefined}
+        />
+      ) : null}
+      <div className="ember-dlg__veil" />
+      <div
+        className="ember-dlg__chrome"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          title="Пропустить"
+          onClick={skipAll}
         >
-          <div className="ember-vn__textbox">
-            <div className="ember-vn__name">{name}</div>
-            <p className="ember-vn__text">{step.textRu}</p>
-            <button
-              type="button"
-              className="ember-vn__next"
-              onClick={() => go(step.next)}
-            >
-              Дальше
-            </button>
-          </div>
-        </VnStage>
-      );
-    }
-    case "splash": {
-      const art = pack.arts[step.artId];
-      const src = art ? emberAssetUrl(art.path) : "";
-      return (
-        <div className="ember-vn">
-          <div className="ember-vn__stage">
-            {src ? (
-              <img className="ember-vn__bg" src={src} alt="" />
-            ) : (
-              <div className="ember-vn__bg ember-vn__bg--empty">нет арта</div>
-            )}
-            <div className="ember-vn__textbox">
-              {step.captionRu ? (
-                <p className="ember-vn__text">{step.captionRu}</p>
-              ) : (
-                <p className="ember-vn__text muted">…</p>
-              )}
-              <button
-                type="button"
-                className="ember-vn__next"
-                onClick={() => go(step.next)}
-              >
-                Дальше
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    case "choice": {
-      const actors = resolveChoiceActors(step, scene);
-      return (
-        <VnStage pack={pack} bgPath={bgPath} actors={actors}>
-          <div className="ember-vn__textbox ember-vn__textbox--choice">
-            <div className="ember-vn__name">Выбор</div>
-            <p className="ember-vn__text">{step.promptRu}</p>
-            <div className="ember-vn__choices">
+          <span aria-hidden>⏭</span>
+          <span className="ember-dlg__chrome-label">Skip</span>
+        </button>
+        <button
+          type="button"
+          title="Авто"
+          className={auto ? "is-on" : ""}
+          onClick={() => setAuto((v) => !v)}
+        >
+          <span aria-hidden>{auto ? "⏸" : "▶"}</span>
+          <span className="ember-dlg__chrome-label">Auto</span>
+        </button>
+        <button
+          type="button"
+          title="Скрыть интерфейс"
+          onClick={() => setHidden(true)}
+        >
+          <span aria-hidden>👁</span>
+          <span className="ember-dlg__chrome-label">Hide</span>
+        </button>
+      </div>
+      {!hidden ? (
+        <div className="ember-dlg__copy">
+          <p className="ember-dlg__text">
+            {shown}
+            {!waiting ? <span className="ember-dlg__caret-inline">▍</span> : null}
+          </p>
+          {step.type === "choice" ? (
+            <div className="ember-dlg__choices">
               {step.options.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => go(opt.next)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    go(opt.next);
+                  }}
                 >
                   {opt.labelRu}
                 </button>
               ))}
             </div>
-          </div>
-        </VnStage>
-      );
-    }
-    case "grant_cinders":
-      return (
-        <div className="ember-vn ember-vn--modal">
-          <div className="ember-vn__modal-card">
-            <p>+{step.amount} угольков</p>
-            <button
-              type="button"
-              className="primary"
-              onClick={() => {
-                onGrantCinders(step.amount);
-                go(step.next);
-              }}
-            >
-              Забрать
-            </button>
-          </div>
+          ) : null}
+          {showCaret ? <span className="ember-dlg__caret" aria-hidden /> : null}
         </div>
-      );
-    case "set_flag":
-      return <div className="ember-vn ember-vn--empty muted">…</div>;
-    case "end":
-      return (
-        <div className="ember-vn ember-vn--modal">
-          <div className="ember-vn__modal-card">
-            <p>Сцена завершена</p>
-            <button type="button" className="primary" onClick={onClose}>
-              Готово
-            </button>
-          </div>
-        </div>
-      );
-    default: {
-      const _n: never = step;
-      void _n;
-      return null;
-    }
-  }
+      ) : (
+        <p className="ember-dlg__hidden-hint">Клик / F — показать</p>
+      )}
+    </div>
+  );
 }

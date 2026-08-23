@@ -5,6 +5,9 @@ export type EmberWorldLoadSnapshot = {
   shadowCached: number;
   shadowTotal: number;
   warmupComplete: boolean;
+  /** 0..1 streaming fraction; overrides boolean settled when set. */
+  terrainFrac?: number;
+  propsFrac?: number;
 };
 
 export type EmberWorldLoadProgress = {
@@ -18,8 +21,10 @@ export function emberWorldLoadProgress(
   if (snapshot.warmupComplete) {
     return { ratio: 1, labelRu: "Готово" };
   }
-  const terrain = snapshot.terrainSettled ? 1 : 0;
-  const props = snapshot.staticPropsSettled ? 1 : 0;
+  const terrain =
+    snapshot.terrainFrac ?? (snapshot.terrainSettled ? 1 : 0);
+  const props =
+    snapshot.propsFrac ?? (snapshot.staticPropsSettled ? 1 : 0);
   const lights = snapshot.lightsReady ? 1 : 0;
   const shadowFrac =
     snapshot.shadowTotal <= 0
@@ -30,8 +35,8 @@ export function emberWorldLoadProgress(
   const ratio =
     terrain * 0.22 + props * 0.28 + lights * 0.12 + shadowFrac * 0.38;
   let labelRu = "Местность…";
-  if (!snapshot.terrainSettled) labelRu = "Местность…";
-  else if (!snapshot.staticPropsSettled) labelRu = "Объекты…";
+  if (terrain < 1) labelRu = "Местность…";
+  else if (props < 1) labelRu = "Объекты…";
   else if (!snapshot.lightsReady || shadowFrac < 1) labelRu = "Свет и тени…";
   else labelRu = "Почти готово…";
   return {

@@ -1,6 +1,9 @@
 /** Voxels along one axis of a single world block. */
 export const VOXELS_PER_BLOCK = 16;
 
+/** Palette array length cap (index 0 = air). */
+export const MAX_VOXEL_PALETTE = 256;
+
 /** Default palette (index 0 = empty / air). */
 export const DEFAULT_VOXEL_PALETTE = [
   "",

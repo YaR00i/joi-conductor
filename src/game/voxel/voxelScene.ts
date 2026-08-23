@@ -11,6 +11,7 @@ import type {
   EmberVoxelSceneObject,
 } from "../content/types";
 import { normalizeVoxelRot } from "./voxelPlacement";
+import { normalizeVoxelCharacterDef } from "./voxelCharacter";
 
 function clamp(n: number, min: number, max: number): number {
   if (!Number.isFinite(n)) return min;
@@ -113,12 +114,16 @@ export function normalizeVoxelScene(
   const animations = (raw.animations ?? []).map((a) =>
     normalizeVoxelAnimClip({ ...a, id: a.id }),
   );
+  const character = normalizeVoxelCharacterDef(raw.character);
+  const role = raw.role === "character" || character ? "character" : undefined;
   return {
     id: raw.id,
     nameRu: raw.nameRu,
     objects,
     joints,
     animations,
+    ...(role ? { role } : {}),
+    ...(character ? { character } : {}),
   };
 }
 

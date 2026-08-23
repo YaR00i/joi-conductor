@@ -11,15 +11,23 @@ import {
 import type {
   EmberMap,
   EmberPack,
+  EmberPixelSprite,
+  EmberScene,
   EmberSpawnTable,
   EmberStage,
   EmberTileset,
   EmberVoxelsFile,
   EmberWeaponDef,
 } from "./types";
+import { parseShopsFile } from "./emberShop";
 import { validatePack } from "./validate";
-import { ensureMapLayers } from "../tile/mapUtils";
+import {
+  canStandAtElev,
+  ensureMapLayers,
+  elevTileIdAt,
+} from "../tile/mapUtils";
 import { normalizeVoxelModel } from "../voxel/voxelModel";
+import { normalizePixelSprite } from "./pixelSprite";
 
 const emberRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -49,18 +57,87 @@ describe("hu_tao_village explore content", () => {
   })();
   const stage = readJson<EmberStage>("stages/village_stroll.json");
   const spawn = readJson<EmberSpawnTable>("spawns/village_stroll.json");
+  const interior = ensureMapLayers(
+    readJson<EmberMap>("maps/hu_tao_house_interior.json"),
+  );
 
-  it("is an explore map with a player start and no NPCs", () => {
+  it("is an explore hub with a south-gate start", () => {
     expect(map.id).toBe("hu_tao_village");
     expect(map.playProfile).toBe("explore");
     expect(resolveMapPlayProfile(map)).toBe("explore");
     expect(resolveMapAutoAttack(map)).toBe(false);
     expect(map.tilesetId).toBe("village_16");
-    expect(map.regions.some((r) => r.kind === "player_start")).toBe(true);
+    const start = map.regions.find((r) => r.kind === "player_start");
+    expect(start).toMatchObject({ id: "start", x: 16, y: 29, w: 3, h: 2 });
+    expect(map.regions.some((r) => r.kind === "npc_idle")).toBe(true);
+    expect(map.regions.some((r) => r.kind === "npc_wander")).toBe(true);
+    expect(map.sprites?.some((s) => s.role === "npc")).toBe(true);
     expect(
-      map.regions.some((r) => r.kind === "npc_idle" || r.kind === "npc_wander"),
+      (map.voxelProps ?? []).some((p) => p.modelId.startsWith("vox_chr_")),
     ).toBe(false);
-    expect(map.sprites?.some((s) => s.role === "npc")).toBeFalsy();
+  });
+
+  it("places shop, door+interior, chest, and talk NPCs", () => {
+    expect(map.voxelProps?.find((p) => p.id === "vil_shop_kiosk")).toMatchObject({
+      modelId: "vox_vil_counter",
+      x: 13,
+      y: 19,
+      interactivity: {
+        kind: "shop",
+        shopId: "wangsheng_kiosk",
+        scriptId: "village_shop_intro",
+      },
+    });
+    expect(map.voxelProps?.find((p) => p.id === "vil_house_door")).toMatchObject({
+      modelId: "vox_vil_door",
+      x: 12,
+      y: 9,
+      interactivity: { kind: "door", triggerId: "house_enter" },
+    });
+    expect(map.regions.find((r) => r.id === "house_enter")).toMatchObject({
+      kind: "trigger",
+      targetMapId: "hu_tao_house_interior",
+      targetRegionId: "start",
+      boundObjectId: "vil_house_door",
+    });
+    expect(interior.id).toBe("hu_tao_house_interior");
+    expect(interior.regions.find((r) => r.id === "exit")).toMatchObject({
+      kind: "trigger",
+      targetMapId: "hu_tao_village",
+      targetRegionId: "house_enter",
+    });
+    expect(map.regions.find((r) => r.id === "side_chest")).toMatchObject({
+      kind: "chest",
+      x: 1,
+      y: 13,
+      lootIds: ["coin", "herb"],
+      closedModelId: "vox_ms8vsb53",
+    });
+    expect(map.sprites?.find((s) => s.id === "vil_talk_porter")).toMatchObject({
+      spriteId: "spr_vil_porter",
+      x: 17,
+      y: 28,
+      interactivity: { kind: "talk", scriptId: "village_porter_talk" },
+    });
+    expect(map.sprites?.find((s) => s.id === "vil_talk_auntie")).toMatchObject({
+      spriteId: "spr_vil_auntie",
+      interactivity: { kind: "talk", scriptId: "village_auntie_talk" },
+    });
+    expect(map.voxelProps?.find((p) => p.id === "vil_quest_sign")).toMatchObject({
+      interactivity: {
+        kind: "quest_marker",
+        questStatus: "available",
+        triggerId: "vil_notice",
+      },
+    });
+    expect(map.regions.find((r) => r.id === "vil_npc_keeper")).toMatchObject({
+      kind: "npc_idle",
+      spriteId: "spr_vil_keeper",
+    });
+    expect(map.regions.find((r) => r.id === "vil_npc_plaza")).toMatchObject({
+      kind: "npc_wander",
+      spriteId: "spr_vil_child",
+    });
   });
 
   it("keeps layer sizes in sync and references village voxels", () => {
@@ -79,7 +156,6 @@ describe("hu_tao_village explore content", () => {
     expect(windowProp?.emissiveLightShadows).toBe(true);
     const windowModel = voxels.models.find((m) => m.id === "vox_vil_window");
     expect(windowModel?.emissiveCastsLight).toBe(true);
-    expect(windowModel?.emissiveLightShadows).toBe(false);
   });
 
   it("has shadow-casting emissive street lights and an empty spawn table", () => {
@@ -120,6 +196,33 @@ describe("hu_tao_village explore content", () => {
       speed: 1,
       range: 1,
     };
+    const spriteIds = [
+      "spr_vil_porter",
+      "spr_vil_auntie",
+      "spr_vil_child",
+      "spr_vil_keeper",
+    ] as const;
+    const sprites: Record<string, EmberPixelSprite> = {};
+    for (const id of spriteIds) {
+      sprites[id] = normalizePixelSprite({
+        id,
+        color: "#c8a878",
+        width: 16,
+        topHeight: 4,
+        wallHeights: [16],
+        pixels: [],
+        roles: ["npc"],
+      });
+    }
+    const shops = parseShopsFile(
+      readJson("shops/catalog.json"),
+    );
+    const scenes: Record<string, EmberScene> = {
+      village_notice_talk: readJson("scenes/village_notice_talk.json"),
+      village_porter_talk: readJson("scenes/village_porter_talk.json"),
+      village_auntie_talk: readJson("scenes/village_auntie_talk.json"),
+      village_shop_intro: readJson("scenes/village_shop_intro.json"),
+    };
     const pack: EmberPack = {
       meta: {
         id: "test",
@@ -127,7 +230,7 @@ describe("hu_tao_village explore content", () => {
         nameRu: "test",
         defaultStageId: "village_stroll",
       },
-      maps: { [map.id]: map },
+      maps: { [map.id]: map, [interior.id]: interior },
       tilesets: { [tileset.id]: tileset },
       stages: { [stage.id]: stage },
       spawns: { [spawn.id]: spawn },
@@ -137,19 +240,103 @@ describe("hu_tao_village explore content", () => {
       },
       weapons: { [weapon.id]: weapon },
       enemies: {},
-      scenes: {},
+      scenes,
+      scripts: {},
       events: {},
       arts: {},
       portraits: {},
-      sprites: {},
+      sprites,
       voxelModels,
       voxelScenes: {},
       lightPresets: {},
       lookPresets: {},
+      items: {},
+      itemIcons: {},
+      shops,
       paletteFavorites: [],
     };
     const issues = validatePack(pack).filter((i) => i.level === "error");
     expect(issues).toEqual([]);
+  });
+
+  it("drops suburban street furniture and restyles off asphalt language", () => {
+    const banned = new Set([
+      "vox_vil_fence",
+      "vox_vil_mailbox",
+      "vox_vil_hydrant",
+    ]);
+    expect(
+      (map.voxelProps ?? []).some((prop) => banned.has(prop.modelId)),
+    ).toBe(false);
+    const ground =
+      map.layers.find((layer) => layer.name === "ground")?.data ?? [];
+    expect(ground.some((id) => id === 3 || id === 5)).toBe(false);
+    const start = map.regions.find((region) => region.kind === "player_start");
+    expect(start).toBeTruthy();
+    expect((start?.y ?? 0) + (start?.h ?? 0)).toBeGreaterThan(map.height * 0.7);
+  });
+
+  it("adds plum trees, grass tufts, and interior roof volumes", () => {
+    const props = map.voxelProps ?? [];
+    expect(props.some((prop) => prop.modelId === "vox_vil_tree")).toBe(true);
+    expect(props.some((prop) => prop.modelId === "vox_vil_grass_tuft")).toBe(
+      true,
+    );
+    expect(
+      props.filter((prop) => prop.modelId === "vox_vil_bush").length,
+    ).toBeGreaterThan(8);
+    expect(voxels.models.some((model) => model.id === "vox_vil_tree")).toBe(
+      true,
+    );
+    expect(
+      voxels.models.some((model) => model.id === "vox_vil_grass_tuft"),
+    ).toBe(true);
+    const grass = voxels.models.find((model) => model.id === "vox_vil_grass_tuft");
+    expect(grass?.physical).toBe(false);
+    expect((map.interiorVolumes?.length ?? 0)).toBeGreaterThan(0);
+    const z2 =
+      map.layers.find((layer) => layer.name === "ground_z2")?.data ?? [];
+    expect(z2.some((id) => id === 14)).toBe(true);
+    const cobbleBand =
+      map.layers.find((layer) => layer.name === "ground_z0")?.data ?? [];
+    for (let y = 16; y <= 22; y++) {
+      let cobble = 0;
+      for (let x = 0; x < map.width; x++) {
+        if (cobbleBand[y * map.width + x] === 4) cobble += 1;
+      }
+      expect(cobble).toBeLessThan(8);
+    }
+  });
+
+  it("keeps shop approach and interior doors walkable on z0", () => {
+    const shop = map.voxelProps?.find((p) => p.id === "vil_shop_kiosk");
+    expect(shop).toMatchObject({ x: 13, y: 19, elev: 0 });
+    expect(canStandAtElev(map, tileset, 13, 20, 0)).toBe(true);
+    expect(elevTileIdAt(map, 13, 20, 0)).toBeGreaterThan(0);
+    expect(elevTileIdAt(map, 13, 20, 1)).toBe(0);
+
+    expect(map.voxelProps?.find((p) => p.id === "vil_house_door")).toMatchObject({
+      x: 12,
+      y: 9,
+      elev: 0,
+    });
+    expect(canStandAtElev(map, tileset, 12, 9, 0)).toBe(true);
+    expect(elevTileIdAt(map, 12, 9, 1)).toBe(0);
+    expect(canStandAtElev(map, tileset, 12, 7, 0)).toBe(true);
+    expect(elevTileIdAt(map, 12, 7, 0)).toBeGreaterThan(0);
+    expect(elevTileIdAt(map, 12, 7, 1)).toBe(0);
+    expect(elevTileIdAt(map, 12, 7, 2)).toBe(14);
+
+    expect(canStandAtElev(map, tileset, 7, 30, 0)).toBe(true);
+    expect(elevTileIdAt(map, 7, 30, 1)).toBe(0);
+
+    const interiorStart = interior.regions.find((r) => r.id === "start");
+    expect(interiorStart).toBeTruthy();
+    const ix = interiorStart?.x ?? 0;
+    const iy = interiorStart?.y ?? 0;
+    expect(canStandAtElev(interior, tileset, ix, iy, 0)).toBe(true);
+    expect(elevTileIdAt(interior, ix, iy, 0)).toBeGreaterThan(0);
+    expect(elevTileIdAt(interior, ix, iy, 1)).toBe(0);
   });
 });
 

@@ -43,6 +43,9 @@ export function inferredLibraryTags(id: string): string[] {
   if (id.startsWith("vox_fan_") || id.startsWith("spr_fan_")) {
     return ["fantasy"];
   }
+  if (id.startsWith("vox_chr_")) {
+    return ["character", "chibi"];
+  }
   return [];
 }
 

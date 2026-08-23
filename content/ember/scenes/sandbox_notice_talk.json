@@ -1,0 +1,32 @@
+{
+  "id": "sandbox_notice_talk",
+  "nameRu": "Табличка у входа",
+  "use": "talk",
+  "startStepId": "a",
+  "steps": [
+    {
+      "id": "a",
+      "type": "dialogue",
+      "speaker": "sign",
+      "portraitKey": "neutral",
+      "nameRu": "Табличка",
+      "textRu": "Песочница агента. Ходи осями карты, F — interact.",
+      "next": "b"
+    },
+    {
+      "id": "b",
+      "type": "dialogue",
+      "speaker": "sign",
+      "portraitKey": "neutral",
+      "nameRu": "Табличка",
+      "textRu": "Сундук севернее, лавка западнее, цепочка — у западной стены.",
+      "next": "end"
+    },
+    { "id": "end", "type": "end" }
+  ],
+  "editorLayout": {
+    "a": { "x": 40, "y": 80 },
+    "b": { "x": 280, "y": 80 },
+    "end": { "x": 520, "y": 80 }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "id": "village_notice",
+  "nameRu": "Объявление деревни",
+  "steps": [
+    { "type": "talk", "dialogueId": "village_notice_talk" },
+    { "type": "set_flag", "flag": "village_notice_read", "value": true }
+  ]
+}

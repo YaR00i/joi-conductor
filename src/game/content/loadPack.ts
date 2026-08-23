@@ -3,6 +3,9 @@ import type {
   EmberArt,
   EmberEnemyDef,
   EmberEvent,
+  EmberItemDef,
+  EmberItemIcon,
+  EmberShopDef,
   EmberLightPreset,
   EmberLightsFile,
   EmberLookPreset,
@@ -13,6 +16,7 @@ import type {
   EmberPixelSprite,
   EmberPool,
   EmberPortraitRegistry,
+  EmberActionScript,
   EmberScene,
   EmberSpawnTable,
   EmberSpritesFile,
@@ -22,6 +26,9 @@ import type {
   EmberVoxelsFile,
   EmberWeaponDef,
 } from "./types";
+import { ITEM_CATALOG_REL, parseItemsFile } from "./emberItem";
+import { parseActionScript } from "./emberScript";
+import { SHOP_CATALOG_REL, parseShopsFile } from "./emberShop";
 import { normalizePixelSprite } from "./pixelSprite";
 import { presetsFromLightsFile } from "./lightPresets";
 import { presetsFromLooksFile } from "./lookPresets";
@@ -233,6 +240,7 @@ export async function loadEmberPack(): Promise<{
     weaponsFile,
     enemiesFile,
     scenes,
+    scriptsRaw,
     events,
     artsFile,
     portraits,
@@ -240,6 +248,8 @@ export async function loadEmberPack(): Promise<{
     voxelLibs,
     lightsLoad,
     looksLoad,
+    itemsLoad,
+    shopsLoad,
   ] = await Promise.all([
     loadJsonDirWithFallback<EmberMap>("maps", ["maps/hu_tao_yard.json"]),
     loadJsonDirWithFallback<EmberTileset>("tilesets", [
@@ -252,6 +262,7 @@ export async function loadEmberPack(): Promise<{
     loadJson<{ weapons: EmberWeaponDef[] }>("weapons.json"),
     loadJson<{ enemies: EmberEnemyDef[] }>("enemies.json"),
     loadJsonDir<EmberScene>("scenes"),
+    loadJsonDir<EmberActionScript>("scripts"),
     loadJsonDir<EmberEvent>("events"),
     loadJson<{ arts: EmberArt[] }>("arts/registry.json"),
     loadJson<EmberPortraitRegistry>("portraits/hu_tao/registry.json"),
@@ -265,6 +276,13 @@ export async function loadEmberPack(): Promise<{
     }),
     loadJsonOptionalReported<EmberLooksFile>("looks/registry.json", {
       presets: [],
+    }),
+    loadJsonOptionalReported<unknown>(ITEM_CATALOG_REL, {
+      icons: [],
+      items: [],
+    }),
+    loadJsonOptionalReported<unknown>(SHOP_CATALOG_REL, {
+      shops: [],
     }),
   ]);
 
@@ -326,6 +344,13 @@ export async function loadEmberPack(): Promise<{
 
   const lightPresets = presetsFromLightsFile(lightsFile);
   const lookPresets = presetsFromLooksFile(looksFile);
+  const { items, itemIcons } = parseItemsFile(itemsLoad.data);
+  const shops = parseShopsFile(shopsLoad.data);
+  const scripts: Record<string, EmberActionScript> = {};
+  for (const raw of Object.values(scriptsRaw)) {
+    const parsed = parseActionScript(raw);
+    if (parsed) scripts[parsed.id] = parsed;
+  }
 
   const pack: EmberPack = {
     meta,
@@ -335,8 +360,12 @@ export async function loadEmberPack(): Promise<{
     spawns,
     pools: { [poolW.id]: poolW, [poolC.id]: poolC },
     weapons,
+    items,
+    itemIcons,
+    shops,
     enemies,
     scenes,
+    scripts,
     events,
     arts,
     portraits: { [portraits.mistressId]: portraits },
@@ -354,6 +383,8 @@ export async function loadEmberPack(): Promise<{
     ...voxelLibs.issues,
     lightsLoad.issue,
     looksLoad.issue,
+    itemsLoad.issue,
+    shopsLoad.issue,
   ].filter((issue): issue is ValidationIssue => Boolean(issue));
   return { pack, issues: [...loadIssues, ...validatePack(pack)] };
 }
@@ -380,6 +411,30 @@ export function upsertMap(pack: EmberPack, map: EmberMap): EmberPack {
   return { ...pack, maps: { ...pack.maps, [map.id]: normalizeLoadedMap(map) } };
 }
 
+/** Drop a map and stages that only point at it. Does not write files. */
+export function removeMapFromPack(
+  pack: EmberPack,
+  mapId: string,
+): { pack: EmberPack; removedStageIds: string[] } {
+  if (!pack.maps[mapId]) return { pack, removedStageIds: [] };
+  const maps = { ...pack.maps };
+  delete maps[mapId];
+  const stages = { ...pack.stages };
+  const removedStageIds: string[] = [];
+  for (const [id, stage] of Object.entries(stages)) {
+    if (stage.mapId === mapId) {
+      delete stages[id];
+      removedStageIds.push(id);
+    }
+  }
+  let meta = pack.meta;
+  if (removedStageIds.includes(pack.meta.defaultStageId)) {
+    const fallback = Object.keys(stages)[0];
+    if (fallback) meta = { ...meta, defaultStageId: fallback };
+  }
+  return { pack: { ...pack, maps, stages, meta }, removedStageIds };
+}
+
 export function upsertStage(pack: EmberPack, stage: EmberStage): EmberPack {
   return { ...pack, stages: { ...pack.stages, [stage.id]: stage } };
 }
@@ -390,6 +445,13 @@ export function upsertScene(pack: EmberPack, scene: EmberScene): EmberPack {
 
 export function upsertEvent(pack: EmberPack, event: EmberEvent): EmberPack {
   return { ...pack, events: { ...pack.events, [event.id]: event } };
+}
+
+export function upsertScript(
+  pack: EmberPack,
+  script: EmberActionScript,
+): EmberPack {
+  return { ...pack, scripts: { ...pack.scripts, [script.id]: script } };
 }
 
 export function upsertArts(pack: EmberPack, arts: EmberArt[]): EmberPack {
@@ -410,4 +472,23 @@ export function upsertLookPresets(
   lookPresets: Record<string, EmberLookPreset>,
 ): EmberPack {
   return { ...pack, lookPresets: { ...lookPresets } };
+}
+
+export function upsertItems(
+  pack: EmberPack,
+  items: Record<string, EmberItemDef>,
+  itemIcons?: Record<string, EmberItemIcon>,
+): EmberPack {
+  return {
+    ...pack,
+    items: { ...items },
+    itemIcons: itemIcons ? { ...itemIcons } : pack.itemIcons,
+  };
+}
+
+export function upsertShops(
+  pack: EmberPack,
+  shops: Record<string, EmberShopDef>,
+): EmberPack {
+  return { ...pack, shops: { ...shops } };
 }

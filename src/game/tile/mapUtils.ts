@@ -294,6 +294,20 @@ export function tileSurfaceElev(
   return base + vox / blockStoryHeight(map.tileSize);
 }
 
+/**
+ * Story a zone occupies. Authored `elev` is a block floor; legacy regions
+ * without it still stick to the column surface (roof if a ceiling exists).
+ */
+export function regionVolumeElev(
+  map: EmberMap,
+  region: EmberMapRegion,
+): number {
+  if (region.elev != null && Number.isFinite(region.elev)) {
+    return clampElevation(region.elev);
+  }
+  return tileSurfaceElev(map, region.x, region.y);
+}
+
 export function maxElevationOnMap(map: EmberMap): number {
   const e = layerData(map, "elevation");
   if (!e) return 0;
@@ -2487,11 +2501,10 @@ export function resolveTeleportTarget(
     const dest = map.regions.find((r) => r.id === region.targetRegionId);
     if (!dest) return null;
     const c = regionCenter(map, dest);
-    const { tx, ty } = worldToTile(map, c.x, c.y);
     return {
       x: c.x,
       y: c.y,
-      elev: region.targetElevation ?? tileSurfaceElev(map, tx, ty),
+      elev: region.targetElevation ?? regionVolumeElev(map, dest),
     };
   }
   if (region.targetX == null || region.targetY == null) return null;
@@ -2505,18 +2518,71 @@ export function resolveTeleportTarget(
   };
 }
 
+export type TeleportStepResult = {
+  warp: { x: number; y: number; elev: number; fromId: string } | null;
+  occupyingId: string | null;
+};
+
+/**
+ * Enter-edge teleport: fire once when stepping onto a pad, then ignore that
+ * destination pad until the player walks off it. Skips no-op (dest inside the
+ * same pad) so unlinked stubs do not look like a freeze.
+ */
+export function stepTeleport(
+  map: EmberMap,
+  px: number,
+  py: number,
+  occupyingId: string | null,
+  allowWarp: boolean,
+  elev?: number,
+): TeleportStepResult {
+  let occupy = occupyingId;
+  if (occupy) {
+    const held = map.regions.find(
+      (region) => region.id === occupy && region.kind === "teleport",
+    );
+    if (!held || !pointInRegion(map, held, px, py, elev)) occupy = null;
+  }
+  if (!allowWarp || occupy) return { warp: null, occupyingId: occupy };
+
+  for (const region of findRegions(map, "teleport")) {
+    if (!pointInRegion(map, region, px, py, elev)) continue;
+    const dest = resolveTeleportTarget(map, region);
+    if (!dest) continue;
+    if (pointInRegion(map, region, dest.x, dest.y, dest.elev)) {
+      return { warp: null, occupyingId: region.id };
+    }
+    const destPad = findRegions(map, "teleport").find((other) =>
+      pointInRegion(map, other, dest.x, dest.y, dest.elev),
+    );
+    return {
+      warp: {
+        x: dest.x,
+        y: dest.y,
+        elev: dest.elev,
+        fromId: region.id,
+      },
+      occupyingId: destPad?.id ?? null,
+    };
+  }
+  return { warp: null, occupyingId: occupy };
+}
+
 export function pointInRegion(
   map: EmberMap,
   region: EmberMapRegion,
   x: number,
   y: number,
+  elev?: number,
 ): boolean {
   const ts = map.tileSize;
   const left = region.x * ts;
   const top = region.y * ts;
   const right = (region.x + region.w) * ts;
   const bottom = (region.y + region.h) * ts;
-  return x >= left && x < right && y >= top && y < bottom;
+  if (!(x >= left && x < right && y >= top && y < bottom)) return false;
+  if (region.elev == null || elev == null) return true;
+  return clampElevation(region.elev) === clampElevation(elev);
 }
 
 export function worldToTile(

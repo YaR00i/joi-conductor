@@ -46,7 +46,7 @@ import {
   randomWalkablePointInRegion,
   regionCenter,
   resolveMapLight,
-  resolveTeleportTarget,
+  stepTeleport,
   tileSurfaceElev,
   tryJumpLedge,
   tryMoveWithElevation,
@@ -157,6 +157,7 @@ export class ArenaScene extends Phaser.Scene {
   private playerElev = 0;
   private jumpCd = 0;
   private teleportCd = 0;
+  private teleportOccupyId: string | null = null;
   private triggerCd = 0;
   private lastFacingX = 0;
   private lastFacingY = 1;
@@ -385,6 +386,9 @@ export class ArenaScene extends Phaser.Scene {
     const pos = regionCenter(this.map, start);
     const startTile = worldToTile(this.map, pos.x, pos.y);
     this.playerElev = tileSurfaceElev(this.map, startTile.tx, startTile.ty);
+    this.teleportOccupyId = findRegions(this.map, "teleport").find((r) =>
+      pointInRegion(this.map, r, pos.x, pos.y, this.playerElev),
+    )?.id ?? null;
 
     this.ensureTextures();
 
@@ -1157,17 +1161,22 @@ export class ArenaScene extends Phaser.Scene {
 
   private tickTeleport(dt: number) {
     this.teleportCd = Math.max(0, this.teleportCd - dt);
-    if (this.teleportCd > 0 || this.awaitingLoot || this.finished) return;
+    if (this.awaitingLoot || this.finished) return;
     const pl = this.logicPos(this.player);
-    for (const r of findRegions(this.map, "teleport")) {
-      if (!pointInRegion(this.map, r, pl.x, pl.y)) continue;
-      const dest = resolveTeleportTarget(this.map, r);
-      if (!dest) continue;
-      this.playerElev = dest.elev;
-      this.place(this.player, dest.x, dest.y, 20, this.playerElev);
-      this.teleportCd = 0.5;
-      return;
-    }
+    const stepped = stepTeleport(
+      this.map,
+      pl.x,
+      pl.y,
+      this.teleportOccupyId,
+      this.teleportCd <= 0,
+      this.playerElev,
+    );
+    this.teleportOccupyId = stepped.occupyingId;
+    const dest = stepped.warp;
+    if (!dest) return;
+    this.playerElev = dest.elev;
+    this.place(this.player, dest.x, dest.y, 20, this.playerElev);
+    this.teleportCd = 0.45;
   }
 
   /** Fire narrative events when the player enters a `trigger` region. */
@@ -1176,7 +1185,7 @@ export class ArenaScene extends Phaser.Scene {
     if (this.triggerCd > 0 || this.awaitingLoot || this.finished) return;
     const pl = this.logicPos(this.player);
     for (const r of findRegions(this.map, "trigger")) {
-      if (!pointInRegion(this.map, r, pl.x, pl.y)) continue;
+      if (!pointInRegion(this.map, r, pl.x, pl.y, this.playerElev)) continue;
       const event = Object.values(this.pack.events).find(
         (ev) =>
           ev.trigger === "on_region_enter" &&
@@ -1899,6 +1908,17 @@ export class ArenaScene extends Phaser.Scene {
       pause: () => this.pauseLogic(),
       resume: () => this.resumeLogic(),
       applyLoot: (itemId: string) => this.applyLoot(itemId),
+      buyShopItem: () => undefined,
+      sellShopItem: () => undefined,
+      closeShop: () => undefined,
+      toggleInventory: () => undefined,
+      closeInventory: () => undefined,
+      equipItem: () => undefined,
+      unequipSlot: () => undefined,
+      useItem: () => undefined,
+      advanceDialogue: () => undefined,
+      captureExploreSave: () => null,
+      applyExploreSave: () => false,
       destroy: () => {
         this.game.destroy(true);
       },

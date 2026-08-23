@@ -33,7 +33,24 @@ type Props = {
   assetMode?: boolean;
   /** Read-only projections (for example built-in presets). */
   editable?: boolean;
+  shopOptions?: ReadonlyArray<{ value: string; label: string }>;
+  scriptOptions?: ReadonlyArray<{ value: string; label: string }>;
 };
+
+function optionalComponentHint(type: EmberOptionalComponentType): string {
+  switch (type) {
+    case "collider":
+      return "Физика, trigger и проходимый верх";
+    case "voxel-light":
+      return "Локальный свет от emissive-вокселей";
+    case "interactivity":
+      return "Дверь, разговор, маркер квеста, магазин";
+    default: {
+      const _never: never = type;
+      return _never;
+    }
+  }
+}
 
 function snapValue(value: number, step: number): number {
   if (!Number.isFinite(value) || !Number.isFinite(step) || step <= 0) return value;
@@ -444,70 +461,95 @@ function SchemaField({
     if (Number.isFinite(next) && next !== value) commit(next);
   };
 
-  if (field.kind === "boolean") {
-    return (
-      <label
-        className="ember-map-inspector__row ember-map-inspector__row--check"
-        title={field.hint}
-      >
-        <span>{field.label}</span>
-        <span className="ember-schema-field__inline-control">
-          {sourceControl}
+  switch (field.kind) {
+    case "boolean":
+      return (
+        <label
+          className="ember-map-inspector__row ember-map-inspector__row--check"
+          title={field.hint}
+        >
+          <span>{field.label}</span>
+          <span className="ember-schema-field__inline-control">
+            {sourceControl}
+            <input
+              type="checkbox"
+              checked={value === true}
+              disabled={!editable}
+              onChange={(event) => commit(event.target.checked)}
+            />
+          </span>
+        </label>
+      );
+    case "number":
+      if (!editable) break;
+      return (
+        <label className="ember-schema-field" title={field.hint}>
+          <span>
+            {field.label}
+            {sourceControl}
+          </span>
+          <div className="ember-schema-field__control">
+            <input
+              type="number"
+              defaultValue={typeof value === "number" ? value : 0}
+              min={field.min}
+              max={field.max}
+              step={field.step ?? 1}
+              onBlur={(event) => commitNumber(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+              }}
+            />
+            {field.unit ? <small>{field.unit}</small> : null}
+          </div>
+        </label>
+      );
+    case "text":
+      if (!editable) break;
+      return (
+        <label className="ember-schema-field" title={field.hint}>
+          <span>
+            {field.label}
+            {sourceControl}
+          </span>
           <input
-            type="checkbox"
-            checked={value === true}
-            disabled={!editable}
-            onChange={(event) => commit(event.target.checked)}
-          />
-        </span>
-      </label>
-    );
-  }
-
-  if (field.kind === "number" && editable) {
-    return (
-      <label className="ember-schema-field" title={field.hint}>
-        <span>
-          {field.label}
-          {sourceControl}
-        </span>
-        <div className="ember-schema-field__control">
-          <input
-            type="number"
-            defaultValue={typeof value === "number" ? value : 0}
-            min={field.min}
-            max={field.max}
-            step={field.step ?? 1}
-            onBlur={(event) => commitNumber(event.target.value)}
+            type="text"
+            defaultValue={typeof value === "string" ? value : ""}
+            onBlur={(event) => {
+              if (event.target.value !== value) commit(event.target.value);
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter") event.currentTarget.blur();
             }}
           />
-          {field.unit ? <small>{field.unit}</small> : null}
-        </div>
-      </label>
-    );
-  }
-
-  if (field.kind === "text" && editable) {
-    return (
-      <label className="ember-schema-field" title={field.hint}>
-        <span>
-          {field.label}
-          {sourceControl}
-        </span>
-        <input
-          type="text"
-          defaultValue={typeof value === "string" ? value : ""}
-          onBlur={(event) => {
-            if (event.target.value !== value) commit(event.target.value);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") event.currentTarget.blur();
-          }}
-        />
-      </label>
-    );
+        </label>
+      );
+    case "select":
+      if (!editable) break;
+      return (
+        <label className="ember-schema-field" title={field.hint}>
+          <span>
+            {field.label}
+            {sourceControl}
+          </span>
+          <select
+            value={typeof value === "string" ? value : ""}
+            onChange={(event) => commit(event.target.value)}
+          >
+            {(field.options ?? []).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      );
+    case "readonly":
+      break;
+    default: {
+      const _never: never = field.kind;
+      return _never;
+    }
   }
 
   return (
@@ -530,6 +572,8 @@ function SchemaComponent({
   onRemoveComponent,
   assetMode,
   inspectorEditable,
+  shopOptions,
+  scriptOptions,
 }: {
   object: EmberWorldObject;
   schema: EmberInspectorComponentSchema;
@@ -541,6 +585,8 @@ function SchemaComponent({
   onRemoveComponent?: (component: EmberOptionalComponentType) => void;
   assetMode?: boolean;
   inspectorEditable: boolean;
+  shopOptions?: ReadonlyArray<{ value: string; label: string }>;
+  scriptOptions?: ReadonlyArray<{ value: string; label: string }>;
 }) {
   const component = object.components.find((item) => item.type === schema.type);
   const fieldSources =
@@ -568,10 +614,13 @@ function SchemaComponent({
       ? schema.type
       : null;
   const optionalComponent =
-    ((object.kind === "voxel" &&
-      (schema.type === "collider" || schema.type === "voxel-light")) ||
-      ((object.kind === "sprite" || object.kind === "tile") &&
-        schema.type === "collider"))
+    (object.kind === "voxel" &&
+      (schema.type === "collider" ||
+        schema.type === "voxel-light" ||
+        schema.type === "interactivity")) ||
+    (object.kind === "sprite" &&
+      (schema.type === "collider" || schema.type === "interactivity")) ||
+    (object.kind === "tile" && schema.type === "collider")
       ? schema.type
       : null;
   const enabledField = schema.fields.find(
@@ -582,9 +631,26 @@ function SchemaComponent({
     inspectorEditable &&
     (enabledField?.editable?.(object) === true ||
       (assetMode && schema.type === "collider"));
-  const visibleFields = enabledField
+  const visibleFields = (enabledField
     ? schema.fields.filter((field) => field !== enabledField)
-    : schema.fields;
+    : schema.fields
+  ).map((field) => {
+    if (field.id === "shopId" && shopOptions?.length) {
+      return {
+        ...field,
+        kind: "select" as const,
+        options: [{ value: "", label: "—" }, ...shopOptions],
+      };
+    }
+    if (field.id === "scriptId" && scriptOptions?.length) {
+      return {
+        ...field,
+        kind: "select" as const,
+        options: [{ value: "", label: "—" }, ...scriptOptions],
+      };
+    }
+    return field;
+  });
   const status =
     overrideCount > 0 ? (
       <small className="is-override">{overrideCount} override</small>
@@ -668,6 +734,8 @@ export function WorldObjectSchemaInspector({
   showTransform = true,
   assetMode = false,
   editable = true,
+  shopOptions,
+  scriptOptions,
 }: Props) {
   const schemas = listEmberInspectorSchemas(object).filter(
     (schema) => schema.type !== "transform",
@@ -680,19 +748,29 @@ export function WorldObjectSchemaInspector({
   }> = [
     { type: "collider", label: "Collider" },
     { type: "voxel-light", label: "Emissive Light" },
+    { type: "interactivity", label: "Интерактивность" },
   ];
   const allowedOptionalTypes =
     object.kind === "voxel"
-      ? new Set<EmberOptionalComponentType>(["collider", "voxel-light"])
-      : object.kind === "sprite" || object.kind === "tile"
-        ? new Set<EmberOptionalComponentType>(["collider"])
-        : new Set<EmberOptionalComponentType>();
-  const addableComponents = optionalComponentCatalog.filter(
-    (item) =>
-      allowedOptionalTypes.has(item.type) && !presentTypes.has(item.type),
-  ).filter(
-    (item) => !removedTypes.has(item.type),
-  );
+      ? new Set<EmberOptionalComponentType>(
+          assetMode
+            ? ["collider", "voxel-light"]
+            : ["collider", "voxel-light", "interactivity"],
+        )
+      : object.kind === "sprite"
+        ? new Set<EmberOptionalComponentType>(
+            assetMode ? ["collider"] : ["collider", "interactivity"],
+          )
+        : object.kind === "tile"
+          ? new Set<EmberOptionalComponentType>(["collider"])
+          : new Set<EmberOptionalComponentType>();
+  const addableComponents = optionalComponentCatalog.filter((item) => {
+    if (!allowedOptionalTypes.has(item.type) || presentTypes.has(item.type)) {
+      return false;
+    }
+    if (item.type === "interactivity") return true;
+    return !removedTypes.has(item.type);
+  });
   return (
     <div className="ember-schema-inspector">
       {showTransform ? (
@@ -715,6 +793,8 @@ export function WorldObjectSchemaInspector({
           onRemoveComponent={onRemoveComponent}
           assetMode={assetMode}
           inspectorEditable={editable}
+          shopOptions={shopOptions}
+          scriptOptions={scriptOptions}
         />
       ))}
       {(object.removedComponents ?? []).map((type) => {
@@ -748,11 +828,7 @@ export function WorldObjectSchemaInspector({
                 onClick={() => onAddComponent(component.type)}
               >
                 <strong>{component.label}</strong>
-                <small>
-                  {component.type === "collider"
-                    ? "Физика, trigger и проходимый верх"
-                    : "Локальный свет от emissive-вокселей"}
-                </small>
+                <small>{optionalComponentHint(component.type)}</small>
               </button>
             ))}
           </div>

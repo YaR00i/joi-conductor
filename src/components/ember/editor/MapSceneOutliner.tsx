@@ -89,7 +89,6 @@ export function MapSceneOutliner({
   const [collapsed, setCollapsed] = useState(false);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [draggedNode, setDraggedNode] = useState<
     { kind: "objects"; keys: readonly string[] } | { kind: "group"; id: string } | null
   >(null);
@@ -193,7 +192,6 @@ export function MapSceneOutliner({
   }, [contextMenu]);
 
   const selectRow = (object: EmberWorldObject, event: MouseEvent) => {
-    setConfirmDelete(false);
     if (event.shiftKey && anchorKeyRef.current) {
       const anchorIndex = visibleObjects.findIndex(
         (candidate) => candidate.key === anchorKeyRef.current,
@@ -501,36 +499,43 @@ export function MapSceneOutliner({
         </select>
       </div>
 
-      {selectedObjects.length > 1 ? (
-        <div className="ember-outliner__batch" aria-label="Пакетные действия">
-          <strong>{selectedObjects.length} выбрано</strong>
-          <div className="ember-outliner__batch-row">
-            <button type="button" title="Сдвинуть влево" onClick={() => onTranslate(selectedObjects, -1, 0)}>←</button>
-            <button type="button" title="Сдвинуть вверх" onClick={() => onTranslate(selectedObjects, 0, -1)}>↑</button>
-            <button type="button" title="Сдвинуть вниз" onClick={() => onTranslate(selectedObjects, 0, 1)}>↓</button>
-            <button type="button" title="Сдвинуть вправо" onClick={() => onTranslate(selectedObjects, 1, 0)}>→</button>
-            <button type="button" title={allSelectedHidden ? "Показать выбранные" : "Скрыть выбранные"} onClick={() => onSetHidden(selectedObjects, !allSelectedHidden)}>
-              {allSelectedHidden ? "◉" : "○"}
-            </button>
-            <button type="button" title={allSelectedLocked ? "Разблокировать выбранные" : "Заблокировать выбранные"} onClick={() => onSetLocked(selectedObjects, !allSelectedLocked)}>
-              {allSelectedLocked ? "□" : "■"}
-            </button>
-          </div>
+      {selectedObjects.length > 0 ? (
+        <div className="ember-outliner__batch" aria-label="Действия с выбранным">
+          <strong>
+            {selectedObjects.length > 1
+              ? `${selectedObjects.length} выбрано`
+              : "Выбран объект"}
+          </strong>
+          {selectedObjects.length > 1 ? (
+            <div className="ember-outliner__batch-row">
+              <button type="button" title="Сдвинуть влево" onClick={() => onTranslate(selectedObjects, -1, 0)}>←</button>
+              <button type="button" title="Сдвинуть вверх" onClick={() => onTranslate(selectedObjects, 0, -1)}>↑</button>
+              <button type="button" title="Сдвинуть вниз" onClick={() => onTranslate(selectedObjects, 0, 1)}>↓</button>
+              <button type="button" title="Сдвинуть вправо" onClick={() => onTranslate(selectedObjects, 1, 0)}>→</button>
+              <button type="button" title={allSelectedHidden ? "Показать выбранные" : "Скрыть выбранные"} onClick={() => onSetHidden(selectedObjects, !allSelectedHidden)}>
+                {allSelectedHidden ? "◉" : "○"}
+              </button>
+              <button type="button" title={allSelectedLocked ? "Разблокировать выбранные" : "Заблокировать выбранные"} onClick={() => onSetLocked(selectedObjects, !allSelectedLocked)}>
+                {allSelectedLocked ? "□" : "■"}
+              </button>
+            </div>
+          ) : null}
           <div className="ember-outliner__batch-wide">
-            <button type="button" onClick={() => onCreateGroup(selectedObjects)}>Сгруппировать</button>
+            {selectedObjects.length > 1 ? (
+              <button type="button" onClick={() => onCreateGroup(selectedObjects)}>
+                Сгруппировать
+              </button>
+            ) : null}
+            <button type="button" onClick={() => onDuplicate(selectedObjects)}>
+              Дублировать
+            </button>
             <button
               type="button"
-              className={confirmDelete ? "is-danger" : ""}
-              onClick={() => {
-                if (!confirmDelete) {
-                  setConfirmDelete(true);
-                  return;
-                }
-                onDelete(selectedObjects);
-                setConfirmDelete(false);
-              }}
+              className="is-danger"
+              title="Удалить с карты (Delete). Можно отменить через Undo."
+              onClick={() => onDelete(selectedObjects)}
             >
-              {confirmDelete ? `Удалить ${selectedObjects.length}?` : "Удалить"}
+              Удалить
             </button>
           </div>
         </div>
@@ -612,6 +617,7 @@ export function MapSceneOutliner({
               <>
                 <button type="button" role="menuitem" onClick={() => { onFocus(object); setContextMenu(null); }}>Фокусировать <kbd>.</kbd></button>
                 <button type="button" role="menuitem" onClick={() => { onDuplicate([object]); setContextMenu(null); }}>Дублировать <kbd>Ctrl+D</kbd></button>
+                <button type="button" role="menuitem" className="is-danger" onClick={() => { onDelete([object]); setContextMenu(null); }}>Удалить <kbd>Del</kbd></button>
                 <button type="button" role="menuitem" onClick={() => { onToggleHidden(object); setContextMenu(null); }}>{hiddenKeys.has(object.key) ? "Показать" : "Скрыть"} <kbd>H</kbd></button>
                 <button type="button" role="menuitem" onClick={() => { onToggleLocked(object); setContextMenu(null); }}>{lockedKeys.has(object.key) ? "Разблокировать" : "Заблокировать"}</button>
                 {groupedKeys.has(object.key) ? (
@@ -625,7 +631,7 @@ export function MapSceneOutliner({
 
       <footer className="ember-outliner__foot">
         <span>{visibleObjects.length} объектов</span>
-        <span>Ctrl / Shift — мультивыбор · Ctrl+D дубль · H скрыть · Shift+H изоляция</span>
+        <span>Ctrl / Shift — мультивыбор · Ctrl+D дубль · Del удалить · H скрыть</span>
       </footer>
     </aside>
   );

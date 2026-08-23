@@ -25,6 +25,8 @@ type Props = {
   pack?: EmberPack;
   selectedId: string | null;
   showOverlay: boolean;
+  /** Current brush floor — new list-panel zones sit on this story. */
+  defaultElev?: number;
   onSelect: (id: string | null) => void;
   onFocus: (region: EmberMapRegion) => void;
   onChange: (regions: EmberMapRegion[]) => void;
@@ -44,7 +46,7 @@ const FILTER_CHIPS: Array<{ id: RegionFilter; label: string }> = [
   { id: "chest", label: "Сундук" },
   { id: "teleport", label: "ТП" },
   { id: "trigger", label: "Триг" },
-  { id: "camera_bound", label: "Кам*" },
+  { id: "camera_bound", label: "Камера" },
   { id: "npc_idle", label: "NPC" },
   { id: "npc_wander", label: "Гуляет" },
 ];
@@ -59,6 +61,7 @@ export function MapRegionsPanel({
   pack,
   selectedId,
   showOverlay,
+  defaultElev,
   onSelect,
   onFocus,
   onChange,
@@ -112,7 +115,7 @@ export function MapRegionsPanel({
   const addRegion = (kind: MapRegionKind) => {
     const cx = Math.max(0, Math.floor(map.width / 2) - 1);
     const cy = Math.max(0, Math.floor(map.height / 2) - 1);
-    const region = makeRegionAt(map, kind, cx, cy);
+    const region = makeRegionAt(map, kind, cx, cy, defaultElev);
     const next = [...map.regions, region];
     onChange(next);
     onSelect(region.id);
@@ -298,9 +301,9 @@ export function MapRegionsPanel({
       >
         <summary>JSON (advanced)</summary>
         <p className="muted ember-hint">
-          player_start, spawn, chest, teleport, trigger. camera_bound — только
-          оверлей (геймплей пока не читает). teleport: targetX/Y/Elevation или
-          targetRegionId.
+          Старт, спавн (арена), сундук, телепорт, триггер. Камера — только
+          оверлей (геймплей пока не читает). Телепорт: выбери второй ТП в
+          инспекторе и нажми «Связать пару ↔», либо targetX/Y.
         </p>
         <textarea
           className="ember-ed-json ember-ed-json--compact"

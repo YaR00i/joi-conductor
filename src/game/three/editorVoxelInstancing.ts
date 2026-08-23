@@ -32,6 +32,8 @@ function copyMeshRenderState(
   target.name = `instances:${source.name || source.uuid}`;
   target.castShadow = source.castShadow;
   target.receiveShadow = source.receiveShadow;
+  target.customDepthMaterial = source.customDepthMaterial;
+  target.customDistanceMaterial = source.customDistanceMaterial;
   target.renderOrder = source.renderOrder;
   target.frustumCulled = source.frustumCulled;
   target.layers.mask = source.layers.mask;

@@ -35,11 +35,17 @@ import {
 } from "../voxel/chestPlacement";
 import { VOXELS_PER_BLOCK } from "../voxel/constants";
 import {
-  resolveVoxelLightOrigin,
+  listVoxelEmissiveLamps,
+  resolveVoxelLampOrigin,
   summarizeVoxelEmissive,
+  summarizeVoxelEmissiveForLamp,
 } from "../voxel/voxelEmissiveLight";
 import { sceneFootprintVoxels } from "../voxel/voxelModelApply";
-import { voxelGridSize } from "../voxel/voxelModel";
+import {
+  voxelGridSize,
+  voxelTransmittanceLeak,
+  voxelTransmittanceShadowParams,
+} from "../voxel/voxelModel";
 import { resolveEmberTransformScale } from "../world/worldTransform";
 import { normalizeVoxelRot } from "../voxel/voxelPlacement";
 import {
@@ -74,6 +80,15 @@ export type EmissiveLocalLightSource = {
   distance: number;
   /** Opt-in cube shadows (budgeted). */
   castShadows: boolean;
+  /**
+   * 0..1 analog leak from voxel transmittance. Dims and softens this
+   * PointLight's umbra; omitted / 0 keeps a hard lantern shadow.
+   */
+  shadowLeak?: number;
+  /** Soften cartoon lamp discs / outer light cutoff. */
+  softRings?: boolean;
+  /** Force transmittance-style penumbra even with leak 0. */
+  softShadows?: boolean;
   /**
    * Sort boost when capping lights / shadow slots.
    * Map voxel props (esp. with shadows) beat chest auto-lights.
@@ -233,21 +248,35 @@ function pushVoxelEmissiveLight(
     ts: number;
     /** Lower than map voxel props so lanterns keep shadow slots. */
     rank?: number;
+    sum?: ReturnType<typeof summarizeVoxelEmissive>;
+    range?: number;
+    strength?: number;
+    castShadows?: boolean;
+    softRings?: boolean;
+    softShadows?: boolean;
+    torchFlicker?: boolean;
+    lanternFlicker?: boolean;
   },
 ): void {
   const { id, modelId, model, tx, ty, worldPosition, ts } = args;
   if (model.emissiveCastsLight !== true) return;
-  const sum = summarizeVoxelEmissive(model);
+  const sum = args.sum ?? summarizeVoxelEmissive(model);
   if (!sum || sum.count < 1) return;
-  const strength = resolveEmissiveStrength(model.emissiveStrength);
-  const rangeTiles = resolveEmissiveLightRange(model.emissiveLightRange);
+  const strength = resolveEmissiveStrength(args.strength ?? model.emissiveStrength);
+  const rangeTiles = resolveEmissiveLightRange(
+    args.range ?? model.emissiveLightRange,
+  );
   const dens = Math.max(
     0.35,
     Math.min(1, 0.4 + sum.weight * 0.35 + Math.min(0.35, sum.count * 0.04)),
   );
   const intensity = voxelPeakIntensity(strength, dens);
   const distance = rangeTiles * ts;
-  const castShadows = model.emissiveLightShadows === true;
+  const castShadows = args.castShadows ?? model.emissiveLightShadows === true;
+  const torchFlicker =
+    args.torchFlicker ?? model.emissiveTorchFlicker === true;
+  const lanternFlicker =
+    args.lanternFlicker ?? model.emissiveLanternFlicker === true;
   out.push({
     id,
     x: tx,
@@ -260,20 +289,30 @@ function pushVoxelEmissiveLight(
     intensity,
     distance,
     castShadows,
+    shadowLeak: voxelTransmittanceLeak(model),
+    softRings: args.softRings ?? model.emissiveLightSoftRings === true,
+    softShadows: args.softShadows ?? model.emissiveLightSoftShadows === true,
     rank: args.rank ?? (castShadows ? 2 : 0),
     meta: buildMeta(
       modelId,
       tx,
       ty,
       {
-        torchFlicker: model.emissiveTorchFlicker === true ? true : undefined,
-        lanternFlicker:
-          model.emissiveLanternFlicker === true ? true : undefined,
+        torchFlicker: torchFlicker ? true : undefined,
+        lanternFlicker: lanternFlicker ? true : undefined,
         baseDistance: distance,
       },
       intensity,
     ),
   });
+}
+
+function voxelLampSourceId(
+  baseId: string,
+  lamps: { id: string }[],
+  lamp: { id: string },
+): string {
+  return lamps.length <= 1 ? baseId : `${baseId}:${lamp.id}`;
 }
 
 /**
@@ -368,73 +407,84 @@ export function listEmissiveLocalLights(
           ? place.emissiveCastsLight
           : model.emissiveCastsLight === true;
       if (!casts) continue;
-      const sum = summarizeVoxelEmissive(model);
-      if (!sum || sum.count < 1) continue;
-
-      const strength = resolveEmissiveStrength(
-        place.emissiveStrength ?? model.emissiveStrength,
-      );
-      const rangeTiles = resolveEmissiveLightRange(
-        place.emissiveLightRange ?? model.emissiveLightRange,
-      );
-      // Voxel cores are denser than pixel ink — mild gain from cell count.
-      const dens = Math.max(
-        0.35,
-        Math.min(1, 0.4 + sum.weight * 0.35 + Math.min(0.35, sum.count * 0.04)),
-      );
-      const intensity = voxelPeakIntensity(strength, dens);
+      const lamps = listVoxelEmissiveLamps(model);
       const elev = place.elev ?? tileSurfaceElev(map, place.x, place.y);
-      const origin = resolveVoxelLightOrigin(model, sum);
-      const worldPosition = voxelLightWorldPosition(
-        place,
-        model,
-        ts,
-        elev,
-        origin,
-      );
-      const castShadows =
-        place.emissiveLightShadows !== undefined
-          ? place.emissiveLightShadows
-          : model.emissiveLightShadows === true;
-      const torchFlicker =
-        place.emissiveTorchFlicker !== undefined
-          ? place.emissiveTorchFlicker
-          : model.emissiveTorchFlicker === true;
-      const lanternFlicker =
-        place.emissiveLanternFlicker !== undefined
-          ? place.emissiveLanternFlicker
-          : model.emissiveLanternFlicker === true;
-      const distance = rangeTiles * ts;
-      // Explicit placement shadow flag outranks auto chest lights.
-      const rank =
-        (castShadows ? 20 : 8) +
-        (place.emissiveLightShadows === true ? 8 : 0);
-
-      out.push({
-        id: `emvox:${place.id}`,
-        x: place.x,
-        y: place.y,
-        localX: ts * 0.5,
-        localZ: ts * 0.5,
-        heightAboveFloor: worldPosition.y,
-        worldPosition,
-        color: new THREE.Color(sum.r, sum.g, sum.b),
-        intensity,
-        distance,
-        castShadows,
-        rank,
-        meta: buildMeta(
-          place.modelId,
-          place.x,
-          place.y,
-          {
-            torchFlicker,
-            lanternFlicker,
-            baseDistance: distance,
-          },
+      for (let li = 0; li < lamps.length; li++) {
+        const lamp = lamps[li]!;
+        const lampSum = summarizeVoxelEmissiveForLamp(model, lamps, li);
+        if (!lampSum || lampSum.count < 1) continue;
+        const origin = resolveVoxelLampOrigin(model, lamp, lampSum);
+        const worldPosition = voxelLightWorldPosition(
+          place,
+          model,
+          ts,
+          elev,
+          origin,
+        );
+        const strength = resolveEmissiveStrength(
+          lamp.strength ?? place.emissiveStrength ?? model.emissiveStrength,
+        );
+        const rangeTiles = resolveEmissiveLightRange(
+          lamp.range ?? place.emissiveLightRange ?? model.emissiveLightRange,
+        );
+        const dens = Math.max(
+          0.35,
+          Math.min(
+            1,
+            0.4 + lampSum.weight * 0.35 + Math.min(0.35, lampSum.count * 0.04),
+          ),
+        );
+        const intensity = voxelPeakIntensity(strength, dens);
+        const castShadows =
+          place.emissiveLightShadows !== undefined
+            ? place.emissiveLightShadows
+            : lamp.shadows === true || model.emissiveLightShadows === true;
+        const torchFlicker =
+          place.emissiveTorchFlicker !== undefined
+            ? place.emissiveTorchFlicker
+            : lamp.torchFlicker === true ||
+              model.emissiveTorchFlicker === true;
+        const lanternFlicker =
+          place.emissiveLanternFlicker !== undefined
+            ? place.emissiveLanternFlicker
+            : lamp.lanternFlicker === true ||
+              model.emissiveLanternFlicker === true;
+        const distance = rangeTiles * ts;
+        const rank =
+          (castShadows ? 20 : 8) +
+          (place.emissiveLightShadows === true ? 8 : 0);
+        out.push({
+          id: voxelLampSourceId(`emvox:${place.id}`, lamps, lamp),
+          x: place.x,
+          y: place.y,
+          localX: ts * 0.5,
+          localZ: ts * 0.5,
+          heightAboveFloor: worldPosition.y,
+          worldPosition,
+          color: new THREE.Color(lampSum.r, lampSum.g, lampSum.b),
           intensity,
-        ),
-      });
+          distance,
+          castShadows,
+          shadowLeak: voxelTransmittanceLeak(model),
+          softRings:
+            lamp.softRings === true || model.emissiveLightSoftRings === true,
+          softShadows:
+            lamp.softShadows === true ||
+            model.emissiveLightSoftShadows === true,
+          rank,
+          meta: buildMeta(
+            place.modelId,
+            place.x,
+            place.y,
+            {
+              torchFlicker,
+              lanternFlicker,
+              baseDistance: distance,
+            },
+            intensity,
+          ),
+        });
+      }
     }
   }
 
@@ -452,28 +502,52 @@ export function listEmissiveLocalLights(
           if (obj.visible === false) continue;
           const model = voxelModels[obj.modelId];
           if (!model || model.emissiveCastsLight !== true) continue;
-          const sum = summarizeVoxelEmissive(model);
-          if (!sum) continue;
-          const origin = resolveVoxelLightOrigin(model, sum);
-          const worldPosition = chestSceneLightWorldPosition(
-            pose,
-            scene,
-            voxelModels,
-            obj.offset,
-            ts,
-            origin,
-          );
-          if (!worldPosition) continue;
-          pushVoxelEmissiveLight(out, {
-            id: `emchest:${region.id}:${obj.id}`,
-            modelId: obj.modelId,
-            model,
-            tx: pose.tx,
-            ty: pose.ty,
-            worldPosition,
-            ts,
-            rank: model.emissiveLightShadows === true ? 3 : 0,
-          });
+          const lamps = listVoxelEmissiveLamps(model);
+          for (let li = 0; li < lamps.length; li++) {
+            const lamp = lamps[li]!;
+            const lampSum = summarizeVoxelEmissiveForLamp(model, lamps, li);
+            if (!lampSum) continue;
+            const origin = resolveVoxelLampOrigin(model, lamp, lampSum);
+            const worldPosition = chestSceneLightWorldPosition(
+              pose,
+              scene,
+              voxelModels,
+              obj.offset,
+              ts,
+              origin,
+            );
+            if (!worldPosition) continue;
+            pushVoxelEmissiveLight(out, {
+              id: voxelLampSourceId(
+                `emchest:${region.id}:${obj.id}`,
+                lamps,
+                lamp,
+              ),
+              modelId: obj.modelId,
+              model,
+              tx: pose.tx,
+              ty: pose.ty,
+              worldPosition,
+              ts,
+              rank: model.emissiveLightShadows === true ? 3 : 0,
+              sum: lampSum,
+              range: lamp.range,
+              strength: lamp.strength,
+              castShadows:
+                lamp.shadows === true || model.emissiveLightShadows === true,
+              softRings:
+                lamp.softRings === true || model.emissiveLightSoftRings === true,
+              softShadows:
+                lamp.softShadows === true ||
+                model.emissiveLightSoftShadows === true,
+              torchFlicker:
+                lamp.torchFlicker === true ||
+                model.emissiveTorchFlicker === true,
+              lanternFlicker:
+                lamp.lanternFlicker === true ||
+                model.emissiveLanternFlicker === true,
+            });
+          }
         }
         continue;
       }
@@ -481,24 +555,43 @@ export function listEmissiveLocalLights(
       if (!modelId) continue;
       const model = voxelModels[modelId];
       if (!model || model.emissiveCastsLight !== true) continue;
-      const sum = summarizeVoxelEmissive(model);
-      if (!sum) continue;
-      const origin = resolveVoxelLightOrigin(model, sum);
-      pushVoxelEmissiveLight(out, {
-        id: `emchest:${region.id}`,
-        modelId,
-        model,
-        tx: pose.tx,
-        ty: pose.ty,
-        worldPosition: chestModelLightWorldPosition(
-          pose,
+      const lamps = listVoxelEmissiveLamps(model);
+      for (let li = 0; li < lamps.length; li++) {
+        const lamp = lamps[li]!;
+        const lampSum = summarizeVoxelEmissiveForLamp(model, lamps, li);
+        if (!lampSum) continue;
+        const origin = resolveVoxelLampOrigin(model, lamp, lampSum);
+        pushVoxelEmissiveLight(out, {
+          id: voxelLampSourceId(`emchest:${region.id}`, lamps, lamp),
+          modelId,
           model,
+          tx: pose.tx,
+          ty: pose.ty,
+          worldPosition: chestModelLightWorldPosition(
+            pose,
+            model,
+            ts,
+            origin,
+          ),
           ts,
-          origin,
-        ),
-        ts,
-        rank: model.emissiveLightShadows === true ? 3 : 0,
-      });
+          rank: model.emissiveLightShadows === true ? 3 : 0,
+          sum: lampSum,
+          range: lamp.range,
+          strength: lamp.strength,
+          castShadows:
+            lamp.shadows === true || model.emissiveLightShadows === true,
+          softRings:
+            lamp.softRings === true || model.emissiveLightSoftRings === true,
+          softShadows:
+            lamp.softShadows === true ||
+            model.emissiveLightSoftShadows === true,
+          torchFlicker:
+            lamp.torchFlicker === true || model.emissiveTorchFlicker === true,
+          lanternFlicker:
+            lamp.lanternFlicker === true ||
+            model.emissiveLanternFlicker === true,
+        });
+      }
     }
   }
 
@@ -537,6 +630,8 @@ function enableEmissiveShadow(
   pl: THREE.PointLight,
   tileSize: number,
   mapSize = 512,
+  leak = 0,
+  forceSoft = false,
 ): void {
   pl.castShadow = true;
   const res = Math.max(128, Math.round(mapSize));
@@ -556,8 +651,9 @@ function enableEmissiveShadow(
   // runtime. MAP_LIGHT_RANGE_MAX remains covered by the tile fallback.
   pl.shadow.camera.far = Math.max(pl.distance * 1.5, tileSize * 18);
   pl.shadow.camera.updateProjectionMatrix();
-  pl.shadow.radius = 0;
-  pl.shadow.intensity = 1;
+  const soft = voxelTransmittanceShadowParams(leak, forceSoft);
+  pl.shadow.radius = soft.radius;
+  pl.shadow.intensity = soft.intensity;
 }
 
 /** Spawn soft PointLights (optional shadows, soft decay). Returns lights for anim tick. */
@@ -615,14 +711,13 @@ export function addThreeEmissiveLocalLights(
   );
   let shadowSlots = allowShadows ? maxShadows : 0;
 
-  // Match lantern disc packing so MeshToon materials get hard core/mid/rim.
-  const discDecay = packLampDiscDecay(0.32, 0.62);
+  // Per-lamp disc packing so MeshToon materials get hard or soft core/mid/rim.
   for (const src of sources.slice(0, maxLights)) {
     const pl = new THREE.PointLight(
       src.color,
       0, // start extinguished — tick eases up
       src.distance,
-      discDecay,
+      packLampDiscDecay(0.32, 0.62, src.softRings === true),
     );
     pl.castShadow = false;
     if (src.worldPosition) {
@@ -640,7 +735,13 @@ export function addThreeEmissiveLocalLights(
     }
     const shadowRequested = allowShadows && src.castShadows;
     if (shadowRequested) {
-      enableEmissiveShadow(pl, ts, shadowMapSize);
+      enableEmissiveShadow(
+        pl,
+        ts,
+        shadowMapSize,
+        src.shadowLeak ?? 0,
+        src.softShadows === true,
+      );
       if (shadowSlots > 0) shadowSlots -= 1;
       else pl.castShadow = false;
     }

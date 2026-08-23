@@ -48,6 +48,10 @@ describe("library tags", () => {
 
   it("matches search haystack including inferred village prefix", () => {
     expect(inferredLibraryTags("vox_vil_lamp")).toEqual(["village"]);
+    expect(inferredLibraryTags("vox_chr_hero_head")).toEqual([
+      "character",
+      "chibi",
+    ]);
     expect(
       libraryAssetMatchesQuery(
         { id: "vox_vil_lamp", nameRu: "Фонарь" },

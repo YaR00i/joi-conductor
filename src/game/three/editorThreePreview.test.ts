@@ -35,7 +35,7 @@ describe("editor pack asset signature", () => {
     const changedModels: EmberVoxelModel[] = [
       { ...model, emissiveLightRange: 4 },
       { ...model, emissiveLightShadows: true },
-      { ...model, emissiveLightOrigin: { x: 3, y: 4, z: 5 } },
+      { ...model, emissiveLights: [{ id: "el_b", origin: { x: 1, y: 2, z: 3 } }] },
       { ...model, emissiveLightOffset: { x: 0.5, y: 1, z: -0.5 } },
       { ...model, emissiveStrength: 2 },
       { ...model, emissiveTorchFlicker: true },

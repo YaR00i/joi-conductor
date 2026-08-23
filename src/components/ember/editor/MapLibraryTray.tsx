@@ -19,6 +19,7 @@ import { VOXELS_PER_BLOCK } from "../../../game/voxel/constants";
 import { EmberSpriteThumb, EmberTileSwatch, EmberVoxelSceneThumb, EmberVoxelThumb } from "./EmberThumbGrid";
 import {
   MAP_REGION_KIND_COLOR,
+  MAP_REGION_KIND_HINT,
   MAP_REGION_KIND_LABEL,
   MAP_REGION_KIND_ORDER,
 } from "./mapRegionHelpers";
@@ -320,7 +321,7 @@ export function MapLibraryTray({
             key: `region:${kind}`,
             payload: { kind: "region" as const, regionKind: kind },
             label: MAP_REGION_KIND_LABEL[kind],
-            title: `${MAP_REGION_KIND_LABEL[kind]} — перетащи зону на карту`,
+            title: `${MAP_REGION_KIND_LABEL[kind]} — ${MAP_REGION_KIND_HINT[kind]}`,
             thumb: (
               <span
                 className="ember-map-lib__region-swatch"

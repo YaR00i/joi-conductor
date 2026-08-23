@@ -63,6 +63,7 @@ import {
 import {
   appendBlankTile,
   appendClonedTile,
+  removeTileFromTileset,
 } from "./tileCreateHelpers";
 
 type Props = {
@@ -298,6 +299,33 @@ export function TileEditorPanel({
           : `Клон #${newId} в паке; запись: ${"error" in res ? res.error : "?"}`,
       );
     });
+  }, [tileset, tileId, onChange, selectTile, onSaved]);
+
+  const deleteCurrentTile = useCallback(() => {
+    const tile = tileset.tiles.find((item) => item.id === tileId);
+    const removed = removeTileFromTileset(tileset, tileId);
+    if (!removed) {
+      onSaved("Этот тайл нельзя удалить (пусто, id 0 или последний в наборе).");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Удалить тайл #${tileId}${tile?.name ? ` «${tile.name}»` : ""} из тайлсета? Это нельзя отменить Undo карты.`,
+      )
+    ) {
+      return;
+    }
+    onChange(removed.tileset);
+    selectTile(removed.nextTileId);
+    void writeEmberJson(`tilesets/${removed.tileset.id}.json`, removed.tileset).then(
+      (res) => {
+        onSaved(
+          res.ok
+            ? `Тайл #${tileId} удалён из тайлсета`
+            : `Удалён в паке; запись: ${"error" in res ? res.error : "?"}`,
+        );
+      },
+    );
   }, [tileset, tileId, onChange, selectTile, onSaved]);
 
   useEffect(() => {
@@ -1446,6 +1474,14 @@ export function TileEditorPanel({
                 onClick={cloneCurrentTile}
               >
                 Клон
+              </button>
+              <button
+                type="button"
+                className="ember-chip ember-chip--sm ember-danger"
+                title="Удалить тайл из тайлсета (не клетку на карте)"
+                onClick={deleteCurrentTile}
+              >
+                Удалить
               </button>
             </div>
           </div>

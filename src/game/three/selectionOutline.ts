@@ -214,7 +214,7 @@ export function addPlanarMarqueeOutline(
 export function addRegionBoundsOutline(
   root: THREE.Object3D,
   map: EmberMap,
-  bounds: { x: number; y: number; w: number; h: number },
+  bounds: { x: number; y: number; w: number; h: number; elev?: number },
   tone: OutlineTone,
   opacityMul = 1,
 ): void {
@@ -223,7 +223,8 @@ export function addRegionBoundsOutline(
   const storyH = blockStoryHeight(ts);
   const cx = Math.floor(bounds.x + bounds.w * 0.5);
   const cy = Math.floor(bounds.y + bounds.h * 0.5);
-  const elev = tileSurfaceElev(map, cx, cy);
+  const elev =
+    bounds.elev ?? tileSurfaceElev(map, cx, cy);
   const y = elev * storyH + 1.2;
   const positions: number[] = [];
   pushBoxEdges(
@@ -234,6 +235,23 @@ export function addRegionBoundsOutline(
     (bounds.x + bounds.w) * ts,
     y + 1.2,
     (bounds.y + bounds.h) * ts,
+  );
+  const px = (bounds.x + bounds.w * 0.5) * ts;
+  const pz = (bounds.y + bounds.h * 0.5) * ts;
+  const arm = Math.min(ts * 0.4, 6);
+  positions.push(
+    px - arm,
+    y + 0.6,
+    pz,
+    px + arm,
+    y + 0.6,
+    pz,
+    px,
+    y + 0.6,
+    pz - arm,
+    px,
+    y + 0.6,
+    pz + arm,
   );
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
@@ -269,12 +287,12 @@ function cellWorldBox(
   const top = topOccupiedElevAt(map, tx, ty) ?? elevationAt(map, tx, ty);
   const voxH = heightVoxelsAt(map, tx, ty);
 
-  // Explicit story: only frame if that elev actually has a tile.
+  // Explicit story: a 1-high pad at that floor, even in empty air
+  // (indoor zones sit under a ceiling without occupying that cell).
   if (elev != null) {
-    if (!elevTileIdAt(map, tx, ty, elev)) return null;
     const { y0, y1 } = elevStoryWorldSpan(elev, storyH);
     let maxY = y1 + 0.9 + inflate;
-    if (voxH > 0 && elev === top) {
+    if (elevTileIdAt(map, tx, ty, elev) && voxH > 0 && elev === top) {
       maxY = Math.max(
         maxY,
         top * storyH + Math.max(voxUnit, voxH * voxUnit) + inflate,

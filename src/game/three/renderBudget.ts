@@ -74,7 +74,8 @@ export function resolvePlayProfileBudget(
         maxPointShadows: 6,
         allowHorde: false,
         allowNpc: true,
-        emissiveShadows: true,
+        // Fill lamps stay; cube maps are nearest lanterns only (not windows).
+        emissiveShadows: false,
         maxNpcs: EXPLORE_NPC_CAP,
       };
     default: {
@@ -167,6 +168,17 @@ export function applyMapLightBudget(
         ? hardware.maxPointShadows
         : clampInt(authored.maxPointShadows, 0, hardware.maxPointShadowsHard),
   };
+}
+
+/**
+ * Explore maps often author 12 cubes for the editor. Play clamps to the
+ * profile so every toon material is not sampling a dozen cube maps.
+ */
+export function playPointShadowCap(
+  budget: EmberRenderBudget,
+  profile: EmberPlayProfileBudget,
+): number {
+  return Math.min(budget.maxPointShadows, profile.maxPointShadows);
 }
 
 /** How many lantern PointLights to spawn before emissive fill takes the rest. */

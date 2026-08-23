@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Three.js isometric map editor viewport.
  * Fixed pitch, yaw orbit (Alt/RMB), pan (MMB), zoom (wheel).
  * Sprites + voxel props rendered in the same scene as terrain.
@@ -34,6 +34,7 @@ import {
 import { buildVoxelSceneMesh } from "../voxel/voxelSceneMesh";
 import { voxelGridSize } from "../voxel/voxelModel";
 import { applyVoxelPlacementTransform } from "../voxel/voxelPlacement";
+import { addQuestMarkerOverlays } from "./questMarkerOverlay";
 import {
   applySpritePlacementScale,
   createPixelBillboard,
@@ -104,6 +105,7 @@ import {
   cachePointLightShadows,
   invalidatePointLightShadows,
 } from "./dynamicShadowPolicy";
+import { emberWorldLoadProgress } from "./emberLoadProgress";
 import {
   collectPlanarReflectMaterials,
   estimatePlanarFloorY,
@@ -188,19 +190,19 @@ export type EditorOverlayMarks = {
    */
   elevGizmoTarget?: PlacePreviewMark | null;
   /** Selected map region cells. */
-  regionTiles?: ReadonlyArray<{ tx: number; ty: number }> | null;
+  regionTiles?: ReadonlyArray<{ tx: number; ty: number; elev?: number }> | null;
   /**
    * Large region / camera_bound: one AABB instead of per-cell flood.
    * Prefer this when `w * h` is big so the whole map isn't wireframed.
    */
-  regionBounds?: { x: number; y: number; w: number; h: number } | null;
+  regionBounds?: { x: number; y: number; w: number; h: number; elev?: number } | null;
   /** Pulse region outline (hover preview of a teleport / zone). */
   pulseRegion?: boolean;
-  /** Selected lamp range disc (tile дальность). */
+  /** Selected lamp range disc (tile РґР°Р»СЊРЅРѕСЃС‚СЊ). */
   lampRange?: LampRangeMark | null;
 };
 
-/** Polar angle from +Y (0 = top-down). Locked isometric pitch — same as play. */
+/** Polar angle from +Y (0 = top-down). Locked isometric pitch вЂ” same as play. */
 export const EDITOR_ISO_POLAR = 0.95;
 
 /** Play follow distance for the explore-camera preview. */
@@ -275,8 +277,8 @@ export type EditorThreePreview = {
   pickTile: (sx: number, sy: number) => { tx: number; ty: number } | null;
   /**
    * Minecraft-like place target on the locked work-plane elev, with face
-   * adjacency when the ray hits terrain (top → same cell elev+1 capped to
-   * lock; side → neighbor on lock plane).
+   * adjacency when the ray hits terrain (top в†’ same cell elev+1 capped to
+   * lock; side в†’ neighbor on lock plane).
    */
   pickPlaceTarget: (
     sx: number,
@@ -315,6 +317,10 @@ export type EditorThreePreview = {
   setLookPreview: (visible: boolean) => void;
   /** Force a complete static PointLight cube-map bake. */
   rebuildStaticShadows: () => void;
+  /** World-open streaming (terrain / props / lights). */
+  onLoadProgress: (
+    cb: ((progress: { ratio: number; labelRu: string }) => void) | null,
+  ) => void;
   /** Pan orbit target to a map tile (world center of cell). */
   focusTile: (tx: number, ty: number) => void;
   /**
@@ -412,7 +418,8 @@ export function packAssetsSignature(
       hashArr(model.voxels, n) ^
       hashArr(model.emissive, n) ^
       hashArr(model.shine, n) ^
-      hashArr(model.transparency, n);
+      hashArr(model.transparency, n) ^
+      hashArr(model.transmittance, n);
     const settings = JSON.stringify({
       sizeBlocks: model.sizeBlocks,
       heightVoxels: model.heightVoxels,
@@ -423,8 +430,11 @@ export function packAssetsSignature(
       emissiveCastsLight: model.emissiveCastsLight,
       emissiveLightRange: model.emissiveLightRange,
       emissiveLightShadows: model.emissiveLightShadows,
+      emissiveLightSoftRings: model.emissiveLightSoftRings,
+      emissiveLightSoftShadows: model.emissiveLightSoftShadows,
       emissiveLightOrigin: model.emissiveLightOrigin,
       emissiveLightOffset: model.emissiveLightOffset,
+      emissiveLights: model.emissiveLights,
       emissiveStrength: model.emissiveStrength,
       emissiveTorchFlicker: model.emissiveTorchFlicker,
       emissiveLanternFlicker: model.emissiveLanternFlicker,
@@ -526,6 +536,18 @@ export function createEditorThreePreview(
   let camReady = false;
   let lastViewMode: MapViewMode | null = null;
   let lastMapKey = "";
+  let loadProgressCb:
+    | ((progress: { ratio: number; labelRu: string }) => void)
+    | null = null;
+  let worldLoadActive = false;
+  let worldLoadTerrainSettled = false;
+  let worldLoadPropsSettled = false;
+  let worldLoadLightsReady = false;
+  let worldLoadWarmupComplete = false;
+  let worldLoadPropsDone = 0;
+  let worldLoadPropsTotal = 0;
+  let propsRebuildGen = 0;
+  let propsRebuildFrame = 0;
   const overlayMarks: {
     hover: EditorPick | null;
     selected: EditorPick | null;
@@ -535,8 +557,8 @@ export function createEditorThreePreview(
     libTile: { tx: number; ty: number } | null;
     placePreview: PlacePreviewMark | null;
     elevGizmoTarget: PlacePreviewMark | null;
-    regionTiles: { tx: number; ty: number }[];
-    regionBounds: { x: number; y: number; w: number; h: number } | null;
+    regionTiles: { tx: number; ty: number; elev?: number }[];
+    regionBounds: { x: number; y: number; w: number; h: number; elev?: number } | null;
     pulseRegion: boolean;
     lampRange: LampRangeMark | null;
   } = {
@@ -568,7 +590,7 @@ export function createEditorThreePreview(
   let emissiveAnim = false;
   let waterAnim = false;
   let modelOutlineAnim = false;
-  /** Flat list — avoid traverse() every frame. */
+  /** Flat list вЂ” avoid traverse() every frame. */
   let emissiveMats: THREE.Material[] = [];
   let waterMats: THREE.Material[] = [];
   let waterReflect: WaterPlanarReflection | null = null;
@@ -591,6 +613,7 @@ export function createEditorThreePreview(
   let lastTerrainSig = "";
   let lastPropsStructSig = "";
   let lastPropsPoseSig = "";
+  let lastRegionsLayoutSig = "";
   let lastLightSig = "";
   let lastPackAssetsSig = "";
   let lastAtmosSig = "";
@@ -841,7 +864,7 @@ export function createEditorThreePreview(
     showSemantics: true,
   };
 
-  /** Neutral day fill — no night wash / bloom / grade / lamps. */
+  /** Neutral day fill вЂ” no night wash / bloom / grade / lamps. */
   const CLEAN_LOOK_LIGHT: ResolvedMapLight = {
     ...DEFAULT_MAP_LIGHT,
     ambientColor: "#f0e8dc",
@@ -861,7 +884,7 @@ export function createEditorThreePreview(
       ? src
       : {
           ...DEFAULT_MAP_ATMOSPHERE,
-          // Keep grade vignette separate — only weather/particles off.
+          // Keep grade vignette separate вЂ” only weather/particles off.
           fog: 0,
           rain: 0,
           cloudShadows: 0,
@@ -887,7 +910,7 @@ export function createEditorThreePreview(
     atmosAnim = Boolean(lastLightCfg);
   };
 
-  /** Editor light pass — smaller cube maps / fewer casters to avoid VRAM wipe. */
+  /** Editor light pass вЂ” smaller cube maps / fewer casters to avoid VRAM wipe. */
   const applyLookPreview = (): boolean => {
     if (!map || !lastLightCfg || !lastLightCenter || !lastTileset) return false;
     setEmberVoxelLightSnap(
@@ -925,7 +948,7 @@ export function createEditorThreePreview(
           authoredLights: lastLightCfg.maxPointLights != null,
           explore,
         }),
-        maxShadows: lightCaps.maxPointLights,
+        maxShadows: lightCaps.maxPointShadows,
         shadows: true,
         shadowMapSize: renderBudget.pointShadowMapSize,
       });
@@ -944,7 +967,11 @@ export function createEditorThreePreview(
           maxShadows: resolvePlayProfileBudget(
             resolveMapPlayProfile(map),
           ).emissiveShadows
-            ? lightCaps.maxPointLights
+            ? Math.max(
+                0,
+                lightCaps.maxPointShadows -
+                  lanternLights.filter((light) => light.castShadow).length,
+              )
             : 0,
           shadowMapSize: renderBudget.pointShadowMapSize,
         },
@@ -1155,7 +1182,7 @@ export function createEditorThreePreview(
       reflectionScheduler.trackCamera(camera);
       updateYawBillboards(propRoot, camera);
       updateYawBillboards(placementGhostRoot, camera);
-      // Billboard AABBs move with yaw — refresh object frames each paint.
+      // Billboard AABBs move with yaw вЂ” refresh object frames each paint.
       const hoverObj =
         overlayMarks.hover?.kind === "sprite" ||
         overlayMarks.hover?.kind === "voxel";
@@ -1184,6 +1211,10 @@ export function createEditorThreePreview(
       );
     } finally {
       pointBake?.restore();
+    }
+    if (worldLoadActive && worldLoadLightsReady && !worldLoadWarmupComplete) {
+      worldLoadWarmupComplete = true;
+      emitWorldLoadProgress();
     }
   };
 
@@ -1369,55 +1400,136 @@ export function createEditorThreePreview(
     });
   };
 
-  const rebuildProps = (
-    m: EmberMap,
-    pack: EmberPack | undefined,
-  ) => {
+  const emitWorldLoadProgress = () => {
+    if (!worldLoadActive || !loadProgressCb) return;
+    const stats = terrainChunks?.getStreamingStats();
+    const terrainTotal = Math.max(1, stats?.totalChunks ?? 1);
+    const terrainLoaded = stats
+      ? Math.max(0, stats.totalChunks - stats.pendingChunks)
+      : worldLoadTerrainSettled
+        ? 1
+        : 0;
+    const progress = emberWorldLoadProgress({
+      terrainSettled: worldLoadTerrainSettled,
+      staticPropsSettled: worldLoadPropsSettled,
+      lightsReady: worldLoadLightsReady,
+      shadowCached: worldLoadWarmupComplete ? 1 : 0,
+      shadowTotal: 1,
+      warmupComplete: worldLoadWarmupComplete,
+      terrainFrac: worldLoadTerrainSettled
+        ? 1
+        : Math.min(0.98, terrainLoaded / terrainTotal),
+      propsFrac:
+        worldLoadPropsTotal <= 0
+          ? worldLoadPropsSettled
+            ? 1
+            : 0
+          : worldLoadPropsDone / worldLoadPropsTotal,
+    });
+    loadProgressCb(progress);
+    if (progress.ratio >= 1) worldLoadActive = false;
+  };
+
+  const tryFinishWorldLoad = () => {
+    if (!worldLoadActive) return;
+    if (!worldLoadTerrainSettled || !worldLoadPropsSettled) {
+      emitWorldLoadProgress();
+      return;
+    }
+    if (!worldLoadLightsReady) {
+      applyLookPreview();
+      worldLoadLightsReady = true;
+      rebuildEmissiveMats();
+      rebuildWaterMats();
+      emitWorldLoadProgress();
+      requestRender();
+      return;
+    }
+    emitWorldLoadProgress();
+  };
+
+  const beginWorldLoad = () => {
+    worldLoadActive = true;
+    worldLoadTerrainSettled = false;
+    worldLoadPropsSettled = false;
+    worldLoadLightsReady = false;
+    worldLoadWarmupComplete = false;
+    worldLoadPropsDone = 0;
+    worldLoadPropsTotal = 0;
+    loadProgressCb?.({ ratio: 0.04, labelRu: "Местность…" });
+  };
+
+  const cancelPropsRebuild = () => {
+    propsRebuildGen += 1;
+    if (propsRebuildFrame) cancelAnimationFrame(propsRebuildFrame);
+    propsRebuildFrame = 0;
+  };
+
+  const resetPropRoot = () => {
     for (const o of modelOutlines) o.dispose();
     modelOutlines = [];
     modelOutlineAnim = false;
     voxelInstanceBatches = [];
     clearObjectRoot(propRoot);
-    const sprites = pack?.sprites ?? {};
-    for (const p of m.sprites ?? []) {
-      const def = sprites[p.spriteId];
-      if (!def) continue;
-      const elev = p.elev ?? tileSurfaceElev(m, p.x, p.y);
-      const bill = createPixelBillboard(
-        def,
-        hexColorOr(def.color, "#c8a878"),
-        m.tileSize * 0.95,
-      );
-      bill.position.set(
-        (p.x + 0.5) * m.tileSize,
-        elev * blockStoryHeight(m.tileSize) + m.tileSize * 0.45,
-        (p.y + 0.5) * m.tileSize,
-      );
-      applySpritePlacementScale(bill, p.scale);
-      const n = normalizePixelSprite(def);
-      if (n.emissivePixels && hasEmissiveInk(n.emissivePixels)) {
-        const mat = bill.material as THREE.MeshBasicMaterial;
-        tagEmissiveMaterial(mat, {
-          anim: n.emissiveAnim,
-          seed: emissivePlacementSeed(p.spriteId, p.x, p.y),
-          baseIntensity: resolveEmissiveGlowStrength(n.emissiveStrength),
-          kind: "basic",
-          periodSec: n.emissiveAnimPeriod,
-          periodMinSec: n.emissiveAnimPeriodMin,
-          periodMaxSec: n.emissiveAnimPeriodMax,
-          triggerWhen: n.emissiveTriggerWhen,
-          triggerRadius: n.emissiveTriggerRadius,
-          triggerEventId: n.emissiveTriggerEventId,
-          tx: p.x,
-          ty: p.y,
-        });
-      }
-      tagPick(bill, { kind: "sprite", id: p.id });
-      propRoot.add(bill);
-    }
+  };
 
+  const addSpriteProp = (
+    m: EmberMap,
+    p: NonNullable<EmberMap["sprites"]>[number],
+    sprites: NonNullable<EmberPack["sprites"]>,
+  ) => {
+    const def = sprites[p.spriteId];
+    if (!def) return;
+    const elev = p.elev ?? tileSurfaceElev(m, p.x, p.y);
+    const bill = createPixelBillboard(
+      def,
+      hexColorOr(def.color, "#c8a878"),
+      m.tileSize * 0.95,
+    );
+    bill.position.set(
+      (p.x + 0.5) * m.tileSize,
+      elev * blockStoryHeight(m.tileSize) + m.tileSize * 0.45,
+      (p.y + 0.5) * m.tileSize,
+    );
+    applySpritePlacementScale(bill, p.scale);
+    const n = normalizePixelSprite(def);
+    if (n.emissivePixels && hasEmissiveInk(n.emissivePixels)) {
+      const mat = bill.material as THREE.MeshBasicMaterial;
+      tagEmissiveMaterial(mat, {
+        anim: n.emissiveAnim,
+        seed: emissivePlacementSeed(p.spriteId, p.x, p.y),
+        baseIntensity: resolveEmissiveGlowStrength(n.emissiveStrength),
+        kind: "basic",
+        periodSec: n.emissiveAnimPeriod,
+        periodMinSec: n.emissiveAnimPeriodMin,
+        periodMaxSec: n.emissiveAnimPeriodMax,
+        triggerWhen: n.emissiveTriggerWhen,
+        triggerRadius: n.emissiveTriggerRadius,
+        triggerEventId: n.emissiveTriggerEventId,
+        tx: p.x,
+        ty: p.y,
+      });
+    }
+    tagPick(bill, { kind: "sprite", id: p.id });
+    propRoot.add(bill);
+  };
+
+  const collectPropJobs = (
+    m: EmberMap,
+    pack: EmberPack | undefined,
+  ): Array<() => void> => {
+    const jobs: Array<() => void> = [];
+    const sprites = pack?.sprites ?? {};
+    const spriteList = m.sprites ?? [];
+    const spriteBatch = 12;
+    for (let i = 0; i < spriteList.length; i += spriteBatch) {
+      const slice = spriteList.slice(i, i + spriteBatch);
+      jobs.push(() => {
+        for (const p of slice) addSpriteProp(m, p, sprites);
+      });
+    }
     const models = pack?.voxelModels ?? {};
-    const voxelBuckets = new Map<string, typeof m.voxelProps>();
+    const voxelBuckets = new Map<string, NonNullable<EmberMap["voxelProps"]>>();
     for (const p of m.voxelProps ?? []) {
       const model: EmberVoxelModel | undefined = models[p.modelId];
       if (!model) continue;
@@ -1433,76 +1545,118 @@ export function createEditorThreePreview(
     }
     for (const placements of voxelBuckets.values()) {
       if (!placements?.length) continue;
-      const first = placements[0]!;
-      const model: EmberVoxelModel | undefined = models[first.modelId];
-      if (!model) continue;
-      const suppressHostShadow =
-        first.emissiveSuppressHostShadow !== undefined
-          ? first.emissiveSuppressHostShadow
-          : model.emissiveSuppressHostShadow === true;
-      if (placements.length > 1) {
-        const resolved = placements.map((placement) => ({
-          placement,
-          elev: placement.elev ?? tileSurfaceElev(m, placement.x, placement.y),
-        }));
-        const batch = createEditorVoxelInstanceBatch(
+      jobs.push(() => {
+        const first = placements[0]!;
+        const model: EmberVoxelModel | undefined = models[first.modelId];
+        if (!model) return;
+        const suppressHostShadow =
+          first.emissiveSuppressHostShadow !== undefined
+            ? first.emissiveSuppressHostShadow
+            : model.emissiveSuppressHostShadow === true;
+        if (placements.length > 1) {
+          const resolved = placements.map((placement) => ({
+            placement,
+            elev: placement.elev ?? tileSurfaceElev(m, placement.x, placement.y),
+          }));
+          const batch = createEditorVoxelInstanceBatch(
+            model,
+            m.tileSize,
+            resolved,
+            {
+              directLightScale:
+                first.directLightScale ?? model.directLightScale,
+              suppressCastShadow: suppressHostShadow,
+            },
+          );
+          if (batch) {
+            voxelInstanceBatches.push(batch);
+            propRoot.add(batch.root);
+            return;
+          }
+        }
+        const p = first;
+        const elev = p.elev ?? tileSurfaceElev(m, p.x, p.y);
+        const built = buildVoxelModelMesh(model, m.tileSize, {
+          directLightScale: p.directLightScale ?? model.directLightScale,
+          suppressCastShadow: suppressHostShadow,
+        });
+        applyVoxelPlacementTransform(
+          built.group,
+          p,
           model,
           m.tileSize,
-          resolved,
-          {
-            directLightScale:
-              first.directLightScale ?? model.directLightScale,
-            suppressCastShadow: suppressHostShadow,
-          },
+          elev,
         );
-        if (batch) {
-          voxelInstanceBatches.push(batch);
-          propRoot.add(batch.root);
-          continue;
-        }
-      }
-      const p = first;
-      const elev = p.elev ?? tileSurfaceElev(m, p.x, p.y);
-      const built = buildVoxelModelMesh(model, m.tileSize, {
-        directLightScale: p.directLightScale ?? model.directLightScale,
-        suppressCastShadow: suppressHostShadow,
+        tagPick(built.group, { kind: "voxel", id: p.id });
+        propRoot.add(built.group);
       });
-      applyVoxelPlacementTransform(
-        built.group,
-        p,
-        model,
-        m.tileSize,
-        elev,
-      );
-      tagPick(built.group, { kind: "voxel", id: p.id });
-      propRoot.add(built.group);
     }
-
-    // Chest regions: scene (hinged) or closed lone model.
+    jobs.push(() => {
+      addQuestMarkerOverlays(propRoot, m, models, undefined, {
+        itemIcons: pack?.itemIcons,
+      });
+    });
     for (const r of m.regions ?? []) {
       if (r.kind !== "chest") continue;
-      const pose = resolveChestModelPose(m, r);
-      const scenes = pack?.voxelScenes ?? {};
-      const scene = r.sceneId ? scenes[r.sceneId] : undefined;
-      if (scene) {
-        const built = buildVoxelSceneMesh(scene, models, {
-          tileSize: m.tileSize,
+      jobs.push(() => {
+        const pose = resolveChestModelPose(m, r);
+        const scenes = pack?.voxelScenes ?? {};
+        const scene = r.sceneId ? scenes[r.sceneId] : undefined;
+        if (scene) {
+          const built = buildVoxelSceneMesh(scene, models, {
+            tileSize: m.tileSize,
+            directLightScale: pose.directLightScale,
+            playhead: 0,
+            clipId: r.openClipId ?? scene.animations?.[0]?.id ?? null,
+          });
+          if (!built) return;
+          built.root.position.set(
+            pose.x,
+            pose.elev * blockStoryHeight(m.tileSize),
+            pose.y,
+          );
+          built.root.rotation.y = pose.rot * (Math.PI / 2);
+          built.root.scale.setScalar(pose.scale);
+          built.root.name = `chest-preview:${r.id}`;
+          propRoot.add(built.root);
+          const outline = createInteractiveOutline(
+            built.root,
+            r.modelOutline,
+            propRoot,
+          );
+          if (outline) {
+            outline.refreshBounds();
+            modelOutlines.push(outline);
+            modelOutlineAnim = true;
+          }
+          return;
+        }
+        if (!r.closedModelId) return;
+        const model: EmberVoxelModel | undefined = models[r.closedModelId];
+        if (!model) return;
+        const built = buildVoxelModelMesh(model, m.tileSize, {
           directLightScale: pose.directLightScale,
-          playhead: 0,
-          clipId: r.openClipId ?? scene.animations?.[0]?.id ?? null,
+          suppressCastShadow: model.emissiveSuppressHostShadow === true,
         });
-        if (!built) continue;
-        built.root.position.set(
+        const { sx, sz } = voxelGridSize(model);
+        const vw = m.tileSize / VOXELS_PER_BLOCK;
+        const inner = new THREE.Group();
+        while (built.group.children.length) {
+          inner.add(built.group.children[0]!);
+        }
+        inner.position.set(-sx * vw * 0.5, 0, -sz * vw * 0.5);
+        built.group.add(inner);
+        built.group.position.set(
           pose.x,
           pose.elev * blockStoryHeight(m.tileSize),
           pose.y,
         );
-        built.root.rotation.y = pose.rot * (Math.PI / 2);
-        built.root.scale.setScalar(pose.scale);
-        built.root.name = `chest-preview:${r.id}`;
-        propRoot.add(built.root);
+        built.group.rotation.y = pose.rot * (Math.PI / 2);
+        built.group.scale.setScalar(pose.scale);
+        built.group.name = `chest-preview:${r.id}`;
+        propRoot.add(built.group);
         const outline = createInteractiveOutline(
-          built.root,
+          built.group,
           r.modelOutline,
           propRoot,
         );
@@ -1511,44 +1665,54 @@ export function createEditorThreePreview(
           modelOutlines.push(outline);
           modelOutlineAnim = true;
         }
-        continue;
-      }
-      if (!r.closedModelId) continue;
-      const model: EmberVoxelModel | undefined = models[r.closedModelId];
-      if (!model) continue;
-      const built = buildVoxelModelMesh(model, m.tileSize, {
-        directLightScale: pose.directLightScale,
-        suppressCastShadow: model.emissiveSuppressHostShadow === true,
       });
-      const { sx, sz } = voxelGridSize(model);
-      const vw = m.tileSize / VOXELS_PER_BLOCK;
-      const inner = new THREE.Group();
-      while (built.group.children.length) {
-        inner.add(built.group.children[0]!);
-      }
-      inner.position.set(-sx * vw * 0.5, 0, -sz * vw * 0.5);
-      built.group.add(inner);
-      built.group.position.set(
-        pose.x,
-        pose.elev * blockStoryHeight(m.tileSize),
-        pose.y,
-      );
-      built.group.rotation.y = pose.rot * (Math.PI / 2);
-      built.group.scale.setScalar(pose.scale);
-      // Not tagged as voxel prop — clicks still hit the chest region tile.
-      built.group.name = `chest-preview:${r.id}`;
-      propRoot.add(built.group);
-      const outline = createInteractiveOutline(
-        built.group,
-        r.modelOutline,
-        propRoot,
-      );
-      if (outline) {
-        outline.refreshBounds();
-        modelOutlines.push(outline);
-        modelOutlineAnim = true;
-      }
     }
+    return jobs;
+  };
+
+  const rebuildProps = (
+    m: EmberMap,
+    pack: EmberPack | undefined,
+  ) => {
+    cancelPropsRebuild();
+    resetPropRoot();
+    for (const job of collectPropJobs(m, pack)) job();
+  };
+
+  const scheduleRebuildProps = (
+    m: EmberMap,
+    pack: EmberPack | undefined,
+  ) => {
+    cancelPropsRebuild();
+    const gen = propsRebuildGen;
+    resetPropRoot();
+    const jobs = collectPropJobs(m, pack);
+    worldLoadPropsTotal = Math.max(1, jobs.length);
+    worldLoadPropsDone = 0;
+    if (jobs.length === 0) {
+      worldLoadPropsSettled = true;
+      tryFinishWorldLoad();
+      return;
+    }
+    let i = 0;
+    const pump = () => {
+      propsRebuildFrame = 0;
+      if (disposed || gen !== propsRebuildGen) return;
+      const started = performance.now();
+      while (i < jobs.length && performance.now() - started < 8) {
+        jobs[i++]!();
+        worldLoadPropsDone = i;
+      }
+      emitWorldLoadProgress();
+      requestRender();
+      if (i < jobs.length) {
+        propsRebuildFrame = requestAnimationFrame(pump);
+        return;
+      }
+      worldLoadPropsSettled = true;
+      tryFinishWorldLoad();
+    };
+    propsRebuildFrame = requestAnimationFrame(pump);
   };
 
   const pickTileAt = (
@@ -1640,7 +1804,7 @@ export function createEditorThreePreview(
 
   /**
    * Resolve a paint target like Minecraft:
-   * 1) Prefer face adjacency when the ray hits terrain (top → above, side → neighbor).
+   * 1) Prefer face adjacency when the ray hits terrain (top в†’ above, side в†’ neighbor).
    * 2) Always snap elev to the locked work plane (brush Z / Ctrl+wheel).
    * 3) Fall back to intersecting the locked horizontal plane (goes through water).
    */
@@ -1674,7 +1838,7 @@ export function createEditorThreePreview(
         let tx = Math.floor(p.x / ts);
         let ty = Math.floor(p.z / ts);
         const hitStory = clampElevation(elevFromWorldY(p.y, storyH));
-        // Side face → step into the adjacent cell (Minecraft attach).
+        // Side face в†’ step into the adjacent cell (Minecraft attach).
         if (Math.abs(faceNormal.y) < 0.55) {
           if (Math.abs(faceNormal.x) >= Math.abs(faceNormal.z)) {
             tx += faceNormal.x > 0 ? 1 : -1;
@@ -1690,7 +1854,7 @@ export function createEditorThreePreview(
             }
           }
         } else {
-          // Bottom face → cell below in XY stays; elev still locked.
+          // Bottom face в†’ cell below in XY stays; elev still locked.
         }
         if (inBounds(tx, ty)) {
           return {
@@ -1713,7 +1877,7 @@ export function createEditorThreePreview(
         : null;
     }
 
-    // Locked height plane — top of the locked elev story (matches props/water).
+    // Locked height plane вЂ” top of the locked elev story (matches props/water).
     workPlane.constant = -(lockedElev * storyH);
     if (raycaster.ray.intersectPlane(workPlane, hit)) {
       const tx = Math.floor(hit.x / ts);
@@ -1762,7 +1926,7 @@ export function createEditorThreePreview(
       .normalize();
 
     const eps = storyH * 0.08;
-    // Thin floor caps sit just above y1 (~0.7 tall) — count them as that story.
+    // Thin floor caps sit just above y1 (~0.7 tall) вЂ” count them as that story.
     const capSlack = 1.15;
 
     const elevAtColumn = (
@@ -1803,7 +1967,7 @@ export function createEditorThreePreview(
     };
 
     const raw = hitInfo.point;
-    // Prefer a deep nudge into the solid — shallow nudges still land in the
+    // Prefer a deep nudge into the solid вЂ” shallow nudges still land in the
     // empty neighbor when the hit sits exactly on a shared face.
     const step = Math.max(0.2, ts * 0.12);
     const samples: THREE.Vector3[] = [
@@ -1852,6 +2016,10 @@ export function createEditorThreePreview(
       viewW = Math.max(64, Math.round(layout.cssW));
       viewH = Math.max(64, Math.round(layout.cssH));
 
+      const mapKey = `${map.id}:${map.width}x${map.height}:${map.tileSize}`;
+      const mapIdentityChanged = lastMapKey !== mapKey;
+      if (mapIdentityChanged) beginWorldLoad();
+
       const terrainSig = terrainSignature(map, tileset.id);
       const propsStructSig = propsStructureSignature(map);
       const propsPoseSig = propsPoseSignature(map);
@@ -1869,6 +2037,13 @@ export function createEditorThreePreview(
       const terrainDirty = terrainSig !== lastTerrainSig || tilesetDirty;
       const propsStructDirty = propsStructSig !== lastPropsStructSig;
       const propsPoseDirty = propsPoseSig !== lastPropsPoseSig;
+      const regionsLayoutSig = (map.regions ?? [])
+        .map(
+          (r) =>
+            `${r.id}:${r.kind}:${r.x},${r.y},${r.w}x${r.h}@${r.elev ?? ""}`,
+        )
+        .join("|");
+      const regionsLayoutDirty = regionsLayoutSig !== lastRegionsLayoutSig;
       const lightDirty = lightSig !== lastLightSig;
       const packAssetsDirty = packAssetsSig !== lastPackAssetsSig;
       const atmosDirty = atmosSig !== lastAtmosSig;
@@ -1878,7 +2053,7 @@ export function createEditorThreePreview(
         (map.regions ?? []).some((r) => r.kind === "chest");
       // Safety: empty prop root with placements (e.g. first pack hydrated late).
       const propsMissing =
-        hasPlacements && propRoot.children.length === 0;
+        hasPlacements && propRoot.children.length === 0 && !worldLoadActive;
 
       if (terrainDirty) {
         if (!terrainChunks) {
@@ -1899,17 +2074,22 @@ export function createEditorThreePreview(
           outlinesNeedRebuild = true;
           if (complete && terrainChunks) {
             lastLightCenter = terrainChunks.center.clone();
-            rebuildEmissiveMats();
-            rebuildWaterMats();
-            applyLookPreview();
+            if (worldLoadActive) {
+              worldLoadTerrainSettled = true;
+              tryFinishWorldLoad();
+            } else {
+              rebuildEmissiveMats();
+              rebuildWaterMats();
+              applyLookPreview();
+            }
+          } else if (worldLoadActive) {
+            emitWorldLoadProgress();
           }
           requestRender();
         });
         lastLightCenter = terrainChunks.center.clone();
 
-        const mapKey = `${map.id}:${map.width}x${map.height}:${map.tileSize}`;
         const viewChanged = lastViewMode !== layout.viewMode;
-        const mapIdentityChanged = lastMapKey !== mapKey;
         if (!camReady || mapIdentityChanged) {
           target.copy(terrainChunks.center);
           zoomDist = THREE.MathUtils.clamp(
@@ -1928,6 +2108,13 @@ export function createEditorThreePreview(
       } else if (lastViewMode !== layout.viewMode) {
         yaw = YAW_PRESET[layout.viewMode] ?? yaw;
         lastViewMode = layout.viewMode;
+        lastMapKey = mapKey;
+      } else {
+        lastMapKey = mapKey;
+      }
+
+      if (worldLoadActive && !terrainDirty) {
+        worldLoadTerrainSettled = true;
       }
 
       lastTileset = tileset;
@@ -1940,8 +2127,10 @@ export function createEditorThreePreview(
       lastLightCfg = lightCfg;
       lastAtmosphere = lightCfg.atmosphere;
 
-      if (propsStructDirty || packAssetsDirty || propsMissing) {
-        rebuildProps(map, pack);
+      const deferWorldBuild = worldLoadActive && mapIdentityChanged;
+      if (propsStructDirty || packAssetsDirty || propsMissing || deferWorldBuild) {
+        if (deferWorldBuild) scheduleRebuildProps(map, pack);
+        else rebuildProps(map, pack);
         lastPropsStructSig = propsStructSig;
         lastPropsPoseSig = propsPoseSig;
         lastPackAssetsSig = packAssetsSig;
@@ -1964,15 +2153,19 @@ export function createEditorThreePreview(
         lastPropsPoseSig = propsPoseSig;
       } else {
         lastPackAssetsSig = packAssetsSig;
+        if (deferWorldBuild) {
+          worldLoadPropsSettled = true;
+        }
       }
 
       if (
-        terrainDirty ||
-        propsStructDirty ||
-        propsPoseDirty ||
-        packAssetsDirty ||
-        propsMissing ||
-        lightDirty
+        !deferWorldBuild &&
+        (terrainDirty ||
+          propsStructDirty ||
+          propsPoseDirty ||
+          packAssetsDirty ||
+          propsMissing ||
+          lightDirty)
       ) {
         invalidatePointLightShadows(lightRoot);
         staticPointShadowBakePending = true;
@@ -1983,15 +2176,18 @@ export function createEditorThreePreview(
       // Fill/lantern lights depend on terrain + lamp list + prop *structure*
       // / pack emissive hosts. Pose-only prop moves keep PointLights via sync above.
       if (
-        terrainDirty ||
-        propsStructDirty ||
-        packAssetsDirty ||
-        propsMissing ||
-        lightDirty
+        !deferWorldBuild &&
+        (terrainDirty ||
+          propsStructDirty ||
+          packAssetsDirty ||
+          propsMissing ||
+          lightDirty)
       ) {
         if (applyLookPreview()) {
           lastLightSig = lightSig;
         }
+      } else if (deferWorldBuild) {
+        lastLightSig = lightSig;
       }
 
       if (atmosDirty) {
@@ -1999,17 +2195,28 @@ export function createEditorThreePreview(
         lastAtmosSig = atmosSig;
       }
 
-      if (terrainDirty) {
-        rebuildEmissiveMats();
-        rebuildWaterMats();
-      } else if (propsStructDirty || packAssetsDirty || propsMissing) {
-        rebuildEmissiveMats();
+      if (!deferWorldBuild) {
+        if (terrainDirty) {
+          rebuildEmissiveMats();
+          rebuildWaterMats();
+        } else if (propsStructDirty || packAssetsDirty || propsMissing) {
+          rebuildEmissiveMats();
+        }
       }
 
       outlinesNeedRebuild = true;
-      if (terrainDirty || propsStructDirty || packAssetsDirty || propsMissing) {
+      if (
+        terrainDirty ||
+        propsStructDirty ||
+        packAssetsDirty ||
+        propsMissing ||
+        regionsLayoutDirty
+      ) {
         rebuildDebug();
       }
+      lastRegionsLayoutSig = regionsLayoutSig;
+
+      if (deferWorldBuild) tryFinishWorldLoad();
 
       parent.style.top = "0";
       parent.style.left = "0";
@@ -2114,7 +2321,11 @@ export function createEditorThreePreview(
       }
       if (marks.regionTiles !== undefined) {
         overlayMarks.regionTiles = marks.regionTiles
-          ? marks.regionTiles.map((c) => ({ tx: c.tx, ty: c.ty }))
+          ? marks.regionTiles.map((c) => ({
+              tx: c.tx,
+              ty: c.ty,
+              ...(c.elev != null ? { elev: c.elev } : {}),
+            }))
           : [];
       }
       if (marks.regionBounds !== undefined) {
@@ -2159,17 +2370,20 @@ export function createEditorThreePreview(
       if (atmospherePreview === visible) return;
       atmospherePreview = visible;
       applyAtmospherePreview();
-      // Vignette rides with atmosphere — refresh grade path.
+      // Vignette rides with atmosphere вЂ” refresh grade path.
       applyLookPreview();
       requestRender();
     },
     setLookPreview(visible) {
       // Idempotent: hover/selection sync must not rebuild PointLights
-      // (they start extinguished and ease up — looks like the lamp blinks out).
+      // (they start extinguished and ease up вЂ” looks like the lamp blinks out).
       if (lookPreview === visible) return;
       lookPreview = visible;
       applyLookPreview();
       requestRender();
+    },
+    onLoadProgress(cb) {
+      loadProgressCb = cb;
     },
     rebuildStaticShadows() {
       invalidatePointLightShadows(lightRoot);
@@ -2255,6 +2469,7 @@ export function createEditorThreePreview(
     },
     dispose() {
       disposed = true;
+      cancelPropsRebuild();
       if (raf) cancelAnimationFrame(raf);
       raf = 0;
       transformGizmo.dispose();

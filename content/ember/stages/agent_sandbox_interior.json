@@ -1,0 +1,28 @@
+{
+  "id": "agent_sandbox_interior",
+  "nameRu": "Интерьер песочницы",
+  "playerMistressId": "hu_tao",
+  "mapId": "agent_sandbox_interior",
+  "spawnTableId": "agent_sandbox_interior",
+  "weaponPoolId": "p1_weapons",
+  "chestPoolId": "p1_chests",
+  "starterWeaponId": "butterfly_fan",
+  "durationSec": 600,
+  "bossAtSec": 9999,
+  "playerHp": 100,
+  "moveSpeed": 110,
+  "playerBody": {
+    "radiusVoxels": 2.5,
+    "heightVoxels": 12,
+    "stepHeightVoxels": 4,
+    "skinVoxels": 0.15,
+    "layer": "actor",
+    "mask": [
+      "world"
+    ]
+  },
+  "cindersClear": 0,
+  "cindersFail": 0,
+  "xpGemValue": 1,
+  "baseXpToLevel": 12
+}

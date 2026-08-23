@@ -1,0 +1,32 @@
+{
+  "id": "village_notice_talk",
+  "nameRu": "Объявление Ваншэн",
+  "use": "talk",
+  "startStepId": "a",
+  "steps": [
+    {
+      "id": "a",
+      "type": "dialogue",
+      "speaker": "sign",
+      "portraitKey": "neutral",
+      "nameRu": "Доска Ваншэн",
+      "textRu": "Потерянный дух бродит у западных слив. Живым вход разрешён, мёртвым — по записи.",
+      "next": "b"
+    },
+    {
+      "id": "b",
+      "type": "dialogue",
+      "speaker": "sign",
+      "portraitKey": "neutral",
+      "nameRu": "Доска Ваншэн",
+      "textRu": "Нашедшему — мелочь из кассы бюро. Не благодарность. Реклама.",
+      "next": "end"
+    },
+    { "id": "end", "type": "end" }
+  ],
+  "editorLayout": {
+    "a": { "x": 40, "y": 80 },
+    "b": { "x": 280, "y": 80 },
+    "end": { "x": 520, "y": 80 }
+  }
+}

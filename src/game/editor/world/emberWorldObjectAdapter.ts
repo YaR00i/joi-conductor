@@ -1,15 +1,25 @@
 import type {
+  EmberInteractivityModifier,
   EmberLightPreset,
   EmberLightSource,
   EmberMap,
   EmberMapRegion,
   EmberPack,
   EmberPixelSprite,
+  EmberSpritePlacement,
   EmberTileset,
   EmberTilesetTile,
   EmberVoxelModel,
   EmberVoxelPlacement,
 } from "../../content/types";
+import { clampElevation } from "../../content/types";
+import {
+  compactInteractivity,
+  defaultInteractivity,
+  isEmberInteractivityKind,
+  parseInteractivity,
+} from "../../content/interactivity";
+import { compactLootIds, parseLootIds } from "../../content/chestLoot";
 import {
   clearElevTile,
   elevationAt,
@@ -17,6 +27,7 @@ import {
   ensureMapLayers,
   heightVoxelsAt,
   tileSurfaceElev,
+  regionVolumeElev,
   topOccupiedElevAt,
 } from "../../tile/mapUtils";
 import {
@@ -44,6 +55,7 @@ import {
   setVoxelAssetComponentPresence,
   setVoxelInstanceComponentPresence,
   voxelOptionalComponentPresent,
+  type EmberOptionalComponentType,
   type EmberVoxelOptionalComponentType,
   type EmberVoxelOverrideComponentType,
 } from "./EmberVoxelPrefab";
@@ -145,6 +157,18 @@ function voxelObjectComponents(
       ),
     });
   }
+  const interactivity = parseInteractivity(placement.interactivity);
+  if (interactivity) {
+    components.push({
+      type: "interactivity",
+      kind: interactivity.kind,
+      triggerId: interactivity.triggerId,
+      scriptId: interactivity.scriptId,
+      iconId: interactivity.iconId,
+      shopId: interactivity.shopId,
+      questStatus: interactivity.questStatus,
+    });
+  }
   return components;
 }
 
@@ -221,6 +245,9 @@ function regionComponents(
       scriptId: region.scriptId,
       note: region.note,
       group: region.group,
+      targetMapId: region.targetMapId,
+      targetRegionId: region.targetRegionId,
+      boundObjectId: region.boundObjectId,
     });
   }
   if (region.kind === "teleport") {
@@ -251,6 +278,8 @@ function regionComponents(
       openModelId: region.openModelId,
       sceneId: region.sceneId,
       openClipId: region.openClipId,
+      lootIds: region.lootIds,
+      repeatable: region.repeatable,
     });
   } else if (region.kind === "camera_bound") {
     components.push({ type: "camera-bounds" });
@@ -314,6 +343,18 @@ export function getEmberWorldObject(
     if (spriteInstanceColliderPresent(value, sprite)) {
       components.push(colliderForSprite(value, context));
     }
+    const spriteInteractivity = parseInteractivity(value.interactivity);
+    if (spriteInteractivity) {
+      components.push({
+        type: "interactivity",
+        kind: spriteInteractivity.kind,
+        triggerId: spriteInteractivity.triggerId,
+        scriptId: spriteInteractivity.scriptId,
+        iconId: spriteInteractivity.iconId,
+        shopId: spriteInteractivity.shopId,
+        questStatus: spriteInteractivity.questStatus,
+      });
+    }
     return {
       key,
       ref,
@@ -351,9 +392,9 @@ export function getEmberWorldObject(
   if (ref.kind === "region") {
     const value = map.regions.find((item) => item.id === ref.id);
     if (!value) return null;
-    const resolvedZ = tileSurfaceElev(map, value.x, value.y);
+    const resolvedZ = regionVolumeElev(map, value);
     const valueTransform: EmberWorldTransform = {
-      ...transform(value.x, value.y, null, resolvedZ),
+      ...transform(value.x, value.y, value.elev ?? null, resolvedZ),
       scale: { x: value.w, y: value.h, z: 1 },
     };
     return {
@@ -699,12 +740,47 @@ export function applyEmberLightAssetInspectorFieldEdit(
   return next;
 }
 
+function setPlacementInteractivity<
+  T extends EmberVoxelPlacement | EmberSpritePlacement,
+>(placement: T, present: boolean): T {
+  if (present) {
+    return {
+      ...placement,
+      interactivity:
+        parseInteractivity(placement.interactivity) ?? defaultInteractivity(),
+    };
+  }
+  const { interactivity: _dropped, ...rest } = placement;
+  return rest as T;
+}
+
 export function setEmberWorldObjectComponentPresence(
   map: EmberMap,
   ref: EmberWorldObjectRef,
-  component: EmberVoxelOptionalComponentType,
+  component: EmberOptionalComponentType,
   present: boolean,
 ): EmberMap {
+  if (component === "interactivity") {
+    if (ref.kind === "voxel") {
+      let changed = false;
+      const voxelProps = (map.voxelProps ?? []).map((placement) => {
+        if (placement.id !== ref.id) return placement;
+        changed = true;
+        return setPlacementInteractivity(placement, present);
+      });
+      return changed ? { ...map, voxelProps } : map;
+    }
+    if (ref.kind === "sprite") {
+      let changed = false;
+      const sprites = (map.sprites ?? []).map((placement) => {
+        if (placement.id !== ref.id) return placement;
+        changed = true;
+        return setPlacementInteractivity(placement, present);
+      });
+      return changed ? { ...map, sprites } : map;
+    }
+    return map;
+  }
   if (ref.kind === "voxel") {
     let changed = false;
     const voxelProps = (map.voxelProps ?? []).map((placement) => {
@@ -1070,13 +1146,16 @@ export function patchEmberWorldObjectTransform(
           patch.scaleY == null
             ? item.h
             : Math.max(1, Math.min(map.height, Math.round(patch.scaleY)));
-        return {
+        const next = {
           ...item,
           w,
           h,
           x: patch.x == null ? Math.min(item.x, map.width - w) : clampX(patch.x, w),
           y: patch.y == null ? Math.min(item.y, map.height - h) : clampY(patch.y, h),
         };
+        if (patch.z === null) delete next.elev;
+        else if (patch.z != null) next.elev = clampElevation(patch.z);
+        return next;
       }),
     };
   }
@@ -1137,7 +1216,7 @@ export function patchEmberWorldObjectLocalTransform(
     ...(patch.x != null || patch.y != null
       ? { x: Math.round(worldX), y: Math.round(worldY) }
       : {}),
-    ...(ref.kind === "voxel" && patch.z != null
+    ...((ref.kind === "voxel" || ref.kind === "region") && patch.z != null
       ? { z: parent.pivot.z + localPosition.z }
       : {}),
     ...(ref.kind === "voxel" && patch.rotationQuarterTurns != null
@@ -1259,8 +1338,26 @@ export function setEmberWorldObjectsElevation(
     changed = true;
     return { ...item, elev: authored };
   });
+  const regions = map.regions.map((item) => {
+    if (!keys.has(`region:${item.id}`)) return item;
+    if (authored == null) {
+      if (item.elev == null) return item;
+      changed = true;
+      const next = { ...item };
+      delete next.elev;
+      return next;
+    }
+    if (item.elev === authored) return item;
+    changed = true;
+    return { ...item, elev: authored };
+  });
   if (!changed) return map;
-  return refreshEmberSceneHierarchyPivots({ ...map, voxelProps, sprites });
+  return refreshEmberSceneHierarchyPivots({
+    ...map,
+    voxelProps,
+    sprites,
+    regions,
+  });
 }
 
 /** Removes several non-tile scene objects as one editor command. */
@@ -1452,7 +1549,10 @@ export function applyEmberInspectorFieldEdit(
     }
     if (edit.fieldId === "z" && typeof edit.value === "number") {
       return patchEmberWorldObjectTransform(map, ref, {
-        z: Math.max(0, Math.min(8, Math.round(edit.value))),
+        z:
+          ref.kind === "region"
+            ? clampElevation(edit.value)
+            : Math.max(0, Math.min(8, Math.round(edit.value))),
       });
     }
     if (
@@ -1561,6 +1661,60 @@ export function applyEmberInspectorFieldEdit(
           };
         }
         return item;
+      }),
+    };
+  }
+
+  if (
+    (ref.kind === "voxel" || ref.kind === "sprite") &&
+    edit.componentType === "interactivity"
+  ) {
+    const patchInteractivity = (
+      current: EmberInteractivityModifier | undefined,
+    ): EmberInteractivityModifier | undefined => {
+      const base = parseInteractivity(current) ?? defaultInteractivity();
+      if (edit.fieldId === "kind") {
+        if (!isEmberInteractivityKind(edit.value)) return base;
+        return compactInteractivity({ ...base, kind: edit.value });
+      }
+      if (
+        edit.fieldId === "triggerId" ||
+        edit.fieldId === "scriptId" ||
+        edit.fieldId === "iconId" ||
+        edit.fieldId === "shopId" ||
+        edit.fieldId === "questStatus"
+      ) {
+        return compactInteractivity({
+          ...base,
+          [edit.fieldId]: optionalText(edit.value),
+        });
+      }
+      return base;
+    };
+    if (ref.kind === "voxel") {
+      return {
+        ...map,
+        voxelProps: (map.voxelProps ?? []).map((item) => {
+          if (item.id !== ref.id) return item;
+          const interactivity = patchInteractivity(item.interactivity);
+          if (!interactivity) {
+            const { interactivity: _dropped, ...rest } = item;
+            return rest;
+          }
+          return { ...item, interactivity };
+        }),
+      };
+    }
+    return {
+      ...map,
+      sprites: (map.sprites ?? []).map((item) => {
+        if (item.id !== ref.id) return item;
+        const interactivity = patchInteractivity(item.interactivity);
+        if (!interactivity) {
+          const { interactivity: _dropped, ...rest } = item;
+          return rest;
+        }
+        return { ...item, interactivity };
       }),
     };
   }
@@ -1754,16 +1908,42 @@ export function applyEmberInspectorFieldEdit(
         if (edit.fieldId === "group") {
           return { ...region, group: optionalText(edit.value) };
         }
-      }
-      if (edit.componentType === "teleport") {
+        if (edit.fieldId === "targetMapId") {
+          return { ...region, targetMapId: optionalText(edit.value) };
+        }
         if (edit.fieldId === "targetRegionId") {
           return { ...region, targetRegionId: optionalText(edit.value) };
         }
+        if (edit.fieldId === "boundObjectId") {
+          return { ...region, boundObjectId: optionalText(edit.value) };
+        }
+      }
+      if (edit.componentType === "teleport") {
+        if (edit.fieldId === "targetRegionId") {
+          return {
+            ...region,
+            targetRegionId: optionalText(edit.value),
+            ...(optionalText(edit.value)
+              ? { targetX: undefined, targetY: undefined }
+              : {}),
+          };
+        }
         if (edit.fieldId === "targetX" && typeof edit.value === "number") {
-          return { ...region, targetX: Math.round(edit.value) };
+          return {
+            ...region,
+            targetX: Math.round(edit.value),
+            targetRegionId: undefined,
+          };
         }
         if (edit.fieldId === "targetY" && typeof edit.value === "number") {
-          return { ...region, targetY: Math.round(edit.value) };
+          return {
+            ...region,
+            targetY: Math.round(edit.value),
+            targetRegionId: undefined,
+          };
+        }
+        if (edit.fieldId === "targetElevation" && typeof edit.value === "number") {
+          return { ...region, targetElevation: Math.round(edit.value) };
         }
       }
       if (edit.componentType === "spawn" && edit.fieldId === "group") {
@@ -1777,6 +1957,15 @@ export function applyEmberInspectorFieldEdit(
           edit.fieldId === "openClipId"
         ) {
           return { ...region, [edit.fieldId]: optionalText(edit.value) };
+        }
+        if (edit.fieldId === "lootIds") {
+          return { ...region, lootIds: compactLootIds(parseLootIds(edit.value)) };
+        }
+        if (edit.fieldId === "repeatable") {
+          return {
+            ...region,
+            repeatable: edit.value === true ? true : undefined,
+          };
         }
       }
       return region;

@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { EmberMap, EmberTileset } from "../content/types";
 import { elevationSteps } from "../content/types";
 import { elevTileIdAt } from "../tile/elevGroundLayers";
+import { mapNeedsInteriorCutawayMeshes } from "../tile/buildingInterior";
 import { blockStoryHeight } from "../tile/extruded";
 import { ensureMapLayers, heightVoxelsAt } from "../tile/mapUtils";
 import {
@@ -369,7 +370,7 @@ export function createChunkedVoxelTerrain(
         replaceChunk(descriptor.key, signature, built.group);
       });
 
-    if (!worker.available) {
+    if (!worker.available || mapNeedsInteriorCutawayMeshes(map)) {
       enqueue(syncJobs());
     } else {
       // Brush drags may publish many maps per second. Coalesce them before

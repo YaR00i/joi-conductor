@@ -1,5 +1,7 @@
 import type {
   EmberColliderModifier,
+  EmberInteractivityKind,
+  EmberQuestMarkerStatus,
   EmberLightSource,
   EmberMapRegion,
   EmberSpritePlacement,
@@ -81,6 +83,19 @@ export type EmberWorldTriggerComponent = Readonly<{
   scriptId?: string;
   note?: string;
   group?: string;
+  targetMapId?: string;
+  targetRegionId?: string;
+  boundObjectId?: string;
+}>;
+
+export type EmberWorldInteractivityComponent = Readonly<{
+  type: "interactivity";
+  kind: EmberInteractivityKind;
+  triggerId?: string;
+  scriptId?: string;
+  iconId?: string;
+  shopId?: string;
+  questStatus?: EmberQuestMarkerStatus;
 }>;
 
 export type EmberWorldTeleportComponent = Readonly<{
@@ -101,6 +116,8 @@ export type EmberWorldChestComponent = Readonly<{
   openModelId?: string;
   sceneId?: string;
   openClipId?: string;
+  lootIds?: readonly string[];
+  repeatable?: boolean;
 }>;
 
 export type EmberWorldCameraBoundsComponent = Readonly<{
@@ -136,7 +153,8 @@ export type EmberWorldObjectComponent =
   | EmberWorldChestComponent
   | EmberWorldCameraBoundsComponent
   | EmberWorldBlockComponent
-  | EmberWorldColliderComponent;
+  | EmberWorldColliderComponent
+  | EmberWorldInteractivityComponent;
 
 export type EmberWorldObjectSource =
   | { kind: "voxel"; value: EmberVoxelPlacement }

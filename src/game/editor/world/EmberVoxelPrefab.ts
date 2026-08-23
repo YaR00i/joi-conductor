@@ -19,10 +19,17 @@ export type EmberVoxelOverrideComponentType =
   | "collider"
   | "voxel-light";
 
-/** Optional components shared by the unified WorldObject Inspector. */
-export type EmberOptionalComponentType = "collider" | "voxel-light";
-/** @deprecated Use EmberOptionalComponentType outside voxel-prefab internals. */
-export type EmberVoxelOptionalComponentType = EmberOptionalComponentType;
+/** Optional prefab components that inherit from the voxel/sprite asset. */
+export type EmberVoxelPrefabComponentType = "collider" | "voxel-light";
+/**
+ * Optional components in the unified WorldObject Inspector.
+ * `interactivity` is instance-only (not an asset default).
+ */
+export type EmberOptionalComponentType =
+  | EmberVoxelPrefabComponentType
+  | "interactivity";
+/** Prefab add/remove only — do not pass `interactivity` here. */
+export type EmberVoxelOptionalComponentType = EmberVoxelPrefabComponentType;
 
 export type EmberVoxelPrefabField<T> = Readonly<{
   value: T;

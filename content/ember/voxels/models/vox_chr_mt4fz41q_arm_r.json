@@ -1,0 +1,40 @@
+{
+  "id": "vox_chr_mt4fz41q_arm_r",
+  "nameRu": "Рука П",
+  "mesh": {
+    "kind": "vox",
+    "file": "voxels/models/vox_chr_mt4fz41q_arm_r.vox"
+  },
+  "model": {
+    "id": "vox_chr_mt4fz41q_arm_r",
+    "nameRu": "Рука П",
+    "tags": [
+      "character",
+      "chibi"
+    ],
+    "sizeBlocks": {
+      "x": 1,
+      "y": 1,
+      "z": 1
+    },
+    "heightVoxels": 10,
+    "palette": [
+      "",
+      "#e8c8b0",
+      "#7ec8f0",
+      "#f4f0ea",
+      "#3a6aaa",
+      "#2a4060",
+      "#c04040",
+      "#f0f0f0",
+      "#202028"
+    ],
+    "voxels": [],
+    "material": "cloth",
+    "physical": true
+  },
+  "tags": [
+    "character",
+    "chibi"
+  ]
+}

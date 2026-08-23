@@ -205,24 +205,36 @@ Ember — кубичный/воксельный мир внутри Electron-п�
 
 ## 8. Волны работы
 
-**Волна 1 — библиотека (старт).** Только новые `vox_fan_*`, без карты.
+**Волна 1 — библиотека (сделано).** `scripts/gen-ember-fantasy-props.mjs`
 
-Предлагаемый набор:
+`vox_fan_signpost`, `vox_fan_well`, `vox_fan_torch`, `vox_fan_crate_old`,
+`vox_fan_rock`, `vox_fan_grass` (`physical: false`), `vox_fan_shrine`,
+`vox_fan_tree_stump`.
 
-1. `vox_fan_signpost` — деревянный указатель
-2. `vox_fan_well` — колодец
-3. `vox_fan_torch` — напольный факел
-4. `vox_fan_crate_old` — потёртый ящик
-5. `vox_fan_rock` — валун
-6. `vox_fan_grass` — пучок травы (`physical: false`)
-7. `vox_fan_shrine` — маленький алтарь
-8. `vox_fan_tree_stump` — пень
+**Env2 — путь / лес / вода / пещера (сделано).** `scripts/gen-ember-fantasy-env2.mjs`
 
-**Волна 2** — расстановка на `hu_tao_village` (отдельная задача).
+`vox_fan_lantern_stone`, `vox_fan_cart` (2×1), `vox_fan_gate_post`, `vox_fan_log`,
+`vox_fan_reeds` (`physical: false`, tag `water`), `vox_fan_stalagmite` (tag `cave`),
+`vox_fan_campfire`, `vox_fan_mushrooms`.
 
-**Волна 3** — крупные вещи как несколько пропов или voxel scene, не один гигантский массив.
+**Env3 — двор / улица деревни (следующая библиотека).** Новый скрипт
+`scripts/gen-ember-fantasy-env3.mjs`. Не перегенерировать Wave 1 / env2.
+Не копировать `vox_vil_*`. Расстановка на карту — отдельная задача.
 
-**Волна 4** — только если волна 1 читается с орбиты: ворота, телега, каменный фонарь.
+1. `vox_fan_barrel` — бочка, обручи, клёпки; не идеальный цилиндр
+2. `vox_fan_bench` — лавка, толстые ножки, пустота под сиденьем
+3. `vox_fan_fence` — сегмент забора 1×1, столбы + перекладины, дырки между
+4. `vox_fan_hay` — стог / тюк сена, перевязан, массивный
+5. `vox_fan_bucket` — деревянное ведро + верёвка
+6. `vox_fan_flowers` — клумба (`physical: false`), 2–3 цвета цветков
+7. `vox_fan_notice_board` — доска объявлений, два столба, бумажки
+8. `vox_fan_lantern_paper` — бумажный фонарь на шесте; emissive, без cube-теней, tag `light`
+
+Теги: `fantasy` + `outdoor` на всех. Extra: `light` на фонаре.
+
+**Расстановка на `hu_tao_village`** — отдельная задача после env3.
+
+**Крупные вещи** (мельница, лодка, мост) — несколько пропов или voxel scene, не один гигантский массив.
 
 ---
 
@@ -252,3 +264,41 @@ content/ember/voxels/models/<id>.json. Не трогай registry.json, карт
 - в редакторе проп ставится на землю, читается с орбиты, не «иголка» и не шум.
 
 Движковые правки и Creative Mode этому боту не отдавать — это другой чат / `EMBER_AI_HANDOFF.md`.
+
+---
+
+## 11. Промпт на env3 (двор / улица)
+
+```text
+Fantasy environment prop library only. No map placement, no registry.json, no src/** changes.
+Wave 1 and env2 files are unchanged by the env3 generator.
+
+Read docs/EMBER_VOXEL_BOT.md. Wave 1 = scripts/gen-ember-fantasy-props.mjs.
+Env2 = scripts/gen-ember-fantasy-env2.mjs. Do not rewrite those scripts or their vox_fan_* outputs.
+
+Env3 — village yard / street
+Script scripts/gen-ember-fantasy-env3.mjs (same emptyGrid / setV / box / finishModel pattern)
+writes eight new ids. MagicaVoxel form language: thick masses, 6–10 colors, readable at 45–60°.
+Does not copy vox_vil_* test assets.
+
+id	What it is	Notes
+vox_fan_barrel	Barrel	Staves + iron hoops; not a perfect cylinder
+vox_fan_bench	Bench	Thick legs, open gap under the seat
+vox_fan_fence	Fence segment	1×1; posts + rails with holes between
+vox_fan_hay	Hay bale	Tied rectangular mass
+vox_fan_bucket	Wooden bucket	Staves, rope, optional water disc
+vox_fan_flowers	Flower patch	physical: false; thick clumps, 2–3 flower colors
+vox_fan_notice_board	Notice board	Two posts, papers, nails
+vox_fan_lantern_paper	Paper lantern on a pole	Small emissive, no cube shadows
+
+Tags: fantasy + outdoor on all. Extra: light on lantern_paper.
+Prefix vox_fan_* is already inferred as fantasy in library search.
+
+How to review / test
+node scripts/gen-ember-fantasy-env3.mjs — regenerates the eight env3 files only.
+Ember Editor → map → library → Воксели → search fan, or tags fantasy / outdoor / light.
+Place each prop and orbit 45–60°. Expect thick silhouettes. Flowers are walk-through.
+Lantern glows without cube shadows.
+
+Intentionally not in this PR: placing props on hu_tao_village, or large multi-prop scenes.
+```

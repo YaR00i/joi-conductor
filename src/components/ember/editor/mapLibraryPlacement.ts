@@ -18,6 +18,19 @@ export type MapLibraryPlacementMode = "surface" | "floor" | "grid";
 export type MapLibraryPlacementTarget = TilePos & { elev: number };
 
 /**
+ * Lights always drop to the column top. Regions treat "surface" as the
+ * locked brush plane — iso camera hits the ceiling first, same as blocks.
+ */
+export function effectiveMapLibraryPlacementMode(
+  payloadKind: MapLibPayload["kind"] | undefined,
+  requested: MapLibraryPlacementMode,
+): MapLibraryPlacementMode {
+  if (payloadKind === "light") return "floor";
+  if (payloadKind === "region" && requested === "surface") return "grid";
+  return requested;
+}
+
+/**
  * Resolves one authoritative target shared by ghost, validation and commit.
  * Surface uses the exact face raycast, floor drops vertically onto authored
  * terrain, and grid keeps the current editor Z plane.

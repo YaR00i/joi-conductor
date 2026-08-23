@@ -1,11 +1,20 @@
 /**
- * 3D per-voxel sculptor: hover highlight, paint / add / erase / emit / shine / fill / pick.
+ * 3D per-voxel sculptor: hover, paint / add / erase / emit / shine / glass / transmittance.
  * Pattern follows three.js interactive voxelpainter (raycast + orbit).
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+} from "react";
 import * as THREE from "three";
 import type {
   EmberPack,
+  EmberVoxelCharacterTemplate,
   EmberVoxelModel,
 } from "../../../game/content/types";
 import {
@@ -15,7 +24,7 @@ import {
 } from "../../../game/content/libraryTags";
 import { countLibraryAssetReferences } from "../../../game/editor/emberLibraryIndex";
 import { EDITOR_ISO_POLAR } from "../../../game/three/editorThreePreview";
-import { createPlayerCapsuleOverlay } from "../../../game/three/playerCapsuleOverlay";
+import { createPlayerCapsuleOverlay, resizePlayerCapsuleOverlay } from "../../../game/three/playerCapsuleOverlay";
 import { DEFAULT_WORLD_BODY } from "../../../game/world/worldPhysics";
 import {
   EMBER_ENV_VOXEL_MULTS,
@@ -62,6 +71,7 @@ import {
   getVoxelEmissive,
   getVoxelShine,
   getVoxelTransparency,
+  getVoxelTransmittance,
   newVoxelVariantId,
   normalizeVoxelModel,
   normalizeVoxelSelection,
@@ -80,8 +90,11 @@ import {
   setVoxelEmissive,
   setVoxelShine,
   setVoxelTransparency,
+  setVoxelTransmittance,
   stampSolidBlock,
   voxelGridSize,
+  voxelTransmittanceLeak,
+  voxelTransmittanceShadowParams,
   VOXEL_MIRROR_OFF,
   type SelectionEditOp,
   type VoxelMirrorAxes,
@@ -89,19 +102,33 @@ import {
   type VoxelSelectionSet,
 } from "../../../game/voxel/voxelModel";
 import {
+  cellFromShapePlaneHit,
+  cellWithShapeHeight,
   cellsForVoxelShape,
   cellsToUnitSelection,
+  dominantVoxelAxis,
   duplicateVoxelSelection,
+  gridExtentAlongAxis,
+  intersectAxisAlignedPlane,
+  intersectHeightAlongAxis,
   rotateVoxelSelection,
+  selectionHasSolidVoxels,
+  shapeFootprintCenter,
   stampVoxelShape,
+  translateVoxelSelection,
+  unionVoxelSelection,
+  usesShapeHeightPhase,
+  voxelSelectionCenter,
+  type VoxelAxis,
   type VoxelRotateAxis,
   type VoxelShapeBrush,
 } from "../../../game/voxel/voxelShapeBrush";
 import {
   countVoxelPaletteUsage,
+  fitVoxelPalette,
   replaceVoxelPaletteIndex,
 } from "../../../game/voxel/voxelPaletteOps";
-import { VOXELS_PER_BLOCK } from "../../../game/voxel/constants";
+import { VOXELS_PER_BLOCK, MAX_VOXEL_PALETTE } from "../../../game/voxel/constants";
 import { readEmberBytes } from "../../../game/content/io";
 import {
   packWithVoxels,
@@ -122,7 +149,6 @@ import {
 } from "../../../game/voxel/emberVoxCodec";
 import {
   ensureVoxelScenes,
-  findChildJoint,
   clearSceneJoints,
   moveAnimKey,
   newVoxelAnimClipId,
@@ -140,7 +166,26 @@ import {
   upsertSceneJoint,
   upsertSceneObject,
 } from "../../../game/voxel/voxelScene";
+import {
+  applySkeletonNodePose,
+  computeSkeletonPoses,
+  jointHingeWorld,
+  resolveJointAngleDeg,
+  translateSceneBone,
+} from "../../../game/voxel/voxelSkeleton";
+import {
+  CHIBI32_SLOT_LABEL_RU,
+  characterCapsule,
+  characterCapsuleCenterRelativeTo,
+  characterModelIdForSlotView,
+  characterSlotForObject,
+  createVoxelCharacter,
+  isCharacterScene,
+  isLockedCharacterObject,
+  newVoxelCharacterId,
+} from "../../../game/voxel/voxelCharacter";
 import type {
+  EmberCharacterCardView,
   EmberVoxelJointAxis,
   EmberVoxelScene,
 } from "../../../game/content/types";
@@ -155,10 +200,13 @@ import {
   resolveEmissiveStrength,
 } from "../../../game/tile/emissivePaint";
 import {
+  listVoxelEmissiveLamps,
   normalizeVoxelLightOffset,
-  resolveVoxelLightBase,
-  resolveVoxelLightOrigin,
+  patchVoxelEmissiveLamp,
+  resolveVoxelLampOrigin,
   summarizeVoxelEmissive,
+  summarizeVoxelEmissiveForLamp,
+  VOXEL_EMISSIVE_LAMPS_MAX,
 } from "../../../game/voxel/voxelEmissiveLight";
 import { packLampDiscDecay } from "../../../game/three/threeLighting";
 import { EditableRange } from "./EditableRange";
@@ -166,6 +214,7 @@ import { VoxelAnimTimeline } from "./VoxelAnimTimeline";
 import { VoxelObjectPropsPanel } from "./VoxelObjectPropsPanel";
 import { DeferredColorInput } from "./DeferredColorInput";
 import { VoxelSceneOutliner } from "./VoxelSceneOutliner";
+import { VoxelCharacterPanel } from "./VoxelCharacterPanel";
 
 export type VoxelSculptSession =
   | { mode: "library" }
@@ -202,6 +251,7 @@ type SculptTool =
   | "emit"
   | "shine"
   | "transparency"
+  | "transmittance"
   | "fill"
   | "replace"
   | "pick"
@@ -214,6 +264,74 @@ type SculptTool =
 type SelectMode = "box" | "layer" | "row" | "col" | "stack" | "linked";
 
 type HitCell = { x: number; y: number; z: number };
+
+function cellInVoxelSelection(
+  sel: VoxelSelectionSet | null | undefined,
+  cell: HitCell,
+): boolean {
+  if (!sel?.length) return false;
+  return sel.some(
+    (b) =>
+      cell.x >= b.x0 &&
+      cell.x <= b.x1 &&
+      cell.y >= b.y0 &&
+      cell.y <= b.y1 &&
+      cell.z >= b.z0 &&
+      cell.z <= b.z1,
+  );
+}
+
+function selectionGizmoScale(sel: VoxelSelectionSet): number {
+  const b = unionVoxelSelection(sel);
+  if (!b) return 1.2;
+  const m = Math.max(b.x1 - b.x0 + 1, b.y1 - b.y0 + 1, b.z1 - b.z0 + 1);
+  return Math.max(1.05, Math.min(2.8, 0.85 + m * 0.14));
+}
+
+type SculptBarMenuId = "edit" | "file" | "create";
+
+function SculptBarMenu({
+  id,
+  label,
+  title,
+  openId,
+  onOpen,
+  children,
+}: {
+  id: SculptBarMenuId;
+  label: string;
+  title?: string;
+  openId: SculptBarMenuId | null;
+  onOpen: (id: SculptBarMenuId | null) => void;
+  children: ReactNode;
+}) {
+  const open = openId === id;
+  return (
+    <div className={`ember-voxel-sculpt__menu ${open ? "is-open" : ""}`}>
+      <button
+        type="button"
+        className={`ghost ${open ? "is-on" : ""}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={title}
+        onClick={() => onOpen(open ? null : id)}
+        onMouseEnter={() => {
+          if (openId && openId !== id) onOpen(id);
+        }}
+      >
+        {label}
+        <span className="ember-voxel-sculpt__menu-caret" aria-hidden>
+          ▾
+        </span>
+      </button>
+      {open ? (
+        <div className="ember-voxel-sculpt__menu-panel" role="menu">
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 type InspectTarget = {
   objectId: string;
@@ -238,7 +356,7 @@ type SceneApi = {
   setMesh: (group: THREE.Group) => void;
   /** Palette hover without rebuilding geometry or changing the draft model. */
   previewPaletteColor: (paletteIndex: number, hex: string) => void;
-  /** Other scene objects (relative to active), cleared on each call. */
+  /** Other scene objects in scene space, cleared on each call. */
   setPeerMeshes: (groups: THREE.Group[]) => void;
   setSelection: (sel: VoxelSelectionSet | null) => void;
   /** Wire edges on exposed faces of solid voxels. */
@@ -258,25 +376,39 @@ type SceneApi = {
         }
       | null,
   ) => void;
+  /** Blender-style translate gizmo for the voxel selection. */
+  setSelectionGizmo: (
+    pose: { pos: { x: number; y: number; z: number }; scale: number } | null,
+  ) => void;
   /** Keep selection/grid/hover aligned when meshRoot has hinge pose. */
   syncEditOverlays: () => void;
   /** Yellow marker at emissive PointLight origin (voxel coords). */
   setLightOriginMarker: (
     pos: { x: number; y: number; z: number } | null,
   ) => void;
-  /** Live PointLight for sculpt studio preview. */
-  setPreviewEmissiveLight: (
-    cfg: {
+  setLightOriginExtras: (positions: { x: number; y: number; z: number }[]) => void;
+  /** Live PointLights for sculpt studio preview. */
+  setPreviewEmissiveLights: (
+    cfgs: Array<{
       pos: { x: number; y: number; z: number };
       color: THREE.Color;
       intensity: number;
-      /** Reach in voxel units. */
       distance: number;
-    } | null,
+      transmittanceLeak?: number;
+      softRings?: boolean;
+      softShadows?: boolean;
+    }> | null,
   ) => void;
   frameCamera: () => void;
   frameExploreCamera: () => void;
-  setPlayerCapsule: (visible: boolean) => void;
+  setPlayerCapsule: (opts: {
+    visible: boolean;
+    radius: number;
+    height: number;
+    x: number;
+    y: number;
+    z: number;
+  }) => void;
   dispose: () => void;
 };
 
@@ -703,6 +835,18 @@ function cellFromHit(
   };
 }
 
+function localHitNormal(
+  hit: THREE.Intersection,
+  meshRoot: THREE.Object3D,
+): THREE.Vector3 {
+  const space = voxelContentRoot(meshRoot);
+  space.updateWorldMatrix(true, false);
+  const nWorld = hit.face?.normal.clone() ?? new THREE.Vector3(0, 1, 0);
+  nWorld.transformDirection(hit.object.matrixWorld);
+  const inv = new THREE.Matrix4().copy(space.matrixWorld).invert();
+  return nWorld.transformDirection(inv).normalize();
+}
+
 /** True if integer grid vertex touches at least one solid voxel. */
 function vertexTouchesSolid(
   model: EmberVoxelModel,
@@ -760,6 +904,7 @@ function applyTool(
   emitAmount: number,
   shineAmount: number,
   transparencyAmount: number,
+  transmittanceAmount: number,
 ): EmberVoxelModel {
   switch (tool) {
     case "add":
@@ -779,6 +924,14 @@ function applyTool(
         cell.y,
         cell.z,
         transparencyAmount,
+      );
+    case "transmittance":
+      return setVoxelTransmittance(
+        model,
+        cell.x,
+        cell.y,
+        cell.z,
+        transmittanceAmount,
       );
     case "fill":
       return floodFillPaint(model, cell.x, cell.y, cell.z, paletteIndex);
@@ -845,6 +998,7 @@ const HOVER_COLOR: Record<SculptTool, number> = {
   emit: 0x80c0ff,
   shine: 0xc8e8f0,
   transparency: 0xa0e8ff,
+  transmittance: 0xffd080,
   fill: 0xc080ff,
   replace: 0xff80b0,
   pick: 0xffffff,
@@ -896,31 +1050,37 @@ const TOOL_BUTTONS: ReadonlyArray<{
   {
     id: "emit",
     label: "Свечение",
-    tip: "Эмиссия · E / 6 · при выделении — свет группы",
+    tip: "Эмиссия · E / 6 · при выделении — свет группы (подгруппа цвета)",
     key: "E",
   },
   {
     id: "shine",
     label: "Блеск",
-    tip: "Блеск · H / 7 · яркий = зеркало на верхней грани · при выделении — блеск группы",
+    tip: "Блеск · H / 7 · яркий = зеркало на верхней грани · при выделении — подгруппа",
     key: "✧",
   },
   {
     id: "transparency",
     label: "Прозрачность",
-    tip: "Прозрачность · T / 9 · видно насквозь · свет проходит · при выделении — на группу",
+    tip: "Прозрачность · T / 9 · видно насквозь · при выделении — подгруппа",
     key: "T",
+  },
+  {
+    id: "transmittance",
+    label: "Просвет",
+    tip: "Просвет · U · непрозрачный · тень светлеет и мягче с расстоянием · 255 = без тени",
+    key: "U",
   },
   {
     id: "select",
     label: "Группа",
-    tip: "Выделение · R / 0 · Shift+Y/X/Z/V/B — режимы",
+    tip: "Выделение · R / 0 · гизмо / стрелки сдвигают группу · Shift+Y/X/Z/V/B",
     key: "R",
   },
   {
     id: "move",
     label: "Сдвиг",
-    tip: "Сдвиг объекта в сцене (offset) · стрелки / outliner",
+    tip: "Сдвиг группы вокселей · гизмо / стрелки · без выделения — кость в сцене",
     key: "M",
   },
   {
@@ -938,8 +1098,16 @@ const SHAPE_BRUSHES: ReadonlyArray<{
 }> = [
   { id: "voxel", label: "Точка", tip: "Один воксель, как сейчас · N переключает форму" },
   { id: "line", label: "Линия", tip: "ЛКМ-drag: линия от точки до точки" },
-  { id: "box", label: "Коробка", tip: "ЛКМ-drag: заполненный прямоугольник" },
-  { id: "sphere", label: "Сфера", tip: "ЛКМ-drag: сфера вписанная в рамку" },
+  {
+    id: "box",
+    label: "Коробка",
+    tip: "ЛКМ-drag по грани клика · отпустить — выдавить по нормали · ЛКМ/Enter — ок · ПКМ/Esc — отмена",
+  },
+  {
+    id: "sphere",
+    label: "Сфера",
+    tip: "ЛКМ-drag по грани клика · отпустить — выдавить по нормали · ЛКМ/Enter — ок · ПКМ/Esc — отмена",
+  },
 ];
 
 const SELECT_MODES: ReadonlyArray<{
@@ -1003,17 +1171,27 @@ export function VoxelSculptPanel({
   const toolRef = useRef<SculptTool>("add");
   const shapeBrushRef = useRef<VoxelShapeBrush>("voxel");
   const shapeDragRef = useRef<{
+    kind: Exclude<VoxelShapeBrush, "voxel">;
+    phase: "plane" | "height";
     start: HitCell;
+    planeEnd: HitCell;
     end: HitCell;
     erase: boolean;
+    heightAxis: VoxelAxis;
+    heightAnchorClientY: number;
+    heightAnchor: number;
+    heightRayBase: number | null;
   } | null>(null);
   const onShapeCommitRef = useRef<
     (start: HitCell, end: HitCell, erase: boolean) => void
   >(() => {});
+  const onShapeCancelRef = useRef<() => void>(() => {});
+  const onShapeConfirmRef = useRef<() => boolean>(() => false);
   const paletteRef = useRef(1);
   const emitRef = useRef(180);
   const shineRef = useRef(180);
   const transparencyRef = useRef(160);
+  const transmittanceRef = useRef(255);
   const lastCellRef = useRef<string | null>(null);
   const paintingRef = useRef(false);
   const orbitingRef = useRef(false);
@@ -1033,9 +1211,25 @@ export function VoxelSculptPanel({
   const onMoveLightOffsetRef = useRef<
     (offset: { x: number; y: number; z: number }) => void
   >(() => {});
+  const onSelMovePreviewRef = useRef<
+    (
+      delta: HitCell,
+    ) => {
+      center: { x: number; y: number; z: number };
+      scale: number;
+    } | null
+  >(() => null);
+  const onSelMoveCommitRef = useRef<(delta: HitCell) => void>(() => {});
+  const onSelMoveCancelRef = useRef<() => void>(() => {});
+  const translateSelectedVoxelsRef = useRef<(delta: HitCell) => void>(() => {});
+  const selMoveBaseRef = useRef<{
+    model: EmberVoxelModel;
+    sel: VoxelSelectionSet;
+  } | null>(null);
   const onInspectRef = useRef<
     (payload: { objectId: string | null; cell: HitCell }) => void
   >(() => {});
+  const onActivateObjectRef = useRef<(objectId: string) => void>(() => {});
   const selectModeRef = useRef<SelectMode>("box");
   const selectEmptyRef = useRef(false);
   const mirrorAxesRef = useRef<VoxelMirrorAxes>(VOXEL_MIRROR_OFF);
@@ -1079,6 +1273,8 @@ export function VoxelSculptPanel({
   /** Single flag for hinge UI / picking — cancel always clears this. */
   const [hingeActive, setHingeActive] = useState(false);
   const [hingeAxis, setHingeAxis] = useState<EmberVoxelJointAxis>("x");
+  const [characterCardView, setCharacterCardView] =
+    useState<EmberCharacterCardView>("front");
   const [hingeParentId, setHingeParentId] = useState<string | null>(null);
   const [hingeChildId, setHingeChildId] = useState<string | null>(null);
   const [keyAngleDeg, setKeyAngleDeg] = useState(0);
@@ -1096,6 +1292,7 @@ export function VoxelSculptPanel({
   const keyAngleDegRef = useRef(0);
   const selectedJointIdRef = useRef<string | null>(null);
   const activeSceneRef = useRef<EmberVoxelScene | null>(null);
+  const prevSceneIdForAnimRef = useRef<string | null>(null);
   const activeObjectIdRef = useRef(activeObjectId);
   const [envVoxelMult, setEnvVoxelMult] = useState<EmberEnvVoxelMult>(() =>
     getEmberEnvMapVoxelMult(),
@@ -1184,12 +1381,16 @@ export function VoxelSculptPanel({
   const [emitAmount, setEmitAmount] = useState(180);
   const [shineAmount, setShineAmount] = useState(180);
   const [transparencyAmount, setTransparencyAmount] = useState(160);
+  const [transmittanceAmount, setTransmittanceAmount] = useState(255);
   const [inspectTarget, setInspectTarget] = useState<InspectTarget | null>(
     null,
   );
   const [pickingLightOrigin, setPickingLightOrigin] = useState(false);
   const pickingLightOriginRef = useRef(false);
   pickingLightOriginRef.current = pickingLightOrigin;
+  const [activeLampId, setActiveLampId] = useState<string | null>(null);
+  const activeLampIdRef = useRef<string | null>(null);
+  activeLampIdRef.current = activeLampId;
   const [hoverLabel, setHoverLabel] = useState("—");
   const [saving, setSaving] = useState(false);
   const [histTick, setHistTick] = useState(0);
@@ -1200,13 +1401,15 @@ export function VoxelSculptPanel({
       return true;
     }
   });
-  const [autoSaveNote, setAutoSaveNote] = useState<string | null>(null);
+  const [sculptMenu, setSculptMenu] = useState<SculptBarMenuId | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoSaveGenRef = useRef(0);
   const lastSavedJsonRef = useRef<string>("");
   const skipPackSyncRef = useRef(false);
   const packRef = useRef(pack);
   packRef.current = pack;
+  const onSavedRef = useRef(onSaved);
+  onSavedRef.current = onSaved;
   const commitSceneRef = useRef<
     (nextScene: EmberVoxelScene, modelsExtra?: Record<string, EmberVoxelModel>) => void
   >(() => {});
@@ -1217,9 +1420,14 @@ export function VoxelSculptPanel({
   toolRef.current = tool;
   shapeBrushRef.current = shapeBrush;
   paletteRef.current = paletteIndex;
+
+  useEffect(() => {
+    onShapeCancelRef.current();
+  }, [tool, shapeBrush]);
   emitRef.current = emitAmount;
   shineRef.current = shineAmount;
   transparencyRef.current = transparencyAmount;
+  transmittanceRef.current = transmittanceAmount;
   selectModeRef.current = selectMode;
   selectEmptyRef.current = selectEmpty;
   mirrorAxesRef.current = mirrorAxes;
@@ -1343,11 +1551,18 @@ export function VoxelSculptPanel({
     const d = draftRef.current;
     if (!d) return;
     beginEditRef.current();
-    setDraft({
-      ...d,
-      emissiveCastsLight: true,
-      emissiveLightOrigin: { x: cell.x, y: cell.y, z: cell.z },
-    });
+    const lamps = listVoxelEmissiveLamps(d);
+    const lampId = activeLampIdRef.current ?? lamps[0]?.id;
+    const origin = { x: cell.x, y: cell.y, z: cell.z };
+    setDraft(
+      lampId
+        ? patchVoxelEmissiveLamp(d, lampId, { origin })
+        : {
+            ...d,
+            emissiveCastsLight: true,
+            emissiveLightOrigin: origin,
+          },
+    );
     setPickingLightOrigin(false);
     onSaved?.(
       `Источник света: ${cell.x}, ${cell.y}, ${cell.z}`,
@@ -1358,11 +1573,18 @@ export function VoxelSculptPanel({
     const d = draftRef.current;
     if (!d) return;
     beginEditRef.current();
-    setDraft({
-      ...d,
-      emissiveCastsLight: true,
-      emissiveLightOffset: normalizeVoxelLightOffset(offset),
-    });
+    const lamps = listVoxelEmissiveLamps(d);
+    const lampId = activeLampIdRef.current ?? lamps[0]?.id;
+    const normalized = normalizeVoxelLightOffset(offset);
+    setDraft(
+      lampId
+        ? patchVoxelEmissiveLamp(d, lampId, { offset: normalized })
+        : {
+            ...d,
+            emissiveCastsLight: true,
+            emissiveLightOffset: normalized,
+          },
+    );
   };
 
   onInspectRef.current = (payload: {
@@ -1383,6 +1605,12 @@ export function VoxelSculptPanel({
       setActiveObjectId(objectId);
     }
     setInspectTarget({ objectId, modelId, cell: payload.cell });
+  };
+
+  onActivateObjectRef.current = (objectId: string) => {
+    if (objectId && objectId !== activeObjectIdRef.current) {
+      setActiveObjectId(objectId);
+    }
   };
 
   // Sync external modelId (library / tab) into active scene.
@@ -1441,14 +1669,22 @@ export function VoxelSculptPanel({
     const obj =
       scene?.objects.find((o) => o.id === activeObjectId) ??
       scene?.objects[0];
-    const mid = obj?.modelId;
+    const slot = scene && obj ? characterSlotForObject(scene, obj.id) : undefined;
+    const mid =
+      scene && slot
+        ? characterModelIdForSlotView(scene, slot, characterCardView) ??
+          obj?.modelId
+        : obj?.modelId;
     const m = mid ? pack.voxelModels[mid] : undefined;
     resetHistory();
     setSelection(null);
     setLibLoadId("");
-    setAutoSaveNote(null);
-    setAnimClipId(scene?.animations?.[0]?.id ?? null);
-    setSelectedJointId(scene?.joints?.[0]?.id ?? null);
+    const sceneChanged = prevSceneIdForAnimRef.current !== (activeId ?? null);
+    prevSceneIdForAnimRef.current = activeId ?? null;
+    if (sceneChanged) {
+      setAnimClipId(scene?.animations?.[0]?.id ?? null);
+      setSelectedJointId(scene?.joints?.[0]?.id ?? null);
+    }
     if (mid && restoreHistSession(mid)) {
       const saved = pack.voxelModels[mid];
       if (saved) {
@@ -1456,11 +1692,11 @@ export function VoxelSculptPanel({
       }
       return;
     }
-    const loaded = m ? normalizeVoxelModel(m) : null;
+    const loaded = m ? fitVoxelPalette(normalizeVoxelModel(m)) : null;
     setDraft(loaded);
     lastSavedJsonRef.current = loaded ? JSON.stringify(loaded) : "";
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pack is initial source only
-  }, [activeId, activeObjectId, variantMode, restoreHistSession]);
+  }, [activeId, activeObjectId, characterCardView, variantMode, restoreHistSession]);
 
   // External pack updates for the active mesh (skip our own autosave echoes).
   useEffect(() => {
@@ -1482,7 +1718,7 @@ export function VoxelSculptPanel({
       }
     }
     lastSavedJsonRef.current = json;
-    setDraft(normalizeVoxelModel(m));
+    setDraft(fitVoxelPalette(normalizeVoxelModel(m)));
   }, [pack.voxelModels, activeObject?.modelId, variantMode]);
 
   // Placement variant: clone source into an isolated draft (don't mutate shared).
@@ -1516,6 +1752,19 @@ export function VoxelSculptPanel({
     () => (draft ? countVoxelPaletteUsage(draft) : []),
     [draft],
   );
+
+  useEffect(() => {
+    if (!draft) return;
+    const last = draft.palette.length - 1;
+    if (paletteIndex > last) setPaletteIndex(Math.max(1, last));
+  }, [draft, paletteIndex]);
+
+  useEffect(() => {
+    if (!draft || draft.palette.length < 128) return;
+    const next = fitVoxelPalette(draft);
+    if (next.palette.length === draft.palette.length) return;
+    setDraft(next);
+  }, [draft]);
 
   const pickerItems = useMemo(() => {
     const q = pickerQuery.trim().toLowerCase();
@@ -1581,6 +1830,19 @@ export function VoxelSculptPanel({
     scene.add(new THREE.HemisphereLight(0xffe0c0, 0x203040, 0.5));
     const key = new THREE.DirectionalLight(0xffe8d0, 0.75);
     key.position.set(6, 10, 4);
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.bias = -0.0008;
+    key.shadow.normalBias = 0.06;
+    key.shadow.radius = 0;
+    const keyCam = key.shadow.camera;
+    keyCam.near = 0.5;
+    keyCam.far = 48;
+    keyCam.left = -28;
+    keyCam.right = 28;
+    keyCam.top = 28;
+    keyCam.bottom = -28;
+    keyCam.updateProjectionMatrix();
     scene.add(key);
 
     const meshRoot = new THREE.Group();
@@ -1588,6 +1850,11 @@ export function VoxelSculptPanel({
     const peerRoot = new THREE.Group();
     peerRoot.name = "vox-peers";
     scene.add(peerRoot);
+    const peerHoverBox = new THREE.BoxHelper(peerRoot, 0xf0c060);
+    peerHoverBox.visible = false;
+    peerHoverBox.raycast = () => {};
+    scene.add(peerHoverBox);
+    let lastPeerHop = { id: "", t: 0 };
 
     const hover = new THREE.Mesh(
       new THREE.BoxGeometry(1.02, 1.02, 1.02),
@@ -1629,28 +1896,67 @@ export function VoxelSculptPanel({
       basePos: new THREE.Vector3(),
     };
 
-    // Studio PointLight so range/strength match map play (voxel units).
-    const previewLight = new THREE.PointLight(
-      0xffc060,
-      0,
-      12,
-      packLampDiscDecay(0.32, 0.62),
-    );
-    previewLight.visible = false;
-    previewLight.castShadow = false;
-    scene.add(previewLight);
+    const selTranslateGizmo = createVoxelTranslateGizmo();
+    editOverlayRoot.add(selTranslateGizmo.root);
+    const selMoveDrag = {
+      active: false,
+      axis: "center" as TranslateGizmoHit,
+      startCenter: new THREE.Vector3(),
+      lastDelta: { x: 0, y: 0, z: 0 },
+    };
 
-    const configurePreviewLightShadow = (distance: number) => {
-      previewLight.castShadow = true;
-      previewLight.shadow.mapSize.set(512, 512);
-      previewLight.shadow.bias = -0.0008;
-      previewLight.shadow.normalBias = 0.08;
-      previewLight.shadow.camera.near = 0.15;
-      previewLight.shadow.camera.far = Math.max(distance * 1.25, 8);
-      previewLight.shadow.camera.updateProjectionMatrix();
-      previewLight.shadow.radius = 0;
-      previewLight.shadow.intensity = 1;
-      renderer.shadowMap.needsUpdate = true;
+    const previewLights: THREE.PointLight[] = [];
+    const extraLampRoot = new THREE.Group();
+    extraLampRoot.name = "extraLampMarkers";
+    editOverlayRoot.add(extraLampRoot);
+    const extraLampGeom = new THREE.SphereGeometry(0.2, 8, 6);
+    const extraLampMat = new THREE.MeshBasicMaterial({
+      color: 0xffc070,
+      depthTest: false,
+      transparent: true,
+      opacity: 0.85,
+    });
+
+    const configurePreviewLightShadow = (
+      light: THREE.PointLight,
+      distance: number,
+      leak = 0,
+      forceSoft = false,
+    ) => {
+      light.castShadow = true;
+      light.shadow.mapSize.set(256, 256);
+      light.shadow.bias = -0.0008;
+      light.shadow.normalBias = 0.08;
+      light.shadow.camera.near = 0.15;
+      light.shadow.camera.far = Math.max(distance * 1.25, 8);
+      light.shadow.camera.updateProjectionMatrix();
+      const soft = voxelTransmittanceShadowParams(leak, forceSoft);
+      light.shadow.radius = soft.radius;
+      light.shadow.intensity = soft.intensity;
+    };
+
+    const ensurePreviewLights = (count: number): THREE.PointLight[] => {
+      while (previewLights.length < count) {
+        const light = new THREE.PointLight(
+          0xffc060,
+          0,
+          12,
+          packLampDiscDecay(0.32, 0.62),
+        );
+        light.visible = false;
+        light.castShadow = false;
+        scene.add(light);
+        previewLights.push(light);
+      }
+      for (let i = 0; i < previewLights.length; i++) {
+        const light = previewLights[i]!;
+        if (i >= count) {
+          light.visible = false;
+          light.intensity = 0;
+          light.castShadow = false;
+        }
+      }
+      return previewLights.slice(0, count);
     };
 
     const bounds = new THREE.Mesh(
@@ -1801,6 +2107,7 @@ export function VoxelSculptPanel({
           disposeVoxelModelMesh(c);
         }
         meshRoot.add(group);
+        renderer.shadowMap.needsUpdate = true;
         api.render();
       },
       previewPaletteColor(paletteIndex, hex) {
@@ -1813,6 +2120,7 @@ export function VoxelSculptPanel({
           peerRoot.remove(c);
           disposeVoxelModelMesh(c);
         }
+        peerHoverBox.visible = false;
         for (const g of groups) peerRoot.add(g);
         api.render();
       },
@@ -1986,6 +2294,16 @@ export function VoxelSculptPanel({
         hingeGizmo.setVisible(true);
         api.render();
       },
+      setSelectionGizmo(pose) {
+        if (!pose) {
+          selTranslateGizmo.setVisible(false);
+          api.render();
+          return;
+        }
+        selTranslateGizmo.setPose(pose.pos, pose.scale);
+        selTranslateGizmo.setVisible(true);
+        api.render();
+      },
       syncEditOverlays() {
         // Selection / hover / grid live in voxel-local space. Match the
         // content group so hinge pose (pivot + rotation) does not skew picks.
@@ -2010,26 +2328,52 @@ export function VoxelSculptPanel({
           api.render();
           return;
         }
-        // Continuous voxel-space coords (cell centers + fractional offset).
         lightTranslateGizmo.setPose(pos, 1.15);
         lightTranslateGizmo.setVisible(true);
         api.render();
       },
-      setPreviewEmissiveLight(cfg) {
-        if (!cfg) {
-          previewLight.visible = false;
-          previewLight.intensity = 0;
-          previewLight.castShadow = false;
+      setLightOriginExtras(positions) {
+        while (extraLampRoot.children.length) {
+          extraLampRoot.remove(extraLampRoot.children[0]!);
+        }
+        for (const pos of positions) {
+          const marker = new THREE.Mesh(extraLampGeom, extraLampMat);
+          marker.position.set(pos.x, pos.y, pos.z);
+          extraLampRoot.add(marker);
+        }
+        api.render();
+      },
+      setPreviewEmissiveLights(cfgs) {
+        if (!cfgs || cfgs.length === 0) {
+          ensurePreviewLights(0);
+          renderer.shadowMap.needsUpdate = true;
           api.render();
           return;
         }
-        previewLight.visible = true;
-        previewLight.color.copy(cfg.color);
-        previewLight.intensity = Math.max(0, cfg.intensity);
-        previewLight.distance = Math.max(0.5, cfg.distance);
-        previewLight.position.set(cfg.pos.x, cfg.pos.y, cfg.pos.z);
-        // Always occlude by solid voxels in studio (map still uses model flag).
-        configurePreviewLightShadow(previewLight.distance);
+        const lights = ensurePreviewLights(
+          Math.min(cfgs.length, VOXEL_EMISSIVE_LAMPS_MAX),
+        );
+        for (let i = 0; i < lights.length; i++) {
+          const cfg = cfgs[i]!;
+          const light = lights[i]!;
+          light.visible = true;
+          light.color.copy(cfg.color);
+          light.intensity = Math.max(0, cfg.intensity);
+          light.distance = Math.max(0.5, cfg.distance);
+          light.position.set(cfg.pos.x, cfg.pos.y, cfg.pos.z);
+          light.decay = packLampDiscDecay(
+            0.32,
+            0.62,
+            cfg.softRings === true,
+          );
+          configurePreviewLightShadow(
+            light,
+            light.distance,
+            cfg.transmittanceLeak ?? 0,
+            cfg.softShadows === true,
+          );
+        }
+        renderer.shadowMap.needsUpdate = true;
         api.render();
       },
       frameCamera() {
@@ -2072,8 +2416,10 @@ export function VoxelSculptPanel({
         api.pitch = EDITOR_ISO_POLAR;
         api.frameCamera();
       },
-      setPlayerCapsule(visible) {
-        playerCapsule.visible = visible;
+      setPlayerCapsule(opts) {
+        resizePlayerCapsuleOverlay(playerCapsule, opts.radius, opts.height);
+        playerCapsule.visible = opts.visible;
+        playerCapsule.position.set(opts.x, opts.y, opts.z);
         api.render();
       },
       dispose() {
@@ -2096,6 +2442,65 @@ export function VoxelSculptPanel({
       ray.params.Line = { threshold: 0.15 };
       ray.setFromCamera(ndc, camera);
       return ray;
+    };
+
+    const overlayLocalToWorld = (local: THREE.Vector3) => {
+      editOverlayRoot.updateWorldMatrix(true, false);
+      return local.clone().applyMatrix4(editOverlayRoot.matrixWorld);
+    };
+    const overlayWorldToLocal = (world: THREE.Vector3) => {
+      editOverlayRoot.updateWorldMatrix(true, false);
+      const inv = new THREE.Matrix4().copy(editOverlayRoot.matrixWorld).invert();
+      return world.clone().applyMatrix4(inv);
+    };
+
+    const beginSelMove = (
+      axis: TranslateGizmoHit,
+      startCenter: { x: number; y: number; z: number },
+    ) => {
+      selMoveDrag.active = true;
+      selMoveDrag.axis = axis;
+      selMoveDrag.startCenter.set(startCenter.x, startCenter.y, startCenter.z);
+      selMoveDrag.lastDelta = { x: 0, y: 0, z: 0 };
+      selTranslateGizmo.setHighlight(axis);
+      const sel = selectionRef.current ?? [];
+      selTranslateGizmo.setPose(startCenter, selectionGizmoScale(sel));
+      el.style.cursor = "grabbing";
+    };
+
+    const deltaFromSelDragHit = (local: THREE.Vector3): HitCell => {
+      const rawX = local.x - selMoveDrag.startCenter.x;
+      const rawY = local.y - selMoveDrag.startCenter.y;
+      const rawZ = local.z - selMoveDrag.startCenter.z;
+      if (selMoveDrag.axis === "x") {
+        return { x: Math.round(rawX), y: 0, z: 0 };
+      }
+      if (selMoveDrag.axis === "y") {
+        return { x: 0, y: Math.round(rawY), z: 0 };
+      }
+      if (selMoveDrag.axis === "z") {
+        return { x: 0, y: 0, z: Math.round(rawZ) };
+      }
+      return {
+        x: Math.round(rawX),
+        y: Math.round(rawY),
+        z: Math.round(rawZ),
+      };
+    };
+
+    const applySelMoveDelta = (delta: HitCell) => {
+      if (
+        delta.x === selMoveDrag.lastDelta.x &&
+        delta.y === selMoveDrag.lastDelta.y &&
+        delta.z === selMoveDrag.lastDelta.z
+      ) {
+        return;
+      }
+      const pose = onSelMovePreviewRef.current(delta);
+      if (!pose) return;
+      selMoveDrag.lastDelta = delta;
+      selTranslateGizmo.setPose(pose.center, pose.scale);
+      api.render();
     };
 
     const activeTool = (): SculptTool => {
@@ -2172,6 +2577,235 @@ export function VoxelSculptPanel({
       return null;
     };
 
+    const shapePlaneName = (axis: VoxelAxis): string => {
+      switch (axis) {
+        case "x":
+          return "YZ";
+        case "y":
+          return "XZ";
+        case "z":
+          return "XY";
+        default: {
+          const _never: never = axis;
+          return _never;
+        }
+      }
+    };
+
+    const shapeDepthName = (axis: VoxelAxis): string => {
+      switch (axis) {
+        case "x":
+          return "глубина X";
+        case "y":
+          return "высота Y";
+        case "z":
+          return "глубина Z";
+        default: {
+          const _never: never = axis;
+          return _never;
+        }
+      }
+    };
+
+    const pickSculptMeshHit = (e: PointerEvent): THREE.Intersection | null => {
+      meshRoot.updateMatrixWorld(true);
+      return pointerRay(e).intersectObject(meshRoot, true)[0] ?? null;
+    };
+
+    const pickShapeStart = (
+      e: PointerEvent,
+    ): { cell: HitCell; heightAxis: VoxelAxis } | null => {
+      const hit = pickSculptMeshHit(e);
+      const t = activeTool();
+      const tool: SculptTool = t === "erase" ? "erase" : "add";
+      if (!hit) {
+        const cell = pick(e);
+        return cell ? { cell, heightAxis: "y" } : null;
+      }
+      const cell = clampCell(cellFromHit(hit, meshRoot, tool));
+      if (!cell) return null;
+      const n = localHitNormal(hit, meshRoot);
+      return {
+        cell,
+        heightAxis: dominantVoxelAxis({ x: n.x, y: n.y, z: n.z }),
+      };
+    };
+
+    const beginShapeStroke = (
+      kind: Exclude<VoxelShapeBrush, "voxel">,
+      cell: HitCell,
+      erase: boolean,
+      e: PointerEvent,
+      heightAxis: VoxelAxis,
+    ) => {
+      shapeDragRef.current = {
+        kind,
+        phase: "plane",
+        start: cell,
+        planeEnd: cell,
+        end: cell,
+        erase,
+        heightAxis,
+        heightAnchorClientY: e.clientY,
+        heightAnchor: cell[heightAxis],
+        heightRayBase: null,
+      };
+    };
+
+    const previewShapeStroke = (
+      drag: NonNullable<typeof shapeDragRef.current>,
+    ) => {
+      if (drag.kind === "box") {
+        api.setSelection([normalizeVoxelSelection(drag.start, drag.end)]);
+      } else {
+        api.setSelection(
+          cellsToUnitSelection(
+            cellsForVoxelShape(drag.start, drag.end, drag.kind),
+          ),
+        );
+      }
+      const box = normalizeVoxelSelection(drag.start, drag.end);
+      const w = box.x1 - box.x0 + 1;
+      const h = box.y1 - box.y0 + 1;
+      const d = box.z1 - box.z0 + 1;
+      const name =
+        drag.kind === "sphere"
+          ? "сфера"
+          : drag.kind === "box"
+            ? "коробка"
+            : "линия";
+      if (drag.kind === "line") {
+        setHoverLabel(`${name} ${w}×${h}×${d}`);
+        return;
+      }
+      if (drag.phase === "height") {
+        setHoverLabel(
+          `${name} ${w}×${h}×${d} · ${shapeDepthName(drag.heightAxis)} · ЛКМ/Enter · ПКМ/Esc`,
+        );
+        return;
+      }
+      setHoverLabel(
+        `${name} ${w}×${h}×${d} · плоскость ${shapePlaneName(drag.heightAxis)}`,
+      );
+    };
+
+    const pickShapePlaneCell = (
+      e: PointerEvent,
+      start: HitCell,
+      heightAxis: VoxelAxis,
+    ): HitCell | null => {
+      const draft = draftRef.current;
+      if (!draft) return null;
+      const g = voxelGridSize(draft);
+      const local = localPointerRay(e);
+      if (local) {
+        const hit = intersectAxisAlignedPlane(
+          local.origin,
+          local.dir,
+          heightAxis,
+          start[heightAxis] + 0.5,
+        );
+        if (hit) {
+          return cellFromShapePlaneHit(hit, start, heightAxis, g);
+        }
+      }
+      const cell = pick(e);
+      if (!cell) return { x: start.x, y: start.y, z: start.z };
+      return cellFromShapePlaneHit(
+        { x: cell.x + 0.5, y: cell.y + 0.5, z: cell.z + 0.5 },
+        start,
+        heightAxis,
+        g,
+      );
+    };
+
+    const sampleShapeHeightCoord = (
+      e: PointerEvent,
+      drag: NonNullable<typeof shapeDragRef.current>,
+    ): number | null => {
+      const local = localPointerRay(e);
+      if (!local) return null;
+      return intersectHeightAlongAxis(
+        local.origin,
+        local.dir,
+        shapeFootprintCenter(drag.start, drag.planeEnd, drag.heightAxis),
+        drag.heightAxis,
+        local.camPos,
+        local.camRight,
+      );
+    };
+
+    const pickShapeHeightEnd = (
+      e: PointerEvent,
+      drag: NonNullable<typeof shapeDragRef.current>,
+    ): HitCell => {
+      const draft = draftRef.current;
+      const g = draft ? voxelGridSize(draft) : { sx: 1, sy: 1, sz: 1 };
+      const sampled = sampleShapeHeightCoord(e, drag);
+      let h: number;
+      if (sampled != null && drag.heightRayBase != null) {
+        h = drag.start[drag.heightAxis] + (sampled - drag.heightRayBase);
+      } else {
+        h =
+          drag.heightAnchor +
+          Math.round((drag.heightAnchorClientY - e.clientY) / 10);
+      }
+      const max = gridExtentAlongAxis(g, drag.heightAxis);
+      h = Math.max(0, Math.min(max - 1, h));
+      return cellWithShapeHeight(drag.planeEnd, h, drag.heightAxis);
+    };
+
+    const localPointerRay = (e: PointerEvent) => {
+      const ray = pointerRay(e);
+      const space = voxelContentRoot(meshRoot);
+      space.updateWorldMatrix(true, false);
+      const inv = new THREE.Matrix4().copy(space.matrixWorld).invert();
+      const origin = ray.ray.origin.clone().applyMatrix4(inv);
+      const target = ray.ray.origin
+        .clone()
+        .add(ray.ray.direction)
+        .applyMatrix4(inv);
+      const dir = target.sub(origin);
+      if (dir.lengthSq() < 1e-12) return null;
+      dir.normalize();
+      const camPos = camera.position.clone();
+      space.worldToLocal(camPos);
+      const camRight = new THREE.Vector3()
+        .setFromMatrixColumn(camera.matrixWorld, 0)
+        .transformDirection(inv)
+        .normalize();
+      return {
+        origin: { x: origin.x, y: origin.y, z: origin.z },
+        dir: { x: dir.x, y: dir.y, z: dir.z },
+        camPos: { x: camPos.x, y: camPos.y, z: camPos.z },
+        camRight: { x: camRight.x, y: camRight.y, z: camRight.z },
+      };
+    };
+
+    const cancelShapeStroke = () => {
+      if (!shapeDragRef.current) return;
+      shapeDragRef.current = null;
+      paintingRef.current = false;
+      shiftEraseRef.current = false;
+      api.setSelection(selectionRef.current);
+      api.render();
+    };
+
+    const confirmShapeStroke = (): boolean => {
+      const drag = shapeDragRef.current;
+      if (!drag || !usesShapeHeightPhase(drag.kind)) return false;
+      onShapeCommitRef.current(drag.start, drag.end, drag.erase);
+      shapeDragRef.current = null;
+      paintingRef.current = false;
+      shiftEraseRef.current = false;
+      api.setSelection(selectionRef.current);
+      api.render();
+      return true;
+    };
+
+    onShapeCancelRef.current = cancelShapeStroke;
+    onShapeConfirmRef.current = confirmShapeStroke;
+
     /** Inspect: active mesh or any peer object in the scene. */
     const pickInspect = (
       e: PointerEvent,
@@ -2212,6 +2846,35 @@ export function VoxelSculptPanel({
       return cell ? { objectId: null, cell } : null;
     };
 
+    const hidePeerHover = () => {
+      peerHoverBox.visible = false;
+    };
+
+    const peerLabel = (objectId: string): string => {
+      const sc = activeSceneRef.current;
+      if (!sc) return objectId;
+      const slot = characterSlotForObject(sc, objectId);
+      if (slot) return CHIBI32_SLOT_LABEL_RU[slot];
+      const obj = sc.objects.find((o) => o.id === objectId);
+      return obj?.nameRu?.trim() || obj?.modelId || objectId;
+    };
+
+    const highlightPeer = (objectId: string) => {
+      const wrap = peerRoot.children.find((c) => c.name === `peer-${objectId}`);
+      if (!wrap) {
+        hidePeerHover();
+        return;
+      }
+      hover.visible = false;
+      vertexHover.visible = false;
+      lastHoverCellRef.current = null;
+      wrap.updateWorldMatrix(true, true);
+      peerHoverBox.setFromObject(wrap);
+      peerHoverBox.visible = true;
+      setHoverLabel(peerLabel(objectId));
+      api.render();
+    };
+
     /** Hinge pivots snap to solid voxel corners (vertices), not cell centers. */
     const pickVertex = (e: PointerEvent): HitCell | null => {
       const draft = draftRef.current;
@@ -2234,6 +2897,7 @@ export function VoxelSculptPanel({
 
     const showHover = (cell: HitCell | null) => {
       const hingeMode = activeTool() === "hinge";
+      hidePeerHover();
       if (!cell || !draftRef.current) {
         hover.visible = false;
         vertexHover.visible = false;
@@ -2314,11 +2978,7 @@ export function VoxelSculptPanel({
           return;
         }
         if (hit.objectId) {
-          hover.visible = false;
-          vertexHover.visible = false;
-          lastHoverCellRef.current = hit.cell;
-          setHoverLabel(`обзор ${hit.cell.x}, ${hit.cell.y}, ${hit.cell.z}`);
-          api.render();
+          highlightPeer(hit.objectId);
         } else {
           showHover(hit.cell);
         }
@@ -2459,6 +3119,7 @@ export function VoxelSculptPanel({
           emitRef.current,
           shineRef.current,
           transparencyRef.current,
+          transmittanceRef.current,
         );
       }
       if (next !== draftRef.current) {
@@ -2477,6 +3138,24 @@ export function VoxelSculptPanel({
     const PAINT_DRAG_THRESHOLD_PX = 3;
 
     const onDown = (e: PointerEvent) => {
+      const heightStroke = shapeDragRef.current;
+      if (
+        heightStroke &&
+        usesShapeHeightPhase(heightStroke.kind) &&
+        heightStroke.phase === "height"
+      ) {
+        if (e.button === 0 && !e.altKey) {
+          e.preventDefault();
+          confirmShapeStroke();
+          return;
+        }
+        if (e.button === 2) {
+          e.preventDefault();
+          cancelShapeStroke();
+          return;
+        }
+        return;
+      }
       if (!e.isPrimary || activePointerId !== null) return;
       if (e.button !== 0 && e.button !== 1 && e.button !== 2) return;
       activePointerId = e.pointerId;
@@ -2499,6 +3178,42 @@ export function VoxelSculptPanel({
         return;
       }
 
+      // Voxel-selection translate gizmo (Blender-style grab).
+      if (e.button === 0 && !e.altKey && selTranslateGizmo.root.visible) {
+        const ray = pointerRay(e);
+        const hit = selTranslateGizmo.pick(ray);
+        if (hit) {
+          e.preventDefault();
+          const center = voxelSelectionCenter(selectionRef.current);
+          if (center) {
+            beginSelMove(hit, center);
+            el.setPointerCapture(e.pointerId);
+            api.render();
+            return;
+          }
+        }
+      }
+
+      // Move tool: drag a selected solid (same as gizmo center).
+      if (
+        e.button === 0 &&
+        !e.altKey &&
+        toolRef.current === "move" &&
+        selectionRef.current?.length
+      ) {
+        const cell = pick(e);
+        if (cell && cellInVoxelSelection(selectionRef.current, cell)) {
+          const center = voxelSelectionCenter(selectionRef.current);
+          if (center) {
+            e.preventDefault();
+            beginSelMove("center", center);
+            el.setPointerCapture(e.pointerId);
+            api.render();
+            return;
+          }
+        }
+      }
+
       // Light-origin translate gizmo (PointLight center).
       if (
         e.button === 0 &&
@@ -2513,8 +3228,16 @@ export function VoxelSculptPanel({
           const draft = draftRef.current;
           const sum = draft ? summarizeVoxelEmissive(draft) : null;
           if (draft && sum) {
-            const origin = resolveVoxelLightOrigin(draft, sum);
-            const base = resolveVoxelLightBase(draft, sum);
+            const lamps = listVoxelEmissiveLamps(draft);
+            const lamp =
+              lamps.find((item) => item.id === activeLampIdRef.current) ??
+              lamps[0]!;
+            const origin = resolveVoxelLampOrigin(draft, lamp, sum);
+            const base = resolveVoxelLampOrigin(
+              draft,
+              { ...lamp, offset: undefined },
+              sum,
+            );
             lightDrag.active = true;
             lightDrag.axis = hit;
             lightDrag.startPos.set(origin.x, origin.y, origin.z);
@@ -2607,6 +3330,29 @@ export function VoxelSculptPanel({
       }
       if (e.button !== 0) return;
 
+      // Ctrl/Cmd+LMB or double-click a peer → make it the active slot.
+      if (
+        !pickingLightOriginRef.current &&
+        toolRef.current !== "hinge" &&
+        toolRef.current !== "inspect"
+      ) {
+        const hit = pickInspect(e);
+        if (hit?.objectId) {
+          const now = performance.now();
+          const dbl =
+            hit.objectId === lastPeerHop.id && now - lastPeerHop.t < 400;
+          lastPeerHop = { id: hit.objectId, t: now };
+          if (e.ctrlKey || e.metaKey || dbl) {
+            e.preventDefault();
+            onActivateObjectRef.current(hit.objectId);
+            return;
+          }
+          e.preventDefault();
+          highlightPeer(hit.objectId);
+          return;
+        }
+      }
+
       // Place PointLight origin on a voxel (from object props «Источник»).
       if (pickingLightOriginRef.current) {
         e.preventDefault();
@@ -2632,15 +3378,18 @@ export function VoxelSculptPanel({
         (t === "add" || t === "erase") &&
         shapeBrushRef.current !== "voxel"
       ) {
-        const cell = pick(e);
-        if (cell) {
-          shapeDragRef.current = {
-            start: cell,
-            end: cell,
-            erase: t === "erase" || shiftEraseRef.current,
-          };
-          showHover(cell);
-          api.setSelection(cellsToUnitSelection([cell]));
+        const kind = shapeBrushRef.current;
+        const started = pickShapeStart(e);
+        if (started) {
+          beginShapeStroke(
+            kind,
+            started.cell,
+            t === "erase" || shiftEraseRef.current,
+            e,
+            usesShapeHeightPhase(kind) ? started.heightAxis : "y",
+          );
+          showHover(started.cell);
+          if (shapeDragRef.current) previewShapeStroke(shapeDragRef.current);
         }
         return;
       }
@@ -2649,6 +3398,19 @@ export function VoxelSculptPanel({
 
     const onMove = (e: PointerEvent) => {
       if (activePointerId !== null && e.pointerId !== activePointerId) return;
+      if (selMoveDrag.active) {
+        const ray = pointerRay(e);
+        const hit = selTranslateGizmo.projectDrag(
+          ray,
+          camera,
+          selMoveDrag.axis,
+          overlayLocalToWorld(selMoveDrag.startCenter),
+        );
+        if (hit) {
+          applySelMoveDelta(deltaFromSelDragHit(overlayWorldToLocal(hit)));
+        }
+        return;
+      }
       if (lightDrag.active) {
         const ray = pointerRay(e);
         const hit = lightTranslateGizmo.projectDrag(
@@ -2724,32 +3486,65 @@ export function VoxelSculptPanel({
         api.render();
         return;
       }
+      const heightDrag = shapeDragRef.current;
+      if (
+        heightDrag &&
+        usesShapeHeightPhase(heightDrag.kind) &&
+        heightDrag.phase === "height"
+      ) {
+        heightDrag.end = pickShapeHeightEnd(e, heightDrag);
+        showHover(heightDrag.end);
+        previewShapeStroke(heightDrag);
+        return;
+      }
       if (paintingRef.current) {
         const t = toolRef.current;
         const kind = shapeBrushRef.current;
         if ((t === "add" || t === "erase") && kind !== "voxel") {
+          const drag = shapeDragRef.current;
+          if (
+            drag &&
+            usesShapeHeightPhase(drag.kind) &&
+            (e.buttons & 2) !== 0
+          ) {
+            cancelShapeStroke();
+            paintingRef.current = false;
+            shiftEraseRef.current = false;
+            activePointerId = null;
+            try {
+              el.releasePointerCapture(e.pointerId);
+            } catch {
+              /* ignore */
+            }
+            return;
+          }
+          if (drag && usesShapeHeightPhase(drag.kind)) {
+            const cell = pickShapePlaneCell(e, drag.start, drag.heightAxis);
+            if (cell) {
+              drag.planeEnd = cell;
+              drag.end = cell;
+              showHover(cell);
+              previewShapeStroke(drag);
+            }
+            return;
+          }
           const cell = pick(e);
           showHover(cell);
           if (cell) {
             if (!shapeDragRef.current) {
-              shapeDragRef.current = {
-                start: cell,
-                end: cell,
-                erase: t === "erase" || shiftEraseRef.current,
-              };
-            } else {
+              beginShapeStroke(
+                kind,
+                cell,
+                t === "erase" || shiftEraseRef.current,
+                e,
+                "y",
+              );
+            } else if (shapeDragRef.current) {
+              shapeDragRef.current.planeEnd = cell;
               shapeDragRef.current.end = cell;
             }
-            const drag = shapeDragRef.current;
-            if (kind === "box") {
-              api.setSelection([normalizeVoxelSelection(drag.start, cell)]);
-            } else {
-              api.setSelection(
-                cellsToUnitSelection(
-                  cellsForVoxelShape(drag.start, cell, kind),
-                ),
-              );
-            }
+            const next = shapeDragRef.current;
+            if (next) previewShapeStroke(next);
           }
           return;
         }
@@ -2767,16 +3562,22 @@ export function VoxelSculptPanel({
       else if (activeTool() === "inspect") {
         const hit = pickInspect(e);
         if (!hit) showHover(null);
-        else if (hit.objectId) {
-          hover.visible = false;
-          vertexHover.visible = false;
-          lastHoverCellRef.current = hit.cell;
-          setHoverLabel(`обзор ${hit.cell.x}, ${hit.cell.y}, ${hit.cell.z}`);
-          api.render();
-        } else {
-          showHover(hit.cell);
-        }
+        else if (hit.objectId) highlightPeer(hit.objectId);
+        else showHover(hit.cell);
       } else {
+        if (selTranslateGizmo.root.visible) {
+          const hit = selTranslateGizmo.pick(pointerRay(e));
+          selTranslateGizmo.setHighlight(hit);
+          if (hit) {
+            el.style.cursor = "grab";
+            hover.visible = false;
+            vertexHover.visible = false;
+            hidePeerHover();
+            api.render();
+            return;
+          }
+          el.style.cursor = "";
+        }
         if (lightTranslateGizmo.root.visible && !pickingLightOriginRef.current) {
           const hit = lightTranslateGizmo.pick(pointerRay(e));
           lightTranslateGizmo.setHighlight(hit);
@@ -2795,20 +3596,41 @@ export function VoxelSculptPanel({
             el.style.cursor = "grab";
             hover.visible = false;
             vertexHover.visible = false;
+            hidePeerHover();
             api.render();
             return;
           }
           el.style.cursor = "";
         }
+        const sceneHit = pickInspect(e);
+        if (sceneHit?.objectId) {
+          highlightPeer(sceneHit.objectId);
+          return;
+        }
         showHover(pick(e));
       }
     };
 
-    const finishPointer = (e: PointerEvent, releaseCapture: boolean) => {
+    const finishPointer = (
+      e: PointerEvent,
+      releaseCapture: boolean,
+      canceled = false,
+    ) => {
       if (activePointerId !== e.pointerId) return;
       // Clear first: releasePointerCapture may synchronously emit
       // lostpointercapture, which must not finish the stroke twice.
       activePointerId = null;
+      if (selMoveDrag.active) {
+        const delta = selMoveDrag.lastDelta;
+        selMoveDrag.active = false;
+        selTranslateGizmo.setHighlight(null);
+        el.style.cursor = "";
+        if (canceled || (delta.x === 0 && delta.y === 0 && delta.z === 0)) {
+          onSelMoveCancelRef.current();
+        } else {
+          onSelMoveCommitRef.current(delta);
+        }
+      }
       if (lightDrag.active) {
         lightDrag.active = false;
         lightTranslateGizmo.setHighlight(null);
@@ -2820,10 +3642,23 @@ export function VoxelSculptPanel({
         el.style.cursor = "";
       }
       const shapeDrag = shapeDragRef.current;
-      shapeDragRef.current = null;
-      if (shapeDrag) {
-        const end = shapeDrag.end ?? lastHoverCellRef.current ?? shapeDrag.start;
-        onShapeCommitRef.current(shapeDrag.start, end, shapeDrag.erase);
+      if (canceled) {
+        if (shapeDrag) cancelShapeStroke();
+      } else if (
+        shapeDrag &&
+        usesShapeHeightPhase(shapeDrag.kind) &&
+        shapeDrag.phase === "plane"
+      ) {
+        shapeDrag.phase = "height";
+        shapeDrag.heightAnchorClientY = e.clientY;
+        shapeDrag.heightAnchor = shapeDrag.start[shapeDrag.heightAxis];
+        shapeDrag.heightRayBase = sampleShapeHeightCoord(e, shapeDrag);
+        previewShapeStroke(shapeDrag);
+      } else if (shapeDrag && shapeDrag.phase === "height") {
+        /* Height is confirmed by a later LMB / Enter, not this release. */
+      } else if (shapeDrag) {
+        shapeDragRef.current = null;
+        onShapeCommitRef.current(shapeDrag.start, shapeDrag.end, shapeDrag.erase);
         api.setSelection(selectionRef.current);
       }
       orbitingRef.current = false;
@@ -2849,12 +3684,13 @@ export function VoxelSculptPanel({
     };
 
     const onUp = (e: PointerEvent) => finishPointer(e, true);
-    const onCancel = (e: PointerEvent) => finishPointer(e, false);
+    const onCancel = (e: PointerEvent) => finishPointer(e, false, true);
     const onLostPointerCapture = (e: PointerEvent) => {
       if (activePointerId === e.pointerId) finishPointer(e, false);
     };
 
     const onLeave = () => {
+      if (shapeDragRef.current?.phase === "height") return;
       if (
         !paintingRef.current &&
         !orbitingRef.current &&
@@ -2922,7 +3758,10 @@ export function VoxelSculptPanel({
       axisGizmo.dispose();
       hingeGizmo.dispose();
       lightTranslateGizmo.dispose();
-      scene.remove(previewLight);
+      selTranslateGizmo.dispose();
+      extraLampGeom.dispose();
+      extraLampMat.dispose();
+      for (const light of previewLights) scene.remove(light);
       el.removeEventListener("pointerdown", onDown);
       el.removeEventListener("pointermove", onMove);
       el.removeEventListener("pointerup", onUp);
@@ -2971,6 +3810,7 @@ export function VoxelSculptPanel({
     if (!api || !draft) return;
     // Reset active transform before remesh (joint preview may have rotated it).
     api.meshRoot.position.set(0, 0, 0);
+    api.meshRoot.quaternion.identity();
     api.meshRoot.rotation.set(0, 0, 0);
     // blockWorld = VOXELS_PER_BLOCK → voxelWorld = 1 (editor cell units).
     const built = buildVoxelModelMesh(draft, VOXELS_PER_BLOCK, {
@@ -2996,36 +3836,64 @@ export function VoxelSculptPanel({
     if (!api) return;
     if (!draft?.emissiveCastsLight) {
       api.setLightOriginMarker(null);
-      api.setPreviewEmissiveLight(null);
+      api.setLightOriginExtras([]);
+      api.setPreviewEmissiveLights(null);
       return;
     }
     const sum = summarizeVoxelEmissive(draft);
     if (!sum) {
       api.setLightOriginMarker(null);
-      api.setPreviewEmissiveLight(null);
+      api.setLightOriginExtras([]);
+      api.setPreviewEmissiveLights(null);
       return;
     }
-    const origin = resolveVoxelLightOrigin(draft, sum);
-    api.setLightOriginMarker(origin);
-    if (!showPreviewEmissiveLight) {
-      api.setPreviewEmissiveLight(null);
-      return;
-    }
-    const strength = resolveEmissiveStrength(draft.emissiveStrength);
-    const rangeTiles = resolveEmissiveLightRange(draft.emissiveLightRange);
-    // Match emissiveLocalLights.voxelPeakIntensity (voxel units = 1 cell).
-    const dens = Math.max(
-      0.35,
-      Math.min(1, 0.4 + sum.weight * 0.35 + Math.min(0.35, sum.count * 0.04)),
+    const lamps = listVoxelEmissiveLamps(draft);
+    const selected =
+      lamps.find((lamp) => lamp.id === activeLampId) ?? lamps[0]!;
+    const selectedOrigin = resolveVoxelLampOrigin(draft, selected, sum);
+    api.setLightOriginMarker(selectedOrigin);
+    api.setLightOriginExtras(
+      lamps
+        .filter((lamp) => lamp.id !== selected.id)
+        .map((lamp) => resolveVoxelLampOrigin(draft, lamp, sum)),
     );
-    const intensity = (3.4 + strength * 9.5) * dens;
-    const distance = rangeTiles * VOXELS_PER_BLOCK;
-    api.setPreviewEmissiveLight({
-      pos: origin,
-      color: new THREE.Color(sum.r, sum.g, sum.b),
-      intensity,
-      distance,
-    });
+    if (!showPreviewEmissiveLight) {
+      api.setPreviewEmissiveLights(null);
+      return;
+    }
+    const leak = voxelTransmittanceLeak(draft);
+    api.setPreviewEmissiveLights(
+      lamps.map((lamp, i) => {
+        const lampSum =
+          summarizeVoxelEmissiveForLamp(draft, lamps, i) ?? sum;
+        const origin = resolveVoxelLampOrigin(draft, lamp, lampSum);
+        const strength = resolveEmissiveStrength(
+          lamp.strength ?? draft.emissiveStrength,
+        );
+        const rangeTiles = resolveEmissiveLightRange(
+          lamp.range ?? draft.emissiveLightRange,
+        );
+        const dens = Math.max(
+          0.35,
+          Math.min(
+            1,
+            0.4 + lampSum.weight * 0.35 + Math.min(0.35, lampSum.count * 0.04),
+          ),
+        );
+        return {
+          pos: origin,
+          color: new THREE.Color(lampSum.r, lampSum.g, lampSum.b),
+          intensity: (3.4 + strength * 9.5) * dens,
+          distance: rangeTiles * VOXELS_PER_BLOCK,
+          transmittanceLeak: leak,
+          softRings:
+            lamp.softRings === true || draft.emissiveLightSoftRings === true,
+          softShadows:
+            lamp.softShadows === true ||
+            draft.emissiveLightSoftShadows === true,
+        };
+      }),
+    );
   }, [
     draft?.id,
     draft?.emissiveCastsLight,
@@ -3037,8 +3905,13 @@ export function VoxelSculptPanel({
     draft?.emissiveLightOffset?.x,
     draft?.emissiveLightOffset?.y,
     draft?.emissiveLightOffset?.z,
+    draft?.emissiveLightSoftRings,
+    draft?.emissiveLightSoftShadows,
     draft?.emissive,
+    draft?.transmittance,
     draft?.voxels,
+    draft?.emissiveLights,
+    activeLampId,
     showPreviewEmissiveLight,
   ]);
 
@@ -3052,7 +3925,7 @@ export function VoxelSculptPanel({
     : null;
   useEffect(() => {
     if (!draftGridKey) return;
-    const key = `${activeId ?? ""}:${activeObjectId ?? ""}:${draftGridKey}`;
+    const key = `${activeId ?? ""}:${draftGridKey}`;
     if (lastFrameKeyRef.current === key) return;
     lastFrameKeyRef.current = key;
     let cancelled = false;
@@ -3069,9 +3942,9 @@ export function VoxelSculptPanel({
       cancelled = true;
       window.cancelAnimationFrame(t);
     };
-  }, [activeId, activeObjectId, draftGridKey]);
+  }, [activeId, draftGridKey]);
 
-  // Peer scene objects + joint preview (active mesh stays at origin).
+  // Peer scene objects + hierarchical joint preview.
   useEffect(() => {
     const api = apiRef.current;
     if (!api) return;
@@ -3079,6 +3952,7 @@ export function VoxelSculptPanel({
       api.setPeerMeshes([]);
       api.meshRoot.visible = true;
       api.meshRoot.position.set(0, 0, 0);
+      api.meshRoot.quaternion.identity();
       api.meshRoot.rotation.set(0, 0, 0);
       const meshChild = api.meshRoot.children[0];
       if (meshChild) meshChild.position.set(0, 0, 0);
@@ -3089,106 +3963,50 @@ export function VoxelSculptPanel({
     }
 
     const clip = activeScene.animations?.find((c) => c.id === animClipId);
-    const activeOff = activeObject.offset;
+    const originFrame = { x: 0, y: 0, z: 0 };
     const peers: THREE.Group[] = [];
+    const poses = computeSkeletonPoses(
+      activeScene,
+      (jointId) =>
+        resolveJointAngleDeg(jointId, {
+          selectedJointId,
+          keyAngleDeg,
+          clip,
+          playhead: animPlayhead,
+        }),
+      1,
+    );
 
-    const placeWithJoint = (
-      wrapper: THREE.Group,
-      inner: THREE.Group,
-      obj: (typeof activeScene.objects)[0],
-    ) => {
-      const joint = findChildJoint(activeScene, obj.id);
-      const parent = joint
-        ? activeScene.objects.find((o) => o.id === joint.parentObjectId)
-        : undefined;
-      const angleDeg = joint
-        ? joint.id === selectedJointId
-          ? keyAngleDeg
-          : clip
-            ? sampleJointAngleDeg(clip, joint.id, animPlayhead)
-            : 0
-        : 0;
-
-      if (joint && parent) {
-        const hinge = {
-          x: parent.offset.x + joint.parentPivot.x - activeOff.x,
-          y: parent.offset.y + joint.parentPivot.y - activeOff.y,
-          z: parent.offset.z + joint.parentPivot.z - activeOff.z,
-        };
-        inner.position.set(
-          -joint.childPivot.x,
-          -joint.childPivot.y,
-          -joint.childPivot.z,
-        );
-        wrapper.add(inner);
-        wrapper.position.set(hinge.x, hinge.y, hinge.z);
-        const rad = THREE.MathUtils.degToRad(angleDeg);
-        if (joint.axis === "x") wrapper.rotation.set(rad, 0, 0);
-        else if (joint.axis === "y") wrapper.rotation.set(0, rad, 0);
-        else wrapper.rotation.set(0, 0, rad);
-      } else {
-        wrapper.add(inner);
-        wrapper.position.set(
-          obj.offset.x - activeOff.x,
-          obj.offset.y - activeOff.y,
-          obj.offset.z - activeOff.z,
-        );
-      }
-    };
-
-    // Joint on the active object (child) — only if the active mesh is shown.
     const activeHidden = activeObject.visible === false;
     api.meshRoot.visible = !activeHidden;
     api.bounds.visible = !activeHidden;
-    if (!activeHidden) {
-      const activeJoint = findChildJoint(activeScene, activeObject.id);
-      const activeParent = activeJoint
-        ? activeScene.objects.find((o) => o.id === activeJoint.parentObjectId)
-        : undefined;
-      if (activeJoint && activeParent) {
-        const angleDeg =
-          activeJoint.id === selectedJointId
-            ? keyAngleDeg
-            : clip
-              ? sampleJointAngleDeg(clip, activeJoint.id, animPlayhead)
-              : 0;
-        const hinge = {
-          x: activeParent.offset.x + activeJoint.parentPivot.x - activeOff.x,
-          y: activeParent.offset.y + activeJoint.parentPivot.y - activeOff.y,
-          z: activeParent.offset.z + activeJoint.parentPivot.z - activeOff.z,
-        };
-        // Offset mesh content so childPivot sits at hinge, then rotate meshRoot.
-        api.meshRoot.position.set(hinge.x, hinge.y, hinge.z);
-        const meshChild = api.meshRoot.children[0];
-        if (meshChild) {
-          meshChild.position.set(
-            -activeJoint.childPivot.x,
-            -activeJoint.childPivot.y,
-            -activeJoint.childPivot.z,
-          );
-        }
-        const rad = THREE.MathUtils.degToRad(angleDeg);
-        if (activeJoint.axis === "x") api.meshRoot.rotation.set(rad, 0, 0);
-        else if (activeJoint.axis === "y") api.meshRoot.rotation.set(0, rad, 0);
-        else api.meshRoot.rotation.set(0, 0, rad);
-      } else {
-        api.meshRoot.position.set(0, 0, 0);
-        api.meshRoot.rotation.set(0, 0, 0);
-        const meshChild = api.meshRoot.children[0];
-        if (meshChild) meshChild.position.set(0, 0, 0);
-      }
+    const activePose = poses.get(activeObject.id);
+    if (!activeHidden && activePose) {
+      applySkeletonNodePose(
+        api.meshRoot,
+        api.meshRoot.children[0],
+        activePose,
+        originFrame,
+      );
     } else {
       api.meshRoot.position.set(0, 0, 0);
+      api.meshRoot.quaternion.identity();
       api.meshRoot.rotation.set(0, 0, 0);
+      const meshChild = api.meshRoot.children[0];
+      if (meshChild) meshChild.position.set(0, 0, 0);
     }
 
     for (const obj of activeScene.objects) {
       if (obj.id === activeObject.id) continue;
       if (obj.visible === false) continue;
+      const slot = characterSlotForObject(activeScene, obj.id);
+      const viewModelId =
+        slot && activeScene.character?.facing === "card4"
+          ? characterModelIdForSlotView(activeScene, slot, characterCardView)
+          : undefined;
+      const modelId = viewModelId ?? obj.modelId;
       const m =
-        obj.modelId === draft?.id
-          ? draft
-          : pack.voxelModels[obj.modelId];
+        modelId === draft?.id ? draft : pack.voxelModels[modelId];
       if (!m) continue;
       const built = buildVoxelModelMesh(m, VOXELS_PER_BLOCK, {
         directLightScale: 1,
@@ -3197,29 +4015,32 @@ export function VoxelSculptPanel({
       });
       const wrapper = new THREE.Group();
       wrapper.name = `peer-${obj.id}`;
-      placeWithJoint(wrapper, built.group, obj);
+      const pose = poses.get(obj.id);
+      if (pose) {
+        applySkeletonNodePose(wrapper, built.group, pose, originFrame);
+        wrapper.add(built.group);
+      } else {
+        wrapper.add(built.group);
+        wrapper.position.set(obj.offset.x, obj.offset.y, obj.offset.z);
+      }
       peers.push(wrapper);
     }
     api.setPeerMeshes(peers);
 
-    // Blender-like hinge gizmo at selected joint pivot (when not picking a new one).
     const jointForGizmo =
       (selectedJointId
         ? activeScene.joints?.find((j) => j.id === selectedJointId)
         : undefined) ?? activeScene.joints?.[0];
     if (jointForGizmo && !hingeActive) {
-      const parent = activeScene.objects.find(
-        (o) => o.id === jointForGizmo.parentObjectId,
-      );
-      if (parent) {
-        const pos = {
-          x: parent.offset.x + jointForGizmo.parentPivot.x - activeOff.x,
-          y: parent.offset.y + jointForGizmo.parentPivot.y - activeOff.y,
-          z: parent.offset.z + jointForGizmo.parentPivot.z - activeOff.z,
-        };
+      const hinge = jointHingeWorld(jointForGizmo, poses, 1);
+      if (hinge) {
         const scale = Math.max(1.2, api.dist * 0.055);
         api.setHingeGizmo({
-          pos,
+          pos: {
+            x: hinge.x,
+            y: hinge.y,
+            z: hinge.z,
+          },
           axis: jointForGizmo.axis,
           scale,
         });
@@ -3243,6 +4064,7 @@ export function VoxelSculptPanel({
     pack.voxelModels,
     shineColorKeep,
     variantMode,
+    characterCardView,
   ]);
 
   // Timeline play: drive live joint angle from clip keys.
@@ -3268,9 +4090,8 @@ export function VoxelSculptPanel({
     return () => cancelAnimationFrame(raf);
   }, [animPlaying, activeScene, animClipId, selectedJointId]);
 
-  // Move tool: arrow keys nudge active object offset.
+  // Move tool: arrow keys nudge voxels, or the scene bone when nothing is selected.
   useEffect(() => {
-    if (tool !== "move" || !activeScene || !activeObject || variantMode) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
         return;
@@ -3285,23 +4106,57 @@ export function VoxelSculptPanel({
       else if (e.key === "ArrowUp") dz = -1;
       else if (e.key === "ArrowDown") dz = 1;
       else return;
+      const model = draftRef.current;
+      const sel = selectionRef.current;
+      if (
+        model &&
+        sel?.length &&
+        (tool === "select" || tool === "move") &&
+        selectionHasSolidVoxels(model, sel)
+      ) {
+        e.preventDefault();
+        translateSelectedVoxelsRef.current({ x: dx, y: dy, z: dz });
+        return;
+      }
+      if (tool !== "move" || !activeScene || !activeObject || variantMode) return;
       e.preventDefault();
-      const next = patchSceneObject(activeScene, activeObject.id, {
-        offset: {
-          x: activeObject.offset.x + dx,
-          y: activeObject.offset.y + dy,
-          z: activeObject.offset.z + dz,
-        },
-      });
-      commitSceneRef.current(next);
+      commitSceneRef.current(
+        translateSceneBone(activeScene, activeObject.id, {
+          x: dx,
+          y: dy,
+          z: dz,
+        }),
+      );
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tool, activeScene, activeObject, variantMode]);
+  }, [tool, activeScene, activeObject, variantMode, selection, draft]);
 
   useEffect(() => {
     apiRef.current?.setSelection(selection);
   }, [selection]);
+
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api) return;
+    const show =
+      (tool === "select" || tool === "move") &&
+      Boolean(draft && selection?.length) &&
+      selectionHasSolidVoxels(draft!, selection);
+    if (!show) {
+      api.setSelectionGizmo(null);
+      return;
+    }
+    const center = voxelSelectionCenter(selection);
+    if (!center) {
+      api.setSelectionGizmo(null);
+      return;
+    }
+    api.setSelectionGizmo({
+      pos: center,
+      scale: selectionGizmoScale(selection!),
+    });
+  }, [tool, selection, draft]);
 
   useEffect(() => {
     try {
@@ -3321,8 +4176,36 @@ export function VoxelSculptPanel({
     } catch {
       /* ignore */
     }
-    apiRef.current?.setPlayerCapsule(showPlayerCapsule);
-  }, [showPlayerCapsule]);
+    apiRef.current?.setPlayerCapsule(
+      showPlayerCapsule
+        ? isCharacterScene(activeScene) && activeScene
+          ? {
+              visible: true,
+              ...characterCapsule(activeScene),
+              ...characterCapsuleCenterRelativeTo(activeScene, {
+                x: 0,
+                y: 0,
+                z: 0,
+              }),
+            }
+          : {
+              visible: true,
+              radius: DEFAULT_WORLD_BODY.radiusVoxels,
+              height: DEFAULT_WORLD_BODY.heightVoxels,
+              x: -DEFAULT_WORLD_BODY.radiusVoxels - 1.5,
+              y: DEFAULT_WORLD_BODY.heightVoxels * 0.5,
+              z: DEFAULT_WORLD_BODY.radiusVoxels,
+            }
+        : {
+            visible: false,
+            radius: DEFAULT_WORLD_BODY.radiusVoxels,
+            height: DEFAULT_WORLD_BODY.heightVoxels,
+            x: 0,
+            y: 0,
+            z: 0,
+          },
+    );
+  }, [showPlayerCapsule, activeScene, activeObject]);
 
   useEffect(() => {
     try {
@@ -3365,7 +4248,7 @@ export function VoxelSculptPanel({
   // Debounced autosave to library + session history.
   useEffect(() => {
     if (!draft) return;
-    const normalized = normalizeVoxelModel(draft);
+    const normalized = fitVoxelPalette(normalizeVoxelModel(draft));
     persistHistSession(normalized);
     if (variantMode || !autoSave) return;
 
@@ -3397,7 +4280,7 @@ export function VoxelSculptPanel({
         });
         if (gen !== autoSaveGenRef.current) return;
         if (!res.ok) {
-          setAutoSaveNote(`Ошибка авто: ${res.error}`);
+          onSavedRef.current?.(`Ошибка авто: ${res.error}`);
           return;
         }
         lastSavedJsonRef.current = json;
@@ -3407,7 +4290,7 @@ export function VoxelSculptPanel({
         const hh = String(t.getHours()).padStart(2, "0");
         const mm = String(t.getMinutes()).padStart(2, "0");
         const ss = String(t.getSeconds()).padStart(2, "0");
-        setAutoSaveNote(`Авто ${hh}:${mm}:${ss}`);
+        onSavedRef.current?.(`Автосохранение вокселей ${hh}:${mm}:${ss}`);
       })();
     }, 900);
 
@@ -3493,7 +4376,9 @@ export function VoxelSculptPanel({
         ? shineRef.current
         : op === "transparency"
           ? transparencyRef.current
-          : emitRef.current;
+          : op === "transmittance"
+            ? transmittanceRef.current
+            : emitRef.current;
     const expanded = expandSelectionWithMirror(
       model,
       sel,
@@ -3589,7 +4474,106 @@ export function VoxelSculptPanel({
     changeSelection(result.selection);
   };
 
+  const remeshStudioFromDraft = () => {
+    const api = apiRef.current;
+    const d = draftRef.current;
+    if (!api || !d) return;
+    const built = buildVoxelModelMesh(d, VOXELS_PER_BLOCK, {
+      directLightScale: 1,
+      shineColorKeep,
+      suppressCastShadow: d.emissiveSuppressHostShadow === true,
+    });
+    api.setMesh(built.group);
+    api.setSelection(selectionRef.current);
+    api.setVoxelGrid(d, showVoxelGrid);
+    api.syncEditOverlays();
+    if (
+      (toolRef.current === "select" || toolRef.current === "move") &&
+      selectionRef.current &&
+      selectionHasSolidVoxels(d, selectionRef.current)
+    ) {
+      const center = voxelSelectionCenter(selectionRef.current);
+      if (center) {
+        api.setSelectionGizmo({
+          pos: center,
+          scale: selectionGizmoScale(selectionRef.current),
+        });
+      } else {
+        api.setSelectionGizmo(null);
+      }
+    } else {
+      api.setSelectionGizmo(null);
+    }
+    api.render();
+  };
+
+  const translateSelectedVoxels = (delta: HitCell) => {
+    const model = draftRef.current;
+    const sel = selectionRef.current;
+    if (!model || !sel?.length) return;
+    const result = translateVoxelSelection(model, sel, delta);
+    if (!result) return;
+    applyEdit(result.model);
+    changeSelection(result.selection);
+  };
+  translateSelectedVoxelsRef.current = translateSelectedVoxels;
+
+  onSelMovePreviewRef.current = (delta) => {
+    if (!selMoveBaseRef.current) {
+      const model = draftRef.current;
+      const sel = selectionRef.current;
+      if (!model || !sel?.length) return null;
+      const clonedSel = cloneVoxelSelectionSet(sel);
+      if (!clonedSel) return null;
+      selMoveBaseRef.current = {
+        model: cloneVoxelModel(model, model.id),
+        sel: clonedSel,
+      };
+    }
+    const base = selMoveBaseRef.current;
+    const result = translateVoxelSelection(base.model, base.sel, delta);
+    if (!result) return null;
+    const api = apiRef.current;
+    if (!api) return null;
+    const built = buildVoxelModelMesh(result.model, VOXELS_PER_BLOCK, {
+      directLightScale: 1,
+      shineColorKeep,
+      suppressCastShadow: result.model.emissiveSuppressHostShadow === true,
+    });
+    api.setMesh(built.group);
+    api.setSelection(result.selection);
+    api.setVoxelGrid(result.model, showVoxelGrid);
+    api.syncEditOverlays();
+    const center = voxelSelectionCenter(result.selection);
+    if (!center) return null;
+    return { center, scale: selectionGizmoScale(result.selection) };
+  };
+  onSelMoveCommitRef.current = (delta) => {
+    const base = selMoveBaseRef.current;
+    selMoveBaseRef.current = null;
+    if (!base) {
+      remeshStudioFromDraft();
+      return;
+    }
+    if (delta.x === 0 && delta.y === 0 && delta.z === 0) {
+      remeshStudioFromDraft();
+      return;
+    }
+    const result = translateVoxelSelection(base.model, base.sel, delta);
+    if (!result) {
+      remeshStudioFromDraft();
+      return;
+    }
+    applyEdit(result.model);
+    changeSelection(result.selection);
+  };
+  onSelMoveCancelRef.current = () => {
+    selMoveBaseRef.current = null;
+    remeshStudioFromDraft();
+  };
+
   const cycleShapeBrush = () => {
+    onShapeCancelRef.current();
     setShapeBrush((cur) => {
       const i = SHAPE_BRUSHES.findIndex((b) => b.id === cur);
       return SHAPE_BRUSHES[(i + 1) % SHAPE_BRUSHES.length]!.id;
@@ -3691,6 +4675,11 @@ export function VoxelSculptPanel({
       }
 
       if (code === "Escape") {
+        if (onShapeCancelRef.current && shapeDragRef.current) {
+          e.preventDefault();
+          onShapeCancelRef.current();
+          return;
+        }
         if (hingeActiveRef.current || toolRef.current === "hinge") {
           e.preventDefault();
           cancelHingeRef.current();
@@ -3698,6 +4687,12 @@ export function VoxelSculptPanel({
         }
         changeSelection(null);
         return;
+      }
+      if (code === "Enter" || code === "NumpadEnter") {
+        if (onShapeConfirmRef.current()) {
+          e.preventDefault();
+          return;
+        }
       }
       if (code === "KeyF" && !mod && shift) {
         e.preventDefault();
@@ -3793,6 +4788,15 @@ export function VoxelSculptPanel({
           else {
             clearHingeRef.current();
             setTool("transparency");
+          }
+          return;
+        }
+        if (code === "KeyU") {
+          e.preventDefault();
+          if (hasSel) applySelectionOp("transmittance");
+          else {
+            clearHingeRef.current();
+            setTool("transmittance");
           }
           return;
         }
@@ -3964,6 +4968,101 @@ export function VoxelSculptPanel({
     setDraft(created);
     markEditorOpened("voxel", scene.id);
     onActiveModelChange?.(id);
+    resetHistory();
+  };
+
+  const createCharacter = (templateId: EmberVoxelCharacterTemplate) => {
+    if (variantMode) return;
+    const id = newVoxelCharacterId();
+    const built = createVoxelCharacter(
+      templateId,
+      id,
+      templateId === "chibi_25d" ? "Новый чиби 2.5D" : "Новый чиби",
+    );
+    const modelsMap = { ...pack.voxelModels, ...built.models };
+    const scenesMap = { ...voxelScenes, [built.scene.id]: built.scene };
+    const pelvis = built.scene.objects.find((o) => o.id === "obj_pelvis");
+    const pelvisModel = pelvis ? built.models[pelvis.modelId] : undefined;
+    setBrowsePicker(false);
+    onPackChange(packWithVoxels(pack, modelsMap, scenesMap));
+    void writeVoxelRegistry(modelsMap, scenesMap, {
+      dirtyIds: [built.scene.id, ...Object.keys(built.models)],
+    });
+    setActiveId(built.scene.id);
+    setActiveObjectId(pelvis?.id ?? built.scene.objects[0]!.id);
+    setLibLoadId(pelvis?.modelId ?? "");
+    if (pelvisModel) setDraft(pelvisModel);
+    setShowPlayerCapsule(true);
+    markEditorOpened("voxel", built.scene.id);
+    onActiveModelChange?.(pelvis?.modelId ?? id);
+    resetHistory();
+    onSaved?.(
+      templateId === "chibi_25d"
+        ? "Чиби 2.5D: карточка 3 vx + объём волос/носа · капсула 22 vx"
+        : "Чиби: шаблон chibi_32 · капсула 22 vx, макушка 32",
+    );
+  };
+
+  const deleteLibraryModel = () => {
+    if (variantMode || !draft) return;
+    const scene = activeScene;
+    const ids = new Set<string>();
+    if (scene && isCharacterScene(scene)) {
+      ids.add(scene.id);
+      for (const object of scene.objects) ids.add(object.modelId);
+    } else {
+      ids.add(draft.id);
+    }
+    const usage = [...ids].reduce(
+      (sum, id) => sum + countLibraryAssetReferences(pack, "voxel", id),
+      0,
+    );
+    const label = scene?.nameRu || draft.nameRu || draft.id;
+    const extra = usage
+      ? `\nНа картах есть ${usage} ссылок — экземпляры нужно убрать отдельно.`
+      : "";
+    if (
+      !window.confirm(
+        `Удалить «${label}» из библиотеки? Файлы модели будут стёрты.${extra}`,
+      )
+    ) {
+      return;
+    }
+    const modelsMap = { ...pack.voxelModels };
+    const scenesMap = { ...voxelScenes };
+    for (const id of ids) {
+      delete modelsMap[id];
+      delete scenesMap[id];
+    }
+    const nextId =
+      Object.keys(scenesMap)[0] ?? Object.keys(modelsMap)[0] ?? null;
+    onPackChange(packWithVoxels(pack, modelsMap, scenesMap));
+    void writeVoxelRegistry(modelsMap, scenesMap, { deletedIds: [...ids] }).then(
+      (res) => {
+        onSaved?.(
+          res.ok
+            ? `Удалено из библиотеки: ${label}`
+            : `Удаление: ${res.error}`,
+        );
+      },
+    );
+    if (nextId) {
+      setActiveId(nextId);
+      const nextScene = scenesMap[nextId];
+      const nextModel =
+        modelsMap[nextId] ??
+        (nextScene ? modelsMap[nextScene.objects[0]?.modelId ?? ""] : undefined);
+      setActiveObjectId(nextScene?.objects[0]?.id ?? "obj0");
+      setLibLoadId(nextModel?.id ?? "");
+      if (nextModel) setDraft(nextModel);
+      markEditorOpened("voxel", nextId);
+      onActiveModelChange?.(nextModel?.id ?? nextId);
+    } else {
+      setActiveId("");
+      setActiveObjectId("obj0");
+      setDraft(null);
+      setBrowsePicker(true);
+    }
     resetHistory();
   };
 
@@ -4254,6 +5353,13 @@ export function VoxelSculptPanel({
 
   const removeObjectFromScene = (objectId: string) => {
     if (!activeScene || activeScene.objects.length < 2) return;
+    if (
+      isCharacterScene(activeScene) &&
+      isLockedCharacterObject(activeScene, objectId)
+    ) {
+      onSaved?.("Слот шаблона нельзя убрать — скройте часть");
+      return;
+    }
     const next = removeSceneObject(activeScene, objectId);
     commitScene(next);
     if (activeObjectId === objectId) {
@@ -4450,6 +5556,10 @@ export function VoxelSculptPanel({
 
   const addPaletteColor = () => {
     if (!draft) return;
+    if (draft.palette.length >= MAX_VOXEL_PALETTE) {
+      onSaved?.("Палитра: максимум 255 цветов");
+      return;
+    }
     const palette = [...draft.palette, "#ffb060"];
     applyEdit({ ...draft, palette });
     setPaletteIndex(palette.length - 1);
@@ -4494,7 +5604,7 @@ export function VoxelSculptPanel({
       return true;
     }
 
-    const normalized = normalizeVoxelModel(draft);
+    const normalized = fitVoxelPalette(normalizeVoxelModel(draft));
     const modelsMap = {
       ...(currentPack.voxelModels ?? {}),
       [normalized.id]: normalized,
@@ -4513,10 +5623,27 @@ export function VoxelSculptPanel({
     skipPackSyncRef.current = true;
     persistHistSession(normalized);
     onPackChange(packWithVoxels(currentPack, modelsMap, scenesMap));
-    setAutoSaveNote("Сохранено");
     onSaved?.(`Воксели «${normalized.nameRu ?? normalized.id}» сохранены`);
     return true;
   };
+
+  useEffect(() => {
+    if (!sculptMenu) return;
+    const onDocDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest(".ember-voxel-sculpt__menu")) return;
+      setSculptMenu(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSculptMenu(null);
+    };
+    document.addEventListener("mousedown", onDocDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [sculptMenu]);
 
   const canOpenMagicaVoxel = Boolean(window.joiDesktop?.ember?.openPath);
 
@@ -4731,9 +5858,11 @@ export function VoxelSculptPanel({
               disabled={!draft}
               aria-pressed={showPlayerCapsule}
               title={
-                draft?.physical === false
-                  ? "Капсула игрока (2.5×12 vx) · модель walk-through"
-                  : "Капсула игрока (2.5×12 vx) рядом с моделью"
+                isCharacterScene(activeScene)
+                  ? "Капсула персонажа (4.5×22 vx) на стопах · волосы снаружи"
+                  : draft?.physical === false
+                    ? "Капсула игрока (2.5×12 vx) · модель walk-through"
+                    : "Капсула игрока (2.5×12 vx) рядом с моделью"
               }
               onClick={() => setShowPlayerCapsule((v) => !v)}
             >
@@ -4748,56 +5877,6 @@ export function VoxelSculptPanel({
               onClick={() => setShowPreviewEmissiveLight((v) => !v)}
             >
               Свет
-            </button>
-          </div>
-
-          <div className="ember-voxel-sculpt__chrome-group">
-            <button
-              type="button"
-              className="ghost"
-              disabled={!draft}
-              title="Перевернуть модель по X (разово)"
-              onClick={() => draft && applyEdit(flipVoxelModel(draft, "x"))}
-            >
-              ↔ X
-            </button>
-            <button
-              type="button"
-              className="ghost"
-              disabled={!draft}
-              title="Перевернуть модель по Y (разово)"
-              onClick={() => draft && applyEdit(flipVoxelModel(draft, "y"))}
-            >
-              ↕ Y
-            </button>
-            <button
-              type="button"
-              className="ghost"
-              disabled={!draft}
-              title="Перевернуть модель по Z (разово)"
-              onClick={() => draft && applyEdit(flipVoxelModel(draft, "z"))}
-            >
-              ↗ Z
-            </button>
-            <button
-              type="button"
-              className="ghost"
-              disabled={!draft}
-              title="Залить весь объём текущим цветом"
-              onClick={() =>
-                draft && applyEdit(stampSolidBlock(draft, paletteIndex))
-              }
-            >
-              Куб
-            </button>
-            <button
-              type="button"
-              className="ghost ember-danger"
-              disabled={!draft}
-              title="Очистить все воксели"
-              onClick={() => draft && applyEdit(clearVoxelModel(draft))}
-            >
-              Очистить
             </button>
           </div>
 
@@ -4844,11 +5923,155 @@ export function VoxelSculptPanel({
             </button>
           </div>
 
-          {!variantMode ? (
-            <div className="ember-voxel-sculpt__chrome-group">
+          <div className="ember-voxel-sculpt__chrome-actions">
+            <SculptBarMenu
+              id="edit"
+              label="Правка"
+              title="Переворот, заливка, очистка, автосохранение"
+              openId={sculptMenu}
+              onOpen={setSculptMenu}
+            >
               <button
                 type="button"
-                className={`ghost ${autoSave ? "is-on" : ""}`}
+                role="menuitem"
+                className="ember-voxel-sculpt__menu-item"
+                disabled={!draft}
+                onClick={() => {
+                  if (draft) applyEdit(flipVoxelModel(draft, "x"));
+                  setSculptMenu(null);
+                }}
+              >
+                Перевернуть X
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="ember-voxel-sculpt__menu-item"
+                disabled={!draft}
+                onClick={() => {
+                  if (draft) applyEdit(flipVoxelModel(draft, "y"));
+                  setSculptMenu(null);
+                }}
+              >
+                Перевернуть Y
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="ember-voxel-sculpt__menu-item"
+                disabled={!draft}
+                onClick={() => {
+                  if (draft) applyEdit(flipVoxelModel(draft, "z"));
+                  setSculptMenu(null);
+                }}
+              >
+                Перевернуть Z
+              </button>
+              <div className="ember-voxel-sculpt__menu-sep" role="separator" />
+              <button
+                type="button"
+                role="menuitem"
+                className="ember-voxel-sculpt__menu-item"
+                disabled={!draft}
+                onClick={() => {
+                  if (draft) applyEdit(stampSolidBlock(draft, paletteIndex));
+                  setSculptMenu(null);
+                }}
+              >
+                Залить куб
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="ember-voxel-sculpt__menu-item ember-danger"
+                disabled={!draft}
+                onClick={() => {
+                  if (draft) applyEdit(clearVoxelModel(draft));
+                  setSculptMenu(null);
+                }}
+              >
+                Очистить воксели
+              </button>
+            </SculptBarMenu>
+            <SculptBarMenu
+              id="file"
+              label="Файл"
+              title="Библиотека и обмен с MagicaVoxel"
+              openId={sculptMenu}
+              onOpen={setSculptMenu}
+            >
+              {!variantMode && !onClose && models.length > 0 ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="ember-voxel-sculpt__menu-item"
+                  onClick={() => {
+                    setBrowsePicker(true);
+                    setSculptMenu(null);
+                  }}
+                >
+                  Выбрать объект
+                </button>
+              ) : null}
+              {!variantMode ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="ember-voxel-sculpt__menu-item"
+                  onClick={() => {
+                    openVoxImporter("new");
+                    setSculptMenu(null);
+                  }}
+                >
+                  Импорт .vox
+                </button>
+              ) : null}
+              <button
+                type="button"
+                role="menuitem"
+                className="ember-voxel-sculpt__menu-item"
+                disabled={!draft}
+                onClick={() => {
+                  openVoxImporter("replace");
+                  setSculptMenu(null);
+                }}
+              >
+                Заменить из .vox
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="ember-voxel-sculpt__menu-item"
+                disabled={!draft}
+                onClick={() => {
+                  exportDraftVox();
+                  setSculptMenu(null);
+                }}
+              >
+                Скачать .vox
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="ember-voxel-sculpt__menu-item"
+                disabled={!draft || variantMode || !canOpenMagicaVoxel}
+                title={
+                  canOpenMagicaVoxel
+                    ? "Открыть voxels/models/<id>.vox в MagicaVoxel. Сохрани там — Ember подхватит сетку."
+                    : "Только в Electron: откроет .vox в MagicaVoxel и будет следить за файлом"
+                }
+                onClick={() => {
+                  void openInMagicaVoxel();
+                  setSculptMenu(null);
+                }}
+              >
+                Открыть MagicaVoxel
+              </button>
+            </SculptBarMenu>
+            {!variantMode ? (
+              <button
+                type="button"
+                className={`ghost ember-voxel-sculpt__autosave ${autoSave ? "is-on" : ""}`}
                 disabled={!draft}
                 aria-pressed={autoSave}
                 title="Автосохранение в библиотеку · история ходов в сессии (Ctrl+Z)"
@@ -4867,70 +6090,9 @@ export function VoxelSculptPanel({
                   });
                 }}
               >
-                Авто
+                {autoSave ? "Авто · вкл" : "Авто · выкл"}
               </button>
-              {autoSaveNote ? (
-                <span
-                  className="ember-voxel-sculpt__chrome-label"
-                  title="Последнее автосохранение"
-                >
-                  {autoSaveNote}
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-          <div className="ember-voxel-sculpt__chrome-actions">
-            {!variantMode && !onClose && models.length > 0 ? (
-            <button
-              type="button"
-              className="ghost"
-              title="Вернуться к меню выбора объекта"
-              onClick={() => setBrowsePicker(true)}
-            >
-              Меню
-            </button>
             ) : null}
-            {!variantMode ? (
-            <button
-              type="button"
-              className="ghost"
-              title="Новый объект из MagicaVoxel .vox (форма и палитра)"
-              onClick={() => openVoxImporter("new")}
-            >
-              Импорт
-            </button>
-            ) : null}
-            <button
-              type="button"
-              className="ghost"
-              disabled={!draft}
-              title="Заменить сетку текущего объекта из MagicaVoxel .vox. Коллизия и свет сохраняются."
-              onClick={() => openVoxImporter("replace")}
-            >
-              Из .vox
-            </button>
-            <button
-              type="button"
-              className="ghost"
-              disabled={!draft}
-              title="Скачать MagicaVoxel .vox (форма и палитра; свет остаётся в JSON)"
-              onClick={exportDraftVox}
-            >
-              В .vox
-            </button>
-            <button
-              type="button"
-              className="ghost"
-              disabled={!draft || variantMode || !canOpenMagicaVoxel}
-              title={
-                canOpenMagicaVoxel
-                  ? "Открыть voxels/models/<id>.vox в MagicaVoxel (или программе по умолчанию). Сохрани там — Ember подхватит сетку."
-                  : "Только в Electron: откроет .vox в MagicaVoxel и будет следить за файлом"
-              }
-              onClick={() => void openInMagicaVoxel()}
-            >
-              MagicaVoxel
-            </button>
             <button
               type="button"
               className="primary"
@@ -5061,7 +6223,7 @@ export function VoxelSculptPanel({
             <select
               value={libLoadId}
               onChange={(e) => setLibLoadId(e.target.value)}
-              title="Чужой меш из библиотеки: основа / открыть / + объект"
+              title="Чужой меш из библиотеки: открыть или вставить через + Создать"
             >
               <option value="">— выбрать —</option>
               {models.map((m) => (
@@ -5075,48 +6237,102 @@ export function VoxelSculptPanel({
             <button
               type="button"
               className="ghost"
-              disabled={
-                !libLoadId ||
-                !pack.voxelModels[libLoadId] ||
-                !draft ||
-                libLoadId === draft.id
-              }
-              title="Скопировать выбранный блок в текущий (id сохранится)"
-              onClick={() => applyLibraryAsBase(libLoadId)}
-            >
-              Основа
-            </button>
-            <button
-              type="button"
-              className="ghost"
               disabled={!libLoadId || !pack.voxelModels[libLoadId]}
               title="Открыть выбранный блок в редакторе"
               onClick={() => loadLibraryModel(libLoadId)}
             >
               Открыть
             </button>
-            <button
-              type="button"
-              className="ghost"
-              disabled={
-                variantMode ||
-                !activeScene ||
-                !libLoadId ||
-                !pack.voxelModels[libLoadId]
-              }
-              title="Добавить меш из библиотеки как новый объект"
-              onClick={addObjectFromLibrary}
+            <SculptBarMenu
+              id="create"
+              label="+ Создать"
+              title="Новая модель или вставка из источника"
+              openId={sculptMenu}
+              onOpen={setSculptMenu}
             >
-              + Объект
-            </button>
-            <button
-              type="button"
-              className="ghost"
-              onClick={createModel}
-              title="Новая модель 1×1×1"
-            >
-              + 1×1×1
-            </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="ember-voxel-sculpt__menu-item"
+                onClick={() => {
+                  createModel();
+                  setSculptMenu(null);
+                }}
+              >
+                + 1×1×1
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="ember-voxel-sculpt__menu-item"
+                disabled={variantMode}
+                onClick={() => {
+                  createCharacter("chibi_32");
+                  setSculptMenu(null);
+                }}
+              >
+                + Чиби
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="ember-voxel-sculpt__menu-item"
+                disabled={variantMode}
+                onClick={() => {
+                  createCharacter("chibi_25d");
+                  setSculptMenu(null);
+                }}
+              >
+                + 2.5D
+              </button>
+              <div className="ember-voxel-sculpt__menu-sep" role="separator" />
+              <p className="ember-voxel-sculpt__menu-hint">Из источника</p>
+              <button
+                type="button"
+                role="menuitem"
+                className="ember-voxel-sculpt__menu-item"
+                disabled={
+                  !libLoadId ||
+                  !pack.voxelModels[libLoadId] ||
+                  !draft ||
+                  libLoadId === draft.id
+                }
+                onClick={() => {
+                  applyLibraryAsBase(libLoadId);
+                  setSculptMenu(null);
+                }}
+              >
+                Подставить основой
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="ember-voxel-sculpt__menu-item"
+                disabled={
+                  variantMode ||
+                  !activeScene ||
+                  !libLoadId ||
+                  !pack.voxelModels[libLoadId]
+                }
+                onClick={() => {
+                  addObjectFromLibrary();
+                  setSculptMenu(null);
+                }}
+              >
+                + Объект в сцену
+              </button>
+            </SculptBarMenu>
+            {!variantMode ? (
+              <button
+                type="button"
+                className="ghost ember-danger"
+                disabled={!draft}
+                title="Удалить текущую модель из библиотеки"
+                onClick={deleteLibraryModel}
+              >
+                Удалить
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -5180,7 +6396,10 @@ export function VoxelSculptPanel({
                     type="button"
                     className={shapeBrush === b.id ? "is-active" : ""}
                     title={b.tip}
-                    onClick={() => setShapeBrush(b.id)}
+                    onClick={() => {
+                      onShapeCancelRef.current();
+                      setShapeBrush(b.id);
+                    }}
                   >
                     {b.label}
                   </button>
@@ -5189,14 +6408,18 @@ export function VoxelSculptPanel({
               <p className="muted ember-voxel-sculpt__group-hint">
                 {shapeBrush === "voxel"
                   ? "Точка: клик / drag как раньше · N — следующая форма"
-                  : "ЛКМ-drag от клетки до клетки · Shift+ЛКМ — стереть · N — форма"}
+                  : shapeBrush === "line"
+                    ? "Линия: ЛКМ-drag от клетки до клетки · Shift+ЛКМ — стереть · N — форма"
+                    : "Коробка/сфера: ЛКМ-drag по грани клика, отпустить — выдавить по нормали, ЛКМ/Enter — ок, ПКМ/Esc — отмена"}
               </p>
             </>
           ) : null}
 
           {tool === "move" ? (
             <p className="muted ember-hint">
-              Стрелки: XZ · Shift+↑↓: Y · или Δ в параметрах объекта
+              {selection?.length
+                ? "Гизмо или стрелки: сдвиг группы вокселей · Shift+↑↓ — высота"
+                : "Стрелки: XZ · Shift+↑↓: Y · без выделения сдвигает кость в сцене"}
             </p>
           ) : null}
 
@@ -5246,10 +6469,22 @@ export function VoxelSculptPanel({
             />
           ) : null}
 
+          {tool === "transmittance" || (tool === "select" && selection) ? (
+            <EditableRange
+              label="Просвет"
+              value={transmittanceAmount}
+              min={0}
+              max={255}
+              title="0 = глухая тень · выше = тень светлеет и мягче дальше от лампы · 255 = без тени"
+              onChange={setTransmittanceAmount}
+            />
+          ) : null}
+
           {tool !== "erase" &&
           tool !== "emit" &&
           tool !== "shine" &&
-          tool !== "transparency" ? (
+          tool !== "transparency" &&
+          tool !== "transmittance" ? (
             <>
               <p className="ember-voxel-sculpt__section">Палитра</p>
               <div className="ember-voxel-sculpt__palette">
@@ -5350,7 +6585,7 @@ export function VoxelSculptPanel({
                     : "Пустые: ряд/слой по air · Shift+ЛКМ добавить"
                   : selectMode === "box"
                     ? "ЛКМ — рамка · Shift+ЛКМ — добавить · ПКМ по вокселю — снять"
-                    : "ЛКМ/drag — группы · Shift+ЛКМ — добавить · ПКМ — снять"
+                    : "ЛКМ/drag — группы · Shift+ЛКМ — добавить · ПКМ — снять · гизмо — сдвиг"
               : "R — группа · Shift+L умный · Shift+Y слой · Esc снять"}
             {selection?.length
               ? ` · ${countSelectionCells(selection)} кл.`
@@ -5411,6 +6646,15 @@ export function VoxelSculptPanel({
               onClick={() => applySelectionOp("transparency")}
             >
               Прозр.
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={!draft || !selection?.length}
+              title="Просвет на выделении: непрозрачный, тень светлеет и мягче с расстоянием"
+              onClick={() => applySelectionOp("transmittance")}
+            >
+              Просвет
             </button>
             <button
               type="button"
@@ -5477,6 +6721,60 @@ export function VoxelSculptPanel({
             >
               Дубль
             </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={!draft || !selection?.length}
+              title="Сдвиг −X · ←"
+              onClick={() => translateSelectedVoxels({ x: -1, y: 0, z: 0 })}
+            >
+              −X
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={!draft || !selection?.length}
+              title="Сдвиг +X · →"
+              onClick={() => translateSelectedVoxels({ x: 1, y: 0, z: 0 })}
+            >
+              +X
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={!draft || !selection?.length}
+              title="Сдвиг −Y · Shift+↓"
+              onClick={() => translateSelectedVoxels({ x: 0, y: -1, z: 0 })}
+            >
+              −Y
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={!draft || !selection?.length}
+              title="Сдвиг +Y · Shift+↑"
+              onClick={() => translateSelectedVoxels({ x: 0, y: 1, z: 0 })}
+            >
+              +Y
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={!draft || !selection?.length}
+              title="Сдвиг −Z · ↓"
+              onClick={() => translateSelectedVoxels({ x: 0, y: 0, z: -1 })}
+            >
+              −Z
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={!draft || !selection?.length}
+              title="Сдвиг +Z · ↑"
+              onClick={() => translateSelectedVoxels({ x: 0, y: 0, z: 1 })}
+            >
+              +Z
+            </button>
           </div>
         </aside>
 
@@ -5526,7 +6824,34 @@ export function VoxelSculptPanel({
           className="ember-voxel-sculpt__side ember-voxel-sculpt__side--scene"
           aria-label="Сцена и модификаторы"
         >
-          <p className="ember-voxel-sculpt__side-title">Сцена</p>
+          <p className="ember-voxel-sculpt__side-title">
+            {isCharacterScene(activeScene) ? "Персонаж" : "Сцена"}
+          </p>
+
+          {!variantMode && activeScene && isCharacterScene(activeScene) ? (
+            <VoxelCharacterPanel
+              scene={activeScene}
+              activeObjectId={activeObject?.id ?? null}
+              onSelectSlot={(id) => setActiveObjectId(id)}
+              cardView={characterCardView}
+              onCardViewChange={setCharacterCardView}
+              onToggleVisible={(id) => {
+                const obj = activeScene.objects.find((o) => o.id === id);
+                if (!obj) return;
+                const nextVisible = obj.visible === false;
+                const nextScene = patchSceneObject(activeScene, id, {
+                  visible: nextVisible,
+                });
+                commitScene(nextScene);
+                if (!nextVisible && id === activeObject?.id) {
+                  const other = nextScene.objects.find(
+                    (o) => o.id !== id && o.visible !== false,
+                  );
+                  if (other) setActiveObjectId(other.id);
+                }
+              }}
+            />
+          ) : null}
 
           {!variantMode ? (
             <VoxelSceneOutliner
@@ -5551,6 +6876,17 @@ export function VoxelSculptPanel({
               }}
               onSeparate={separateSelection}
               canSeparate={Boolean(draft && selection?.length)}
+              onDuplicate={duplicateSceneObject}
+              onRemove={removeObjectFromScene}
+              canRemove={
+                (activeScene?.objects.length ?? 0) >= 2 &&
+                !(
+                  activeScene &&
+                  isCharacterScene(activeScene) &&
+                  activeObject &&
+                  isLockedCharacterObject(activeScene, activeObject.id)
+                )
+              }
             />
           ) : null}
 
@@ -5562,7 +6898,14 @@ export function VoxelSculptPanel({
                   ? draft
                   : pack.voxelModels[activeObject.modelId] ?? null
               }
-              canRemove={(activeScene?.objects.length ?? 0) >= 2}
+              canRemove={
+                (activeScene?.objects.length ?? 0) >= 2 &&
+                !(
+                  activeScene &&
+                  isCharacterScene(activeScene) &&
+                  isLockedCharacterObject(activeScene, activeObject.id)
+                )
+              }
               onRename={(nameRu) => {
                 if (!activeScene) return;
                 commitScene(
@@ -5572,7 +6915,11 @@ export function VoxelSculptPanel({
               onSetOffset={(offset) => {
                 if (!activeScene) return;
                 commitScene(
-                  patchSceneObject(activeScene, activeObject.id, { offset }),
+                  translateSceneBone(activeScene, activeObject.id, {
+                    x: offset.x - activeObject.offset.x,
+                    y: offset.y - activeObject.offset.y,
+                    z: offset.z - activeObject.offset.z,
+                  }),
                 );
               }}
               onResizeBlocks={resizeBlocks}
@@ -5593,9 +6940,12 @@ export function VoxelSculptPanel({
                 if (!draft || draft.id !== activeObject.modelId) return;
                 applyEdit(next);
               }}
+              selection={selection}
               onDuplicate={() => duplicateSceneObject(activeObject.id)}
               onRemove={() => removeObjectFromScene(activeObject.id)}
               pickingLightOrigin={pickingLightOrigin}
+              selectedLampId={activeLampId}
+              onSelectLamp={setActiveLampId}
               onStartPickLightOrigin={() => {
                 setPickingLightOrigin(true);
                 onSaved?.(
@@ -5605,11 +6955,20 @@ export function VoxelSculptPanel({
               onClearLightOrigin={() => {
                 if (!draft || draft.id !== activeObject.modelId) return;
                 beginEditRef.current();
-                setDraft({
-                  ...draft,
-                  emissiveLightOrigin: undefined,
-                  emissiveLightOffset: undefined,
-                });
+                const lamps = listVoxelEmissiveLamps(draft);
+                const lampId = activeLampId ?? lamps[0]?.id;
+                setDraft(
+                  lampId
+                    ? patchVoxelEmissiveLamp(draft, lampId, {
+                        origin: undefined,
+                        offset: undefined,
+                      })
+                    : {
+                        ...draft,
+                        emissiveLightOrigin: undefined,
+                        emissiveLightOffset: undefined,
+                      },
+                );
                 onSaved?.("Источник света: авто (центр emissive)");
               }}
             />
@@ -5691,6 +7050,7 @@ export function VoxelSculptPanel({
                     const emit = getVoxelEmissive(model, x, y, z);
                     const shine = getVoxelShine(model, x, y, z);
                     const transparency = getVoxelTransparency(model, x, y, z);
+                    const transmittance = getVoxelTransmittance(model, x, y, z);
                     const color =
                       pi > 0
                         ? model.palette[pi] || "#888888"
@@ -5788,6 +7148,20 @@ export function VoxelSculptPanel({
                             patchCell(setVoxelTransparency(draft, x, y, z, v));
                           }}
                         />
+                        <EditableRange
+                          label="Просвет"
+                          value={transmittance}
+                          min={0}
+                          max={255}
+                          disabled={!canEdit || pi <= 0}
+                          title="Непрозрачный; тень светлеет и мягче с расстоянием"
+                          onChange={(v) => {
+                            if (!draft || !canEdit) return;
+                            patchCell(
+                              setVoxelTransmittance(draft, x, y, z, v),
+                            );
+                          }}
+                        />
                         {model.material ? (
                           <p className="muted ember-voxel-inspect__mat">
                             Материал модели:{" "}
@@ -5812,6 +7186,8 @@ export function VoxelSculptPanel({
                                 setPaletteIndex(pi);
                                 setEmitAmount(emit);
                                 setShineAmount(shine);
+                                setTransparencyAmount(transparency);
+                                setTransmittanceAmount(transmittance);
                                 setTool("paint");
                               }}
                             >

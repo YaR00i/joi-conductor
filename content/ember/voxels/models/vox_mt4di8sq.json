@@ -1,0 +1,24 @@
+{
+  "id": "vox_mt4di8sq",
+  "nameRu": "Новый блок",
+  "mesh": {
+    "kind": "vox",
+    "file": "voxels/models/vox_mt4di8sq.vox"
+  },
+  "model": {
+    "id": "vox_mt4di8sq",
+    "nameRu": "Новый блок",
+    "sizeBlocks": {
+      "x": 1,
+      "y": 1,
+      "z": 1
+    },
+    "heightVoxels": 16,
+    "palette": [
+      "",
+      "#6a7a50"
+    ],
+    "voxels": [],
+    "physical": true
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "id": "scene_ncmssl",
+  "nameRu": "Болтовня",
+  "use": "talk",
+  "startStepId": "line_a",
+  "steps": [
+    {
+      "id": "line_a",
+      "type": "dialogue",
+      "speaker": "hu_tao",
+      "portraitKey": "neutral",
+      "nameRu": "hu_tao",
+      "textRu": "Привет.",
+      "next": "line_b"
+    },
+    {
+      "id": "line_b",
+      "type": "dialogue",
+      "speaker": "hu_tao",
+      "portraitKey": "neutral",
+      "nameRu": "hu_tao",
+      "textRu": "Что-нибудь ещё?",
+      "next": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  "editorLayout": {
+    "line_a": {
+      "x": 40,
+      "y": 80
+    },
+    "line_b": {
+      "x": 280,
+      "y": 80
+    },
+    "end": {
+      "x": 520,
+      "y": 80
+    }
+  }
+}

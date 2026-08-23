@@ -22,13 +22,24 @@ import {
 } from "../../../game/tile/emissivePaint";
 import { VOXELS_PER_BLOCK } from "../../../game/voxel/constants";
 import {
+  addVoxelEmissiveLamp,
+  clusterVoxelEmissiveLamps,
+  listVoxelEmissiveLamps,
   modelHasEmissiveVoxels,
   normalizeVoxelLightOffset,
+  patchVoxelEmissiveLamp,
+  removeVoxelEmissiveLamp,
+  VOXEL_EMISSIVE_LAMPS_MAX,
 } from "../../../game/voxel/voxelEmissiveLight";
 import {
-  listPaletteGroups,
+  listPaletteGroupFamilies,
+  paletteGroupHitsSelection,
   setPaletteGroupChannel,
+  setPaletteSlotColors,
   voxelGridSize,
+  type VoxelPaintChannel,
+  type VoxelPaletteGroup,
+  type VoxelSelectionSet,
 } from "../../../game/voxel/voxelModel";
 import { EditableRange } from "./EditableRange";
 import { DeferredColorInput } from "./DeferredColorInput";
@@ -198,6 +209,92 @@ function EnterCommitIntegerInput({
   );
 }
 
+function PaletteGroupCard({
+  model,
+  group,
+  selection,
+  subgroup,
+  onSetPaletteColor,
+  onPreviewPaletteColor,
+  onEditModel,
+}: {
+  model: EmberVoxelModel;
+  group: VoxelPaletteGroup;
+  selection?: VoxelSelectionSet | null;
+  subgroup: boolean;
+  onSetPaletteColor: (index: number, hex: string) => void;
+  onPreviewPaletteColor?: (index: number, hex: string) => void;
+  onEditModel: (next: EmberVoxelModel) => void;
+}) {
+  const selected = paletteGroupHitsSelection(model, group.index, selection);
+  const paint = (channel: VoxelPaintChannel, amount: number) => {
+    onEditModel(
+      setPaletteGroupChannel(
+        model,
+        group.index,
+        channel,
+        amount,
+        selected ? selection : null,
+      ),
+    );
+  };
+  return (
+    <div
+      className={`ember-voxel-objprops__group${
+        subgroup ? " is-sub" : ""
+      }${selected ? " is-sel" : ""}`}
+    >
+      <div className="ember-voxel-objprops__group-head">
+        <span
+          className="ember-voxel-objprops__swatch"
+          style={{ background: group.color }}
+        />
+        <span className="ember-voxel-objprops__group-meta">
+          #{group.index}
+          {subgroup ? " · подгруппа" : ""} · {group.count} кл.
+        </span>
+        <DeferredColorInput
+          className="ember-voxel-objprops__color"
+          value={group.color.startsWith("#") ? group.color : "#888888"}
+          title="Цвет слота палитры"
+          onPreview={(hex) => onPreviewPaletteColor?.(group.index, hex)}
+          onCommit={(hex) => onSetPaletteColor(group.index, hex)}
+        />
+      </div>
+      <EditableRange
+        label="Свечение"
+        value={group.emitAvg}
+        min={0}
+        max={255}
+        onChange={(v) => paint("emissive", v)}
+      />
+      <EditableRange
+        label="Блеск"
+        value={group.shineAvg}
+        min={0}
+        max={255}
+        onChange={(v) => paint("shine", v)}
+      />
+      <EditableRange
+        label="Прозрачность"
+        value={group.transparencyAvg}
+        min={0}
+        max={255}
+        title="0 = непрозрачный · выше = стекло, свет проходит"
+        onChange={(v) => paint("transparency", v)}
+      />
+      <EditableRange
+        label="Просвет"
+        value={group.transmittanceAvg}
+        min={0}
+        max={255}
+        title="0 = глухая тень · выше = тень светлеет и мягче дальше от лампы · 255 = без тени"
+        onChange={(v) => paint("transmittance", v)}
+      />
+    </div>
+  );
+}
+
 type Props = {
   object: EmberVoxelSceneObject | null;
   model: EmberVoxelModel | null;
@@ -212,8 +309,12 @@ type Props = {
   onEditModel: (next: EmberVoxelModel) => void;
   onDuplicate?: () => void;
   onRemove?: () => void;
+  /** Active sculpt selection — channel sliders split a subgroup from the rest. */
+  selection?: VoxelSelectionSet | null;
   /** Pick light origin by clicking a voxel in the viewport. */
   pickingLightOrigin?: boolean;
+  selectedLampId?: string | null;
+  onSelectLamp?: (id: string) => void;
   onStartPickLightOrigin?: () => void;
   onClearLightOrigin?: () => void;
 };
@@ -232,7 +333,10 @@ export function VoxelObjectPropsPanel({
   onEditModel,
   onDuplicate,
   onRemove,
+  selection,
   pickingLightOrigin,
+  selectedLampId,
+  onSelectLamp,
   onStartPickLightOrigin,
   onClearLightOrigin,
 }: Props) {
@@ -243,18 +347,20 @@ export function VoxelObjectPropsPanel({
   }
 
   const grid = model ? voxelGridSize(model) : null;
-  const groups = model ? listPaletteGroups(model) : [];
+  const families = model ? listPaletteGroupFamilies(model) : [];
   const heightVoxels =
     model?.heightVoxels ??
     (model ? model.sizeBlocks.y * VOXELS_PER_BLOCK : 1);
   const hasEmit = model ? modelHasEmissiveVoxels(model) : false;
   const castsLight = model?.emissiveCastsLight === true;
-  const lightRange = resolveEmissiveLightRange(model?.emissiveLightRange);
-  const lightStrength = resolveEmissiveStrength(model?.emissiveStrength);
   const lightShadows = model?.emissiveLightShadows === true;
   const torchFlicker = model?.emissiveTorchFlicker === true;
   const lanternFlicker = model?.emissiveLanternFlicker === true;
   const origin = model?.emissiveLightOrigin;
+  const lamps = model ? listVoxelEmissiveLamps(model) : [];
+  const activeLamp =
+    lamps.find((lamp) => lamp.id === selectedLampId) ?? lamps[0] ?? null;
+  const activeOrigin = activeLamp?.origin ?? origin;
 
   return (
     <div className="ember-voxel-objprops">
@@ -390,6 +496,12 @@ export function VoxelObjectPropsPanel({
                         emissiveLightShadows: on
                           ? model.emissiveLightShadows
                           : undefined,
+                        emissiveLightSoftRings: on
+                          ? model.emissiveLightSoftRings
+                          : undefined,
+                        emissiveLightSoftShadows: on
+                          ? model.emissiveLightSoftShadows
+                          : undefined,
                         emissiveLightRange: on
                           ? model.emissiveLightRange ??
                             DEFAULT_EMISSIVE_LIGHT_RANGE
@@ -399,37 +511,119 @@ export function VoxelObjectPropsPanel({
                   />
                   Свет от emissive
                 </label>
+                {castsLight && lamps.length > 0 ? (
+                  <div className="ember-voxel-objprops__lamps">
+                    {lamps.map((lamp, i) => (
+                      <button
+                        key={lamp.id}
+                        type="button"
+                        className={`ghost${activeLamp?.id === lamp.id ? " is-active" : ""}`}
+                        onClick={() => onSelectLamp?.(lamp.id)}
+                      >
+                        {lamp.nameRu?.trim() || `Свет ${i + 1}`}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className="ghost"
+                      disabled={lamps.length >= VOXEL_EMISSIVE_LAMPS_MAX}
+                      title="Ещё один PointLight на этом объекте"
+                      onClick={() => {
+                        const next = addVoxelEmissiveLamp(model);
+                        onEditModel(next);
+                        const added = listVoxelEmissiveLamps(next).at(-1);
+                        if (added) onSelectLamp?.(added.id);
+                      }}
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost"
+                      title="По одному источнику на каждый островок светящихся вокселей"
+                      onClick={() => {
+                        const next = clusterVoxelEmissiveLamps(model);
+                        onEditModel(next);
+                        const first = listVoxelEmissiveLamps(next)[0];
+                        if (first) onSelectLamp?.(first.id);
+                      }}
+                    >
+                      Кластеры
+                    </button>
+                    {lamps.length > 1 && activeLamp ? (
+                      <button
+                        type="button"
+                        className="ghost"
+                        title="Удалить выбранный источник"
+                        onClick={() => {
+                          const next = removeVoxelEmissiveLamp(
+                            model,
+                            activeLamp.id,
+                          );
+                          onEditModel(next);
+                          onSelectLamp?.(
+                            listVoxelEmissiveLamps(next)[0]?.id ?? "",
+                          );
+                        }}
+                      >
+                        Удалить
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
                 <EditableRange
                   label="Дальность (тайлы)"
-                  value={lightRange}
+                  value={resolveEmissiveLightRange(
+                    activeLamp?.range ?? model.emissiveLightRange,
+                  )}
                   min={MIN_EMISSIVE_LIGHT_RANGE}
                   max={MAX_EMISSIVE_LIGHT_RANGE}
                   step={0.05}
                   decimals={2}
                   disabled={!castsLight}
-                  onChange={(v) =>
+                  onChange={(v) => {
+                    const range = resolveEmissiveLightRange(v);
+                    if (activeLamp) {
+                      onEditModel(
+                        patchVoxelEmissiveLamp(model, activeLamp.id, {
+                          range,
+                        }),
+                      );
+                      return;
+                    }
                     onEditModel({
                       ...model,
                       emissiveCastsLight: true,
-                      emissiveLightRange: resolveEmissiveLightRange(v),
-                    })
-                  }
+                      emissiveLightRange: range,
+                    });
+                  }}
                 />
                 <EditableRange
                   label="Сила"
-                  value={lightStrength}
+                  value={resolveEmissiveStrength(
+                    activeLamp?.strength ?? model.emissiveStrength,
+                  )}
                   min={MIN_EMISSIVE_STRENGTH}
                   max={MAX_EMISSIVE_STRENGTH}
                   step={0.05}
                   decimals={2}
                   disabled={!castsLight}
-                  onChange={(v) =>
+                  onChange={(v) => {
+                    const strength = resolveEmissiveStrength(v);
+                    if (activeLamp) {
+                      onEditModel(
+                        patchVoxelEmissiveLamp(model, activeLamp.id, {
+                          strength,
+                        }),
+                      );
+                      return;
+                    }
                     onEditModel({
                       ...model,
                       emissiveCastsLight: true,
-                      emissiveStrength: resolveEmissiveStrength(v),
-                    })
-                  }
+                      emissiveStrength: strength,
+                    });
+                  }}
                 />
                 <label
                   className="ember-voxel-objprops__check"
@@ -439,18 +633,102 @@ export function VoxelObjectPropsPanel({
                   <input
                     type="checkbox"
                     disabled={!castsLight}
-                    checked={lightShadows}
-                    onChange={(e) =>
+                    checked={
+                      activeLamp
+                        ? activeLamp.shadows === true ||
+                          model.emissiveLightShadows === true
+                        : lightShadows
+                    }
+                    onChange={(e) => {
+                      if (activeLamp) {
+                        onEditModel(
+                          patchVoxelEmissiveLamp(model, activeLamp.id, {
+                            shadows: e.target.checked ? true : undefined,
+                          }),
+                        );
+                        return;
+                      }
                       onEditModel({
                         ...model,
                         emissiveCastsLight: true,
                         emissiveLightShadows: e.target.checked
                           ? true
                           : undefined,
-                      })
-                    }
+                      });
+                    }}
                   />
                   Тени PointLight
+                </label>
+                <label
+                  className="ember-voxel-objprops__check"
+                  style={{ opacity: castsLight ? 1 : 0.4 }}
+                  title="Смягчает кольца MeshToon-света, особенно край, где свет кончается"
+                >
+                  <input
+                    type="checkbox"
+                    disabled={!castsLight}
+                    checked={
+                      activeLamp?.softRings === true ||
+                      model.emissiveLightSoftRings === true
+                    }
+                    onChange={(e) => {
+                      if (activeLamp) {
+                        onEditModel(
+                          patchVoxelEmissiveLamp(model, activeLamp.id, {
+                            softRings: e.target.checked ? true : undefined,
+                          }),
+                        );
+                        return;
+                      }
+                      onEditModel({
+                        ...model,
+                        emissiveCastsLight: true,
+                        emissiveLightSoftRings: e.target.checked
+                          ? true
+                          : undefined,
+                      });
+                    }}
+                  />
+                  Мягкие кольца света
+                </label>
+                <label
+                  className="ember-voxel-objprops__check"
+                  style={{ opacity: castsLight ? 1 : 0.4 }}
+                  title="Полутень как у просвета: край тени размывается с расстоянием. Можно тестить без слайдера просвета. Нужны тени PointLight."
+                >
+                  <input
+                    type="checkbox"
+                    disabled={!castsLight}
+                    checked={
+                      activeLamp?.softShadows === true ||
+                      model.emissiveLightSoftShadows === true
+                    }
+                    onChange={(e) => {
+                      if (activeLamp) {
+                        onEditModel({
+                          ...patchVoxelEmissiveLamp(model, activeLamp.id, {
+                            softShadows: e.target.checked ? true : undefined,
+                            shadows: e.target.checked ? true : activeLamp.shadows,
+                          }),
+                          ...(e.target.checked
+                            ? { emissiveLightShadows: true }
+                            : {}),
+                        });
+                        return;
+                      }
+                      onEditModel({
+                        ...model,
+                        emissiveCastsLight: true,
+                        ...(e.target.checked
+                          ? { emissiveLightShadows: true }
+                          : {}),
+                        emissiveLightSoftShadows: e.target.checked
+                          ? true
+                          : undefined,
+                      });
+                    }}
+                  />
+                  Мягкие тени
                 </label>
                 <label
                   className="ember-voxel-objprops__check"
@@ -517,9 +795,10 @@ export function VoxelObjectPropsPanel({
                 </label>
                 <p className="muted ember-hint">
                   Источник:{" "}
-                  {origin
-                    ? `${origin.x}, ${origin.y}, ${origin.z}`
+                  {activeOrigin
+                    ? `${activeOrigin.x}, ${activeOrigin.y}, ${activeOrigin.z}`
                     : "авто (центр emissive)"}
+                  {lamps.length > 1 ? ` · ${lamps.length} ламп` : ""}
                 </p>
                 <div
                   className="ember-voxel-objprops__offset"
@@ -528,7 +807,8 @@ export function VoxelObjectPropsPanel({
                 >
                   <span className="ember-voxel-objprops__sub">Оффсет Δ</span>
                   {(["x", "y", "z"] as const).map((axis) => {
-                    const off = model.emissiveLightOffset;
+                    const off =
+                      activeLamp?.offset ?? model.emissiveLightOffset;
                     const val = off?.[axis] ?? 0;
                     return (
                       <label key={axis}>
@@ -547,6 +827,14 @@ export function VoxelObjectPropsPanel({
                               [axis]: n,
                             };
                             const normalized = normalizeVoxelLightOffset(next);
+                            if (activeLamp) {
+                              onEditModel(
+                                patchVoxelEmissiveLamp(model, activeLamp.id, {
+                                  offset: normalized,
+                                }),
+                              );
+                              return;
+                            }
                             onEditModel({
                               ...model,
                               emissiveCastsLight: true,
@@ -571,7 +859,7 @@ export function VoxelObjectPropsPanel({
                   <button
                     type="button"
                     className="ghost"
-                    disabled={!origin && !model.emissiveLightOffset}
+                    disabled={!origin && !model.emissiveLightOffset && !activeLamp?.offset}
                     title="Сбросить точку и оффсет на центр масс светящихся вокселей"
                     onClick={() => onClearLightOrigin?.()}
                   >
@@ -611,81 +899,69 @@ export function VoxelObjectPropsPanel({
       {model ? (
         <div className="ember-voxel-objprops__groups">
           <p className="ember-voxel-sculpt__section">Группы цветов</p>
-          {groups.length === 0 ? (
+          <p className="muted ember-hint">
+            Выдели часть цвета и смени просвет / блеск / свет — клетки станут
+            подгруппой, слайдеры больше не смешаются.
+          </p>
+          {families.length === 0 ? (
             <p className="muted ember-hint">Нет сплошных вокселей</p>
           ) : (
             <ul className="ember-voxel-objprops__group-list">
-              {groups.map((g) => (
-                <li key={g.index} className="ember-voxel-objprops__group">
-                  <div className="ember-voxel-objprops__group-head">
-                    <span
-                      className="ember-voxel-objprops__swatch"
-                      style={{ background: g.color }}
-                    />
-                    <span className="ember-voxel-objprops__group-meta">
-                      #{g.index} · {g.count} кл.
-                    </span>
-                    <DeferredColorInput
-                      className="ember-voxel-objprops__color"
-                      value={
-                        g.color.startsWith("#") ? g.color : "#888888"
-                      }
-                      title="Цвет слота палитры"
-                      onPreview={(hex) => onPreviewPaletteColor?.(g.index, hex)}
-                      onCommit={(hex) => onSetPaletteColor(g.index, hex)}
-                    />
-                  </div>
-                  <EditableRange
-                    label="Свечение"
-                    value={g.emitAvg}
-                    min={0}
-                    max={255}
-                    onChange={(v) =>
-                      onEditModel(
-                        setPaletteGroupChannel(
-                          model,
-                          g.index,
-                          "emissive",
-                          v,
-                        ),
-                      )
-                    }
-                  />
-                  <EditableRange
-                    label="Блеск"
-                    value={g.shineAvg}
-                    min={0}
-                    max={255}
-                    onChange={(v) =>
-                      onEditModel(
-                        setPaletteGroupChannel(
-                          model,
-                          g.index,
-                          "shine",
-                          v,
-                        ),
-                      )
-                    }
-                  />
-                  <EditableRange
-                    label="Прозрачность"
-                    value={g.transparencyAvg}
-                    min={0}
-                    max={255}
-                    title="0 = непрозрачный · выше = стекло, свет проходит"
-                    onChange={(v) =>
-                      onEditModel(
-                        setPaletteGroupChannel(
-                          model,
-                          g.index,
-                          "transparency",
-                          v,
-                        ),
-                      )
-                    }
-                  />
-                </li>
-              ))}
+              {families.map((fam) => {
+                const nested = fam.groups.length > 1;
+                return (
+                  <li key={fam.hex} className="ember-voxel-objprops__family">
+                    {nested ? (
+                      <div className="ember-voxel-objprops__family-head">
+                        <span
+                          className="ember-voxel-objprops__swatch"
+                          style={{
+                            background: fam.groups[0]?.color || fam.hex,
+                          }}
+                        />
+                        <span className="ember-voxel-objprops__group-meta">
+                          {fam.groups.length} подгруппы · {fam.count} кл.
+                        </span>
+                        <DeferredColorInput
+                          className="ember-voxel-objprops__color"
+                          value={
+                            (fam.groups[0]?.color ?? fam.hex).startsWith("#")
+                              ? fam.groups[0]?.color ?? fam.hex
+                              : "#888888"
+                          }
+                          title="Перекрасить все подгруппы этого цвета"
+                          onPreview={(hex) => {
+                            for (const g of fam.groups) {
+                              onPreviewPaletteColor?.(g.index, hex);
+                            }
+                          }}
+                          onCommit={(hex) =>
+                            onEditModel(
+                              setPaletteSlotColors(
+                                model,
+                                fam.groups.map((g) => g.index),
+                                hex,
+                              ),
+                            )
+                          }
+                        />
+                      </div>
+                    ) : null}
+                    {fam.groups.map((g) => (
+                      <PaletteGroupCard
+                        key={g.index}
+                        model={model}
+                        group={g}
+                        selection={selection}
+                        subgroup={nested}
+                        onSetPaletteColor={onSetPaletteColor}
+                        onPreviewPaletteColor={onPreviewPaletteColor}
+                        onEditModel={onEditModel}
+                      />
+                    ))}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

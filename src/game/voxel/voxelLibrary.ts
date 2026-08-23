@@ -27,7 +27,9 @@ export const VOXEL_SHARD_USER = "voxels/user.json";
 export const VOXEL_SHARD_FANTASY = "voxels/fantasy.json";
 
 export function voxelAssetFileName(id: string): string {
-  const safe = id.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/^_+|_+$/g, "");
+  const safe = String(id ?? "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
   return `${safe || "voxel"}.json`;
 }
 

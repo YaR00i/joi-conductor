@@ -59,6 +59,7 @@ describe("Ember ↔ MagicaVoxel", () => {
       src.id,
       src.nameRu,
     );
+    expect(back.palette.length).toBe(3);
     const { sx, sy, sz } = voxelGridSize(src);
     expect(voxelGridSize(back)).toEqual({ sx, sy, sz });
     for (let y = 0; y < sy; y++) {
@@ -105,6 +106,7 @@ describe("Ember ↔ MagicaVoxel", () => {
     expect(joined.palette[getVoxel(joined, 4, 2, 4)]?.toLowerCase()).toBe(
       "#ffb44a",
     );
+    expect(joined.palette.length).toBe(3);
   });
 
   it("keeps extra voxel channels on the json prefab", () => {

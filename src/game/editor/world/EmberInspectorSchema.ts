@@ -13,15 +13,21 @@ export type EmberInspectorFieldEdit = Readonly<{
   value: EmberInspectorFieldValue;
 }>;
 
+export type EmberInspectorSelectOption = Readonly<{
+  value: string;
+  label: string;
+}>;
+
 export type EmberInspectorFieldSchema = Readonly<{
   id: string;
   label: string;
-  kind: "text" | "number" | "boolean" | "readonly";
+  kind: "text" | "number" | "boolean" | "readonly" | "select";
   unit?: string;
   min?: number;
   max?: number;
   step?: number;
   hint?: string;
+  options?: readonly EmberInspectorSelectOption[];
   read(object: EmberWorldObject): EmberInspectorFieldValue;
   editable?: (object: EmberWorldObject) => boolean;
   source?: (object: EmberWorldObject) => EmberWorldValueSource | null;
@@ -62,8 +68,8 @@ const transformSchema: EmberInspectorComponentSchema = {
       unit: "ур.",
       step: 1,
       read: (object) => object.transform.resolvedZ,
-      editable: (object) => object.kind === "voxel",
-      hint: "Высота экземпляра. Для остальных объектов наследуется от поверхности.",
+      editable: (object) => object.kind === "voxel" || object.kind === "region",
+      hint: "Этаж объёма. Для зоны без Z визуал липнет к крыше колонки.",
     },
     {
       id: "rotationQuarterTurns",
@@ -483,8 +489,9 @@ const schemas: readonly EmberInspectorComponentSchema[] = [
     fields: [
       {
         id: "scriptId",
-        label: "Скрипт",
+        label: "Диалог / цепочка",
         kind: "text",
+        hint: "id сцены или action list. Срабатывает по F / входу, если нет targetMapId.",
         read: (object) =>
           emberWorldObjectComponent(object, "trigger")?.scriptId ?? "",
         editable: () => true,
@@ -505,44 +512,165 @@ const schemas: readonly EmberInspectorComponentSchema[] = [
           emberWorldObjectComponent(object, "trigger")?.group ?? "",
         editable: () => true,
       },
+      {
+        id: "targetMapId",
+        label: "Целевая карта",
+        kind: "text",
+        hint: "id другой карты. Interact или вход в зону грузит её и ставит игрока в целевой регион.",
+        read: (object) =>
+          emberWorldObjectComponent(object, "trigger")?.targetMapId ?? "",
+        editable: () => true,
+      },
+      {
+        id: "targetRegionId",
+        label: "Целевой регион",
+        kind: "text",
+        hint: "id региона старта / прихода на целевой (или этой) карте.",
+        read: (object) =>
+          emberWorldObjectComponent(object, "trigger")?.targetRegionId ?? "",
+        editable: () => true,
+      },
+      {
+        id: "boundObjectId",
+        label: "Объект",
+        kind: "text",
+        hint: "id размещённого объекта, который стреляет этот триггер. Обычно задаётся с стороны двери (triggerId).",
+        read: (object) =>
+          emberWorldObjectComponent(object, "trigger")?.boundObjectId ?? "",
+        editable: () => true,
+      },
+    ],
+  },
+  {
+    type: "interactivity",
+    label: "Интерактивность",
+    order: 55,
+    fields: [
+      {
+        id: "kind",
+        label: "Тип",
+        kind: "select",
+        hint: "Дверь стреляет связанный триггер. Магазин открывает UI по shopId.",
+        options: [
+          { value: "door", label: "Дверь" },
+          { value: "talk", label: "Разговор" },
+          { value: "quest_marker", label: "Маркер квеста" },
+          { value: "shop", label: "Магазин" },
+          { value: "custom", label: "Скрипт" },
+        ],
+        read: (object) =>
+          emberWorldObjectComponent(object, "interactivity")?.kind ?? "custom",
+        editable: (object) =>
+          object.kind === "voxel" || object.kind === "sprite",
+      },
+      {
+        id: "triggerId",
+        label: "Триггер",
+        kind: "text",
+        hint: "id зоны trigger на этой карте. Interact на объекте стреляет её.",
+        read: (object) =>
+          emberWorldObjectComponent(object, "interactivity")?.triggerId ?? "",
+        editable: (object) =>
+          object.kind === "voxel" || object.kind === "sprite",
+      },
+      {
+        id: "scriptId",
+        label: "Диалог / цепочка",
+        kind: "text",
+        hint: "id сцены (talk/cutscene/shop_intro) или action list. Inspector даёт список.",
+        read: (object) =>
+          emberWorldObjectComponent(object, "interactivity")?.scriptId ?? "",
+        editable: (object) =>
+          object.kind === "voxel" || object.kind === "sprite",
+      },
+      {
+        id: "questStatus",
+        label: "Статус квеста",
+        kind: "select",
+        hint: "Иконка над объектом: доступен / активен / сдан.",
+        options: [
+          { value: "", label: "—" },
+          { value: "available", label: "Доступен" },
+          { value: "active", label: "Активен" },
+          { value: "done", label: "Сдан" },
+        ],
+        read: (object) =>
+          emberWorldObjectComponent(object, "interactivity")?.questStatus ?? "",
+        editable: (object) =>
+          object.kind === "voxel" || object.kind === "sprite",
+      },
+      {
+        id: "iconId",
+        label: "Иконка",
+        kind: "text",
+        hint: "quest_marker: id иконки 16×16 (quest_available / quest_active / quest_done).",
+        read: (object) =>
+          emberWorldObjectComponent(object, "interactivity")?.iconId ?? "",
+        editable: (object) =>
+          object.kind === "voxel" || object.kind === "sprite",
+      },
+      {
+        id: "shopId",
+        label: "Магазин",
+        kind: "text",
+        hint: "shop: id из shops/catalog.json (можно выбрать в инспекторе).",
+        read: (object) =>
+          emberWorldObjectComponent(object, "interactivity")?.shopId ?? "",
+        editable: (object) =>
+          object.kind === "voxel" || object.kind === "sprite",
+      },
     ],
   },
   {
     type: "teleport",
-    label: "Teleport",
+    label: "Телепорт",
     order: 70,
     fields: [
       {
         id: "targetRegionId",
         label: "Целевая зона",
         kind: "text",
+        hint: "id другой зоны. Для пары A↔B открой редактор зоны ниже и нажми «Связать пару».",
         read: (object) =>
           emberWorldObjectComponent(object, "teleport")?.targetRegionId ?? "",
         editable: () => true,
       },
       {
         id: "targetX",
-        label: "Target X",
+        label: "Цель X (клетка)",
         kind: "number",
         step: 1,
+        hint: "Клетка прихода, если цель не зона. Пусто = не задано.",
         read: (object) =>
-          emberWorldObjectComponent(object, "teleport")?.targetPosition?.x ?? 0,
+          emberWorldObjectComponent(object, "teleport")?.targetPosition?.x ??
+          null,
         editable: () => true,
       },
       {
         id: "targetY",
-        label: "Target Y",
+        label: "Цель Y (клетка)",
         kind: "number",
         step: 1,
         read: (object) =>
-          emberWorldObjectComponent(object, "teleport")?.targetPosition?.y ?? 0,
+          emberWorldObjectComponent(object, "teleport")?.targetPosition?.y ??
+          null,
+        editable: () => true,
+      },
+      {
+        id: "targetElevation",
+        label: "Высота прихода (Z)",
+        kind: "number",
+        step: 1,
+        read: (object) =>
+          emberWorldObjectComponent(object, "teleport")?.targetPosition?.z ??
+          null,
         editable: () => true,
       },
     ],
   },
   {
     type: "spawn",
-    label: "Spawn",
+    label: "Спавн врагов",
     order: 70,
     fields: [
       {
@@ -556,6 +684,7 @@ const schemas: readonly EmberInspectorComponentSchema[] = [
         id: "group",
         label: "Группа",
         kind: "text",
+        hint: "Группа волн арены. На карте «исследовать» спавн не стреляет.",
         read: (object) =>
           emberWorldObjectComponent(object, "spawn")?.group ?? "",
         editable: () => true,
@@ -564,7 +693,7 @@ const schemas: readonly EmberInspectorComponentSchema[] = [
   },
   {
     type: "chest",
-    label: "Chest",
+    label: "Сундук",
     order: 70,
     fields: [
       {
@@ -599,11 +728,31 @@ const schemas: readonly EmberInspectorComponentSchema[] = [
           emberWorldObjectComponent(object, "chest")?.openClipId ?? "",
         editable: () => true,
       },
+      {
+        id: "lootIds",
+        label: "Лут (каталог)",
+        kind: "text",
+        hint: "id предметов через запятую: coin, herb. Неизвестный id — stub. Пусто = открывается пустым.",
+        read: (object) =>
+          (emberWorldObjectComponent(object, "chest")?.lootIds ?? []).join(
+            ", ",
+          ),
+        editable: () => true,
+      },
+      {
+        id: "repeatable",
+        label: "Повторно",
+        kind: "boolean",
+        hint: "Снять — открывается один раз. Включить — лут снова при каждом F.",
+        read: (object) =>
+          emberWorldObjectComponent(object, "chest")?.repeatable === true,
+        editable: () => true,
+      },
     ],
   },
   {
     type: "camera-bounds",
-    label: "Camera Bounds",
+    label: "Камера",
     order: 70,
     fields: [],
   },

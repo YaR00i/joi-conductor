@@ -23,6 +23,17 @@ export function createPlayerCapsuleOverlay(
 ): THREE.Group {
   const g = new THREE.Group();
   g.name = "playerCapsuleOverlay";
+  g.add(makeCapsuleMesh(radius, height, color));
+  g.userData.capsuleRadius = radius;
+  g.userData.capsuleHeight = height;
+  return g;
+}
+
+function makeCapsuleMesh(
+  radius: number,
+  height: number,
+  color: number,
+): THREE.Mesh {
   const r = Math.max(0.05, radius);
   const h = Math.max(r * 2 + 0.01, height);
   const cyl = Math.max(0.01, h - 2 * r);
@@ -40,8 +51,32 @@ export function createPlayerCapsuleOverlay(
   );
   mesh.renderOrder = 26;
   mesh.frustumCulled = false;
-  g.add(mesh);
-  return g;
+  return mesh;
+}
+
+/** Rebuild geometry in place when the gameplay body size changes. */
+export function resizePlayerCapsuleOverlay(
+  root: THREE.Group,
+  radius: number,
+  height: number,
+): void {
+  if (
+    root.userData.capsuleRadius === radius &&
+    root.userData.capsuleHeight === height &&
+    root.children.length > 0
+  ) {
+    return;
+  }
+  const color =
+    root.children[0] instanceof THREE.Mesh &&
+    root.children[0].material instanceof THREE.MeshBasicMaterial
+      ? root.children[0].material.color.getHex()
+      : 0x7cff9a;
+  disposePlayerCapsuleOverlay(root);
+  while (root.children.length) root.remove(root.children[0]!);
+  root.add(makeCapsuleMesh(radius, height, color));
+  root.userData.capsuleRadius = radius;
+  root.userData.capsuleHeight = height;
 }
 
 export function disposePlayerCapsuleOverlay(root: THREE.Object3D): void {

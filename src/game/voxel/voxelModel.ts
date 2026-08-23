@@ -1,10 +1,18 @@
 import { normalizeEmberLibraryTags } from "../content/libraryTags";
-import type { EmberMaterialKind, EmberVoxelModel } from "../content/types";
+import type {
+  EmberMaterialKind,
+  EmberVoxelEmissiveLamp,
+  EmberVoxelModel,
+} from "../content/types";
 import {
   resolveEmissiveLightRange,
   resolveEmissiveStrength,
 } from "../tile/emissivePaint";
-import { DEFAULT_VOXEL_PALETTE, VOXELS_PER_BLOCK } from "./constants";
+import {
+  DEFAULT_VOXEL_PALETTE,
+  MAX_VOXEL_PALETTE,
+  VOXELS_PER_BLOCK,
+} from "./constants";
 
 const MATERIAL_KINDS: readonly EmberMaterialKind[] = [
   "stone",
@@ -35,6 +43,60 @@ function normalizeLightOffset(
   const z = clamp(raw.z);
   if (x === 0 && y === 0 && z === 0) return undefined;
   return { x, y, z };
+}
+
+function clampLampOrigin(
+  raw: { x?: number; y?: number; z?: number } | undefined,
+  sx: number,
+  sy: number,
+  sz: number,
+): { x: number; y: number; z: number } | undefined {
+  const x = Number(raw?.x);
+  const y = Number(raw?.y);
+  const z = Number(raw?.z);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+    return undefined;
+  }
+  return {
+    x: Math.max(0, Math.min(sx - 1, Math.round(x))),
+    y: Math.max(0, Math.min(sy - 1, Math.round(y))),
+    z: Math.max(0, Math.min(sz - 1, Math.round(z))),
+  };
+}
+
+function normalizeEmissiveLights(
+  raw: EmberVoxelEmissiveLamp[] | undefined,
+  sx: number,
+  sy: number,
+  sz: number,
+): EmberVoxelEmissiveLamp[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const seen = new Set<string>();
+  const out: EmberVoxelEmissiveLamp[] = [];
+  for (const item of raw) {
+    if (!item || typeof item.id !== "string" || !item.id.trim()) continue;
+    const id = item.id.trim();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const origin = clampLampOrigin(item.origin, sx, sy, sz);
+    const offset = normalizeLightOffset(item.offset);
+    const lamp: EmberVoxelEmissiveLamp = { id };
+    if (typeof item.nameRu === "string" && item.nameRu.trim()) {
+      lamp.nameRu = item.nameRu.trim();
+    }
+    if (origin) lamp.origin = origin;
+    if (offset) lamp.offset = offset;
+    if (Number.isFinite(item.range)) lamp.range = item.range;
+    if (Number.isFinite(item.strength)) lamp.strength = item.strength;
+    if (item.shadows === true) lamp.shadows = true;
+    if (item.softRings === true) lamp.softRings = true;
+    if (item.softShadows === true) lamp.softShadows = true;
+    if (item.torchFlicker === true) lamp.torchFlicker = true;
+    if (item.lanternFlicker === true) lamp.lanternFlicker = true;
+    out.push(lamp);
+    if (out.length >= 8) break;
+  }
+  return out.length > 0 ? out : undefined;
 }
 
 export function voxelGridSize(
@@ -108,7 +170,58 @@ export function getVoxelTransparency(
   return model.transparency?.[i] ?? 0;
 }
 
-export type VoxelPaintChannel = "emissive" | "shine" | "transparency";
+export function getVoxelTransmittance(
+  model: EmberVoxelModel,
+  x: number,
+  y: number,
+  z: number,
+): number {
+  const i = voxelIndex(model, x, y, z);
+  if (i < 0) return 0;
+  return model.transmittance?.[i] ?? 0;
+}
+
+/**
+ * 0..1 leak from transmitting solid cells. Average of cells with tx > 0
+ * so a transmitting shell reads, while a fully opaque model stays 0.
+ */
+export function voxelTransmittanceLeak(model: EmberVoxelModel): number {
+  const tx = model.transmittance;
+  if (!tx || tx.length === 0) return 0;
+  let sum = 0;
+  let n = 0;
+  const limit = Math.min(model.voxels.length, tx.length);
+  for (let i = 0; i < limit; i++) {
+    if ((model.voxels[i] ?? 0) <= 0) continue;
+    const v = tx[i] ?? 0;
+    if (v <= 0) continue;
+    sum += v;
+    n += 1;
+  }
+  if (n === 0) return 0;
+  return Math.max(0, Math.min(1, sum / (n * 255)));
+}
+
+/** Host PointLight shadow: radius 0 keeps a hard lantern umbra. */
+export function voxelTransmittanceShadowParams(
+  leak: number,
+  forceSoft = false,
+): {
+  radius: number;
+  intensity: number;
+} {
+  const t = Math.max(0, Math.min(1, Number.isFinite(leak) ? leak : 0));
+  const intensity = t <= 0.02 ? 1 : Math.max(0.12, 1 - t * 0.88);
+  let radius = t <= 0.02 ? 0 : 2.2 + t * 5;
+  if (forceSoft) radius = Math.max(radius, 4.4);
+  return { radius, intensity };
+}
+
+export type VoxelPaintChannel =
+  | "emissive"
+  | "shine"
+  | "transparency"
+  | "transmittance";
 
 function ensureChannelArray(
   model: EmberVoxelModel,
@@ -138,6 +251,10 @@ function ensureShineArray(model: EmberVoxelModel): number[] {
 
 function ensureTransparencyArray(model: EmberVoxelModel): number[] {
   return ensureChannelArray(model, "transparency");
+}
+
+function ensureTransmittanceArray(model: EmberVoxelModel): number[] {
+  return ensureChannelArray(model, "transmittance");
 }
 
 /** Default true: omitted / undefined means the model collides. */
@@ -174,27 +291,29 @@ export function createEmptyVoxelModel(
     emissive: new Array(n).fill(0),
     shine: new Array(n).fill(0),
     transparency: new Array(n).fill(0),
+    transmittance: new Array(n).fill(0),
     // New sculpt models collide unless the author turns physicality off.
     physical: true,
   };
 }
 
-/** Deep-ish clone with a new id (and optional display name). */
+/** Deep-ish clone. Omit `newId` to keep the same id. */
 export function cloneVoxelModel(
   model: EmberVoxelModel,
-  newId: string,
+  newId?: string,
   nameRu?: string,
 ): EmberVoxelModel {
   const prev = normalizeVoxelModel(model);
   return {
     ...prev,
-    id: newId,
+    id: newId ?? prev.id,
     nameRu: nameRu ?? prev.nameRu,
     palette: [...prev.palette],
     voxels: [...prev.voxels],
     emissive: [...(prev.emissive ?? [])],
     shine: [...(prev.shine ?? [])],
     transparency: [...(prev.transparency ?? [])],
+    transmittance: [...(prev.transmittance ?? [])],
   };
 }
 
@@ -215,6 +334,7 @@ export function stampSolidBlock(
     emissive: ensureEmissiveArray(model),
     shine: ensureShineArray(model),
     transparency: ensureTransparencyArray(model),
+    transmittance: ensureTransmittanceArray(model),
   };
   const { sx, sy, sz } = voxelGridSize(next);
   const pi = Math.max(1, Math.min(next.palette.length - 1, paletteIndex));
@@ -227,6 +347,7 @@ export function stampSolidBlock(
           next.emissive[i] = 0;
           next.shine[i] = 0;
           next.transparency[i] = 0;
+          next.transmittance[i] = 0;
         }
       }
     }
@@ -250,12 +371,218 @@ export function setVoxel(
   const emissive = ensureEmissiveArray(model);
   const shine = ensureShineArray(model);
   const transparency = ensureTransparencyArray(model);
+  const transmittance = ensureTransmittanceArray(model);
   if (pi === 0) {
     emissive[i] = 0;
     shine[i] = 0;
     transparency[i] = 0;
+    transmittance[i] = 0;
   }
-  return { ...model, voxels, emissive, shine, transparency };
+  return { ...model, voxels, emissive, shine, transparency, transmittance };
+}
+
+function paintChannelValue(
+  model: EmberVoxelModel,
+  channel: VoxelPaintChannel,
+): number[] {
+  switch (channel) {
+    case "emissive":
+      return ensureEmissiveArray(model);
+    case "shine":
+      return ensureShineArray(model);
+    case "transparency":
+      return ensureTransparencyArray(model);
+    case "transmittance":
+      return ensureTransmittanceArray(model);
+    default: {
+      const _n: never = channel;
+      return _n;
+    }
+  }
+}
+
+function readChannelValue(
+  model: EmberVoxelModel,
+  channel: VoxelPaintChannel,
+  i: number,
+): number {
+  switch (channel) {
+    case "emissive":
+      return model.emissive?.[i] ?? 0;
+    case "shine":
+      return model.shine?.[i] ?? 0;
+    case "transparency":
+      return model.transparency?.[i] ?? 0;
+    case "transmittance":
+      return model.transmittance?.[i] ?? 0;
+    default: {
+      const _n: never = channel;
+      return _n;
+    }
+  }
+}
+
+function withPaintChannel(
+  model: EmberVoxelModel,
+  channel: VoxelPaintChannel,
+  arr: number[],
+): EmberVoxelModel {
+  switch (channel) {
+    case "emissive":
+      return { ...model, emissive: arr };
+    case "shine":
+      return { ...model, shine: arr };
+    case "transparency":
+      return { ...model, transparency: arr };
+    case "transmittance":
+      return { ...model, transmittance: arr };
+    default: {
+      const _n: never = channel;
+      return _n;
+    }
+  }
+}
+
+export function normalizePaletteHex(hex: string): string {
+  const t = hex.trim().toLowerCase();
+  if (/^#[0-9a-f]{3}$/.test(t)) {
+    return `#${t[1]}${t[1]}${t[2]}${t[2]}${t[3]}${t[3]}`;
+  }
+  return t;
+}
+
+function paletteSlotUniformChannel(
+  voxels: number[],
+  channel: VoxelPaintChannel,
+  model: EmberVoxelModel,
+  paletteIndex: number,
+  amount: number,
+): boolean {
+  let saw = false;
+  for (let i = 0; i < voxels.length; i++) {
+    if ((voxels[i] ?? 0) !== paletteIndex) continue;
+    saw = true;
+    if (readChannelValue(model, channel, i) !== amount) return false;
+  }
+  return saw;
+}
+
+function resolvePaletteSubgroupIndex(
+  model: EmberVoxelModel,
+  voxels: number[],
+  palette: string[],
+  hex: string,
+  channel: VoxelPaintChannel,
+  amount: number,
+): { destPi: number; palette: string[] } {
+  const want = normalizePaletteHex(hex);
+  const usage = new Array(Math.max(palette.length, 1)).fill(0);
+  for (const pi of voxels) {
+    if (pi > 0 && pi < usage.length) usage[pi] += 1;
+  }
+  for (let q = 1; q < palette.length; q++) {
+    if (normalizePaletteHex(palette[q] || "") !== want) continue;
+    if ((usage[q] ?? 0) === 0) {
+      return { destPi: q, palette };
+    }
+    if (paletteSlotUniformChannel(voxels, channel, model, q, amount)) {
+      return { destPi: q, palette };
+    }
+  }
+  if (palette.length >= MAX_VOXEL_PALETTE) {
+    return { destPi: 0, palette };
+  }
+  return { destPi: palette.length, palette: [...palette, hex] };
+}
+
+/**
+ * Move a partial color-group onto a cloned palette slot (same hex) so channel
+ * edits do not share a slider with leftover cells of that color.
+ */
+export function detachPartialPaletteCells(
+  model: EmberVoxelModel,
+  cellIndices: ReadonlyArray<number>,
+  channel: VoxelPaintChannel,
+  amount: number,
+): EmberVoxelModel {
+  if (!cellIndices.length) return model;
+  const usage = new Array(Math.max(model.palette.length, 1)).fill(0);
+  for (const pi of model.voxels) {
+    if (pi > 0 && pi < usage.length) usage[pi] += 1;
+  }
+  const selectedByHex = new Map<string, { hexRaw: string; idxs: number[] }>();
+  const selectedCountByPi = new Map<number, number>();
+  for (const i of cellIndices) {
+    if (i < 0 || i >= model.voxels.length) continue;
+    const pi = model.voxels[i] ?? 0;
+    if (pi <= 0) continue;
+    selectedCountByPi.set(pi, (selectedCountByPi.get(pi) ?? 0) + 1);
+    const hexRaw = model.palette[pi] || "#888888";
+    const hex = normalizePaletteHex(hexRaw) || `#slot-${pi}`;
+    const cur = selectedByHex.get(hex);
+    if (cur) cur.idxs.push(i);
+    else selectedByHex.set(hex, { hexRaw, idxs: [i] });
+  }
+  if (!selectedByHex.size) return model;
+
+  let palette = [...model.palette];
+  const voxels = [...model.voxels];
+  let changed = false;
+  const v = Math.max(0, Math.min(255, Math.round(amount)));
+
+  for (const { hexRaw, idxs } of selectedByHex.values()) {
+    let anyPartial = false;
+    const seenPi = new Set<number>();
+    for (const i of idxs) {
+      const pi = model.voxels[i] ?? 0;
+      if (pi <= 0 || seenPi.has(pi)) continue;
+      seenPi.add(pi);
+      if ((selectedCountByPi.get(pi) ?? 0) < (usage[pi] ?? 0)) {
+        anyPartial = true;
+      }
+    }
+    if (!anyPartial) continue;
+    const resolved = resolvePaletteSubgroupIndex(
+      model,
+      voxels,
+      palette,
+      hexRaw,
+      channel,
+      v,
+    );
+    palette = resolved.palette;
+    if (resolved.destPi <= 0) continue;
+    for (const i of idxs) {
+      if ((voxels[i] ?? 0) > 0 && voxels[i] !== resolved.destPi) {
+        voxels[i] = resolved.destPi;
+        changed = true;
+      }
+    }
+  }
+  return changed ? { ...model, palette, voxels } : model;
+}
+
+function selectedSolidIndices(
+  model: EmberVoxelModel,
+  boxes: ReadonlyArray<VoxelSelection>,
+  paletteIndex?: number,
+): number[] {
+  const out: number[] = [];
+  for (const sel of boxes) {
+    for (let y = sel.y0; y <= sel.y1; y++) {
+      for (let z = sel.z0; z <= sel.z1; z++) {
+        for (let x = sel.x0; x <= sel.x1; x++) {
+          const i = voxelIndex(model, x, y, z);
+          if (i < 0) continue;
+          const pi = model.voxels[i] ?? 0;
+          if (pi <= 0) continue;
+          if (paletteIndex != null && pi !== paletteIndex) continue;
+          out.push(i);
+        }
+      }
+    }
+  }
+  return out;
 }
 
 export function setVoxelEmissive(
@@ -309,6 +636,23 @@ export function setVoxelTransparency(
   return { ...model, transparency };
 }
 
+export function setVoxelTransmittance(
+  model: EmberVoxelModel,
+  x: number,
+  y: number,
+  z: number,
+  amount: number,
+): EmberVoxelModel {
+  const i = voxelIndex(model, x, y, z);
+  if (i < 0) return model;
+  if ((model.voxels[i] ?? 0) <= 0) return model;
+  const v = Math.max(0, Math.min(255, Math.round(amount)));
+  const transmittance = ensureTransmittanceArray(model);
+  if (transmittance[i] === v) return model;
+  transmittance[i] = v;
+  return { ...model, transmittance };
+}
+
 export type VoxelPaletteGroup = {
   index: number;
   color: string;
@@ -316,13 +660,20 @@ export type VoxelPaletteGroup = {
   emitAvg: number;
   shineAvg: number;
   transparencyAvg: number;
+  transmittanceAvg: number;
 };
 
 /** Solid cells grouped by palette index (skip air). */
 export function listPaletteGroups(model: EmberVoxelModel): VoxelPaletteGroup[] {
   const stats = new Map<
     number,
-    { count: number; emit: number; shine: number; transparency: number }
+    {
+      count: number;
+      emit: number;
+      shine: number;
+      transparency: number;
+      transmittance: number;
+    }
   >();
   const n = model.voxels.length;
   for (let i = 0; i < n; i++) {
@@ -333,11 +684,13 @@ export function listPaletteGroups(model: EmberVoxelModel): VoxelPaletteGroup[] {
       emit: 0,
       shine: 0,
       transparency: 0,
+      transmittance: 0,
     };
     cur.count += 1;
     cur.emit += model.emissive?.[i] ?? 0;
     cur.shine += model.shine?.[i] ?? 0;
     cur.transparency += model.transparency?.[i] ?? 0;
+    cur.transmittance += model.transmittance?.[i] ?? 0;
     stats.set(pi, cur);
   }
   return [...stats.entries()]
@@ -349,24 +702,73 @@ export function listPaletteGroups(model: EmberVoxelModel): VoxelPaletteGroup[] {
       emitAvg: s.count ? Math.round(s.emit / s.count) : 0,
       shineAvg: s.count ? Math.round(s.shine / s.count) : 0,
       transparencyAvg: s.count ? Math.round(s.transparency / s.count) : 0,
+      transmittanceAvg: s.count ? Math.round(s.transmittance / s.count) : 0,
     }));
 }
 
-/** Set emissive / shine / transparency on every solid cell of a palette index. */
+export type VoxelPaletteFamily = {
+  hex: string;
+  count: number;
+  groups: VoxelPaletteGroup[];
+};
+
+/** Palette slots nested by color so cloned subgroups stay under one swatch. */
+export function listPaletteGroupFamilies(
+  model: EmberVoxelModel,
+): VoxelPaletteFamily[] {
+  const groups = listPaletteGroups(model);
+  const buckets = new Map<string, VoxelPaletteGroup[]>();
+  const order: string[] = [];
+  for (const g of groups) {
+    const hex = normalizePaletteHex(g.color) || `#slot-${g.index}`;
+    const list = buckets.get(hex);
+    if (list) list.push(g);
+    else {
+      buckets.set(hex, [g]);
+      order.push(hex);
+    }
+  }
+  return order.map((hex) => {
+    const list = buckets.get(hex) ?? [];
+    list.sort((a, b) => a.index - b.index);
+    return {
+      hex,
+      count: list.reduce((n, g) => n + g.count, 0),
+      groups: list,
+    };
+  });
+}
+
+/** Set emissive / shine / transparency / transmittance on every solid cell of a palette index. */
 export function setPaletteGroupChannel(
   model: EmberVoxelModel,
   paletteIndex: number,
   channel: VoxelPaintChannel,
   amount: number,
+  selection?: VoxelSelectionSet | null,
 ): EmberVoxelModel {
   const pi = Math.max(1, paletteIndex | 0);
   const v = Math.max(0, Math.min(255, Math.round(amount)));
-  const arr =
-    channel === "emissive"
-      ? ensureEmissiveArray(model)
-      : channel === "shine"
-        ? ensureShineArray(model)
-        : ensureTransparencyArray(model);
+  const boxes = selection?.length
+    ? asSelectionSet(selection)
+        .map((b) => clampVoxelSelection(model, b))
+        .filter((b): b is VoxelSelection => Boolean(b))
+    : [];
+  if (boxes.length) {
+    const idxs = selectedSolidIndices(model, boxes, pi);
+    if (idxs.length) {
+      const detached = detachPartialPaletteCells(model, idxs, channel, v);
+      const arr = paintChannelValue(detached, channel);
+      let changed = detached !== model;
+      for (const i of idxs) {
+        if (arr[i] === v) continue;
+        arr[i] = v;
+        changed = true;
+      }
+      return changed ? withPaintChannel(detached, channel, arr) : model;
+    }
+  }
+  const arr = paintChannelValue(model, channel);
   let changed = false;
   for (let i = 0; i < model.voxels.length; i++) {
     if ((model.voxels[i] ?? 0) !== pi) continue;
@@ -375,9 +777,35 @@ export function setPaletteGroupChannel(
     changed = true;
   }
   if (!changed) return model;
-  if (channel === "emissive") return { ...model, emissive: arr };
-  if (channel === "shine") return { ...model, shine: arr };
-  return { ...model, transparency: arr };
+  return withPaintChannel(model, channel, arr);
+}
+
+export function setPaletteSlotColors(
+  model: EmberVoxelModel,
+  indices: ReadonlyArray<number>,
+  hex: string,
+): EmberVoxelModel {
+  const palette = [...model.palette];
+  let changed = false;
+  for (const i of indices) {
+    if (i <= 0 || i >= palette.length) continue;
+    if (palette[i] === hex) continue;
+    palette[i] = hex;
+    changed = true;
+  }
+  return changed ? { ...model, palette } : model;
+}
+
+export function paletteGroupHitsSelection(
+  model: EmberVoxelModel,
+  paletteIndex: number,
+  selection?: VoxelSelectionSet | null,
+): boolean {
+  if (!selection?.length) return false;
+  const boxes = asSelectionSet(selection)
+    .map((b) => clampVoxelSelection(model, b))
+    .filter((b): b is VoxelSelection => Boolean(b));
+  return selectedSolidIndices(model, boxes, paletteIndex).length > 0;
 }
 
 /** Paint palette index onto an existing solid cell (no grow/shrink). */
@@ -461,6 +889,7 @@ export function flipVoxelModel(
   const emissive = new Array(sx * sy * sz).fill(0);
   const shine = new Array(sx * sy * sz).fill(0);
   const transparency = new Array(sx * sy * sz).fill(0);
+  const transmittance = new Array(sx * sy * sz).fill(0);
   for (let y = 0; y < sy; y++) {
     for (let z = 0; z < sz; z++) {
       for (let x = 0; x < sx; x++) {
@@ -475,10 +904,11 @@ export function flipVoxelModel(
         emissive[j] = prev.emissive?.[i] ?? 0;
         shine[j] = prev.shine?.[i] ?? 0;
         transparency[j] = prev.transparency?.[i] ?? 0;
+        transmittance[j] = prev.transmittance?.[i] ?? 0;
       }
     }
   }
-  return { ...prev, voxels, emissive, shine, transparency };
+  return { ...prev, voxels, emissive, shine, transparency, transmittance };
 }
 
 /** Live sculpt symmetry (Blender-style): mirror edits across grid midplanes. */
@@ -534,6 +964,7 @@ export function clearVoxelModel(model: EmberVoxelModel): EmberVoxelModel {
     emissive: new Array(n).fill(0),
     shine: new Array(n).fill(0),
     transparency: new Array(n).fill(0),
+    transmittance: new Array(n).fill(0),
   };
 }
 
@@ -933,7 +1364,8 @@ export type SelectionEditOp =
   | "erase"
   | "emit"
   | "shine"
-  | "transparency";
+  | "transparency"
+  | "transmittance";
 
 export type ExtractSelectionResult = {
   /** Cropped model containing only selected solids. */
@@ -1000,6 +1432,7 @@ export function extractSelectionToModel(
     emissive: ensureEmissiveArray(next),
     shine: ensureShineArray(next),
     transparency: ensureTransparencyArray(next),
+    transmittance: ensureTransmittanceArray(next),
   };
 
   const inSel = (x: number, y: number, z: number) =>
@@ -1028,6 +1461,7 @@ export function extractSelectionToModel(
         next.emissive![i] = getVoxelEmissive(src, x, y, z);
         next.shine![i] = getVoxelShine(src, x, y, z);
         next.transparency![i] = getVoxelTransparency(src, x, y, z);
+        next.transmittance![i] = getVoxelTransmittance(src, x, y, z);
       }
     }
   }
@@ -1038,7 +1472,7 @@ export function extractSelectionToModel(
   };
 }
 
-/** Apply paint / solid fill / erase / emissive / shine / transparency inside selection. */
+/** Apply paint / solid fill / erase / emissive / shine / transparency / transmittance inside selection. */
 export function editVoxelSelection(
   model: EmberVoxelModel,
   selIn: VoxelSelection | VoxelSelectionSet,
@@ -1050,13 +1484,57 @@ export function editVoxelSelection(
     .map((b) => clampVoxelSelection(model, b))
     .filter((b): b is VoxelSelection => Boolean(b));
   if (!boxes.length) return model;
-  const voxels = [...model.voxels];
-  const emissive = ensureEmissiveArray(model);
-  const shine = ensureShineArray(model);
-  const transparency = ensureTransparencyArray(model);
-  const pi = Math.max(1, Math.min(model.palette.length - 1, paletteIndex | 0));
   const emit = Math.max(0, Math.min(255, Math.round(emitAmount)));
-  let changed = false;
+  let working = model;
+  switch (op) {
+    case "emit":
+      working = detachPartialPaletteCells(
+        model,
+        selectedSolidIndices(model, boxes),
+        "emissive",
+        emit,
+      );
+      break;
+    case "shine":
+      working = detachPartialPaletteCells(
+        model,
+        selectedSolidIndices(model, boxes),
+        "shine",
+        emit,
+      );
+      break;
+    case "transparency":
+      working = detachPartialPaletteCells(
+        model,
+        selectedSolidIndices(model, boxes),
+        "transparency",
+        emit,
+      );
+      break;
+    case "transmittance":
+      working = detachPartialPaletteCells(
+        model,
+        selectedSolidIndices(model, boxes),
+        "transmittance",
+        emit,
+      );
+      break;
+    case "erase":
+    case "fill":
+    case "paint":
+      break;
+    default: {
+      const _n: never = op;
+      void _n;
+    }
+  }
+  const voxels = [...working.voxels];
+  const emissive = ensureEmissiveArray(working);
+  const shine = ensureShineArray(working);
+  const transparency = ensureTransparencyArray(working);
+  const transmittance = ensureTransmittanceArray(working);
+  const pi = Math.max(1, Math.min(working.palette.length - 1, paletteIndex | 0));
+  let changed = working !== model;
 
   for (const sel of boxes) {
     for (let y = sel.y0; y <= sel.y1; y++) {
@@ -1071,6 +1549,7 @@ export function editVoxelSelection(
                 emissive[i] = 0;
                 shine[i] = 0;
                 transparency[i] = 0;
+                transmittance[i] = 0;
                 changed = true;
               }
               break;
@@ -1110,6 +1589,13 @@ export function editVoxelSelection(
               }
               break;
             }
+            case "transmittance": {
+              if ((voxels[i] ?? 0) > 0 && transmittance[i] !== emit) {
+                transmittance[i] = emit;
+                changed = true;
+              }
+              break;
+            }
             default: {
               const _n: never = op;
               void _n;
@@ -1120,7 +1606,7 @@ export function editVoxelSelection(
     }
   }
   return changed
-    ? { ...model, voxels, emissive, shine, transparency }
+    ? { ...working, voxels, emissive, shine, transparency, transmittance }
     : model;
 }
 
@@ -1149,6 +1635,7 @@ export function resizeVoxelModel(
   const emissive = new Array(n).fill(0);
   const shine = new Array(n).fill(0);
   const transparency = new Array(n).fill(0);
+  const transmittance = new Array(n).fill(0);
   const ox = Math.max(0, Math.min(a.sx, b.sx));
   const oy = Math.max(0, Math.min(a.sy, b.sy));
   const oz = Math.max(0, Math.min(a.sz, b.sz));
@@ -1162,6 +1649,7 @@ export function resizeVoxelModel(
         emissive[ib] = prev.emissive?.[ia] ?? 0;
         shine[ib] = prev.shine?.[ia] ?? 0;
         transparency[ib] = prev.transparency?.[ia] ?? 0;
+        transmittance[ib] = prev.transmittance?.[ia] ?? 0;
       }
     }
   }
@@ -1180,6 +1668,16 @@ export function resizeVoxelModel(
       };
     }
   }
+  const emissiveLights = prev.emissiveLights?.map((lamp) => {
+    const origin = lamp.origin
+      ? {
+          x: Math.min(lamp.origin.x, b.sx - 1),
+          y: Math.min(lamp.origin.y, b.sy - 1),
+          z: Math.min(lamp.origin.z, b.sz - 1),
+        }
+      : undefined;
+    return origin ? { ...lamp, origin } : lamp;
+  });
   return {
     ...prev,
     sizeBlocks: size,
@@ -1188,7 +1686,9 @@ export function resizeVoxelModel(
     emissive,
     shine,
     transparency,
+    transmittance,
     emissiveLightOrigin,
+    emissiveLights,
   };
 }
 
@@ -1235,9 +1735,19 @@ export function normalizeVoxelModel(raw: EmberVoxelModel): EmberVoxelModel {
         ? Math.max(0, Math.min(255, (trSrc[i] as number) | 0))
         : 0;
   }
+  const txSrc = Array.isArray(raw.transmittance) ? raw.transmittance : [];
+  const transmittance = new Array(need).fill(0);
+  for (let i = 0; i < Math.min(need, txSrc.length); i++) {
+    transmittance[i] =
+      voxels[i]! > 0
+        ? Math.max(0, Math.min(255, (txSrc[i] as number) | 0))
+        : 0;
+  }
   const palette =
     Array.isArray(raw.palette) && raw.palette.length > 1
-      ? raw.palette.map((c, i) => (i === 0 ? "" : c || "#888888"))
+      ? raw.palette.map((c, i) =>
+          i === 0 ? "" : typeof c === "string" && c.trim() ? c : "",
+        )
       : [...DEFAULT_VOXEL_PALETTE];
   if (palette[0] !== "") palette[0] = "";
 
@@ -1276,6 +1786,7 @@ export function normalizeVoxelModel(raw: EmberVoxelModel): EmberVoxelModel {
     emissive,
     shine,
     transparency,
+    transmittance,
     material: normalizeModelMaterial(raw.material),
     emissiveCastsLight: raw.emissiveCastsLight === true ? true : undefined,
     emissiveLightRange: Number.isFinite(raw.emissiveLightRange)
@@ -1283,8 +1794,13 @@ export function normalizeVoxelModel(raw: EmberVoxelModel): EmberVoxelModel {
       : undefined,
     emissiveLightShadows:
       raw.emissiveLightShadows === true ? true : undefined,
+    emissiveLightSoftRings:
+      raw.emissiveLightSoftRings === true ? true : undefined,
+    emissiveLightSoftShadows:
+      raw.emissiveLightSoftShadows === true ? true : undefined,
     emissiveLightOrigin,
     emissiveLightOffset: normalizeLightOffset(raw.emissiveLightOffset),
+    emissiveLights: normalizeEmissiveLights(raw.emissiveLights, sx, sy, sz),
     emissiveStrength: Number.isFinite(raw.emissiveStrength)
       ? resolveEmissiveStrength(raw.emissiveStrength)
       : undefined,

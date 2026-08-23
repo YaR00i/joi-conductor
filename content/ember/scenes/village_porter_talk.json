@@ -1,0 +1,32 @@
+{
+  "id": "village_porter_talk",
+  "nameRu": "Привратник у южных ворот",
+  "use": "talk",
+  "startStepId": "a",
+  "steps": [
+    {
+      "id": "a",
+      "type": "dialogue",
+      "speaker": "porter",
+      "portraitKey": "neutral",
+      "nameRu": "Привратник Ваншэн",
+      "textRu": "О, живые ноги. В Ваншэн таких встречают с улыбкой — пока они сами идут.",
+      "next": "b"
+    },
+    {
+      "id": "b",
+      "type": "dialogue",
+      "speaker": "porter",
+      "portraitKey": "neutral",
+      "nameRu": "Привратник Ваншэн",
+      "textRu": "Прямо — улица и лавка. Севернее домик с дверью. Сливы лучше не пинать: они помнят имена.",
+      "next": "end"
+    },
+    { "id": "end", "type": "end" }
+  ],
+  "editorLayout": {
+    "a": { "x": 40, "y": 80 },
+    "b": { "x": 280, "y": 80 },
+    "end": { "x": 520, "y": 80 }
+  }
+}

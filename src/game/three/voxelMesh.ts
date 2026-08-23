@@ -38,6 +38,7 @@ import {
   tileUsesTransparency,
 } from "./toonMaterials";
 import { createWaterMaterial, isWaterTile } from "./waterMaterial";
+import { cutawayRoleForCell, type CutawayRole } from "../tile/buildingInterior";
 
 export type VoxelMeshBuild = {
   group: THREE.Group;
@@ -432,6 +433,8 @@ export function buildVoxelMesh(
     geom: THREE.BufferGeometry;
     tx: number;
     ty: number;
+    elev: number;
+    role: CutawayRole;
   };
 
   const floorBuckets = new Map<number, CellGeom[]>();
@@ -451,7 +454,7 @@ export function buildVoxelMesh(
     tx: number,
     ty: number,
   ) => {
-    const cell = { tile, geom, tx, ty };
+    const cell = { tile, geom, tx, ty, elev: 0, role: "floor" as const };
     const list = waterBedBuckets.get(tile.id);
     if (list) list.push(cell);
     else waterBedBuckets.set(tile.id, [cell]);
@@ -462,8 +465,16 @@ export function buildVoxelMesh(
     geom: THREE.BufferGeometry,
     tx: number,
     ty: number,
+    elev = 0,
   ) => {
-    const cell = { tile, geom, tx, ty };
+    const cell = {
+      tile,
+      geom,
+      tx,
+      ty,
+      elev,
+      role: cutawayRoleForCell(tile.name, elev, "floor"),
+    };
     if (
       perCellEmissiveMaterials &&
       emissiveAnimNeedsPerCellMaterial(tile.emissiveAnim) &&
@@ -485,8 +496,16 @@ export function buildVoxelMesh(
     geom: THREE.BufferGeometry,
     tx: number,
     ty: number,
+    elev = 0,
   ) => {
-    const cell = { tile, geom, tx, ty };
+    const cell = {
+      tile,
+      geom,
+      tx,
+      ty,
+      elev,
+      role: cutawayRoleForCell(tile.name, elev, "wall"),
+    };
     if (
       perCellEmissiveMaterials &&
       emissiveAnimNeedsPerCellMaterial(tile.emissiveAnim) &&
@@ -572,6 +591,7 @@ export function buildVoxelMesh(
           boxAt(cx, cy, cz, ts, storyH, ts, storyH),
           tx,
           ty,
+          elev,
         );
         // Thin top cap for readable floor texel on the story face.
         pushFloor(
@@ -579,6 +599,7 @@ export function buildVoxelMesh(
           boxAt(cx, y1 + 0.35, cz, ts * 0.98, 0.7, ts * 0.98, storyH),
           tx,
           ty,
+          elev,
         );
       }
 
@@ -596,12 +617,13 @@ export function buildVoxelMesh(
           // Wall extrusion starts on the top of the topmost solid story.
           const baseY = topElev * storyH;
           const cy = baseY + h * 0.5;
-          pushWall(topTile, boxAt(cx, cy, cz, ts, h, ts, storyH), tx, ty);
+          pushWall(topTile, boxAt(cx, cy, cz, ts, h, ts, storyH), tx, ty, topElev);
           pushFloor(
             topTile,
             boxAt(cx, baseY + h + 0.4, cz, ts * 0.98, 0.8, ts * 0.98, storyH),
             tx,
             ty,
+            topElev,
           );
         }
       }
@@ -611,6 +633,16 @@ export function buildVoxelMesh(
   const group = new THREE.Group();
   group.name = "voxelMap";
 
+  const tagCutaway = (mesh: THREE.Mesh, cell: CellGeom) => {
+    if (cell.role === "floor") return;
+    mesh.userData.emberCutaway = {
+      tx: cell.tx,
+      ty: cell.ty,
+      elev: cell.elev,
+      role: cell.role,
+    };
+  };
+
   const flushMerged = (
     buckets: Map<number, CellGeom[]>,
     face: "top" | "wall",
@@ -619,20 +651,35 @@ export function buildVoxelMesh(
     for (const [, cells] of buckets) {
       if (!cells.length) continue;
       const tile = cells[0]!.tile;
-      const geoms = cells.map((c) => c.geom);
-      const merged = mergeGeometries(geoms, false);
-      for (const g of geoms) g.dispose();
-      if (!merged) continue;
+      const tagged = cells.filter(
+        (cell) => cell.role === "roof" || cell.role === "wall",
+      );
+      const mergeable = cells.filter((cell) => cell.role === "floor");
       const mat = face === "top" ? getFloorMat(tile) : getWallMat(tile);
-      const mesh = new THREE.Mesh(merged, mat);
-      mesh.castShadow = !(face === "top" && isWaterTile(tile));
-      mesh.receiveShadow = true;
-      if (transparentPass || isTransparentTile(tile)) {
-        mesh.castShadow = false;
-        mesh.renderOrder = face === "top" ? 12 : 11;
-        mesh.userData.emberTransparentTile = true;
+      const addMesh = (
+        geom: THREE.BufferGeometry,
+        cell?: CellGeom,
+        disposeGeom = false,
+      ) => {
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.castShadow = !(face === "top" && isWaterTile(tile));
+        mesh.receiveShadow = true;
+        if (transparentPass || isTransparentTile(tile)) {
+          mesh.castShadow = false;
+          mesh.renderOrder = face === "top" ? 12 : 11;
+          mesh.userData.emberTransparentTile = true;
+        }
+        if (cell) tagCutaway(mesh, cell);
+        group.add(mesh);
+        if (disposeGeom) geom.dispose();
+      };
+      if (mergeable.length) {
+        const geoms = mergeable.map((c) => c.geom);
+        const merged = mergeGeometries(geoms, false);
+        for (const g of geoms) g.dispose();
+        if (merged) addMesh(merged);
       }
-      group.add(mesh);
+      for (const cell of tagged) addMesh(cell.geom, cell);
     }
   };
 
@@ -663,6 +710,7 @@ export function buildVoxelMesh(
       mesh.renderOrder = 12;
       mesh.userData.emberTransparentTile = true;
     }
+    tagCutaway(mesh, cell);
     group.add(mesh);
   }
 
@@ -675,6 +723,7 @@ export function buildVoxelMesh(
       mesh.renderOrder = 11;
       mesh.userData.emberTransparentTile = true;
     }
+    tagCutaway(mesh, cell);
     group.add(mesh);
   }
 

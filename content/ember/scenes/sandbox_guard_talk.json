@@ -1,0 +1,42 @@
+{
+  "id": "sandbox_guard_talk",
+  "nameRu": "Страж у входа",
+  "use": "talk",
+  "startStepId": "a",
+  "steps": [
+    {
+      "id": "a",
+      "type": "dialogue",
+      "speaker": "guard",
+      "portraitKey": "neutral",
+      "nameRu": "Страж",
+      "textRu": "Эй. Это учебный двор, не деревня.",
+      "next": "b"
+    },
+    {
+      "id": "b",
+      "type": "dialogue",
+      "speaker": "guard",
+      "portraitKey": "neutral",
+      "nameRu": "Страж",
+      "textRu": "Хочешь ветку — поговори с тем, кто у табличек.",
+      "next": "c"
+    },
+    {
+      "id": "c",
+      "type": "dialogue",
+      "speaker": "guard",
+      "portraitKey": "neutral",
+      "nameRu": "Страж",
+      "textRu": "И не ломай сундук дважды. Он один.",
+      "next": "end"
+    },
+    { "id": "end", "type": "end" }
+  ],
+  "editorLayout": {
+    "a": { "x": 40, "y": 80 },
+    "b": { "x": 280, "y": 80 },
+    "c": { "x": 520, "y": 80 },
+    "end": { "x": 760, "y": 80 }
+  }
+}

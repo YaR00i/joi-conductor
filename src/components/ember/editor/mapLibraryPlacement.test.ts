@@ -6,6 +6,7 @@ import type {
 } from "../../../game/content/types";
 import {
   checkMapLibraryPlacement,
+  effectiveMapLibraryPlacementMode,
   resolveMapLibraryPlacementTarget,
 } from "./mapLibraryPlacement";
 
@@ -104,5 +105,14 @@ describe("checkMapLibraryPlacement", () => {
     expect(
       resolveMapLibraryPlacementTarget(map, "floor", { x: 1, y: 1 }, surface, 3),
     ).toEqual({ x: 1, y: 1, elev: 0 });
+  });
+
+  it("maps region surface placement onto the locked grid like blocks", () => {
+    expect(effectiveMapLibraryPlacementMode("region", "surface")).toBe("grid");
+    expect(effectiveMapLibraryPlacementMode("region", "floor")).toBe("floor");
+    expect(effectiveMapLibraryPlacementMode("light", "surface")).toBe("floor");
+    expect(effectiveMapLibraryPlacementMode("voxel", "surface")).toBe(
+      "surface",
+    );
   });
 });

@@ -62,3 +62,26 @@ export function appendClonedTile(
     },
   };
 }
+
+/**
+ * Remove a tileset tile. Id 0 (empty) and the last remaining tile stay.
+ * Confirm in UI: this is a library asset, not a painted map cell.
+ */
+export function removeTileFromTileset(
+  tileset: EmberTileset,
+  tileId: number,
+): { tileset: EmberTileset; nextTileId: number } | null {
+  if (tileId === 0) return null;
+  const tiles = tileset.tiles.filter((tile) => tile.id !== tileId);
+  if (tiles.length === tileset.tiles.length || tiles.length === 0) return null;
+  const nextTileId =
+    tiles.find((tile) => tile.id !== 0)?.id ?? tiles[0]?.id ?? 0;
+  return {
+    nextTileId,
+    tileset: {
+      ...tileset,
+      tiles,
+      tileCount: tiles.length,
+    },
+  };
+}

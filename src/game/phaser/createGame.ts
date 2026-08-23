@@ -65,6 +65,17 @@ export function createEmberPhaserGame(opts: CreateEmberGameOpts): EmberGameApi {
     pause: () => scene()?.pauseLogic(),
     resume: () => scene()?.resumeLogic(),
     applyLoot: (itemId: string) => scene()?.applyLoot(itemId),
+    buyShopItem: () => undefined,
+    sellShopItem: () => undefined,
+    closeShop: () => undefined,
+    toggleInventory: () => undefined,
+    closeInventory: () => undefined,
+    equipItem: () => undefined,
+    unequipSlot: () => undefined,
+    useItem: () => undefined,
+    advanceDialogue: () => undefined,
+    captureExploreSave: () => null,
+    applyExploreSave: () => false,
     destroy: () => {
       game.destroy(true);
     },

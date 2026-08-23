@@ -7,7 +7,7 @@
  * Shape + palette live in .vox. Collider / light / extra channels stay on the Ember model JSON.
  */
 import type { EmberVoxelAssetFile, EmberVoxelModel } from "../content/types";
-import { VOXELS_PER_BLOCK } from "./constants";
+import { DEFAULT_VOXEL_PALETTE, VOXELS_PER_BLOCK } from "./constants";
 import {
   createEmptyVoxelModel,
   getVoxel,
@@ -24,7 +24,9 @@ import {
 const GRID_MAX = 8 * VOXELS_PER_BLOCK;
 
 export function voxRelForModelId(id: string): string {
-  const safe = id.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/^_+|_+$/g, "");
+  const safe = String(id ?? "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
   return `voxels/models/${safe || "voxel"}.vox`;
 }
 
@@ -118,7 +120,7 @@ export function voxDocumentToEmberModel(
   };
   let model = createEmptyVoxelModel(id, sizeBlocks, nameRu, sy);
   const used = new Map<number, number>();
-  const palette = ["", ...Array.from({ length: 255 }, () => "")];
+  const colors: string[] = [""];
 
   for (const v of src.voxels) {
     if (v.i <= 0) continue;
@@ -131,7 +133,7 @@ export function voxDocumentToEmberModel(
       pi = used.size + 1;
       used.set(v.i, pi);
       const o = v.i * 4;
-      palette[pi] = rgbaToHex(
+      colors[pi] = rgbaToHex(
         doc.palette[o] ?? 0,
         doc.palette[o + 1] ?? 0,
         doc.palette[o + 2] ?? 0,
@@ -143,7 +145,7 @@ export function voxDocumentToEmberModel(
 
   model = {
     ...model,
-    palette,
+    palette: colors.length > 1 ? colors : [...DEFAULT_VOXEL_PALETTE],
   };
   return normalizeVoxelModel(model);
 }
@@ -169,6 +171,7 @@ export function stripVoxelGridForPrefab(model: EmberVoxelModel): EmberVoxelModel
   if (!channelHasSignal(next.emissive)) delete next.emissive;
   if (!channelHasSignal(next.shine)) delete next.shine;
   if (!channelHasSignal(next.transparency)) delete next.transparency;
+  if (!channelHasSignal(next.transmittance)) delete next.transmittance;
   return next;
 }
 
@@ -195,6 +198,10 @@ export function mergeVoxMeshOntoPrefab(
       keepExtra && prefab.transparency?.length
         ? prefab.transparency
         : mesh.transparency,
+    transmittance:
+      keepExtra && prefab.transmittance?.length
+        ? prefab.transmittance
+        : mesh.transmittance,
   });
 }
 

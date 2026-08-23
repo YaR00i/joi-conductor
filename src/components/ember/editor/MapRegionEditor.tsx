@@ -8,7 +8,11 @@ import type {
   EmberPack,
   MapRegionKind,
 } from "../../../game/content/types";
-import { MAX_ELEVATION } from "../../../game/content/types";
+import { MAX_ELEVATION, MIN_ELEVATION, clampElevation } from "../../../game/content/types";
+import {
+  formatLootIds,
+  parseLootIds,
+} from "../../../game/content/chestLoot";
 import {
   clampChestModelOffset,
   clampChestModelScale,
@@ -24,10 +28,14 @@ import {
 } from "../../../game/voxel/voxelMesher";
 import { normalizeVoxelRot } from "../../../game/voxel/voxelPlacement";
 import {
+  clampRegionOrigin,
   MAP_REGION_KIND_COLOR,
   MAP_REGION_KIND_LABEL,
   MAP_REGION_KIND_ORDER,
+  regionFootprintCenter,
+  regionOriginFromCenter,
 } from "./mapRegionHelpers";
+import { regionVolumeElev } from "../../../game/tile/mapUtils";
 import { ModelOutlineFields } from "./ModelOutlineFields";
 
 const TP_HOVER_FOCUS_KEY = "ember-tp-hover-focus";
@@ -57,6 +65,238 @@ export type MapRegionEditorProps = {
 function clampInt(v: number, min: number, max: number): number {
   if (!Number.isFinite(v)) return min;
   return Math.max(min, Math.min(max, Math.round(v)));
+}
+
+function RegionFootprintFields({
+  region,
+  map,
+  onChange,
+}: {
+  region: EmberMapRegion;
+  map: EmberMap;
+  onChange: (next: EmberMapRegion) => void;
+}) {
+  const { cx, cy } = regionFootprintCenter(region);
+  const nudge = (dx: number, dy: number) => {
+    onChange({
+      ...region,
+      ...clampRegionOrigin(
+        region.x + dx,
+        region.y + dy,
+        region.w,
+        region.h,
+        map.width,
+        map.height,
+      ),
+    });
+  };
+  return (
+    <div className="ember-map-region-ed__block">
+      <p className="ember-map-region-ed__label">Прямоугольник на карте</p>
+      <p className="muted ember-map-region-ed__hint">
+        Гизмо стоит в центре AABB на выбранном этаже (Z), как блоки.
+        X/Y — северо-западный угол; W/H растут на восток и юг. Под потолком
+        ставь зону в режиме «Сетка Z» и текущим этажом кисти. Сдвиг: кнопки
+        ниже или Shift+стрелки. Стрелки без Shift — ракурс камеры.
+      </p>
+      <div className="ember-map-region-ed__grid4">
+        <label className="ember-map-region-ed__field">
+          <span>X СЗ</span>
+          <input
+            type="number"
+            min={0}
+            max={map.width - 1}
+            value={region.x}
+            onChange={(e) =>
+              onChange({
+                ...region,
+                ...clampRegionOrigin(
+                  Number(e.target.value),
+                  region.y,
+                  region.w,
+                  region.h,
+                  map.width,
+                  map.height,
+                ),
+              })
+            }
+          />
+        </label>
+        <label className="ember-map-region-ed__field">
+          <span>Y СЗ</span>
+          <input
+            type="number"
+            min={0}
+            max={map.height - 1}
+            value={region.y}
+            onChange={(e) =>
+              onChange({
+                ...region,
+                ...clampRegionOrigin(
+                  region.x,
+                  Number(e.target.value),
+                  region.w,
+                  region.h,
+                  map.width,
+                  map.height,
+                ),
+              })
+            }
+          />
+        </label>
+        <label className="ember-map-region-ed__field">
+          <span>W</span>
+          <input
+            type="number"
+            min={1}
+            max={map.width}
+            value={region.w}
+            onChange={(e) => {
+              const w = clampInt(Number(e.target.value), 1, map.width);
+              onChange({
+                ...region,
+                w,
+                ...clampRegionOrigin(
+                  region.x,
+                  region.y,
+                  w,
+                  region.h,
+                  map.width,
+                  map.height,
+                ),
+              });
+            }}
+          />
+        </label>
+        <label className="ember-map-region-ed__field">
+          <span>H</span>
+          <input
+            type="number"
+            min={1}
+            max={map.height}
+            value={region.h}
+            onChange={(e) => {
+              const h = clampInt(Number(e.target.value), 1, map.height);
+              onChange({
+                ...region,
+                h,
+                ...clampRegionOrigin(
+                  region.x,
+                  region.y,
+                  region.w,
+                  h,
+                  map.width,
+                  map.height,
+                ),
+              });
+            }}
+          />
+        </label>
+      </div>
+      <label className="ember-map-region-ed__field">
+        <span>Z этаж</span>
+        <input
+          type="number"
+          min={MIN_ELEVATION}
+          max={MAX_ELEVATION}
+          step={1}
+          value={region.elev ?? regionVolumeElev(map, region)}
+          onChange={(e) =>
+            onChange({
+              ...region,
+              elev: clampElevation(Number(e.target.value)),
+            })
+          }
+        />
+      </label>
+      <div className="ember-map-region-ed__grid2">
+        <label className="ember-map-region-ed__field">
+          <span>Центр X</span>
+          <input
+            type="number"
+            step={0.5}
+            min={region.w / 2}
+            max={map.width - region.w / 2}
+            value={cx}
+            onChange={(e) =>
+              onChange({
+                ...region,
+                ...regionOriginFromCenter(
+                  region,
+                  Number(e.target.value),
+                  cy,
+                  map.width,
+                  map.height,
+                ),
+              })
+            }
+          />
+        </label>
+        <label className="ember-map-region-ed__field">
+          <span>Центр Y</span>
+          <input
+            type="number"
+            step={0.5}
+            min={region.h / 2}
+            max={map.height - region.h / 2}
+            value={cy}
+            onChange={(e) =>
+              onChange({
+                ...region,
+                ...regionOriginFromCenter(
+                  region,
+                  cx,
+                  Number(e.target.value),
+                  map.width,
+                  map.height,
+                ),
+              })
+            }
+          />
+        </label>
+      </div>
+      <div
+        className="ember-map-inspector__pad"
+        role="group"
+        aria-label="Сдвиг зоны"
+      >
+        <button
+          type="button"
+          className="ghost"
+          title="Север (−Y)"
+          onClick={() => nudge(0, -1)}
+        >
+          ↑
+        </button>
+        <div className="ember-map-inspector__pad-mid">
+          <button
+            type="button"
+            className="ghost"
+            title="Запад (−X)"
+            onClick={() => nudge(-1, 0)}
+          >
+            ←
+          </button>
+          <button
+            type="button"
+            className="ghost"
+            title="Юг (+Y)"
+            onClick={() => nudge(0, 1)}
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            className="ghost"
+            title="Восток (+X)"
+            onClick={() => nudge(1, 0)}
+          >
+            →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function regionCovers(r: EmberMapRegion, tx: number, ty: number): boolean {
@@ -262,10 +502,10 @@ export function MapRegionEditor({
             const kind = e.target.value as MapRegionKind;
             const next: EmberMapRegion = { ...region, kind };
             if (kind === "teleport" && !next.targetRegionId && next.targetX == null) {
-              next.targetX = region.x;
-              next.targetY = region.y;
+              next.note = "Поставь второй телепорт и свяжи пару в инспекторе";
             }
             if (kind === "trigger" && next.scriptId == null) next.scriptId = "";
+            if (kind === "chest" && !next.lootIds?.length) next.lootIds = ["coin"];
             if (kind === "spawn" && !next.group) next.group = next.id;
             patch(next);
           }}
@@ -278,45 +518,59 @@ export function MapRegionEditor({
         </select>
       </label>
 
-      <div className="ember-map-region-ed__grid4">
-        <label className="ember-map-region-ed__field">
-          <span>X</span>
-          <input type="number" min={0} max={map.width - 1} value={region.x} onChange={onNum("x")} />
-        </label>
-        <label className="ember-map-region-ed__field">
-          <span>Y</span>
-          <input type="number" min={0} max={map.height - 1} value={region.y} onChange={onNum("y")} />
-        </label>
-        <label className="ember-map-region-ed__field">
-          <span>W</span>
-          <input type="number" min={1} max={map.width} value={region.w} onChange={onNum("w")} />
-        </label>
-        <label className="ember-map-region-ed__field">
-          <span>H</span>
-          <input type="number" min={1} max={map.height} value={region.h} onChange={onNum("h")} />
-        </label>
-      </div>
+      <RegionFootprintFields region={region} map={map} onChange={onChange} />
 
       {region.kind === "spawn" ? (
-        <label className="ember-map-region-ed__field">
-          <span>Группа спавна</span>
-          <input
-            type="text"
-            value={region.group ?? ""}
-            placeholder={region.id}
-            onChange={(e) =>
-              patch({ group: e.target.value.trim() || undefined })
-            }
-          />
-        </label>
+        <>
+          <p className="muted ember-hint">
+            Волны врагов для арены. На карте с профилем «исследовать» зона
+            ничего не спавнит.
+          </p>
+          <label className="ember-map-region-ed__field">
+            <span>Группа спавна</span>
+            <input
+              type="text"
+              value={region.group ?? ""}
+              placeholder={region.id}
+              onChange={(e) =>
+                patch({ group: e.target.value.trim() || undefined })
+              }
+            />
+          </label>
+        </>
       ) : null}
 
       {region.kind === "chest" ? (
         <div className="ember-map-region-ed__block ember-map-region-ed__chest">
           <p className="muted ember-hint">
-            Лут — пул стадии (`chestPoolId`). Зона X/Y/W/H — триггер; визуал
-            настраивается ниже.
+            Исследование: F / interact открывает тайник. Лут — id из каталога
+            Предметы (`coin`, `herb`). Неизвестный id остаётся stub. Арена без
+            lootIds по-прежнему берёт пул стадии (`chestPoolId`) при подходе.
+            Зона X/Y/W/H — триггер; визуал настраивается ниже.
           </p>
+          <label className="ember-map-region-ed__field">
+            <span>Лут (id каталога)</span>
+            <input
+              type="text"
+              defaultValue={formatLootIds(region.lootIds)}
+              key={`${region.id}:${formatLootIds(region.lootIds)}`}
+              placeholder="coin, herb"
+              onBlur={(e) => {
+                const lootIds = parseLootIds(e.target.value);
+                patch({ lootIds: lootIds.length ? lootIds : undefined });
+              }}
+            />
+          </label>
+          <label className="ember-map-region-ed__field ember-map-inspector__row--check">
+            <span>Повторно</span>
+            <input
+              type="checkbox"
+              checked={region.repeatable === true}
+              onChange={(e) =>
+                patch({ repeatable: e.target.checked ? true : undefined })
+              }
+            />
+          </label>
 
           {(() => {
             const scenes = Object.values(pack?.voxelScenes ?? {}).slice().sort(
@@ -506,57 +760,9 @@ export function MapRegionEditor({
                 modelOffsetY: clampChestModelOffset(offsetY + dy),
               });
             };
-            const moveZone = (dx: number, dy: number) => {
-              const nx = clampInt(region.x + dx, 0, Math.max(0, map.width - region.w));
-              const ny = clampInt(region.y + dy, 0, Math.max(0, map.height - region.h));
-              if (nx === region.x && ny === region.y) return;
-              patch({ x: nx, y: ny });
-            };
             return (
               <div className="ember-map-region-ed__place">
                 <p className="ember-map-region-ed__label">Размещение визуала</p>
-
-                <p className="ember-map-region-ed__sub">Зона на карте</p>
-                <div
-                  className="ember-map-inspector__pad"
-                  role="group"
-                  aria-label="Сдвиг зоны"
-                >
-                  <button
-                    type="button"
-                    className="ghost"
-                    title="Север (−Y)"
-                    onClick={() => moveZone(0, -1)}
-                  >
-                    ↑
-                  </button>
-                  <div className="ember-map-inspector__pad-mid">
-                    <button
-                      type="button"
-                      className="ghost"
-                      title="Запад (−X)"
-                      onClick={() => moveZone(-1, 0)}
-                    >
-                      ←
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost"
-                      title="Юг (+Y)"
-                      onClick={() => moveZone(0, 1)}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost"
-                      title="Восток (+X)"
-                      onClick={() => moveZone(1, 0)}
-                    >
-                      →
-                    </button>
-                  </div>
-                </div>
 
                 <p className="ember-map-region-ed__sub">Сдвиг модели (клетки)</p>
                 <div
@@ -775,7 +981,8 @@ export function MapRegionEditor({
           </div>
           {teleportPeers.length === 0 ? (
             <p className="muted ember-hint">
-              На карте нет других ТП — поставь второй и свяжи здесь.
+              Поставь второй телепорт на карту, выбери его в списке и нажми
+              «Связать пару ↔». Один телепорт никуда не ведёт.
             </p>
           ) : (
             <ul
@@ -939,6 +1146,36 @@ export function MapRegionEditor({
       {region.kind === "trigger" ? (
         <div className="ember-map-region-ed__block">
           <label className="ember-map-region-ed__field">
+            <span>Целевая карта</span>
+            <input
+              type="text"
+              value={region.targetMapId ?? ""}
+              placeholder="agent_sandbox_interior"
+              onChange={(e) =>
+                patch({
+                  targetMapId: e.target.value.trim() || undefined,
+                })
+              }
+            />
+          </label>
+          <label className="ember-map-region-ed__field">
+            <span>Целевой регион</span>
+            <input
+              type="text"
+              value={region.targetRegionId ?? ""}
+              placeholder="start"
+              onChange={(e) =>
+                patch({
+                  targetRegionId: e.target.value.trim() || undefined,
+                })
+              }
+            />
+          </label>
+          <p className="muted ember-hint">
+            Interact или вход в зону грузит карту и ставит игрока в регион
+            (иначе player_start). Дверь на объекте стреляет этот trigger.
+          </p>
+          <label className="ember-map-region-ed__field">
             <span>Script id</span>
             <input
               type="text"
@@ -977,7 +1214,8 @@ export function MapRegionEditor({
 
       {region.kind === "player_start" ? (
         <p className="muted ember-hint">
-          Точка появления игрока. Обычно одна на карту.
+          Точка появления игрока. Обычно одна на карту. Для деревни лучше у ворот,
+          не в центре асфальта.
         </p>
       ) : null}
 
@@ -985,8 +1223,8 @@ export function MapRegionEditor({
         <div className="ember-map-region-ed__block">
           <p className="muted ember-hint">
             {region.kind === "npc_wander"
-              ? "Исследование: NPC патрулирует зону. Диалогов нет."
-              : "Исследование: NPC стоит на месте. Диалогов нет."}
+              ? "Исследование: NPC патрулирует зону. Нужен спрайт. Кап 24 на карту. Диалогов нет."
+              : "Исследование: NPC стоит на месте. Нужен спрайт. Кап 24 на карту. Диалогов нет."}
           </p>
           <label className="ember-map-region-ed__field">
             <span>Спрайт</span>

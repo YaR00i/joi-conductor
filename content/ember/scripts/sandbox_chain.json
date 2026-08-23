@@ -1,0 +1,10 @@
+{
+  "id": "sandbox_chain",
+  "nameRu": "Цепочка песочницы",
+  "steps": [
+    { "type": "talk", "dialogueId": "sandbox_notice_talk" },
+    { "type": "give_item", "itemId": "coin", "count": 1 },
+    { "type": "set_flag", "flag": "sandbox_chain_done", "value": true },
+    { "type": "wait", "sec": 0 }
+  ]
+}

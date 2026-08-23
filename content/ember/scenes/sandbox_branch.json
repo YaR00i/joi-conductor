@@ -1,0 +1,42 @@
+{
+  "id": "sandbox_branch",
+  "nameRu": "Короткая ветка",
+  "use": "talk",
+  "startStepId": "ask",
+  "steps": [
+    {
+      "id": "ask",
+      "type": "choice",
+      "promptRu": "Ты агент или просто гуляешь?",
+      "options": [
+        { "id": "agent", "labelRu": "Агент. Проверяю цепочки.", "next": "agent_r" },
+        { "id": "walk", "labelRu": "Просто смотрю двор.", "next": "walk_r" }
+      ]
+    },
+    {
+      "id": "agent_r",
+      "type": "dialogue",
+      "speaker": "guide",
+      "portraitKey": "neutral",
+      "nameRu": "Проводник",
+      "textRu": "Тогда зайди в зону у западной стены — там цепочка.",
+      "next": "end"
+    },
+    {
+      "id": "walk_r",
+      "type": "dialogue",
+      "speaker": "guide",
+      "portraitKey": "neutral",
+      "nameRu": "Проводник",
+      "textRu": "Ладно. Таблички справа — доступен, активен, сдан.",
+      "next": "end"
+    },
+    { "id": "end", "type": "end" }
+  ],
+  "editorLayout": {
+    "ask": { "x": 40, "y": 80 },
+    "agent_r": { "x": 320, "y": 20 },
+    "walk_r": { "x": 320, "y": 160 },
+    "end": { "x": 600, "y": 80 }
+  }
+}

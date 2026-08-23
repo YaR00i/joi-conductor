@@ -4,6 +4,7 @@ import {
   lazy,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ErrorInfo,
@@ -14,12 +15,15 @@ import type {
   LibNavigateFocus,
   LibNavigateTab,
 } from "../components/ember/editor/ArtsEditorPanel";
+import { EmberSavePanel } from "../components/ember/EmberSavePanel";
 import {
   clearAllLocalOverrides,
   clearLocalOverride,
+  deleteEmberFile,
   listLocalOverrides,
   writeEmberJson,
 } from "../game/content/io";
+import { createLocalStorageSaveBackend } from "../game/content/emberSave";
 import {
   createEmptyScene,
   createEventForScene,
@@ -27,11 +31,20 @@ import {
 } from "../game/content/sceneFactory";
 import {
   loadEmberPack,
+  removeMapFromPack,
   upsertEvent,
+  upsertMap,
   upsertScene,
+  upsertStage,
 } from "../game/content/loadPack";
+import {
+  createBlankEmberMap,
+  createStageForMap,
+} from "../game/content/mapFactory";
 import { validatePack } from "../game/content/validate";
 import type {
+  EmberDialogueUse,
+  EmberMapPlayProfile,
   EmberPack,
   ValidationIssue,
 } from "../game/content/types";
@@ -66,6 +79,16 @@ const LazyArtsEditorPanel = lazy(() =>
     default: module.ArtsEditorPanel,
   })),
 );
+const LazyItemsEditorPanel = lazy(() =>
+  import("../components/ember/editor/ItemsEditorPanel").then((module) => ({
+    default: module.ItemsEditorPanel,
+  })),
+);
+const LazyShopsEditorPanel = lazy(() =>
+  import("../components/ember/editor/ShopsEditorPanel").then((module) => ({
+    default: module.ShopsEditorPanel,
+  })),
+);
 import type {
   EmberArt,
   EmberEvent,
@@ -80,7 +103,18 @@ type Tab =
   | "voxels"
   | "scenes"
   | "library"
+  | "items"
+  | "shops"
   | "validate";
+
+type EditorToast = {
+  id: number;
+  text: string;
+  kind: "default" | "warn";
+};
+
+const TOAST_MS = 2500;
+const TOAST_WARN_MS = 4200;
 
 type Props = {
   onBackToPlay: () => void;
@@ -155,6 +189,28 @@ const NAV_GROUPS: Array<{
     ],
   },
   {
+    id: "items",
+    title: "Предметы",
+    items: [
+      {
+        id: "items",
+        label: "Предметы",
+        hint: "Каталог, иконки, лут сундуков",
+      },
+    ],
+  },
+  {
+    id: "shops",
+    title: "Магазины",
+    items: [
+      {
+        id: "shops",
+        label: "Магазины",
+        hint: "Ассортимент, цены, сток",
+      },
+    ],
+  },
+  {
     id: "system",
     title: "Система",
     items: [{ id: "validate", label: "Validate", hint: "Проверка пака" }],
@@ -212,8 +268,11 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [tab, setTab] = useState<Tab>("maps");
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<EditorToast[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const toastIdRef = useRef(0);
+  const toastTimersRef = useRef<Map<number, number>>(new Map());
+  const toastsRef = useRef<EditorToast[]>([]);
   const [overrides, setOverrides] = useState<string[]>([]);
   const [sceneId, setSceneId] = useState<string | null>(null);
   const [activeTilesetId, setActiveTilesetId] = useState<string | null>(null);
@@ -221,7 +280,52 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
   const [spriteFocusId, setSpriteFocusId] = useState<string | null>(null);
   const [tileFocusId, setTileFocusId] = useState<number | null>(null);
   const [voxelFocusId, setVoxelFocusId] = useState<string | null>(null);
+  const [createMapOpen, setCreateMapOpen] = useState(false);
+  const [createMapName, setCreateMapName] = useState("Новая карта");
+  const [createMapW, setCreateMapW] = useState(24);
+  const [createMapH, setCreateMapH] = useState(24);
+  const [createMapTilesetId, setCreateMapTilesetId] = useState("");
+  const [createMapProfile, setCreateMapProfile] =
+    useState<EmberMapPlayProfile>("explore");
   const menubarRef = useRef<HTMLElement>(null);
+  const saveBackend = useMemo(() => createLocalStorageSaveBackend(), []);
+  const prevToastFlagsRef = useRef({ bak: false, vox: 0, ov: 0 });
+
+  const setStatus = useCallback(
+    (text: string, kind: "default" | "warn" = "default") => {
+      const warn = kind === "warn" || /ошибк|override|\.bak/i.test(text);
+      const ms = warn ? TOAST_WARN_MS : TOAST_MS;
+      const existing = toastsRef.current.find((t) => t.text === text);
+      const id = existing?.id ?? ++toastIdRef.current;
+      const prevTimer = toastTimersRef.current.get(id);
+      if (prevTimer !== undefined) window.clearTimeout(prevTimer);
+      const timer = window.setTimeout(() => {
+        toastsRef.current = toastsRef.current.filter((t) => t.id !== id);
+        setToasts(toastsRef.current);
+        toastTimersRef.current.delete(id);
+      }, ms);
+      toastTimersRef.current.set(id, timer);
+      if (existing) return;
+      const toastKind: EditorToast["kind"] = warn ? "warn" : "default";
+      const next: EditorToast[] = [
+        { id, text, kind: toastKind },
+        ...toastsRef.current,
+      ].slice(0, 4);
+      toastsRef.current = next;
+      setToasts(next);
+    },
+    [],
+  );
+
+  useEffect(
+    () => () => {
+      for (const timer of toastTimersRef.current.values()) {
+        window.clearTimeout(timer);
+      }
+      toastTimersRef.current.clear();
+    },
+    [],
+  );
 
   const reload = useCallback(async () => {
     setError(null);
@@ -248,20 +352,22 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "load failed");
     }
-  }, []);
+  }, [setStatus]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
 
-  const createScene = useCallback(async () => {
+  const createScene = useCallback(async (use?: EmberDialogueUse) => {
     if (!pack) return;
     const speaker = Object.keys(pack.portraits)[0] ?? "hu_tao";
     const scene = createEmptyScene({
       speaker,
-      defaultBgArtId: pack.meta
-        ? Object.values(pack.scenes)[0]?.defaultBgArtId
-        : undefined,
+      use,
+      defaultBgArtId:
+        use === "talk" || use === "shop_intro"
+          ? undefined
+          : Object.values(pack.scenes)[0]?.defaultBgArtId,
     });
     const event = createEventForScene(scene, "manual");
     let next = upsertScene(pack, scene);
@@ -280,6 +386,138 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
       );
     }
   }, [pack]);
+
+  const openCreateMap = useCallback(() => {
+    if (!pack) return;
+    const current =
+      (activeMapId && pack.maps[activeMapId]) ||
+      Object.values(pack.maps)[0] ||
+      null;
+    setCreateMapName("Новая карта");
+    setCreateMapW(current?.width ? Math.min(48, current.width) : 24);
+    setCreateMapH(current?.height ? Math.min(48, current.height) : 24);
+    setCreateMapTilesetId(
+      current?.tilesetId && pack.tilesets[current.tilesetId]
+        ? current.tilesetId
+        : Object.keys(pack.tilesets)[0] ?? "",
+    );
+    setCreateMapProfile(
+      current?.playProfile === "explore" ? "explore" : "arena",
+    );
+    setOpenMenu(null);
+    setCreateMapOpen(true);
+  }, [pack, activeMapId]);
+
+  const createMap = useCallback(async () => {
+    if (!pack) return;
+    const tileset =
+      pack.tilesets[createMapTilesetId] ?? Object.values(pack.tilesets)[0];
+    if (!tileset) {
+      setStatus("Нет тайлсета — сначала загрузи пак");
+      return;
+    }
+    const lightTemplate =
+      Object.values(pack.maps).find(
+        (m) =>
+          (createMapProfile === "explore"
+            ? m.playProfile === "explore"
+            : m.playProfile !== "explore") && m.light,
+      ) ??
+      pack.maps[activeMapId ?? ""] ??
+      Object.values(pack.maps)[0] ??
+      null;
+    const map = createBlankEmberMap({
+      nameRu: createMapName,
+      width: createMapW,
+      height: createMapH,
+      tilesetId: tileset.id,
+      tileSize: tileset.tileSize,
+      playProfile: createMapProfile,
+      lightTemplate,
+      usedMapIds: pack.maps,
+    });
+    let next = upsertMap(pack, map);
+    let stageId: string | null = null;
+    try {
+      const stage = createStageForMap(next, map);
+      next = upsertStage(next, stage);
+      stageId = stage.id;
+    } catch {
+      /* pack without stages — map still playable once a stage exists */
+    }
+    setPack(next);
+    setIssues(validatePack(next));
+    setActiveMapId(map.id);
+    setActiveTilesetId(tileset.id);
+    setTab("maps");
+    setCreateMapOpen(false);
+    const mapRes = await writeEmberJson(`maps/${map.id}.json`, map);
+    let stageError: string | null = null;
+    if (stageId) {
+      const stageRes = await writeEmberJson(
+        `stages/${stageId}.json`,
+        next.stages[stageId]!,
+      );
+      if (!stageRes.ok) stageError = stageRes.error;
+    }
+    setOverrides(listLocalOverrides());
+    if (mapRes.ok && !stageError) {
+      setStatus(`Карта «${map.nameRu}» создана`);
+    } else {
+      setStatus(
+        `Карта: ${mapRes.ok ? "ok" : mapRes.error} · стадия: ${stageError ?? "ok"}`,
+      );
+    }
+  }, [
+    pack,
+    createMapName,
+    createMapW,
+    createMapH,
+    createMapTilesetId,
+    createMapProfile,
+    activeMapId,
+  ]);
+
+  const deleteMap = useCallback(async () => {
+    if (!pack) return;
+    const id =
+      (activeMapId && pack.maps[activeMapId] ? activeMapId : null) ??
+      Object.keys(pack.maps)[0] ??
+      null;
+    if (!id) return;
+    if (Object.keys(pack.maps).length <= 1) {
+      setStatus("Нельзя удалить последнюю карту пака");
+      return;
+    }
+    const map = pack.maps[id];
+    if (
+      !window.confirm(
+        `Удалить карту «${map?.nameRu ?? id}» и связанные стадии? Это нельзя отменить Undo.`,
+      )
+    ) {
+      return;
+    }
+    const { pack: next, removedStageIds } = removeMapFromPack(pack, id);
+    setPack(next);
+    setIssues(validatePack(next));
+    setActiveMapId(Object.keys(next.maps)[0] ?? null);
+    const mapRes = await deleteEmberFile(`maps/${id}.json`);
+    const stageErrors: string[] = [];
+    for (const stageId of removedStageIds) {
+      const stageRes = await deleteEmberFile(`stages/${stageId}.json`);
+      if (!stageRes.ok) stageErrors.push(stageRes.error);
+    }
+    setOverrides(listLocalOverrides());
+    if (mapRes.ok && stageErrors.length === 0) {
+      setStatus(`Карта «${map?.nameRu ?? id}» удалена`);
+    } else {
+      setStatus(
+        `Карта: ${mapRes.ok ? "ok" : mapRes.error}${
+          stageErrors.length ? ` · стадии: ${stageErrors.join("; ")}` : ""
+        }`,
+      );
+    }
+  }, [pack, activeMapId]);
 
   const applyEventChange = useCallback(
     async (event: EmberEvent) => {
@@ -304,15 +542,18 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
   );
 
   useEffect(() => {
-    if (!openMenu) return;
+    if (!openMenu && !createMapOpen) return;
     const onDocDown = (e: MouseEvent) => {
       const root = menubarRef.current;
-      if (root && !root.contains(e.target as Node)) {
+      if (openMenu && root && !root.contains(e.target as Node)) {
         setOpenMenu(null);
       }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpenMenu(null);
+      if (e.key === "Escape") {
+        setOpenMenu(null);
+        setCreateMapOpen(false);
+      }
     };
     document.addEventListener("mousedown", onDocDown);
     document.addEventListener("keydown", onKey);
@@ -320,7 +561,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
       document.removeEventListener("mousedown", onDocDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [openMenu]);
+  }, [openMenu, createMapOpen]);
 
   const mapId =
     (activeMapId && pack?.maps[activeMapId] ? activeMapId : null) ??
@@ -420,6 +661,27 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
       issue.path.startsWith("voxels/") && issue.message.includes("резервн"),
   );
 
+  useEffect(() => {
+    const prev = prevToastFlagsRef.current;
+    if (voxelBakIssue && !prev.bak) {
+      setStatus("voxel .bak — открыта резервная копия", "warn");
+    }
+    if (voxelOverrides.length !== prev.vox && voxelOverrides.length > 0) {
+      setStatus(`voxel override×${voxelOverrides.length}`, "warn");
+    } else if (
+      voxelOverrides.length === 0 &&
+      overrides.length !== prev.ov &&
+      overrides.length > 0
+    ) {
+      setStatus(`override×${overrides.length}`, "warn");
+    }
+    prevToastFlagsRef.current = {
+      bak: voxelBakIssue,
+      vox: voxelOverrides.length,
+      ov: overrides.length,
+    };
+  }, [voxelBakIssue, voxelOverrides.length, overrides.length, setStatus]);
+
   return (
     <div className="page page--ember-editor">
       <nav
@@ -493,28 +755,50 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
             /
           </span>
           <strong>{current.label}</strong>
-          {tab === "maps" && pack && Object.keys(pack.maps).length > 1 ? (
-            <label className="ember-menubar__pick">
-              <span className="muted">Карта</span>
-              <select
-                aria-label="Карта"
-                value={mapId ?? ""}
-                onChange={(e) => {
-                  const id = e.target.value;
-                  setActiveMapId(id);
-                  const tilesetIdForMap = pack.maps[id]?.tilesetId;
-                  if (tilesetIdForMap && pack.tilesets[tilesetIdForMap]) {
-                    setActiveTilesetId(tilesetIdForMap);
-                  }
-                }}
+          {tab === "maps" && pack ? (
+            <>
+              {Object.keys(pack.maps).length > 0 ? (
+                <label className="ember-menubar__pick">
+                  <span className="muted">Карта</span>
+                  <select
+                    aria-label="Карта"
+                    value={mapId ?? ""}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setActiveMapId(id);
+                      const tilesetIdForMap = pack.maps[id]?.tilesetId;
+                      if (tilesetIdForMap && pack.tilesets[tilesetIdForMap]) {
+                        setActiveTilesetId(tilesetIdForMap);
+                      }
+                    }}
+                  >
+                    {Object.values(pack.maps).map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.nameRu ?? m.id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <button
+                type="button"
+                className="ghost ember-menubar__create"
+                title="Пустая карта + стадия для play"
+                onClick={openCreateMap}
               >
-                {Object.values(pack.maps).map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.nameRu ?? m.id}
-                  </option>
-                ))}
-              </select>
-            </label>
+                + Карта
+              </button>
+              {mapId ? (
+                <button
+                  type="button"
+                  className="ghost ember-danger ember-menubar__create"
+                  title="Удалить открытую карту из пака"
+                  onClick={() => void deleteMap()}
+                >
+                  Удалить карту
+                </button>
+              ) : null}
+            </>
           ) : null}
           {tab === "tiles" && pack && Object.keys(pack.tilesets).length > 1 ? (
             <label className="ember-menubar__pick">
@@ -531,34 +815,6 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
                 ))}
               </select>
             </label>
-          ) : null}
-          {status ? (
-            <span className="ember-menubar__status muted" title={status}>
-              · {status}
-            </span>
-          ) : null}
-          {voxelBakIssue ? (
-            <span
-              className="ember-menubar__status ember-menubar__status--warn"
-              title="Воксельный JSON на диске пустой или битый — открыта резервная копия .bak"
-            >
-              · voxel .bak
-            </span>
-          ) : null}
-          {voxelOverrides.length > 0 ? (
-            <span
-              className="ember-menubar__status ember-menubar__status--warn"
-              title={voxelOverrides.join(", ")}
-            >
-              · voxel override×{voxelOverrides.length}
-            </span>
-          ) : overrides.length > 0 ? (
-            <span
-              className="ember-menubar__status muted"
-              title={overrides.join(", ")}
-            >
-              · override×{overrides.length}
-            </span>
           ) : null}
         </div>
 
@@ -601,6 +857,103 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
       </nav>
 
       {error ? <p className="ember-error">{error}</p> : null}
+
+      {createMapOpen && pack ? (
+        <div
+          className="ember-ed-create-map"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ember-create-map-title"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setCreateMapOpen(false);
+          }}
+        >
+          <form
+            className="ember-ed-create-map__card"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void createMap();
+            }}
+          >
+            <p className="ember-ed-create-map__kicker muted">Новая карта</p>
+            <h2 id="ember-create-map-title">Пустой мир</h2>
+            <p className="muted ember-ed-create-map__hint">
+              Рамка-стены и точка старта. Свет копируется с похожей карты, если
+              она есть.
+            </p>
+            <label className="ember-ed-create-map__field">
+              <span>Имя</span>
+              <input
+                type="text"
+                value={createMapName}
+                onChange={(e) => setCreateMapName(e.target.value)}
+                autoFocus
+              />
+            </label>
+            <div className="ember-ed-create-map__row">
+              <label className="ember-ed-create-map__field">
+                <span>Ширина</span>
+                <input
+                  type="number"
+                  min={8}
+                  max={96}
+                  value={createMapW}
+                  onChange={(e) => setCreateMapW(Number(e.target.value))}
+                />
+              </label>
+              <label className="ember-ed-create-map__field">
+                <span>Высота</span>
+                <input
+                  type="number"
+                  min={8}
+                  max={96}
+                  value={createMapH}
+                  onChange={(e) => setCreateMapH(Number(e.target.value))}
+                />
+              </label>
+            </div>
+            <label className="ember-ed-create-map__field">
+              <span>Тайлсет</span>
+              <select
+                value={createMapTilesetId}
+                onChange={(e) => setCreateMapTilesetId(e.target.value)}
+              >
+                {Object.values(pack.tilesets).map((ts) => (
+                  <option key={ts.id} value={ts.id}>
+                    {ts.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="ember-ed-create-map__field">
+              <span>Режим</span>
+              <select
+                value={createMapProfile}
+                onChange={(e) =>
+                  setCreateMapProfile(
+                    e.target.value === "arena" ? "arena" : "explore",
+                  )
+                }
+              >
+                <option value="explore">Прогулка</option>
+                <option value="arena">Арена</option>
+              </select>
+            </label>
+            <div className="ember-ed-create-map__ops">
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => setCreateMapOpen(false)}
+              >
+                Отмена
+              </button>
+              <button type="submit" className="primary">
+                Создать
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
 
       <div className="ember-editor-shell">
         <div className="ember-editor-body">
@@ -646,6 +999,17 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
                     setOpenMenu(null);
                   }}
                 />
+              ) : tab === "maps" ? (
+                <div className="ember-ed-card">
+                  <p className="muted">Нет карт в паке.</p>
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={openCreateMap}
+                  >
+                    + Создать карту
+                  </button>
+                </div>
               ) : null}
 
               {tab === "tiles" && tilesetId && pack.tilesets[tilesetId] ? (
@@ -728,7 +1092,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
                     scene={pack.scenes[sceneId]}
                     sceneId={sceneId}
                     onSelectScene={setSceneId}
-                    onCreateScene={() => void createScene()}
+                    onCreateScene={(use) => void createScene(use)}
                     onChange={(scene) => {
                       const next = {
                         ...pack,
@@ -789,6 +1153,34 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
                 />
               ) : null}
 
+              {tab === "items" ? (
+                <LazyItemsEditorPanel
+                  pack={pack}
+                  onChangePack={(next) => {
+                    setPack(next);
+                    setIssues(validatePack(next));
+                  }}
+                  onSaved={(msg) => {
+                    setStatus(msg);
+                    setOverrides(listLocalOverrides());
+                  }}
+                />
+              ) : null}
+
+              {tab === "shops" ? (
+                <LazyShopsEditorPanel
+                  pack={pack}
+                  onChangePack={(next) => {
+                    setPack(next);
+                    setIssues(validatePack(next));
+                  }}
+                  onSaved={(msg) => {
+                    setStatus(msg);
+                    setOverrides(listLocalOverrides());
+                  }}
+                />
+              ) : null}
+
               {tab === "validate" ? (
                 <div className="ember-ed-card ember-validate">
                   <h3 className="ember-ed-card__title">Проверка пака</h3>
@@ -808,6 +1200,12 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
                       </div>
                     ))
                   )}
+                  <EmberSavePanel
+                    packId={pack.meta.id}
+                    backend={saveBackend}
+                    mode="editor"
+                    onToast={(textRu) => setStatus(textRu)}
+                  />
                 </div>
               ) : null}
               </Suspense>
@@ -815,6 +1213,28 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
           )}
         </div>
       </div>
+
+      {toasts.length > 0 ? (
+        <div
+          className="ember-toast-host ember-toast-host--top"
+          aria-live="polite"
+          aria-relevant="additions"
+        >
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className={
+                toast.kind === "warn"
+                  ? "ember-toast ember-toast--warn"
+                  : "ember-toast"
+              }
+              role="status"
+            >
+              {toast.text}
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

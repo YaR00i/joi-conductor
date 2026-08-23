@@ -1,3 +1,14 @@
+import type { EmberDialogueUse } from "../content/types";
+import type {
+  EmberExploreAutosaveReason,
+  EmberExploreSaveState,
+} from "../content/emberSave";
+import type {
+  EmberEquipment,
+  EmberEquipSlot,
+  InventoryItemView,
+} from "../content/emberEquipment";
+
 export type EmberLootOption = {
   id: string;
   itemId: string;
@@ -48,7 +59,44 @@ export type EmberBridgeEvent =
     }
   | { type: "toast"; textRu: string }
   | { type: "load_progress"; ratio: number; labelRu: string }
-  | { type: "pause_menu"; relockWaitMs: number };
+  | { type: "pause_menu"; relockWaitMs: number }
+  | {
+      type: "shop";
+      shopId: string;
+      nameRu: string;
+      wallet: number;
+      listings: Array<{
+        itemId: string;
+        nameRu: string;
+        buyPrice: number;
+        sellPrice: number;
+        stock: number | null;
+      }>;
+      sellable: Array<{
+        itemId: string;
+        nameRu: string;
+        count: number;
+        sellPrice: number;
+      }>;
+      errorRu: string | null;
+    }
+  | { type: "shop_close" }
+  | {
+      type: "inventory";
+      items: InventoryItemView[];
+      equipment: EmberEquipment;
+      atk: number;
+      def: number;
+      arenaAtk: number;
+      errorRu: string | null;
+    }
+  | { type: "inventory_close" }
+  | {
+      type: "dialogue";
+      sceneId: string;
+      use: EmberDialogueUse;
+    }
+  | { type: "explore_autosave"; reason: EmberExploreAutosaveReason };
 
 export type EmberBridgeHandler = (event: EmberBridgeEvent) => void;
 
@@ -59,5 +107,17 @@ export type EmberGameApi = {
   pause: () => void;
   resume: () => void;
   applyLoot: (itemId: string) => void;
+  buyShopItem: (itemId: string) => void;
+  sellShopItem: (itemId: string) => void;
+  closeShop: () => void;
+  toggleInventory: () => void;
+  closeInventory: () => void;
+  equipItem: (itemId: string) => void;
+  unequipSlot: (slot: EmberEquipSlot) => void;
+  useItem: (itemId: string) => void;
+  /** Resume an action list after the play dialogue overlay closes. */
+  advanceDialogue: () => void;
+  captureExploreSave: () => EmberExploreSaveState | null;
+  applyExploreSave: (save: EmberExploreSaveState) => boolean;
   destroy: () => void;
 };

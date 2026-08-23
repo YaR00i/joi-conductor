@@ -31,6 +31,47 @@ export type EmberModelOutline = {
   pulseSec?: number;
 };
 
+/**
+ * Gameplay interactivity hanging on a placed voxel/sprite — not a new zone kind.
+ * Constructor: object modifier + optional bound trigger volume.
+ */
+export const EMBER_INTERACTIVITY_KINDS = [
+  "door",
+  "talk",
+  "quest_marker",
+  "shop",
+  "custom",
+] as const;
+
+export type EmberInteractivityKind = (typeof EMBER_INTERACTIVITY_KINDS)[number];
+
+export const EMBER_QUEST_MARKER_STATUSES = [
+  "available",
+  "active",
+  "done",
+] as const;
+
+export type EmberQuestMarkerStatus =
+  (typeof EMBER_QUEST_MARKER_STATUSES)[number];
+
+export type EmberInteractivityModifier = {
+  kind: EmberInteractivityKind;
+  /** Bound trigger region id — interact fires that volume. */
+  triggerId?: string;
+  /**
+   * Dialogue scene id, action-list script id, or leftover hook.
+   * talk / custom / shop intro / trigger `scriptId` resolve through pack.scenes
+   * then pack.scripts.
+   */
+  scriptId?: string;
+  /** quest_marker: item-icon id (`quest_available` / `quest` alias). */
+  iconId?: string;
+  /** shop: id from pack.shops (`shops/catalog.json`). */
+  shopId?: string;
+  /** quest_marker: authored pin state. Runtime may override via flags. */
+  questStatus?: EmberQuestMarkerStatus;
+};
+
 export type EmberMapRegion = {
   id: string;
   kind: MapRegionKind;
@@ -38,20 +79,36 @@ export type EmberMapRegion = {
   y: number;
   w: number;
   h: number;
+  /**
+   * Story the volume sits on (same axis as blocks). Omit = glue to the
+   * column surface, which is the roof when a ceiling tile exists above.
+   */
+  elev?: number;
   group?: string;
   /** teleport: warp destination in tile coords (or use targetRegionId). */
   targetX?: number;
   targetY?: number;
   targetElevation?: number;
-  /** teleport: warp to center of this region id on the same map. */
+  /** teleport / map-change: warp to center of this region id. */
   targetRegionId?: string;
   /**
-   * Editor stub for trigger-zone scripts (no runtime yet).
-   * Fill later when Ember script triggers land; empty string = unset.
+   * Action list (`pack.scripts`) or dialogue (`pack.scenes`) id.
+   * Empty string = unset. Play and exploreSim execute it.
    */
   scriptId?: string;
   /** Free-form note / TODO for authors (trigger stubs, teleport reminders). */
   note?: string;
+  /**
+   * Trigger: destination map for a map change. Play and headless exploreSim
+   * load that map from the same pack and spawn at targetRegionId, else
+   * targetX/Y, else player_start.
+   */
+  targetMapId?: string;
+  /**
+   * Reverse bind: placed object / modifier that fires this trigger.
+   * The object side (`interactivity.triggerId`) is the authoring source.
+   */
+  boundObjectId?: string;
   /**
    * Chest: voxel model while closed (`pack.voxelModels` id).
    * Falls back to placeholder billboard when unset.
@@ -98,6 +155,21 @@ export type EmberMapRegion = {
    * Authoring lives on the region; runtime draws edges around the mesh.
    */
   modelOutline?: EmberModelOutline;
+  /**
+   * Chest / stash: item catalog ids (`pack.items`). Unknown ids stay
+   * allowed as stubs. Example: `["coin", "herb"]`. Empty / omitted = empty.
+   */
+  lootIds?: string[];
+  /**
+   * Chest: grant loot again on later interacts. Omit / false = once.
+   * Visual stays opened after the first open either way.
+   */
+  repeatable?: boolean;
+  /**
+   * Chest runtime: already opened this session. Not an authoring default;
+   * play and exploreSim persist it so a once-chest does not refill.
+   */
+  opened?: boolean;
   /**
    * Explore NPC: pixel sprite from `pack.sprites`.
    * Used by `npc_idle` / `npc_wander` regions.
@@ -492,6 +564,8 @@ export type EmberSpritePlacement = {
    * this field forces a placed sprite into the NPC layer.
    */
   role?: "npc";
+  /** Instance gameplay interactivity (door / talk / quest marker / shop stub). */
+  interactivity?: EmberInteractivityModifier;
 };
 
 /** Per-cell component overrides for one authored tile block. */
@@ -502,6 +576,26 @@ export type EmberTileInstanceModifier = {
   componentStates?: Partial<Record<"collider", boolean>>;
   /** Per-instance collider fields merged over the tileset asset. */
   collider?: EmberColliderModifier;
+};
+
+/**
+ * Extra PointLight on a voxel model (windows, twin lanterns, etc.).
+ * Omitted fields inherit the model's emissiveLight* defaults.
+ */
+export type EmberVoxelEmissiveLamp = {
+  id: string;
+  nameRu?: string;
+  /** Cell indices; omitted → this lamp uses the nearest emissive cluster. */
+  origin?: { x: number; y: number; z: number };
+  /** Extra shift in voxel units from origin / cluster centroid. */
+  offset?: { x: number; y: number; z: number };
+  range?: number;
+  strength?: number;
+  shadows?: boolean;
+  softRings?: boolean;
+  softShadows?: boolean;
+  torchFlicker?: boolean;
+  lanternFlicker?: boolean;
 };
 
 /**
@@ -542,6 +636,13 @@ export type EmberVoxelModel = {
    */
   transparency?: number[];
   /**
+   * Optional per-voxel light transmittance 0..255 (same layout as `voxels`).
+   * 0 = blocks light (hard umbra); higher = dimmer, softer host-lamp shadow
+   * (grey penumbra that widens with distance); 255 = still looks solid, but
+   * casts no sun / PointLight shadows.
+   */
+  transmittance?: number[];
+  /**
    * Base surface kind for lamp catch / specular defaults
    * (shine voxels still override locally).
    */
@@ -558,6 +659,16 @@ export type EmberVoxelModel = {
   /** PointLight cube shadows (budgeted globally). */
   emissiveLightShadows?: boolean;
   /**
+   * Soften cartoon lamp discs, especially the outer cutoff
+   * (where the light pool ends).
+   */
+  emissiveLightSoftRings?: boolean;
+  /**
+   * Distance-scaled penumbra on this lamp's shadows (просвет-style),
+   * even when transmittance leak is 0.
+   */
+  emissiveLightSoftShadows?: boolean;
+  /**
    * Light pivot in voxel-grid coords (cell indices).
    * Omitted → weighted centroid of emissive cells.
    */
@@ -567,6 +678,11 @@ export type EmberVoxelModel = {
    * Applied after `emissiveLightOrigin` / auto center.
    */
   emissiveLightOffset?: { x: number; y: number; z: number };
+  /**
+   * Extra PointLights beyond the primary (legacy origin/offset) lamp.
+   * Empty / omitted → one light from the model-level fields.
+   */
+  emissiveLights?: EmberVoxelEmissiveLamp[];
   /** 0..1 glow strength for the PointLight (default ~0.75). */
   emissiveStrength?: number;
   /**
@@ -634,6 +750,8 @@ export type EmberVoxelPlacement = {
    * (avoids sealing / hard rim umbras from an interior light).
    */
   emissiveSuppressHostShadow?: boolean;
+  /** Instance gameplay interactivity (door / talk / quest marker / shop stub). */
+  interactivity?: EmberInteractivityModifier;
 };
 
 export type EmberVoxelsFile = {
@@ -711,6 +829,76 @@ export type EmberVoxelAnimClip = {
   tracks: EmberVoxelAnimTrack[];
 };
 
+export const EMBER_VOXEL_CHARACTER_TEMPLATES = [
+  "chibi_32",
+  "chibi_25d",
+] as const;
+export type EmberVoxelCharacterTemplate =
+  (typeof EMBER_VOXEL_CHARACTER_TEMPLATES)[number];
+
+export const EMBER_CHIBI32_SLOTS = [
+  "pelvis",
+  "torso",
+  "head",
+  "arm_l",
+  "arm_r",
+  "leg_l",
+  "leg_r",
+  "hair",
+  "twin_l",
+  "twin_r",
+  "ears",
+] as const;
+export type EmberChibi32Slot = (typeof EMBER_CHIBI32_SLOTS)[number];
+
+export const EMBER_CHIBI32_SOCKETS = ["hand_r", "hat", "pet"] as const;
+export type EmberChibi32Socket = (typeof EMBER_CHIBI32_SOCKETS)[number];
+
+export const EMBER_CHARACTER_CLIP_ROLES = ["idle", "walk", "attack"] as const;
+export type EmberCharacterClipRole = (typeof EMBER_CHARACTER_CLIP_ROLES)[number];
+
+export const EMBER_CHARACTER_FACING = ["volume", "card4"] as const;
+export type EmberCharacterFacing = (typeof EMBER_CHARACTER_FACING)[number];
+
+export const EMBER_CHARACTER_CARD_VIEWS = [
+  "front",
+  "back",
+  "side_l",
+  "side_r",
+] as const;
+export type EmberCharacterCardView =
+  (typeof EMBER_CHARACTER_CARD_VIEWS)[number];
+
+/**
+ * Character profile on a voxel scene. Visual mesh can be taller than
+ * the gameplay capsule (hair / ears stay outside collision).
+ */
+export type EmberVoxelCharacterDef = {
+  templateId: EmberVoxelCharacterTemplate;
+  /** Capsule height in voxels, typically to the shoulders. */
+  bodyHeightVoxels: number;
+  bodyRadiusVoxels: number;
+  /**
+   * `volume` — one 3D mesh, yaw in world.
+   * `card4` — Octopath swap: 4 drawings + billboard in play.
+   */
+  facing?: EmberCharacterFacing;
+  /** Slot name → scene object id (the front / volume set). */
+  slots: Partial<Record<EmberChibi32Slot, string>>;
+  /**
+   * Per-view **model** ids for `card4`. Omitted slots keep the object's model.
+   * Drawings are authored on the same +Z sprite plane as the front.
+   */
+  views?: Partial<
+    Record<
+      EmberCharacterCardView,
+      Partial<Record<EmberChibi32Slot, string>>
+    >
+  >;
+  sockets?: Partial<Record<EmberChibi32Socket, string>>;
+  clips?: Partial<Record<EmberCharacterClipRole, string>>;
+};
+
 /**
  * Voxel editor scene: several objects sharing one sculpt viewport
  * (dropdown «Сцена»). Not the narrative `EmberScene`.
@@ -721,6 +909,9 @@ export type EmberVoxelScene = {
   objects: EmberVoxelSceneObject[];
   joints?: EmberVoxelSceneJoint[];
   animations?: EmberVoxelAnimClip[];
+  /** Character editor profile. Omitted on ordinary props / chests. */
+  role?: "character";
+  character?: EmberVoxelCharacterDef;
 };
 
 /** Shared lamp look (no position) — clipboard + pack presets. */
@@ -798,6 +989,15 @@ export type EmberSceneHierarchy = {
   groups: EmberSceneGroup[];
 };
 
+/** Axis-aligned building interior used by play roof/wall cutaway. Not a zone. */
+export type EmberInteriorVolume = {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
 export type EmberMap = {
   id: string;
   nameRu?: string;
@@ -832,6 +1032,12 @@ export type EmberMap = {
   sprites?: EmberSpritePlacement[];
   /** Sparse per-block overrides; absent cells inherit their tileset asset. */
   tileModifiers?: EmberTileInstanceModifier[];
+  /**
+   * Authored building interiors for play cutaway (hide roof + camera-facing walls).
+   * If omitted, play infers rooms from roof tiles on `ground_z2+`.
+   * Not a zone/region — do not use the zone editor for these.
+   */
+  interiorVolumes?: EmberInteriorVolume[];
   /** Sculpted voxel props placed on tiles. */
     voxelProps?: EmberVoxelPlacement[];
     /** Persistent editor/runtime scene graph. Missing means a flat legacy map. */
@@ -1226,15 +1432,61 @@ export type SceneStep =
 /** Canvas positions for the scene step graph editor (ignored at runtime). */
 export type SceneEditorLayout = Record<string, { x: number; y: number }>;
 
+export const EMBER_DIALOGUE_USES = [
+  "cutscene",
+  "talk",
+  "shop_intro",
+] as const;
+
+export type EmberDialogueUse = (typeof EMBER_DIALOGUE_USES)[number];
+
 export type EmberScene = {
   id: string;
   nameRu: string;
   startStepId: string;
+  /**
+   * How UI/runtime presents this graph. Omit = `cutscene`.
+   * `talk` / `shop_intro` stay light (HSR overlay, no VN box).
+   */
+  use?: EmberDialogueUse;
   /** Fallback background when a step has no bgArtId. */
   defaultBgArtId?: string;
   steps: SceneStep[];
   /** Block positions on the step graph canvas. */
   editorLayout?: SceneEditorLayout;
+};
+
+export const EMBER_SCRIPT_STEP_KINDS = [
+  "talk",
+  "change_map",
+  "open_shop",
+  "give_item",
+  "set_flag",
+  "wait",
+  "run_script",
+] as const;
+
+export type EmberScriptStepKind = (typeof EMBER_SCRIPT_STEP_KINDS)[number];
+
+export type EmberFlagValue = boolean | string | number;
+
+export type EmberScriptStep =
+  | { type: "talk"; dialogueId: string }
+  | {
+      type: "change_map";
+      targetMapId: string;
+      targetRegionId?: string;
+    }
+  | { type: "open_shop"; shopId: string }
+  | { type: "give_item"; itemId: string; count?: number }
+  | { type: "set_flag"; flag: string; value: EmberFlagValue }
+  | { type: "wait"; sec: number }
+  | { type: "run_script"; scriptId: string };
+
+export type EmberActionScript = {
+  id: string;
+  nameRu: string;
+  steps: EmberScriptStep[];
 };
 
 export type EmberEventTrigger =
@@ -1281,6 +1533,101 @@ export type EmberPortraitRegistry = {
   expressions: Record<string, { labelRu: string; path: string }>;
 };
 
+/** Explore/JRPG + arena loot table (not the arena auto-attack `EmberWeaponDef`). */
+export const EMBER_ITEM_KINDS = [
+  "weapon_arena",
+  "weapon_jrpg",
+  "armor",
+  "accessory",
+  "consumable",
+  "material",
+  "key",
+] as const;
+
+export type EmberItemKind = (typeof EMBER_ITEM_KINDS)[number];
+
+export const EMBER_ITEM_SLOTS = [
+  "none",
+  "weapon",
+  "head",
+  "body",
+  "accessory",
+] as const;
+
+export type EmberItemSlot = (typeof EMBER_ITEM_SLOTS)[number];
+
+/** Catalog rarity — wider than arena pool `EmberRarity`. */
+export const EMBER_ITEM_RARITIES = [
+  "common",
+  "uncommon",
+  "rare",
+  "epic",
+] as const;
+
+export type EmberItemRarity = (typeof EMBER_ITEM_RARITIES)[number];
+
+export const EMBER_ITEM_USE_IN = ["arena", "explore", "both"] as const;
+
+export type EmberItemUseIn = (typeof EMBER_ITEM_USE_IN)[number];
+
+/** Shared 16×16 (or 32×32) pixel icon. Compact `rows`+`palette` or flat `pixels`. */
+export type EmberItemIcon = {
+  id: string;
+  nameRu?: string;
+  size: number;
+  palette?: Record<string, string>;
+  rows?: string[];
+  /** Row-major hex colors; "" = transparent. length === size*size after normalize. */
+  pixels: string[];
+};
+
+export type EmberItemDef = {
+  id: string;
+  name?: string;
+  nameRu: string;
+  kind: EmberItemKind;
+  slot: EmberItemSlot;
+  rarity: EmberItemRarity;
+  stackMax: number;
+  /** Arena auto-weapons vs JRPG/explore kit — do not collapse into one blob. */
+  useIn: EmberItemUseIn;
+  atk?: number;
+  def?: number;
+  hpRestore?: number;
+  tags?: string[];
+  iconId?: string;
+  /** Per-item pixel override (same length as icon size²). */
+  iconPixels?: string[];
+  notesRu?: string;
+  /** Price a shop pays when buying this item from the player. */
+  sellPrice?: number;
+  /** If true, shops refuse to buy this item (typical for keys). */
+  unsellable?: boolean;
+};
+
+export type EmberItemsFile = {
+  icons?: EmberItemIcon[];
+  items?: EmberItemDef[];
+};
+
+export type EmberShopListing = {
+  itemId: string;
+  buyPrice: number;
+  sellPrice?: number;
+  /** Omit = unlimited. Session remaining is tracked separately. */
+  stock?: number;
+};
+
+export type EmberShopDef = {
+  id: string;
+  nameRu: string;
+  listings: EmberShopListing[];
+};
+
+export type EmberShopsFile = {
+  shops?: EmberShopDef[];
+};
+
 export type EmberPackMeta = {
   id: string;
   version: number;
@@ -1304,8 +1651,16 @@ export type EmberPack = {
   spawns: Record<string, EmberSpawnTable>;
   pools: Record<string, EmberPool>;
   weapons: Record<string, EmberWeaponDef>;
+  /** Village / JRPG / arena item catalog (`content/ember/items/catalog.json`). */
+  items: Record<string, EmberItemDef>;
+  /** Shared pixel icons for catalog items. */
+  itemIcons: Record<string, EmberItemIcon>;
+  /** Explore shops (`content/ember/shops/catalog.json`). */
+  shops: Record<string, EmberShopDef>;
   enemies: Record<string, EmberEnemyDef>;
   scenes: Record<string, EmberScene>;
+  /** Ordered action lists (`content/ember/scripts/*.json`). */
+  scripts: Record<string, EmberActionScript>;
   events: Record<string, EmberEvent>;
   arts: Record<string, EmberArt>;
   portraits: Record<string, EmberPortraitRegistry>;

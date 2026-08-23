@@ -1,0 +1,22 @@
+{
+  "id": "sandbox_shop_intro",
+  "nameRu": "Приветствие лавки",
+  "use": "shop_intro",
+  "startStepId": "hi",
+  "steps": [
+    {
+      "id": "hi",
+      "type": "dialogue",
+      "speaker": "keeper",
+      "portraitKey": "neutral",
+      "nameRu": "Лавочник",
+      "textRu": "Монеты на прилавок. Трава дешевле, чем в деревне.",
+      "next": "end"
+    },
+    { "id": "end", "type": "end" }
+  ],
+  "editorLayout": {
+    "hi": { "x": 40, "y": 80 },
+    "end": { "x": 320, "y": 80 }
+  }
+}

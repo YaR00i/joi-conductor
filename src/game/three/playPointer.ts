@@ -125,7 +125,7 @@ export function playPointerLockRelockReady(
 }
 
 export const PLAY_LOOK_LOCK_UI_SELECTOR =
-  "button, input, select, textarea, a, .ember-hud, .ember-play-bar, .ember-play__menu";
+  "button, input, select, textarea, a, .ember-hud, .ember-play-bar, .ember-play__menu, .ember-shop-overlay, .ember-inv-overlay, .ember-save-panel, .ember-save-debug";
 
 export function playPointerDownShouldLock(
   insideShell: boolean,

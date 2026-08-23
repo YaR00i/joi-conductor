@@ -13,6 +13,9 @@ type Props = {
   onToggleVisible: (objectId: string) => void;
   onSeparate: () => void;
   canSeparate: boolean;
+  onDuplicate?: (objectId: string) => void;
+  onRemove?: (objectId: string) => void;
+  canRemove?: boolean;
 };
 
 function EyeIcon({ crossed }: { crossed: boolean }) {
@@ -42,6 +45,9 @@ export function VoxelSceneOutliner({
   onToggleVisible,
   onSeparate,
   canSeparate,
+  onDuplicate,
+  onRemove,
+  canRemove = false,
 }: Props) {
   if (!scene) {
     return (
@@ -105,6 +111,33 @@ export function VoxelSceneOutliner({
                 >
                   <EyeIcon crossed={hidden} />
                 </button>
+                {onDuplicate ? (
+                  <button
+                    type="button"
+                    className="ghost ember-voxel-outliner__op"
+                    title="Дублировать объект сцены"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDuplicate(o.id);
+                    }}
+                  >
+                    Дубль
+                  </button>
+                ) : null}
+                {onRemove ? (
+                  <button
+                    type="button"
+                    className="ghost ember-danger ember-voxel-outliner__op"
+                    title="Убрать объект со сцены"
+                    disabled={!canRemove || !active}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove(o.id);
+                    }}
+                  >
+                    Убрать
+                  </button>
+                ) : null}
               </div>
             </li>
           );

@@ -22,9 +22,96 @@ import {
 } from "three";
 
 const MARKER = "Ember voxel light snap";
-const CACHE_TAG = "ember-voxel-light-snap-v11";
+const CACHE_TAG = "ember-voxel-light-snap-v12";
 const INCLUDE_LIGHTS = "#include <lights_fragment_begin>";
 const INCLUDE_WORLDPOS = "#include <worldpos_vertex>";
+const INCLUDE_SHADOWMAP = "#include <shadowmap_pars_fragment>";
+const PENUMBRA_MARKER = "emberPointPenumbra";
+
+const EMBER_GET_POINT_SHADOW = `float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {
+
+	float shadow = 1.0;
+
+	vec3 lightToPosition = shadowCoord.xyz;
+
+	float lightToPositionLength = length( lightToPosition );
+
+	if ( lightToPositionLength - shadowCameraFar <= 0.0 && lightToPositionLength - shadowCameraNear >= 0.0 ) {
+
+		float dp = ( lightToPositionLength - shadowCameraNear ) / ( shadowCameraFar - shadowCameraNear );
+		dp += shadowBias;
+
+		vec3 bd3D = normalize( lightToPosition );
+
+		vec2 texelSize = vec2( 1.0 ) / ( shadowMapSize * vec2( 4.0, 2.0 ) );
+
+		// ${PENUMBRA_MARKER}: radius 0 keeps a hard lantern umbra. Analog leak
+		// uses radius > 0 so the umbra greys and widens farther from the lamp.
+		if ( shadowRadius < 0.05 ) {
+
+			shadow = texture2DCompare( shadowMap, cubeToUV( bd3D, texelSize.y ), dp );
+
+		} else {
+
+			float distN = clamp( ( lightToPositionLength - shadowCameraNear ) / max( shadowCameraFar - shadowCameraNear, 1e-3 ), 0.0, 1.0 );
+			float blurCells = ( 0.55 + distN * 2.8 ) * clamp( shadowRadius / 2.2, 0.5, 3.5 );
+			float dirOff = ( emberVoxelSize * blurCells ) / max( lightToPositionLength, emberVoxelSize );
+			vec2 offset = vec2( - 1.0, 1.0 ) * dirOff;
+
+			shadow = (
+				texture2DCompare( shadowMap, cubeToUV( bd3D + offset.xyy, texelSize.y ), dp ) +
+				texture2DCompare( shadowMap, cubeToUV( bd3D + offset.yyy, texelSize.y ), dp ) +
+				texture2DCompare( shadowMap, cubeToUV( bd3D + offset.xyx, texelSize.y ), dp ) +
+				texture2DCompare( shadowMap, cubeToUV( bd3D + offset.yyx, texelSize.y ), dp ) +
+				texture2DCompare( shadowMap, cubeToUV( bd3D, texelSize.y ), dp ) +
+				texture2DCompare( shadowMap, cubeToUV( bd3D + offset.xxy, texelSize.y ), dp ) +
+				texture2DCompare( shadowMap, cubeToUV( bd3D + offset.yxy, texelSize.y ), dp ) +
+				texture2DCompare( shadowMap, cubeToUV( bd3D + offset.xxx, texelSize.y ), dp ) +
+				texture2DCompare( shadowMap, cubeToUV( bd3D + offset.yxx, texelSize.y ), dp )
+			) * ( 1.0 / 9.0 );
+
+		}
+
+	}
+
+	return mix( 1.0, shadow, shadowIntensity );
+
+}
+`;
+
+function replaceGlslFunction(
+  chunk: string,
+  signature: string,
+  replacement: string,
+): string {
+  const start = chunk.indexOf(signature);
+  if (start < 0) return chunk;
+  const brace = chunk.indexOf("{", start);
+  if (brace < 0) return chunk;
+  let depth = 0;
+  for (let i = brace; i < chunk.length; i++) {
+    const ch = chunk[i];
+    if (ch === "{") depth += 1;
+    else if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return chunk.slice(0, start) + replacement + chunk.slice(i + 1);
+      }
+    }
+  }
+  return chunk;
+}
+
+/** Stock Three point-shadow PCF, with distance-scaled penumbra when radius > 0. */
+export function patchedShadowmapParsFragment(): string {
+  const chunk = ShaderChunk.shadowmap_pars_fragment;
+  if (chunk.includes(PENUMBRA_MARKER)) return chunk;
+  return replaceGlslFunction(
+    chunk,
+    "float getPointShadow(",
+    EMBER_GET_POINT_SHADOW,
+  );
+}
 
 /** Shared across all Ember lit materials. */
 export const emberVoxelLightSnapState = {
@@ -217,9 +304,13 @@ function patchedLightsFragmentBegin(): string {
 }
 
 function injectFragmentSnap(fragmentShader: string): string {
-  if (fragmentShader.includes(MARKER)) return fragmentShader;
-  if (!fragmentShader.includes(INCLUDE_LIGHTS)) return fragmentShader;
-  return fragmentShader.replace(INCLUDE_LIGHTS, patchedLightsFragmentBegin());
+  let fs = fragmentShader;
+  if (fs.includes(INCLUDE_SHADOWMAP) && !fs.includes(PENUMBRA_MARKER)) {
+    fs = fs.replace(INCLUDE_SHADOWMAP, patchedShadowmapParsFragment());
+  }
+  if (fs.includes(MARKER)) return fs;
+  if (!fs.includes(INCLUDE_LIGHTS)) return fs;
+  return fs.replace(INCLUDE_LIGHTS, patchedLightsFragmentBegin());
 }
 
 function injectVertexWorldVarying(vertexShader: string): string {

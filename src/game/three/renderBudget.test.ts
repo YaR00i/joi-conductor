@@ -3,6 +3,7 @@ import {
   applyMapLightBudget,
   lanternShadowShare,
   lanternVisibleShare,
+  playPointShadowCap,
   resolveEmberRenderBudget,
   resolvePlayProfileBudget,
 } from "./renderBudget";
@@ -63,7 +64,7 @@ describe("Ember WebGL render budget", () => {
     expect(budget.directionalShadowMapSize).toBe(1024);
   });
 
-  it("gives explore more fill lamps and emissive cubes without horde", () => {
+  it("gives explore more fill lamps without horde or emissive cubes", () => {
     const arena = resolvePlayProfileBudget("arena");
     expect(arena.allowHorde).toBe(true);
     expect(arena.allowNpc).toBe(false);
@@ -73,7 +74,7 @@ describe("Ember WebGL render budget", () => {
     const explore = resolvePlayProfileBudget("explore");
     expect(explore.allowHorde).toBe(false);
     expect(explore.allowNpc).toBe(true);
-    expect(explore.emissiveShadows).toBe(true);
+    expect(explore.emissiveShadows).toBe(false);
     expect(explore.maxPointLights).toBeGreaterThan(arena.maxPointLights);
     expect(explore.maxPointShadows).toBe(arena.maxPointShadows);
     expect(explore.maxNpcs).toBe(24);
@@ -133,5 +134,26 @@ describe("Ember WebGL render budget", () => {
         maxPointShadows: 8,
       }).maxPointShadows,
     ).toBe(8);
+  });
+
+  it("clamps explore play cube shadows to the profile, not authored 12", () => {
+    const hardware = resolveEmberRenderBudget(
+      {
+        maxFragmentUniforms: 4096,
+        maxTextures: 64,
+        maxTextureSize: 16384,
+        maxCubemapSize: 16384,
+      },
+      "play",
+      "explore",
+    );
+    const authored = applyMapLightBudget(hardware, {
+      maxPointLights: 24,
+      maxPointShadows: 12,
+    });
+    expect(authored.maxPointShadows).toBe(12);
+    expect(
+      playPointShadowCap(authored, resolvePlayProfileBudget("explore")),
+    ).toBe(6);
   });
 });

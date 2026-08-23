@@ -22,7 +22,7 @@ import { VOXELS_PER_BLOCK } from "./constants";
 import { normalizeVoxelModel, voxelGridSize, voxelIndex } from "./voxelModel";
 
 /** Must stay unique vs lampDiscFalloff cache key (overwrites after patch). */
-const VOXEL_PROP_LIGHT_CACHE_KEY = "ember-lamp-discs-v4-voxel-prop-light-v2";
+const VOXEL_PROP_LIGHT_CACHE_KEY = "ember-lamp-discs-v5-voxel-prop-light-v2";
 
 /** Default MeshToon direct-light scale for map props (avoids lantern blowout). */
 export const DEFAULT_VOXEL_DIRECT_LIGHT_SCALE = 0.42;
@@ -287,7 +287,7 @@ export function buildVoxelModelMesh(
   const group = new THREE.Group();
   group.name = `vox:${model.id}`;
 
-  // key = paletteIndex | (emBand << 8) | (shineBand << 12) | (alphaBand << 16)
+  // key = palette | em | shine | alpha | transmit
   const buckets = new Map<number, FaceBucket>();
 
   for (let y = 0; y < sy; y++) {
@@ -299,7 +299,13 @@ export function buildVoxelModelMesh(
         const emBand = emissiveBand(model.emissive?.[i] ?? 0);
         const shBand = emissiveBand(model.shine?.[i] ?? 0);
         const alphaBand = emissiveBand(model.transparency?.[i] ?? 0);
-        const key = pi | (emBand << 8) | (shBand << 12) | (alphaBand << 16);
+        const fullTransmit = (model.transmittance?.[i] ?? 0) >= 255 ? 1 : 0;
+        const key =
+          pi |
+          (emBand << 8) |
+          (shBand << 12) |
+          (alphaBand << 16) |
+          (fullTransmit << 20);
         let bucket = buckets.get(key);
         if (!bucket) {
           bucket = { positions: [], normals: [], indices: [] };
@@ -334,6 +340,7 @@ export function buildVoxelModelMesh(
     const emBand = (key >> 8) & 0xf;
     const shBand = (key >> 12) & 0xf;
     const alphaBand = (key >> 16) & 0xf;
+    const fullTransmit = ((key >> 20) & 1) === 1;
     const hex = model.palette[pi] || "#888888";
     const color = hexColor(hex);
     const geo = new THREE.BufferGeometry();
@@ -436,8 +443,11 @@ export function buildVoxelModelMesh(
     mat.userData.emberVoxelPaletteIndex = pi;
     mat.userData.emberVoxelHasEmissiveColor = intensity > 0;
     const mesh = new THREE.Mesh(geo, mat);
-    // Emissive / glass must not occlude PointLights (shadow cube maps).
-    mesh.castShadow = !suppressCastShadow && intensity <= 0 && !useAlpha;
+    // Glass skips shadows. Full transmittance (255) skips them too. Mid
+    // values still occlude; analog leak is the host PointLight's umbra
+    // (dim + distance-soft penumbra), not holes in the depth map.
+    mesh.castShadow =
+      !suppressCastShadow && intensity <= 0 && !useAlpha && !fullTransmit;
     mesh.receiveShadow = true;
     group.add(mesh);
   }
@@ -481,6 +491,10 @@ export function disposeVoxelModelMesh(group: THREE.Object3D): void {
       const m = o.material;
       if (Array.isArray(m)) m.forEach((x) => x.dispose());
       else m.dispose();
+      o.customDepthMaterial?.dispose();
+      o.customDistanceMaterial?.dispose();
+      o.customDepthMaterial = undefined;
+      o.customDistanceMaterial = undefined;
     }
   });
 }

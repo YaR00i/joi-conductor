@@ -652,6 +652,130 @@ describe("EmberWorldObject adapter", () => {
     expect(map.regions[0]).not.toHaveProperty("scriptId");
   });
 
+  it("adds and edits an instance interactivity modifier on a voxel", () => {
+    const map = worldMap();
+    const added = setEmberWorldObjectComponentPresence(
+      map,
+      { kind: "voxel", id: "crate-1" },
+      "interactivity",
+      true,
+    );
+    expect(
+      getEmberWorldObject(added, { kind: "voxel", id: "crate-1" }),
+    ).toEqual(
+      expect.objectContaining({
+        components: expect.arrayContaining([
+          expect.objectContaining({ type: "interactivity", kind: "custom" }),
+        ]),
+      }),
+    );
+    const door = applyEmberInspectorFieldEdit(
+      added,
+      { kind: "voxel", id: "crate-1" },
+      { componentType: "interactivity", fieldId: "kind", value: "door" },
+    );
+    const bound = applyEmberInspectorFieldEdit(
+      door,
+      { kind: "voxel", id: "crate-1" },
+      {
+        componentType: "interactivity",
+        fieldId: "triggerId",
+        value: " exit-1 ",
+      },
+    );
+    expect(bound.voxelProps?.[0]?.interactivity).toEqual({
+      kind: "door",
+      triggerId: "exit-1",
+    });
+    const mapped = applyEmberInspectorFieldEdit(
+      bound,
+      { kind: "region", id: "exit-1" },
+      {
+        componentType: "trigger",
+        fieldId: "targetMapId",
+        value: " other_map ",
+      },
+    );
+    expect(mapped.regions[0]).toMatchObject({
+      targetMapId: "other_map",
+    });
+    const removed = setEmberWorldObjectComponentPresence(
+      bound,
+      { kind: "voxel", id: "crate-1" },
+      "interactivity",
+      false,
+    );
+    expect(removed.voxelProps?.[0]).not.toHaveProperty("interactivity");
+    expect(
+      emberWorldObjectComponent(
+        getEmberWorldObject(removed, { kind: "voxel", id: "crate-1" })!,
+        "interactivity",
+      ),
+    ).toBeNull();
+  });
+
+  it("edits chest loot stub ids and repeatable on a region", () => {
+    const map = worldMap();
+    map.regions = [
+      {
+        id: "stash-1",
+        kind: "chest",
+        x: 2,
+        y: 2,
+        w: 1,
+        h: 1,
+      },
+    ];
+    const looted = applyEmberInspectorFieldEdit(
+      map,
+      { kind: "region", id: "stash-1" },
+      { componentType: "chest", fieldId: "lootIds", value: " coin, herb " },
+    );
+    const repeatable = applyEmberInspectorFieldEdit(
+      looted,
+      { kind: "region", id: "stash-1" },
+      { componentType: "chest", fieldId: "repeatable", value: true },
+    );
+    expect(repeatable.regions[0]).toMatchObject({
+      lootIds: ["coin", "herb"],
+      repeatable: true,
+    });
+    const once = applyEmberInspectorFieldEdit(
+      repeatable,
+      { kind: "region", id: "stash-1" },
+      { componentType: "chest", fieldId: "repeatable", value: false },
+    );
+    expect(once.regions[0].repeatable).toBeUndefined();
+  });
+
+  it("clears tile dest when linking a teleport to a region and vice versa", () => {
+    const map = worldMap();
+    const byCell = applyEmberInspectorFieldEdit(
+      map,
+      { kind: "region", id: "exit-1" },
+      { componentType: "teleport", fieldId: "targetX", value: 4 },
+    );
+    const byCellY = applyEmberInspectorFieldEdit(
+      byCell,
+      { kind: "region", id: "exit-1" },
+      { componentType: "teleport", fieldId: "targetY", value: 5 },
+    );
+    expect(byCellY.regions[0]).toMatchObject({
+      targetX: 4,
+      targetY: 5,
+    });
+    expect(byCellY.regions[0].targetRegionId).toBeUndefined();
+
+    const linked = applyEmberInspectorFieldEdit(
+      byCellY,
+      { kind: "region", id: "exit-1" },
+      { componentType: "teleport", fieldId: "targetRegionId", value: "pad-b" },
+    );
+    expect(linked.regions[0].targetRegionId).toBe("pad-b");
+    expect(linked.regions[0].targetX).toBeUndefined();
+    expect(linked.regions[0].targetY).toBeUndefined();
+  });
+
   it("removes any stored scene object through one API", () => {
     const map = worldMap();
     expect(

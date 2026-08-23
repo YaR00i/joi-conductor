@@ -1,0 +1,22 @@
+{
+  "id": "village_shop_intro",
+  "nameRu": "Приветствие киоска Ваншэн",
+  "use": "shop_intro",
+  "startStepId": "hi",
+  "steps": [
+    {
+      "id": "hi",
+      "type": "dialogue",
+      "speaker": "keeper",
+      "portraitKey": "neutral",
+      "nameRu": "Лавочник Ваншэн",
+      "textRu": "Бюро ещё работает. Чай, травы и талисманы — пока вы в состоянии платить.",
+      "next": "end"
+    },
+    { "id": "end", "type": "end" }
+  ],
+  "editorLayout": {
+    "hi": { "x": 40, "y": 80 },
+    "end": { "x": 320, "y": 80 }
+  }
+}

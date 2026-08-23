@@ -1,0 +1,34 @@
+{
+  "id": "vox_chr_mt4jdf49_hair",
+  "nameRu": "Волосы",
+  "mesh": {
+    "kind": "vox",
+    "file": "voxels/models/vox_chr_mt4jdf49_hair.vox"
+  },
+  "model": {
+    "id": "vox_chr_mt4jdf49_hair",
+    "nameRu": "Волосы",
+    "tags": [
+      "character",
+      "chibi"
+    ],
+    "sizeBlocks": {
+      "x": 1,
+      "y": 1,
+      "z": 1
+    },
+    "heightVoxels": 6,
+    "palette": [
+      "",
+      "#f07828",
+      "#c05018"
+    ],
+    "voxels": [],
+    "material": "cloth",
+    "physical": false
+  },
+  "tags": [
+    "character",
+    "chibi"
+  ]
+}

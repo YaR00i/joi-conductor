@@ -41,8 +41,6 @@ export function InspectorObjectHeader({
   onDelete,
   onClose,
 }: InspectorObjectHeaderProps) {
-  const hasMenu = Boolean(onDuplicate);
-
   return (
     <header className="ember-inspector-object-head">
       <div className="ember-inspector-object-head__topline">
@@ -98,29 +96,6 @@ export function InspectorObjectHeader({
         >
           {locked ? "▣" : "▢"}
         </button>
-        {hasMenu ? (
-          <details className="ember-inspector-object-head__menu">
-            <summary aria-label="Действия с объектом" title="Дополнительные действия">⋮</summary>
-            <div className="ember-inspector-object-head__menu-popover">
-              {onDuplicate ? (
-                <button type="button" onClick={onDuplicate}>
-                  Дублировать
-                </button>
-              ) : null}
-            </div>
-          </details>
-        ) : null}
-        {onDelete ? (
-          <button
-            type="button"
-            className="ghost danger ember-inspector-object-head__tool"
-            aria-label="Удалить объект"
-            title="Удалить объект с карты (можно отменить через Undo)"
-            onClick={onDelete}
-          >
-            🗑
-          </button>
-        ) : null}
         <button
           type="button"
           className="ghost ember-inspector-object-head__tool"
@@ -131,6 +106,30 @@ export function InspectorObjectHeader({
           ›
         </button>
       </div>
+      {onDuplicate || onDelete ? (
+        <div className="ember-inspector-object-head__actions">
+          {onDuplicate ? (
+            <button
+              type="button"
+              className="ghost"
+              title="Дублировать выбранное (Ctrl+D). Можно отменить через Undo."
+              onClick={onDuplicate}
+            >
+              Дублировать
+            </button>
+          ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              className="ghost ember-danger"
+              title="Удалить выбранное с карты (Delete). Можно отменить через Undo."
+              onClick={onDelete}
+            >
+              Удалить
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {description ? (
         <p className="ember-inspector-object-head__description">{description}</p>

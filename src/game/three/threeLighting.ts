@@ -36,11 +36,18 @@ export const THREE_MAX_LAMP_SHADOWS = MAP_POINT_LIGHTS_MAX;
  * Pack core/mid fractions of cutoff into PointLight.decay for the toon
  * falloff shader (physical decay is unused — we use hard discs).
  * Layout: floor(pack) = round(coreT*1000), fract(pack) ≈ midT.
+ * Soft rings add LAMP_DISC_SOFT_BIAS so the shader can smooth disc edges.
  */
-export function packLampDiscDecay(coreT: number, midT: number): number {
+export const LAMP_DISC_SOFT_BIAS = 2000;
+
+export function packLampDiscDecay(
+  coreT: number,
+  midT: number,
+  softRings = false,
+): number {
   const c = Math.round(Math.max(0.001, Math.min(0.998, coreT)) * 1000);
   const m = Math.max(0.001, Math.min(0.999, midT));
-  return c + m;
+  return (softRings ? LAMP_DISC_SOFT_BIAS : 0) + c + m;
 }
 
 export function lampDiscFractions(params: ResolvedLanternParams): {

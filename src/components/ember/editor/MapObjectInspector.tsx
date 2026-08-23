@@ -14,6 +14,7 @@ import type {
   EmberTileset,
   EmberVoxelPlacement,
 } from "../../../game/content/types";
+import { listAssignableScriptOptions } from "../../../game/content/emberScript";
 import { MAX_ELEVATION, MIN_ELEVATION } from "../../../game/content/types";
 import { normalizePixelSprite } from "../../../game/content/pixelSprite";
 import { normalizeLampParams } from "../../../game/content/lightPresets";
@@ -123,7 +124,12 @@ export type MapObjectInspectorProps = {
   onDropMultiToFloor?: () => void;
   onSetMultiLocked?: (locked: boolean) => void;
   onSetMultiHidden?: (hidden: boolean) => void;
+  onDuplicateMulti?: () => void;
   onDeleteMulti?: () => void;
+  /** Duplicate the inspector's primary placed object (undoable). */
+  onDuplicateSelection?: () => void;
+  /** Delete the inspector's primary placed object or tile (undoable). */
+  onDeleteSelection?: () => void;
   /** Editor-only lock from the Scene Outliner. */
   locked?: boolean;
   /** Editor-only visibility from the Scene Outliner. */
@@ -1755,14 +1761,35 @@ export function MapObjectInspector(props: MapObjectInspectorProps) {
     }
     return undefined;
   })();
-  const duplicateFromHeader =
-    selection.kind === "voxel"
-      ? () => props.onDuplicateVoxel(selection.id)
-      : selection.kind === "group" && props.onDuplicateGroup
-        ? () => props.onDuplicateGroup?.(selection.id)
-        : undefined;
+  const duplicateFromHeader = (() => {
+    if (selection.kind === "group" && props.onDuplicateGroup) {
+      return () => props.onDuplicateGroup?.(selection.id);
+    }
+    if (
+      selection.kind === "voxel" ||
+      selection.kind === "sprite" ||
+      selection.kind === "light" ||
+      selection.kind === "region"
+    ) {
+      if (props.onDuplicateSelection) return props.onDuplicateSelection;
+      if (selection.kind === "voxel") {
+        return () => props.onDuplicateVoxel(selection.id);
+      }
+      return undefined;
+    }
+    return undefined;
+  })();
   const deleteFromHeader = (() => {
     if (props.locked) return undefined;
+    if (
+      selection.kind === "voxel" ||
+      selection.kind === "sprite" ||
+      selection.kind === "light" ||
+      selection.kind === "region" ||
+      selection.kind === "tile"
+    ) {
+      if (props.onDeleteSelection) return props.onDeleteSelection;
+    }
     if (selection.kind === "voxel") return () => props.onDeleteVoxel(selection.id);
     if (selection.kind === "sprite") return () => props.onDeleteSprite(selection.id);
     if (selection.kind === "light") return () => props.onDeleteSource(selection.id);
@@ -1908,19 +1935,18 @@ export function MapObjectInspector(props: MapObjectInspectorProps) {
             </button>
             <button
               type="button"
+              disabled={(props.multiWorldObjects?.length ?? 0) === 0}
+              onClick={props.onDuplicateMulti}
+            >
+              Дублировать
+            </button>
+            <button
+              type="button"
               className="is-danger"
               disabled={(props.multiWorldObjects?.length ?? 0) === 0}
-              onClick={() => {
-                if (
-                  window.confirm(
-                    `Удалить выбранные объекты (${props.multiWorldObjects?.length ?? 0})?`,
-                  )
-                ) {
-                  props.onDeleteMulti?.();
-                }
-              }}
+              onClick={props.onDeleteMulti}
             >
-              Delete
+              Удалить
             </button>
           </div>
         </section>
@@ -1985,6 +2011,14 @@ export function MapObjectInspector(props: MapObjectInspectorProps) {
             }
             onAddComponent={props.onAddWorldObjectComponent}
             onRemoveComponent={props.onRemoveWorldObjectComponent}
+            shopOptions={Object.values(props.pack.shops ?? {}).map((shop) => ({
+              value: shop.id,
+              label: `${shop.nameRu} (${shop.id})`,
+            }))}
+            scriptOptions={listAssignableScriptOptions(
+              props.pack.scenes,
+              props.pack.scripts,
+            )}
           />
         ) : null}
 
@@ -2109,12 +2143,7 @@ export function MapObjectInspector(props: MapObjectInspectorProps) {
         ) : null}
 
         {selection.kind === "region" && regionPlace ? (
-          worldObject ? (
-            <details className="ember-schema-advanced">
-              <summary>Расширенный редактор зоны</summary>
-              {selectedRegionEditor}
-            </details>
-          ) : selectedRegionEditor
+          selectedRegionEditor
         ) : null}
 
         {selection.kind === "lib" ? (

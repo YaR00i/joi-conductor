@@ -7,6 +7,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { isEmberDialogueUse } from "../../../game/content/emberScript";
 import {
   ACTOR_Y_MAX,
   ACTOR_Y_MIN,
@@ -20,6 +21,7 @@ import {
 import { emberAssetUrl, writeEmberJson } from "../../../game/content/io";
 import type {
   EmberArt,
+  EmberDialogueUse,
   EmberEvent,
   EmberEventTrigger,
   EmberPack,
@@ -47,7 +49,7 @@ type Props = {
   scene: EmberScene;
   sceneId: string;
   onSelectScene: (id: string) => void;
-  onCreateScene: () => void;
+  onCreateScene: (use?: EmberDialogueUse) => void;
   onChange: (scene: EmberScene) => void;
   onArtsChange?: (arts: EmberArt[]) => void;
   onEventChange?: (event: EmberEvent) => void;
@@ -448,10 +450,18 @@ export function SceneEditorPanel({
           <button
             type="button"
             className="ember-add-btn"
-            onClick={onCreateScene}
-            title="Создать новую сцену"
+            onClick={() => onCreateScene("cutscene")}
+            title="Большая сцена: портреты, ветки, splash"
           >
             + Сцена
+          </button>
+          <button
+            type="button"
+            className="ember-add-btn"
+            onClick={() => onCreateScene("talk")}
+            title="Короткая болтовня: 1–3 реплики, тот же плеер"
+          >
+            + Болтовня
           </button>
           <label className="ember-scene-toolbar__name">
             <span className="muted">Имя</span>
@@ -509,6 +519,30 @@ export function SceneEditorPanel({
 
       {showSettings ? (
         <section className="ember-scene-settings">
+          <div className="ember-scene-settings__col">
+            <h3 className="ember-ed-card__title">Профиль</h3>
+            <label className="ember-ed-form">
+              Использование
+              <select
+                value={scene.use ?? "cutscene"}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  commit({
+                    ...scene,
+                    use: isEmberDialogueUse(next) ? next : "cutscene",
+                  });
+                }}
+              >
+                <option value="cutscene">Сцена / катсцена</option>
+                <option value="talk">Болтовня</option>
+                <option value="shop_intro">Приветствие лавки</option>
+              </select>
+            </label>
+            <p className="muted">
+              Один граф и один play overlay. Болтовня и лавка — лёгкий HSR-текст
+              без коробки.
+            </p>
+          </div>
           <div className="ember-scene-settings__col">
             <h3 className="ember-ed-card__title">Фон по умолчанию</h3>
             <EmberArtPicker

@@ -17,12 +17,83 @@ import {
 } from "../content/pixelSprite";
 import type {
   EmberEnemyDef,
+  EmberFlagValue,
   EmberMap,
+  EmberMapRegion,
   EmberPack,
+  EmberScriptStep,
   EmberStage,
   EmberTileset,
+  EmberVoxelPlacement,
   EmberWeaponDef,
 } from "../content/types";
+import { compactInventory, grantItemCounts } from "../content/emberItem";
+import {
+  captureExploreSave,
+  exploreSaveWorldPos,
+  type EmberExploreAutosaveReason,
+  type EmberExploreSaveState,
+} from "../content/emberSave";
+import {
+  incomingPlayerDamage,
+  outgoingPlayerDamage,
+  playerCombatStats,
+  type EmberCombatStats,
+} from "../content/emberCombatStats";
+import {
+  compactEquipment,
+  emptyEquipment,
+  equipFailRu,
+  equipItem as applyEquipItem,
+  isEmberEquipSlot,
+  listInventoryViews,
+  type EmberEquipSlot,
+  type EmberEquipment,
+  unequipSlot as applyUnequipSlot,
+  useInventoryItem,
+} from "../content/emberEquipment";
+import {
+  dialogueUseOf,
+  resolveScriptRef,
+} from "../content/emberScript";
+import {
+  buyShopItem,
+  seedShopRemaining,
+  sellableFromInventory,
+  sellShopItem,
+  SHOP_WALLET_ITEM_ID,
+  wouldFireForShop,
+} from "../content/emberShop";
+import {
+  applyChestOpen,
+  chestIsOpened,
+  chestKey,
+  chestToastText,
+  stampOpenedChests,
+  wouldFireForChest,
+} from "../content/chestLoot";
+import {
+  boundTriggerFor,
+  pickInteractHit,
+  wouldFireForInteractivity,
+  wouldFireForTriggerRegion,
+  type InteractivityWouldFire,
+} from "../content/interactivity";
+import {
+  MAP_CHANGE_COOLDOWN,
+  mapChangeRequestFromRegion,
+  mapChangeRequestFromWouldFire,
+  resolveMapChangeArrival,
+  type MapChangeArrival,
+  type MapChangeRequest,
+} from "../content/mapChange";
+import {
+  beginMapFade,
+  createMapFadeState,
+  mapFadeBusy,
+  stepMapFade,
+  type MapFadeState,
+} from "../content/mapFade";
 import {
   resolveMapAutoAttack,
   resolveMapPlayProfile,
@@ -42,10 +113,15 @@ import {
   randomWalkablePointInRegion,
   regionCenter,
   resolveMapLight,
-  resolveTeleportTarget,
+  stepTeleport,
   tileSurfaceElev,
   worldToTile,
 } from "../tile/mapUtils";
+import {
+  buildCutawayHideSet,
+  occupiedInteriorAt,
+  playCutawayCacheKey,
+} from "../tile/buildingInterior";
 import { blockStoryHeight } from "../tile/extruded";
 import { resolveChestModelPose } from "../voxel/chestPlacement";
 import {
@@ -68,6 +144,7 @@ import {
   hexColorOr,
   updateYawBillboards,
 } from "./billboards";
+import { addQuestMarkerOverlays } from "./questMarkerOverlay";
 import {
   PLAY_LOOK_LOCK_UI_SELECTOR,
   PLAY_POINTER_LOCK_RELOCK_MS,
@@ -92,6 +169,7 @@ import { createPostFx, type EmberPostFx } from "./postFx";
 import {
   applyMapLightBudget,
   lanternVisibleShare,
+  playPointShadowCap,
   resolveEmberRenderBudget,
   resolvePlayProfileBudget,
   type EmberPlayProfileBudget,
@@ -139,6 +217,21 @@ import {
   type TerrainStreamingStats,
 } from "./voxelTerrainChunks";
 import {
+  applyInteriorCutawayTagged,
+  collectCutawayTagged,
+  tagCutawayObject,
+} from "./interiorCutaway";
+import { createEditorVoxelInstanceBatch } from "./editorVoxelInstancing";
+import {
+  closeInventoryOverlayFlags,
+  closeShopOverlayFlags,
+  playEscOverlayAction,
+  playLookBlocked,
+  playMovementFrozen,
+  restorePlayOverlayFocus,
+  type PlayOverlayFlags,
+} from "./playOverlayState";
+import {
   collectWaterMaterials,
   ensureWaterShoreAttributes,
   maxWaterReflectMult,
@@ -165,6 +258,7 @@ import {
   type EmberProfilerExtras,
 } from "./emberFrameProfiler";
 import {
+  DYNAMIC_LOCAL_SHADOW_MAX_LIGHTS,
   EMBER_DYNAMIC_ACTOR_LAYER,
   beginPointShadowBake,
   configureCachedSunShadow,
@@ -214,6 +308,7 @@ export type EmberThreeWorldOpts = {
     loadRadiusChunks?: number;
     unloadRadiusChunks?: number;
   };
+  exploreSave?: EmberExploreSaveState | null;
 };
 
 const STRIP_COLORS = ["#e8a878", "#e09070", "#d07090", "#c050a0"];
@@ -321,6 +416,8 @@ export class EmberThreeWorld {
   private readonly lookOffset = new THREE.Vector3();
   private readonly lookAxis = new THREE.Vector3(0, 1, 0);
   private mapGroup: THREE.Group | null = null;
+  private lastCutawayKey = "";
+  private cutawayTagged: THREE.Object3D[] = [];
   private terrainChunks: ChunkedVoxelTerrain | null = null;
   private readonly terrainStreaming: Required<
     NonNullable<EmberThreeWorldOpts["terrainStreaming"]>
@@ -328,7 +425,7 @@ export class EmberThreeWorld {
   private terrainFocusChunkKey = "";
   private terrainLoadKeySig = "";
   private terrainRetainKeySig = "";
-  private readonly terrainDatasetKey: string;
+  private terrainDatasetKey: string;
   private entityRoot = new THREE.Group();
   private readonly enemyBillboards = new RuntimeBillboardBatches(
     this.entityRoot,
@@ -389,8 +486,8 @@ export class EmberThreeWorld {
   private readonly onBridge: EmberBridgeHandler;
   private readonly pack: EmberPack;
   private readonly stage: EmberStage;
-  private readonly map: EmberMap;
-  private readonly tileset: EmberTileset;
+  private map: EmberMap;
+  private tileset: EmberTileset;
   private readonly shortMode: boolean;
 
   private actors: Actor[] = [];
@@ -461,10 +558,22 @@ export class EmberThreeWorld {
   private nowMs = 0;
   private hudAcc = 0;
   private teleportCd = 0;
+  /** Pad id the player is standing on after a warp (or a no-op stub). */
+  private teleportOccupyId: string | null = null;
+  private mapChangeCd = 0;
+  private mapChangeOccupyId: string | null = null;
+  private mapFade: MapFadeState = createMapFadeState();
+  private pendingMapFade: {
+    arrival: MapChangeArrival;
+    tileset: EmberTileset;
+  } | null = null;
+  private mapFadeEl: HTMLDivElement | null = null;
+  private mapFadeDoorEl: HTMLDivElement | null = null;
+  private scriptHeldForMapFade = false;
   private triggerCd = 0;
   private spawnAcc: number[] = [];
   private onceFired = new Set<number>();
-  private chestTaken = new Set<string>();
+  private openedChestKeys = new Set<string>();
   /** Opening hinged chests: play clip then open loot UI. */
   private chestOpens: {
     actor: Actor;
@@ -477,6 +586,18 @@ export class EmberThreeWorld {
   /** EmberEvent ids that have fired this run (for emissive trigger_event). */
   private activeEmissiveEvents = new Set<string>();
   private awaitingLoot = false;
+  private shopOpen = false;
+  private inventoryOpen = false;
+  private dialogueOpen = false;
+  private scriptQueue: EmberScriptStep[] = [];
+  private pendingShopId: string | null = null;
+  private flags: Record<string, EmberFlagValue> = {};
+  private shopId: string | null = null;
+  private shopStock: Record<string, Record<string, number>> = {};
+  private inventory: Record<string, number> = {};
+  private equipment: EmberEquipment = emptyEquipment();
+  private applyingSave = false;
+  private exploreSpawnFromSave: EmberExploreSaveState | null = null;
   private pausedLogic = false;
   private lookWarpSkip = 0;
   private finished = false;
@@ -507,7 +628,38 @@ export class EmberThreeWorld {
       ev.preventDefault();
       ev.stopPropagation();
       if (ev.repeat) return;
-      this.openPauseMenu(PLAY_POINTER_LOCK_RELOCK_MS);
+      const action = playEscOverlayAction({
+        shopOpen: this.shopOpen,
+        inventoryOpen: this.inventoryOpen,
+        dialogueOpen: this.dialogueOpen,
+      });
+      switch (action) {
+        case "close_shop":
+          this.closeShop();
+          return;
+        case "close_inventory":
+          this.closeInventory();
+          return;
+        case "ignore":
+          return;
+        case "pause":
+          this.openPauseMenu(PLAY_POINTER_LOCK_RELOCK_MS);
+          return;
+        default: {
+          const _never: never = action;
+          void _never;
+        }
+      }
+      return;
+    }
+    if (ev.code === "KeyF" && !ev.repeat) {
+      ev.preventDefault();
+      this.tryInteract();
+      return;
+    }
+    if (ev.code === "KeyI" && !ev.repeat) {
+      ev.preventDefault();
+      this.toggleInventory();
       return;
     }
     if (ev.code === "Space") ev.preventDefault();
@@ -599,6 +751,20 @@ export class EmberThreeWorld {
     const mapRaw = opts.pack.maps[stage.mapId];
     if (!mapRaw) throw new Error(`map ${stage.mapId}`);
     this.map = ensureMapLayers(mapRaw);
+    if (resolveMapPlayProfile(this.map) === "explore") {
+      this.inventory = { [SHOP_WALLET_ITEM_ID]: 20 };
+      const incoming = opts.exploreSave ?? null;
+      const dest = incoming ? this.pack.maps[incoming.mapId] : undefined;
+      if (
+        incoming &&
+        dest &&
+        resolveMapPlayProfile(dest) === "explore"
+      ) {
+        this.map = ensureMapLayers(dest);
+        this.applyExploreProgressFields(incoming);
+        this.exploreSpawnFromSave = incoming;
+      }
+    }
     this.autoAttackEnabled = resolveMapAutoAttack(this.map);
     this.enemySpatial = new RuntimeActorSpatialIndex(
       Math.max(24, this.map.tileSize * 2),
@@ -633,6 +799,9 @@ export class EmberThreeWorld {
 
     this.maxHp = stage.playerHp;
     this.hp = stage.playerHp;
+    if (this.exploreSpawnFromSave) {
+      this.applyExploreHp(this.exploreSpawnFromSave);
+    }
     this.duration = stageUsesTimedClear(resolveMapPlayProfile(this.map))
       ? this.shortMode
         ? Math.min(90, stage.durationSec)
@@ -675,6 +844,7 @@ export class EmberThreeWorld {
     this.renderer.domElement.tabIndex = 0;
     opts.parent.innerHTML = "";
     opts.parent.appendChild(this.renderer.domElement);
+    this.mountMapFadeOverlay();
     this.profiler = createEmberFrameProfiler(
       this.renderer,
       "GAME",
@@ -693,8 +863,9 @@ export class EmberThreeWorld {
     );
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.1;
+    // Follow lerp already smooths translation. Damping here fights mouse yaw
+    // and hitch-sized dt, which reads as a jerky village camera.
+    this.controls.enableDamping = false;
     this.controls.enablePan = false;
     this.controls.enableRotate = false;
     this.controls.enableZoom = true;
@@ -940,6 +1111,7 @@ export class EmberThreeWorld {
       this.terrainSettled = true;
       this.refreshEmissiveMats();
       this.refreshWaterMats();
+      this.refreshCutawayTagged();
       this.emitLoadProgress();
     };
     if (!force && !loadChanged) {
@@ -996,8 +1168,16 @@ export class EmberThreeWorld {
     );
     const lightCfg = resolveMapLight(this.map);
     const lightCaps = applyMapLightBudget(this.renderBudget, lightCfg);
-    this.localShadowMapBank.setDynamicLimit(lightCfg.dynamicPointShadows);
     const explore = !this.playProfileBudget.allowHorde;
+    const pointShadowCap = playPointShadowCap(
+      lightCaps,
+      this.playProfileBudget,
+    );
+    const dynamicShadowCap = Math.min(
+      lightCfg.dynamicPointShadows,
+      DYNAMIC_LOCAL_SHADOW_MAX_LIGHTS,
+    );
+    this.localShadowMapBank.setDynamicLimit(dynamicShadowCap);
     const maxLamps = lanternVisibleShare(lightCaps, {
       authoredLights: lightCfg.maxPointLights != null,
       explore,
@@ -1010,11 +1190,14 @@ export class EmberThreeWorld {
       sprites: this.pack.sprites,
       sourceBounds,
       maxLamps,
-      maxShadows: lightCaps.maxPointLights,
+      maxShadows: pointShadowCap,
       shadows: true,
       shadowMapSize: this.renderBudget.pointShadowMapSize,
       shadowFocus: explore ? this.player.mesh.position : undefined,
     });
+    const lanternCubes = this.lanternLights.filter(
+      (light) => light.castShadow,
+    ).length;
     this.emissiveLights = addThreeEmissiveLocalLights(
       this.localLightRoot,
       this.map,
@@ -1027,7 +1210,7 @@ export class EmberThreeWorld {
           lightCaps.maxPointLights - this.lanternLights.length,
         ),
         maxShadows: this.playProfileBudget.emissiveShadows
-          ? lightCaps.maxPointLights
+          ? Math.max(0, pointShadowCap - lanternCubes)
           : 0,
         shadowMapSize: this.renderBudget.pointShadowMapSize,
         voxelModels: this.pack.voxelModels,
@@ -1054,6 +1237,10 @@ export class EmberThreeWorld {
     );
     canvas.dataset.localLanternLights = String(this.lanternLights.length);
     canvas.dataset.localEmissiveLights = String(this.emissiveLights.length);
+    canvas.dataset.playPointShadowCap = String(pointShadowCap);
+    canvas.dataset.localShadowCubes = String(
+      this.localShadowCandidates.length,
+    );
     this.localLightsSpawned = true;
     this.invalidateStaticShadows();
     this.emitLoadProgress();
@@ -1085,12 +1272,26 @@ export class EmberThreeWorld {
         w: 1,
         h: 1,
       });
-    const pos = regionCenter(this.map, start);
+    const saved = this.exploreSpawnFromSave;
+    const pos = saved
+      ? exploreSaveWorldPos(saved, this.map.tileSize)
+      : regionCenter(this.map, start);
     const tile = worldToTile(this.map, pos.x, pos.y);
-    this.playerElev = tileSurfaceElev(this.map, tile.tx, tile.ty);
+    this.playerElev =
+      saved?.elev ?? tileSurfaceElev(this.map, tile.tx, tile.ty);
     this.playerFeetElev = this.playerElev;
     this.playerFallVelocity = 0;
     this.playerGrounded = true;
+    this.teleportOccupyId = findRegions(this.map, "teleport").find((r) =>
+      pointInRegion(this.map, r, pos.x, pos.y, this.playerElev),
+    )?.id ?? null;
+    this.mapChangeOccupyId = findRegions(this.map, "trigger").find((r) =>
+      pointInRegion(this.map, r, pos.x, pos.y, this.playerElev),
+    )?.id ?? null;
+    if (this.exploreSpawnFromSave) {
+      this.mapChangeCd = MAP_CHANGE_COOLDOWN;
+      this.teleportCd = MAP_CHANGE_COOLDOWN;
+    }
     const mesh = createColorBillboard(STRIP_COLORS[0]!, 10, "#1a1010");
     this.player = {
       mesh,
@@ -1110,6 +1311,7 @@ export class EmberThreeWorld {
       this.weapons.push({ def: bolt, level: 1, cooldown: 0 });
     }
     this.rebuildOrbitals();
+    this.ensureArenaStarterLoadout();
   }
 
   private makeChestMesh(
@@ -1174,9 +1376,13 @@ export class EmberThreeWorld {
   }
 
   private placeChests(): void {
+    stampOpenedChests(this.map, this.openedChestKeys);
     for (const r of findRegions(this.map, "chest")) {
+      const key = chestKey(this.map.id, r.id);
+      const opened = r.opened === true || this.openedChestKeys.has(key);
+      if (opened) this.openedChestKeys.add(key);
       const pose = resolveChestModelPose(this.map, r);
-      const mesh = this.makeChestMesh(r, false);
+      const mesh = this.makeChestMesh(r, opened);
       const a: Actor = {
         mesh,
         lx: pose.x,
@@ -1185,6 +1391,7 @@ export class EmberThreeWorld {
         radius: 6,
         kind: "chest",
         regionId: r.id,
+        dead: opened,
       };
       this.addActor(a);
       this.syncActor(a);
@@ -1194,6 +1401,7 @@ export class EmberThreeWorld {
         this.entityRoot,
       );
       a.outline?.refreshBounds();
+      if (opened) a.outline?.setCanInteract(false);
     }
   }
 
@@ -1246,10 +1454,9 @@ export class EmberThreeWorld {
       }
       root.add(mesh);
     }
-    for (const p of this.map.voxelProps ?? []) {
-      if (!contains(p.x, p.y)) continue;
+    const placeVoxelProp = (p: EmberVoxelPlacement) => {
       const model = this.pack.voxelModels[p.modelId];
-      if (!model) continue;
+      if (!model) return;
       const elev = p.elev ?? tileSurfaceElev(this.map, p.x, p.y);
       const suppressHostShadow =
         p.emissiveSuppressHostShadow !== undefined
@@ -1266,8 +1473,54 @@ export class EmberThreeWorld {
         this.map.tileSize,
         elev,
       );
+      tagCutawayObject(built.group, p.x, p.y, elev, "prop");
       root.add(built.group);
+    };
+    const instanceGroups = new Map<string, EmberVoxelPlacement[]>();
+    for (const p of this.map.voxelProps ?? []) {
+      if (!contains(p.x, p.y)) continue;
+      if (!this.pack.voxelModels[p.modelId]) continue;
+      if (occupiedInteriorAt(this.map, p.x, p.y)) {
+        placeVoxelProp(p);
+        continue;
+      }
+      const list = instanceGroups.get(p.modelId);
+      if (list) list.push(p);
+      else instanceGroups.set(p.modelId, [p]);
     }
+    for (const list of instanceGroups.values()) {
+      const first = list[0];
+      const model = first ? this.pack.voxelModels[first.modelId] : undefined;
+      if (!first || !model || list.length < 2) {
+        for (const p of list) placeVoxelProp(p);
+        continue;
+      }
+      const suppressHostShadow =
+        first.emissiveSuppressHostShadow !== undefined
+          ? first.emissiveSuppressHostShadow
+          : model.emissiveSuppressHostShadow === true;
+      const batch = createEditorVoxelInstanceBatch(
+        model,
+        this.map.tileSize,
+        list.map((p) => ({
+          placement: p,
+          elev: p.elev ?? tileSurfaceElev(this.map, p.x, p.y),
+        })),
+        {
+          directLightScale: first.directLightScale ?? model.directLightScale,
+          suppressCastShadow: suppressHostShadow,
+        },
+      );
+      if (!batch) {
+        for (const p of list) placeVoxelProp(p);
+        continue;
+      }
+      root.add(batch.root);
+    }
+    addQuestMarkerOverlays(root, this.map, this.pack.voxelModels, contains, {
+      itemIcons: this.pack.itemIcons,
+      flags: this.flags,
+    });
     return root;
   }
 
@@ -1309,12 +1562,14 @@ export class EmberThreeWorld {
         this.staticPropQueue.length,
       );
       this.invalidateStaticShadows();
+      this.refreshCutawayTagged();
       this.emitLoadProgress();
     };
     if (this.staticPropQueue.length === 0) {
       if (removed) finish();
       else {
         this.staticPropsSettled = true;
+        this.refreshCutawayTagged();
         this.emitLoadProgress();
       }
       return;
@@ -1648,6 +1903,7 @@ export class EmberThreeWorld {
         maxLights: Math.min(
           lightCfg.dynamicPointShadows,
           this.localPointShadowLimit,
+          DYNAMIC_LOCAL_SHADOW_MAX_LIGHTS,
         ),
         previous: this.dynamicLocalLights,
         enterScale: lightCfg.dynamicShadowEnterScale,
@@ -1761,7 +2017,7 @@ export class EmberThreeWorld {
     const t = this.nowMs / 1000;
     for (const a of this.actors) {
       if (!a.outline || a.kind !== "chest" || a.dead) continue;
-      if (a.regionId && this.chestTaken.has(a.regionId)) {
+      if (a.regionId && this.openedChestKeys.has(chestKey(this.map.id, a.regionId))) {
         a.outline.setCanInteract(false);
         a.outline.tick(t);
         continue;
@@ -1886,6 +2142,41 @@ export class EmberThreeWorld {
     this.syncPointerLock();
   }
 
+  private overlayFlags(): PlayOverlayFlags {
+    return {
+      pausedLogic: this.pausedLogic,
+      shopOpen: this.shopOpen,
+      inventoryOpen: this.inventoryOpen,
+      dialogueOpen: this.dialogueOpen,
+      awaitingLoot: this.awaitingLoot,
+      finished: this.finished,
+      fadeBusy: mapFadeBusy(this.mapFade),
+    };
+  }
+
+  private refreshCutawayTagged(): void {
+    this.cutawayTagged = [];
+    if (this.mapGroup) {
+      this.cutawayTagged.push(...collectCutawayTagged(this.mapGroup));
+    }
+    this.cutawayTagged.push(...collectCutawayTagged(this.staticPropRoot));
+    this.lastCutawayKey = "";
+  }
+
+  private applyPlayInteriorCutaway(): void {
+    if (!this.mapGroup) return;
+    const { tx, ty } = worldToTile(this.map, this.player.lx, this.player.ly);
+    const yaw = Math.atan2(
+      this.camera.position.x - this.controls.target.x,
+      this.camera.position.z - this.controls.target.z,
+    );
+    const key = playCutawayCacheKey(this.map, tx, ty, yaw);
+    if (key === this.lastCutawayKey) return;
+    this.lastCutawayKey = key;
+    const hide = buildCutawayHideSet(this.map, this.tileset, tx, ty, yaw);
+    applyInteriorCutawayTagged(this.cutawayTagged, hide);
+  }
+
   private tick(): void {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.tick);
@@ -1893,17 +2184,17 @@ export class EmberThreeWorld {
     this.profiler.beginFrame();
     const dt = Math.min(0.05, this.clock.getDelta());
     this.nowMs += dt * 1000;
+    this.tickMapFade(dt);
 
     if (
       this.shadowWarmupComplete &&
-      !this.pausedLogic &&
-      !this.awaitingLoot &&
-      !this.finished
+      !playMovementFrozen(this.overlayFlags())
     ) {
       this.elapsed += dt;
       this.handleMove(dt);
       this.tickPlayerVertical(dt);
       this.tickTeleport(dt);
+      this.tickMapChangeEnter(dt);
       this.tickTriggerRegions(dt);
       this.tickWeapons(dt);
       this.tickBullets(dt);
@@ -1945,12 +2236,14 @@ export class EmberThreeWorld {
     const prevX = this.controls.target.x;
     const prevY = this.controls.target.y;
     const prevZ = this.controls.target.z;
-    const followAlpha = 1 - Math.pow(0.0002, dt);
+    const followDt = Math.min(dt, 1 / 30);
+    const followAlpha = 1 - Math.pow(0.0002, followDt);
     this.controls.target.lerp(this.followTarget, followAlpha);
     this.camera.position.x += this.controls.target.x - prevX;
     this.camera.position.y += this.controls.target.y - prevY;
     this.camera.position.z += this.controls.target.z - prevZ;
     this.controls.update();
+    this.applyPlayInteriorCutaway();
 
     // Sprites stay upright: yaw toward camera only (no pitch tip).
     this.enemyBillboards.sync(this.camera);
@@ -2072,6 +2365,34 @@ export class EmberThreeWorld {
         avoidanceActors: this.enemyAvoidanceActorsLastFrame,
         avoidanceNeighbors: this.enemyAvoidanceNeighborsLastFrame,
       },
+      renderables: this.profilerRenderableCounts(),
+    };
+  }
+
+  private profilerRenderableCounts(): {
+    terrain: number;
+    props: number;
+    overlays: number;
+    instances: number;
+  } {
+    let terrain = 0;
+    let props = 0;
+    let instances = 0;
+    this.mapGroup?.traverse((object) => {
+      if ((object as THREE.Mesh).isMesh) terrain += 1;
+    });
+    this.staticPropRoot.traverse((object) => {
+      if (object instanceof THREE.InstancedMesh) {
+        instances += 1;
+        return;
+      }
+      if ((object as THREE.Mesh).isMesh) props += 1;
+    });
+    return {
+      terrain,
+      props,
+      overlays: this.cutawayTagged.length,
+      instances,
     };
   }
 
@@ -2219,24 +2540,319 @@ export class EmberThreeWorld {
 
   private tickTeleport(dt: number): void {
     this.teleportCd = Math.max(0, this.teleportCd - dt);
-    if (this.teleportCd > 0) return;
-    for (const r of findRegions(this.map, "teleport")) {
-      if (!pointInRegion(this.map, r, this.player.lx, this.player.ly)) continue;
-      const dest = resolveTeleportTarget(this.map, r);
-      if (!dest) continue;
-      this.player.lx = dest.x;
-      this.player.ly = dest.y;
-      this.resetPlayerVertical(dest.elev);
-      this.teleportCd = 0.5;
+    const stepped = stepTeleport(
+      this.map,
+      this.player.lx,
+      this.player.ly,
+      this.teleportOccupyId,
+      this.teleportCd <= 0,
+      this.playerElev,
+    );
+    this.teleportOccupyId = stepped.occupyingId;
+    const dest = stepped.warp;
+    if (!dest) return;
+    this.player.lx = dest.x;
+    this.player.ly = dest.y;
+    this.resetPlayerVertical(dest.elev);
+    this.teleportCd = 0.45;
+  }
+
+  private tickMapChangeEnter(dt: number): void {
+    this.mapChangeCd = Math.max(0, this.mapChangeCd - dt);
+    if (this.mapChangeOccupyId) {
+      const held = this.map.regions.find(
+        (region) =>
+          region.id === this.mapChangeOccupyId && region.kind === "trigger",
+      );
+      if (
+        !held ||
+        !pointInRegion(this.map, held, this.player.lx, this.player.ly, this.playerElev)
+      ) {
+        this.mapChangeOccupyId = null;
+      }
+    }
+    if (this.mapChangeCd > 0 || this.mapChangeOccupyId) return;
+    if (playMovementFrozen(this.overlayFlags())) {
       return;
     }
+    const region = findRegions(this.map, "trigger").find((item) =>
+      pointInRegion(this.map, item, this.player.lx, this.player.ly, this.playerElev),
+    );
+    if (!region) return;
+    const request = mapChangeRequestFromRegion(region);
+    if (!request) return;
+    this.applyPlayMapChange(request, region.id);
+  }
+
+  private tryInteract(): void {
+    if (
+      !this.shadowWarmupComplete ||
+      playMovementFrozen(this.overlayFlags())
+    ) {
+      return;
+    }
+    const hit = pickInteractHit(
+      this.map,
+      this.player.lx,
+      this.player.ly,
+      this.lastFacingX,
+      this.lastFacingY,
+      this.pack.voxelModels,
+      this.playerElev,
+    );
+    if (!hit) return;
+    switch (hit.kind) {
+      case "region": {
+        if (hit.region.kind === "chest") {
+          this.interactPlayChest(hit.region);
+          break;
+        }
+        if (hit.region.kind !== "trigger") return;
+        const wouldFire = wouldFireForTriggerRegion(hit.region);
+        this.fireInteractAction(wouldFire, hit.region, hit.region.id);
+        break;
+      }
+      case "prop": {
+        const wouldFire = wouldFireForInteractivity(
+          this.map,
+          hit.prop.interactivity,
+        );
+        const bound = boundTriggerFor(this.map, hit.prop.interactivity);
+        this.fireInteractAction(
+          wouldFire,
+          bound,
+          bound?.id ?? hit.prop.id,
+          hit.prop.interactivity.scriptId,
+        );
+        break;
+      }
+      default: {
+        const _never: never = hit;
+        void _never;
+      }
+    }
+  }
+
+  private fireInteractAction(
+    wouldFire: InteractivityWouldFire,
+    source: EmberMap["regions"][number] | null,
+    fromId: string,
+    hookId?: string | null,
+  ): void {
+    switch (wouldFire.action) {
+      case "change_map":
+        this.applyPlayMapChange(
+          mapChangeRequestFromWouldFire(wouldFire, source),
+          fromId,
+        );
+        break;
+      case "shop":
+        this.startHook(hookId ?? null, wouldFire.shopId);
+        break;
+      case "talk":
+        this.startHook(wouldFire.scriptId, null);
+        break;
+      case "run_script":
+        this.startHook(wouldFire.scriptId, null);
+        break;
+      case "open_chest":
+        this.onBridge({
+          type: "toast",
+          textRu: chestToastText({
+            loot: wouldFire.loot,
+            lootNames: wouldFire.lootNames,
+            empty: wouldFire.empty,
+            opened: wouldFire.opened,
+            alreadyOpen: wouldFire.alreadyOpen,
+            repeatable: wouldFire.repeatable,
+          }),
+        });
+        break;
+      case "warp":
+        break;
+      default: {
+        const _never: never = wouldFire;
+        void _never;
+      }
+    }
+  }
+
+  private applyPlayMapChange(
+    request: MapChangeRequest | null,
+    _fromId: string,
+  ): boolean {
+    if (!request) return false;
+    if (mapFadeBusy(this.mapFade)) return false;
+    const arrival = resolveMapChangeArrival(this.pack.maps, request);
+    if (!arrival) {
+      this.onBridge({
+        type: "toast",
+        textRu: `Карта «${request.targetMapId}» не найдена`,
+      });
+      return false;
+    }
+    const tileset = this.pack.tilesets[arrival.map.tilesetId];
+    if (!tileset) {
+      this.onBridge({
+        type: "toast",
+        textRu: `Тайлсет «${arrival.map.tilesetId}» не найден`,
+      });
+      return false;
+    }
+    this.beginPlayMapFade(arrival, tileset);
+    return true;
+  }
+
+  private beginPlayMapFade(
+    arrival: MapChangeArrival,
+    tileset: EmberTileset,
+  ): void {
+    if (mapFadeBusy(this.mapFade)) return;
+    this.pendingMapFade = { arrival, tileset };
+    this.mapFade = beginMapFade(this.mapFade);
+    this.syncMapFadeOverlay();
+  }
+
+  private mountMapFadeOverlay(): void {
+    const shell = this.parent.parentElement;
+    const host =
+      shell instanceof HTMLElement &&
+      shell.classList.contains("ember-play-shell")
+        ? shell
+        : this.parent;
+    const el = document.createElement("div");
+    el.className = "ember-map-fade";
+    el.setAttribute("aria-hidden", "true");
+    el.hidden = true;
+    const door = document.createElement("div");
+    door.className = "ember-map-fade__door";
+    el.appendChild(door);
+    host.appendChild(el);
+    this.mapFadeEl = el;
+    this.mapFadeDoorEl = door;
+  }
+
+  private tickMapFade(dt: number): void {
+    if (!mapFadeBusy(this.mapFade) && !this.pendingMapFade) return;
+    const wasBusy = mapFadeBusy(this.mapFade);
+    const { state, swap } = stepMapFade(this.mapFade, dt * 1000);
+    this.mapFade = state;
+    if (swap && this.pendingMapFade) {
+      const pending = this.pendingMapFade;
+      this.pendingMapFade = null;
+      this.reloadPlayMap(pending.arrival, pending.tileset);
+    }
+    this.syncMapFadeOverlay();
+    if (
+      wasBusy &&
+      !mapFadeBusy(this.mapFade) &&
+      this.scriptHeldForMapFade
+    ) {
+      this.scriptHeldForMapFade = false;
+      this.advanceScriptQueue();
+    }
+  }
+
+  private syncMapFadeOverlay(): void {
+    const el = this.mapFadeEl;
+    if (!el) return;
+    const busy = mapFadeBusy(this.mapFade) || this.mapFade.opacity > 0;
+    el.hidden = !busy;
+    el.style.opacity = busy ? String(this.mapFade.opacity) : "0";
+    if (this.mapFadeDoorEl) {
+      this.mapFadeDoorEl.style.opacity = String(this.mapFade.door);
+    }
+  }
+
+  private reloadPlayMap(
+    arrival: MapChangeArrival,
+    tileset: EmberTileset,
+  ): void {
+    const yaw = this.controls.getAzimuthalAngle();
+    const polar = this.controls.getPolarAngle();
+    const dist = this.controls.getDistance();
+
+    for (const actor of [...this.actors]) {
+      if (actor === this.player || actor.kind === "orbit") continue;
+      this.removeActor(actor);
+    }
+    this.chestOpens = [];
+    this.npcPlacementIds.clear();
+    this.onceFired.clear();
+    this.spawnAcc = [];
+
+    if (this.staticPropFrame) cancelAnimationFrame(this.staticPropFrame);
+    this.staticPropFrame = 0;
+    this.staticPropQueue = [];
+    for (const group of this.staticPropChunks.values()) {
+      this.staticPropRoot.remove(group);
+      this.disposeObject(group);
+    }
+    this.staticPropChunks.clear();
+    this.loadedStaticPropChunkKeys.clear();
+
+    if (this.mapGroup) {
+      this.scene.remove(this.mapGroup);
+      this.terrainChunks?.dispose();
+      this.terrainChunks = null;
+      this.mapGroup = null;
+    }
+
+    this.map = ensureMapLayers(arrival.map);
+    this.tileset = tileset;
+    this.terrainDatasetKey = `runtime:${this.map.id}:${this.tileset.id}`;
+    this.terrainFocusChunkKey = "";
+    this.terrainLoadKeySig = "";
+    this.terrainRetainKeySig = "";
+    this.lastCutawayKey = "";
+    this.cutawayTagged = [];
+    this.terrainStreaming.enabled =
+      resolveMapPlayProfile(this.map) !== "explore";
+    this.terrainSettled = false;
+    this.staticPropsSettled = false;
+    this.localLightsSpawned = false;
+
+    this.buildMapAndLights();
+    this.refreshWaterMats();
+    this.player.lx = arrival.x;
+    this.player.ly = arrival.y;
+    this.resetPlayerVertical(arrival.elev);
+    this.teleportOccupyId = findRegions(this.map, "teleport").find((region) =>
+      pointInRegion(this.map, region, arrival.x, arrival.y, arrival.elev),
+    )?.id ?? arrival.occupyId;
+    this.mapChangeOccupyId = arrival.occupyId;
+    this.mapChangeCd = MAP_CHANGE_COOLDOWN;
+    this.teleportCd = MAP_CHANGE_COOLDOWN;
+    this.spawnExploreNpcs();
+    this.updateTerrainStreaming(true);
+    this.placeChests();
+    this.refreshEmissiveMats();
+    this.invalidateStaticShadows();
+
+    const focus = logicToThree(
+      this.player.lx,
+      this.player.ly,
+      this.playerFeetElev,
+      6,
+      this.map.tileSize,
+    );
+    this.followTarget.copy(focus);
+    this.controls.target.copy(focus);
+    const spherical = new THREE.Spherical(
+      Number.isFinite(dist) && dist > 1 ? dist : this.followDist,
+      polar,
+      yaw,
+    );
+    this.camera.position.setFromSpherical(spherical).add(this.controls.target);
+    this.lookOffset.copy(this.camera.position).sub(this.controls.target);
+    this.controls.update();
   }
 
   private tickTriggerRegions(dt: number): void {
     this.triggerCd = Math.max(0, this.triggerCd - dt);
     if (this.triggerCd > 0) return;
     for (const r of findRegions(this.map, "trigger")) {
-      if (!pointInRegion(this.map, r, this.player.lx, this.player.ly)) continue;
+      if (!pointInRegion(this.map, r, this.player.lx, this.player.ly, this.playerElev)) continue;
       const event = Object.values(this.pack.events).find(
         (ev) =>
           ev.trigger === "on_region_enter" &&
@@ -2974,80 +3590,142 @@ export class EmberThreeWorld {
     );
   }
 
+  private interactPlayChest(region: EmberMapRegion): void {
+    const explore = resolveMapPlayProfile(this.map) === "explore";
+    const alreadyOpen = chestIsOpened(
+      this.map.id,
+      region,
+      this.openedChestKeys,
+    );
+    if (explore) {
+      const result = applyChestOpen(
+        this.map.id,
+        region,
+        this.openedChestKeys,
+        this.pack.items,
+      );
+      if (result.loot.length) {
+        this.inventory = grantItemCounts(
+          this.inventory,
+          result.loot,
+          this.pack.items,
+        );
+      }
+      this.fireInteractAction(
+        wouldFireForChest(region, result),
+        region,
+        region.id,
+      );
+      if (!alreadyOpen) this.playChestOpenVisual(region, { arenaLoot: false });
+      this.emitExploreAutosave("chest");
+      return;
+    }
+    if (alreadyOpen) {
+      this.onBridge({ type: "toast", textRu: "Сундук уже открыт" });
+      return;
+    }
+    this.openedChestKeys.add(chestKey(this.map.id, region.id));
+    region.opened = true;
+    this.playChestOpenVisual(region, { arenaLoot: true });
+  }
+
+  private playChestOpenVisual(
+    region: EmberMapRegion,
+    opts: { arenaLoot: boolean },
+  ): void {
+    const actor = this.actors.find(
+      (item) => item.kind === "chest" && item.regionId === region.id,
+    );
+    if (!actor || actor.dead) {
+      if (opts.arenaLoot) this.openChest();
+      return;
+    }
+    this.beginChestOpenVisual(actor, region, opts);
+  }
+
+  private beginChestOpenVisual(
+    a: Actor,
+    region: EmberMapRegion,
+    opts: { arenaLoot: boolean },
+  ): void {
+    a.outline?.dispose();
+    a.outline = null;
+    const scene =
+      region.sceneId && this.pack.voxelScenes?.[region.sceneId]
+        ? this.pack.voxelScenes[region.sceneId]
+        : undefined;
+    const sceneMesh = a.mesh.userData.voxelSceneMesh as
+      | VoxelSceneMesh
+      | undefined;
+    const clipId =
+      region.openClipId ??
+      scene?.animations?.[0]?.id ??
+      (a.mesh.userData.chestClipId as string | null | undefined) ??
+      null;
+    const clip = clipId
+      ? scene?.animations?.find((c) => c.id === clipId)
+      : undefined;
+
+    if (scene && sceneMesh && clip && clip.durationSec > 0) {
+      a.dead = true;
+      this.chestOpens.push({
+        actor: a,
+        sceneMesh,
+        clipId,
+        durationSec: Math.max(0.05, clip.durationSec),
+        t: 0,
+        lootOpened: !opts.arenaLoot,
+      });
+      return;
+    }
+
+    if (scene && sceneMesh) {
+      sceneMesh.setPlayhead(1, clipId);
+      a.dead = true;
+      if (opts.arenaLoot) this.openChest();
+      return;
+    }
+
+    if (region.openModelId || region.closedModelId || region.sceneId) {
+      const next = this.makeChestMesh(region, true);
+      this.entityRoot.remove(a.mesh);
+      if (a.mesh.userData.voxelSceneMesh) {
+        (a.mesh.userData.voxelSceneMesh as VoxelSceneMesh).dispose();
+      } else if (a.mesh.userData.voxelChest) {
+        disposeVoxelModelMesh(a.mesh);
+      } else {
+        this.disposeObject(a.mesh);
+      }
+      a.mesh = next;
+      a.dead = true;
+      this.entityRoot.add(a.mesh);
+      this.syncActor(a);
+    } else {
+      this.removeActor(a);
+    }
+    if (opts.arenaLoot) this.openChest();
+  }
+
   private tickChestPickup(): void {
+    if (resolveMapPlayProfile(this.map) === "explore") return;
     for (const a of [...this.actors]) {
       if (a.kind !== "chest" || a.dead || !a.regionId) continue;
-      if (this.chestTaken.has(a.regionId)) continue;
+      if (this.openedChestKeys.has(chestKey(this.map.id, a.regionId))) continue;
       if (
         Math.hypot(a.lx - this.player.lx, a.ly - this.player.ly) >
         CHEST_INTERACT_R
       ) {
         continue;
       }
-      this.chestTaken.add(a.regionId);
-      a.outline?.dispose();
-      a.outline = null;
       const region = this.map.regions.find((r) => r.id === a.regionId);
+      this.openedChestKeys.add(chestKey(this.map.id, a.regionId));
       if (!region) {
         this.removeActor(a);
         this.openChest();
         return;
       }
-
-      const scene =
-        region.sceneId && this.pack.voxelScenes?.[region.sceneId]
-          ? this.pack.voxelScenes[region.sceneId]
-          : undefined;
-      const sceneMesh = a.mesh.userData.voxelSceneMesh as
-        | VoxelSceneMesh
-        | undefined;
-      const clipId =
-        region.openClipId ??
-        scene?.animations?.[0]?.id ??
-        (a.mesh.userData.chestClipId as string | null | undefined) ??
-        null;
-      const clip = clipId
-        ? scene?.animations?.find((c) => c.id === clipId)
-        : undefined;
-
-      if (scene && sceneMesh && clip && clip.durationSec > 0) {
-        a.dead = true;
-        this.chestOpens.push({
-          actor: a,
-          sceneMesh,
-          clipId,
-          durationSec: Math.max(0.05, clip.durationSec),
-          t: 0,
-          lootOpened: false,
-        });
-        return;
-      }
-
-      if (scene && sceneMesh) {
-        sceneMesh.setPlayhead(1, clipId);
-        a.dead = true;
-        this.openChest();
-        return;
-      }
-
-      if (region.openModelId || region.closedModelId || region.sceneId) {
-        const next = this.makeChestMesh(region, true);
-        this.entityRoot.remove(a.mesh);
-        if (a.mesh.userData.voxelSceneMesh) {
-          (a.mesh.userData.voxelSceneMesh as VoxelSceneMesh).dispose();
-        } else if (a.mesh.userData.voxelChest) {
-          disposeVoxelModelMesh(a.mesh);
-        } else {
-          this.disposeObject(a.mesh);
-        }
-        a.mesh = next;
-        a.dead = true;
-        this.entityRoot.add(a.mesh);
-        this.syncActor(a);
-      } else {
-        this.removeActor(a);
-      }
-      this.openChest();
+      region.opened = true;
+      this.beginChestOpenVisual(a, region, { arenaLoot: true });
       return;
     }
   }
@@ -3114,7 +3792,9 @@ export class EmberThreeWorld {
 
   private applyDamageToEnemy(enemy: Actor, dmg: number): void {
     if (enemy.dead || enemy.kind !== "enemy") return;
-    enemy.hp = (enemy.hp ?? 1) - dmg;
+    const profile = resolveMapPlayProfile(this.map);
+    const dealt = outgoingPlayerDamage(profile, dmg, this.playerCombatStats());
+    enemy.hp = (enemy.hp ?? 1) - dealt;
     if ((enemy.hp ?? 0) <= 0) this.killEnemy(enemy);
   }
 
@@ -3139,8 +3819,9 @@ export class EmberThreeWorld {
     strip: number,
     src?: Pick<EmberEnemyDef, "filthOnHit" | "filthDurationMs">,
   ): void {
-    if (this.finished || this.awaitingLoot) return;
+    if (this.finished || this.awaitingLoot || this.shopOpen || this.inventoryOpen) return;
     if (this.stressEnemyTarget > 0 && import.meta.env.DEV) return;
+    dmg = incomingPlayerDamage(dmg, this.playerCombatStats());
     this.hp -= dmg;
     this.stripMeter += strip;
     while (this.stripMeter >= 25 && this.stripTier < 3) {
@@ -3297,6 +3978,90 @@ export class EmberThreeWorld {
     this.syncPointerLock();
   }
 
+  private applyExploreProgressFields(save: EmberExploreSaveState): void {
+    this.openedChestKeys = new Set(save.openedChests);
+    this.inventory = compactInventory(save.inventory) ?? {};
+    this.equipment = compactEquipment(save.equipment);
+    this.shopStock = {};
+    for (const [id, stock] of Object.entries(save.shopStock)) {
+      this.shopStock[id] = { ...stock };
+    }
+    this.flags = { ...save.flags };
+  }
+
+  private applyExploreHp(save: EmberExploreSaveState): void {
+    if (save.maxHp != null && Number.isFinite(save.maxHp) && save.maxHp > 0) {
+      this.maxHp = save.maxHp;
+    }
+    if (save.hp != null && Number.isFinite(save.hp)) {
+      this.hp = Math.max(0, Math.min(this.maxHp, save.hp));
+    }
+  }
+
+  private emitExploreAutosave(reason: EmberExploreAutosaveReason): void {
+    if (this.applyingSave || this.disposed) return;
+    if (resolveMapPlayProfile(this.map) !== "explore") return;
+    this.onBridge({ type: "explore_autosave", reason });
+  }
+
+  captureExploreSave(): EmberExploreSaveState | null {
+    if (!this.player || resolveMapPlayProfile(this.map) !== "explore") {
+      return null;
+    }
+    const tile = worldToTile(this.map, this.player.lx, this.player.ly);
+    return captureExploreSave({
+      packId: this.pack.meta.id,
+      slot: 0,
+      source: {
+        mapId: this.map.id,
+        x: this.player.lx,
+        y: this.player.ly,
+        elev: this.playerFeetElev,
+        tile,
+        inventory: this.inventory,
+        equipment: this.equipment,
+        openedChests: [...this.openedChestKeys],
+        shopStock: this.shopStock,
+        flags: this.flags,
+      },
+      hp: this.hp,
+      maxHp: this.maxHp,
+    });
+  }
+
+  applyExploreSave(save: EmberExploreSaveState): boolean {
+    const dest = this.pack.maps[save.mapId];
+    if (!dest) return false;
+    const map = ensureMapLayers(dest);
+    const tileset = this.pack.tilesets[map.tilesetId];
+    if (!tileset) return false;
+    this.applyingSave = true;
+    this.applyExploreProgressFields(save);
+    this.applyExploreHp(save);
+    const pos = exploreSaveWorldPos(save, map.tileSize);
+    const occupyTrigger = findRegions(map, "trigger").find((region) =>
+      pointInRegion(map, region, pos.x, pos.y, save.elev),
+    );
+    const occupyPad = findRegions(map, "teleport").find((region) =>
+      pointInRegion(map, region, pos.x, pos.y, save.elev),
+    );
+    this.reloadPlayMap(
+      {
+        map,
+        mapId: map.id,
+        x: pos.x,
+        y: pos.y,
+        elev: save.elev ?? tileSurfaceElev(map, pos.tx, pos.ty),
+        regionId: occupyTrigger?.id ?? occupyPad?.id ?? null,
+        occupyId: occupyTrigger?.id ?? occupyPad?.id ?? null,
+      },
+      tileset,
+    );
+    this.applyingSave = false;
+    this.emitHud();
+    return true;
+  }
+
   private emitHud(): void {
     this.onBridge({
       type: "hud",
@@ -3311,10 +4076,382 @@ export class EmberThreeWorld {
       filthMs: Math.max(0, this.filthUntil - this.nowMs),
       killed: this.killed,
       paused:
-        !this.shadowWarmupComplete ||
-        this.pausedLogic ||
-        this.awaitingLoot,
+        !this.shadowWarmupComplete || playLookBlocked(this.overlayFlags()),
     });
+  }
+
+  private shopFailRu(
+    reason:
+      | "unknown_shop"
+      | "unknown_item"
+      | "broke"
+      | "out_of_stock"
+      | "nothing_to_sell"
+      | "unsellable",
+  ): string {
+    switch (reason) {
+      case "broke":
+        return "Не хватает монет";
+      case "out_of_stock":
+        return "Нет в наличии";
+      case "unknown_item":
+        return "Нет такого товара";
+      case "unknown_shop":
+        return "Магазин не найден";
+      case "nothing_to_sell":
+        return "Нечего продать";
+      case "unsellable":
+        return "Этот предмет нельзя продать";
+      default: {
+        const _never: never = reason;
+        return _never;
+      }
+    }
+  }
+
+  private remainingForShop(shopId: string): Record<string, number> {
+    const shop = this.pack.shops?.[shopId];
+    if (!shop) return {};
+    if (!this.shopStock[shopId]) {
+      this.shopStock[shopId] = seedShopRemaining(shop);
+    }
+    return this.shopStock[shopId];
+  }
+
+  private emitShop(errorRu: string | null = null): void {
+    const shopId = this.shopId;
+    const shop = shopId ? this.pack.shops?.[shopId] : undefined;
+    const remaining = shopId ? this.remainingForShop(shopId) : {};
+    const fire = wouldFireForShop(
+      shop,
+      shopId,
+      this.inventory,
+      remaining,
+      this.pack.items,
+    );
+    this.onBridge({
+      type: "shop",
+      shopId: fire.shopId ?? shopId ?? "",
+      nameRu: fire.nameRu ?? shopId ?? "Магазин",
+      wallet: fire.wallet,
+      listings: fire.listings,
+      sellable: shop
+        ? sellableFromInventory(shop, this.inventory, this.pack.items)
+        : [],
+      errorRu,
+    });
+  }
+
+  private openShop(shopId: string | null): void {
+    const id = shopId?.trim() || null;
+    if (!id || !this.pack.shops?.[id]) {
+      this.onBridge({
+        type: "toast",
+        textRu: id ? `Магазин «${id}» не найден` : "У объекта нет shopId",
+      });
+      return;
+    }
+    this.closeInventory();
+    this.shopId = id;
+    this.shopOpen = true;
+    this.remainingForShop(id);
+    this.syncPointerLock();
+    this.emitShop(null);
+  }
+
+  private startHook(id: string | null, afterShopId: string | null): void {
+    const ref = resolveScriptRef(this.pack.scripts, this.pack.scenes, id);
+    if (!ref) {
+      if (afterShopId) {
+        this.openShop(afterShopId);
+        return;
+      }
+      if (id) {
+        this.onBridge({
+          type: "toast",
+          textRu: `Скрипт «${id}» не найден`,
+        });
+      }
+      return;
+    }
+    this.pendingShopId = afterShopId;
+    this.scriptQueue = [];
+    switch (ref.kind) {
+      case "dialogue":
+        this.openDialogue(ref.scene.id);
+        break;
+      case "script":
+        this.scriptQueue = [...ref.script.steps];
+        this.advanceScriptQueue();
+        break;
+      default: {
+        const _never: never = ref;
+        void _never;
+      }
+    }
+  }
+
+  private openDialogue(sceneId: string): void {
+    const scene = this.pack.scenes[sceneId];
+    if (!scene) {
+      this.onBridge({
+        type: "toast",
+        textRu: `Диалог «${sceneId}» не найден`,
+      });
+      this.advanceScriptQueue();
+      return;
+    }
+    this.dialogueOpen = true;
+    this.pausedLogic = true;
+    this.syncPointerLock();
+    this.onBridge({
+      type: "dialogue",
+      sceneId,
+      use: dialogueUseOf(scene),
+    });
+  }
+
+  advanceDialogue(): void {
+    this.dialogueOpen = false;
+    if (this.scriptQueue.length) {
+      this.advanceScriptQueue();
+      return;
+    }
+    if (this.pendingShopId) {
+      const shopId = this.pendingShopId;
+      this.pendingShopId = null;
+      this.openShop(shopId);
+      return;
+    }
+    this.resume();
+  }
+
+  private advanceScriptQueue(): void {
+    while (this.scriptQueue.length) {
+      const step = this.scriptQueue.shift();
+      if (!step) break;
+      switch (step.type) {
+        case "talk":
+          this.openDialogue(step.dialogueId);
+          return;
+        case "change_map":
+          this.applyPlayMapChange(
+            {
+              targetMapId: step.targetMapId,
+              targetRegionId: step.targetRegionId ?? null,
+            },
+            "script",
+          );
+          if (mapFadeBusy(this.mapFade)) {
+            this.scriptHeldForMapFade = true;
+            return;
+          }
+          break;
+        case "open_shop":
+          this.openShop(step.shopId);
+          return;
+        case "give_item": {
+          const loot = Array.from(
+            { length: Math.max(1, step.count ?? 1) },
+            () => step.itemId,
+          );
+          this.inventory = grantItemCounts(
+            this.inventory,
+            loot,
+            this.pack.items,
+          );
+          break;
+        }
+        case "set_flag":
+          this.flags[step.flag] = step.value;
+          break;
+        case "wait":
+          break;
+        case "run_script": {
+          const nested = this.pack.scripts?.[step.scriptId];
+          if (nested) this.scriptQueue.unshift(...nested.steps);
+          break;
+        }
+        default: {
+          const _never: never = step;
+          void _never;
+        }
+      }
+    }
+    if (this.pendingShopId) {
+      const shopId = this.pendingShopId;
+      this.pendingShopId = null;
+      this.openShop(shopId);
+      return;
+    }
+    if (!this.shopOpen) this.resume();
+  }
+
+  closeShop(): void {
+    if (!this.shopOpen) return;
+    const next = closeShopOverlayFlags(this.overlayFlags());
+    this.shopOpen = next.shopOpen;
+    this.shopId = null;
+    this.pausedLogic = next.pausedLogic;
+    this.onBridge({ type: "shop_close" });
+    restorePlayOverlayFocus(this.renderer.domElement);
+    if (!playLookBlocked(this.overlayFlags())) this.requestLookLock();
+    else this.syncPointerLock();
+    this.emitHud();
+  }
+
+  private playerCombatStats(): EmberCombatStats {
+    return playerCombatStats(
+      resolveMapPlayProfile(this.map),
+      this.equipment,
+      this.pack.items,
+    );
+  }
+
+  private ensureArenaStarterLoadout(): void {
+    if (resolveMapPlayProfile(this.map) !== "arena") return;
+    if (this.equipment.arena_weapon) return;
+    const starterId = this.stage.starterWeaponId;
+    const item = this.pack.items[starterId];
+    if (!item || item.kind !== "weapon_arena") return;
+    if ((this.inventory[starterId] ?? 0) < 1) {
+      this.inventory = grantItemCounts(
+        this.inventory,
+        [starterId],
+        this.pack.items,
+      );
+    }
+    const result = applyEquipItem(
+      this.inventory,
+      this.equipment,
+      starterId,
+      this.pack.items,
+    );
+    if (!result.ok) return;
+    this.inventory = result.inventory;
+    this.equipment = result.equipment;
+  }
+
+  private emitInventory(errorRu: string | null = null): void {
+    const equipment = compactEquipment(this.equipment);
+    const explore = playerCombatStats("explore", equipment, this.pack.items);
+    const arena = playerCombatStats("arena", equipment, this.pack.items);
+    this.onBridge({
+      type: "inventory",
+      items: listInventoryViews(this.inventory, this.pack.items),
+      equipment,
+      atk: explore.atk,
+      def: explore.def,
+      arenaAtk: arena.atk,
+      errorRu,
+    });
+  }
+
+  toggleInventory(): void {
+    if (this.shopOpen || this.dialogueOpen || this.awaitingLoot || this.finished) {
+      return;
+    }
+    if (this.inventoryOpen) {
+      this.closeInventory();
+      return;
+    }
+    this.inventoryOpen = true;
+    this.syncPointerLock();
+    this.emitInventory(null);
+  }
+
+  closeInventory(): void {
+    if (!this.inventoryOpen) return;
+    const next = closeInventoryOverlayFlags(this.overlayFlags());
+    this.inventoryOpen = next.inventoryOpen;
+    this.pausedLogic = next.pausedLogic;
+    this.onBridge({ type: "inventory_close" });
+    restorePlayOverlayFocus(this.renderer.domElement);
+    if (!playLookBlocked(this.overlayFlags())) this.requestLookLock();
+    else this.syncPointerLock();
+    this.emitHud();
+  }
+
+  equipItem(itemId: string): void {
+    if (!this.inventoryOpen) return;
+    const result = applyEquipItem(
+      this.inventory,
+      this.equipment,
+      itemId,
+      this.pack.items,
+    );
+    this.inventory = result.inventory;
+    this.equipment = result.equipment;
+    this.emitInventory(result.ok ? null : equipFailRu(result.reason));
+  }
+
+  unequipSlot(slot: EmberEquipSlot): void {
+    if (!this.inventoryOpen) return;
+    if (!isEmberEquipSlot(slot)) return;
+    const result = applyUnequipSlot(
+      this.inventory,
+      this.equipment,
+      slot,
+      this.pack.items,
+    );
+    this.inventory = result.inventory;
+    this.equipment = result.equipment;
+    this.emitInventory(result.ok ? null : equipFailRu(result.reason));
+  }
+
+  useItem(itemId: string): void {
+    if (!this.inventoryOpen) return;
+    const result = useInventoryItem(
+      this.inventory,
+      this.equipment,
+      itemId,
+      this.pack.items,
+    );
+    this.inventory = result.inventory;
+    this.equipment = result.equipment;
+    if (result.ok && result.heal && result.heal > 0) {
+      const before = this.hp;
+      this.hp = Math.min(this.maxHp, this.hp + result.heal);
+      const gained = Math.max(0, this.hp - before);
+      this.onBridge({
+        type: "toast",
+        textRu: gained > 0 ? `+${gained} HP` : "HP уже полный",
+      });
+      this.emitHud();
+    }
+    this.emitInventory(result.ok ? null : equipFailRu(result.reason));
+  }
+
+  buyShopItem(itemId: string): void {
+    if (!this.shopOpen) return;
+    const id = this.shopId;
+    const result = buyShopItem(
+      id ? this.pack.shops?.[id] : undefined,
+      itemId,
+      this.inventory,
+      id ? this.remainingForShop(id) : {},
+      this.pack.items,
+    );
+    this.inventory = result.inventory;
+    if (id && result.ok) this.shopStock[id] = result.remaining;
+    this.emitShop(result.ok ? null : this.shopFailRu(result.reason));
+    if (result.ok) this.emitExploreAutosave("shop");
+  }
+
+  sellShopItem(itemId: string): void {
+    if (!this.shopOpen) return;
+    const id = this.shopId;
+    const result = sellShopItem(
+      id ? this.pack.shops?.[id] : undefined,
+      itemId,
+      this.inventory,
+      id ? this.remainingForShop(id) : {},
+      this.pack.items,
+    );
+    this.inventory = result.inventory;
+    if (id) this.shopStock[id] = result.remaining;
+    this.emitShop(result.ok ? null : this.shopFailRu(result.reason));
+    if (result.ok) this.emitExploreAutosave("shop");
   }
 
   pause(): void {
@@ -3325,9 +4462,7 @@ export class EmberThreeWorld {
   private openPauseMenu(relockWaitMs: number): void {
     if (
       !this.shadowWarmupComplete ||
-      this.pausedLogic ||
-      this.awaitingLoot ||
-      this.finished
+      playMovementFrozen(this.overlayFlags())
     ) {
       return;
     }
@@ -3337,6 +4472,7 @@ export class EmberThreeWorld {
 
   resume(): void {
     this.pausedLogic = false;
+    restorePlayOverlayFocus(this.renderer.domElement);
     this.requestLookLock();
   }
 
@@ -3345,10 +4481,11 @@ export class EmberThreeWorld {
     finished: boolean;
     awaitingLoot: boolean;
   } {
+    const blocked = playLookBlocked(this.overlayFlags());
     return {
-      paused: this.pausedLogic,
+      paused: blocked,
       finished: this.finished,
-      awaitingLoot: this.awaitingLoot,
+      awaitingLoot: blocked,
     };
   }
 
@@ -3432,6 +4569,12 @@ export class EmberThreeWorld {
     document.removeEventListener("pointerlockchange", this.onPointerLockChange);
     this.parent.classList.remove("is-looking");
     this.parent.parentElement?.classList.remove("is-looking");
+    this.mapFadeEl?.remove();
+    this.mapFadeEl = null;
+    this.mapFadeDoorEl = null;
+    this.pendingMapFade = null;
+    this.mapFade = createMapFadeState();
+    this.scriptHeldForMapFade = false;
     releasePlayCursorClip();
     if (document.pointerLockElement) document.exitPointerLock();
     this.renderer.domElement.removeEventListener(

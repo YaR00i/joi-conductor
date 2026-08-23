@@ -1,6 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EmberLootRoulette } from "../components/ember/EmberLootRoulette";
+import {
+  EmberInventoryPanel,
+  type EmberInventoryPanelState,
+} from "../components/ember/EmberInventoryPanel";
+import {
+  EmberShopPanel,
+  type EmberShopPanelState,
+} from "../components/ember/EmberShopPanel";
 import { ScenePlayer } from "../components/ember/ScenePlayer";
+import { EmberSavePanel } from "../components/ember/EmberSavePanel";
 import type {
   EmberBridgeEvent,
   EmberGameApi,
@@ -8,6 +17,13 @@ import type {
 } from "../game/bridge/events";
 import { loadEmberPack } from "../game/content/loadPack";
 import { resolveMapPlayProfile } from "../game/content/playProfile";
+import {
+  createLocalStorageSaveBackend,
+  getActiveExploreSaveSlot,
+  readExploreSave,
+  writeExploreSave,
+  type EmberExploreAutosaveReason,
+} from "../game/content/emberSave";
 import type {
   EmberPack,
   ValidationIssue,
@@ -61,15 +77,22 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
     null,
   );
   const [loot, setLoot] = useState<LootModal | null>(null);
+  const [shop, setShop] = useState<EmberShopPanelState | null>(null);
+  const [inventory, setInventory] = useState<EmberInventoryPanelState | null>(
+    null,
+  );
   const [toast, setToast] = useState<string | null>(null);
   const [result, setResult] = useState<ResultState | null>(null);
   const [sceneId, setSceneId] = useState<string | null>(null);
+  const [playDialogueId, setPlayDialogueId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [saveDebugOpen, setSaveDebugOpen] = useState(false);
   const [relockAtMs, setRelockAtMs] = useState(0);
   const [nowMs, setNowMs] = useState(0);
   const rewardedRef = useRef(false);
   const engineRequestRef = useRef(0);
   const startingRef = useRef(false);
+  const saveBackend = useMemo(() => createLocalStorageSaveBackend(), []);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -99,8 +122,12 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
     apiRef.current = null;
     setRunning(false);
     setLoot(null);
+    setShop(null);
+    setInventory(null);
+    setPlayDialogueId(null);
     setHud(null);
     setMenuOpen(false);
+    setSaveDebugOpen(false);
   }, []);
 
   useEffect(() => () => stopGame(), [stopGame]);
@@ -121,6 +148,30 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
 
   const packRef = useRef(pack);
   packRef.current = pack;
+
+  const persistExplore = useCallback(
+    (reason: EmberExploreAutosaveReason) => {
+      const p = packRef.current;
+      if (!p) return;
+      const blob = apiRef.current?.captureExploreSave();
+      if (!blob) return;
+      const slot = getActiveExploreSaveSlot(saveBackend, p.meta.id);
+      writeExploreSave(saveBackend, {
+        ...blob,
+        packId: p.meta.id,
+        slot,
+        savedAtMs: Date.now(),
+      });
+      void reason;
+    },
+    [saveBackend],
+  );
+
+  useEffect(() => {
+    const onLeave = () => persistExplore("quit");
+    window.addEventListener("beforeunload", onLeave);
+    return () => window.removeEventListener("beforeunload", onLeave);
+  }, [persistExplore]);
 
   const onBridge = useCallback(
     (ev: EmberBridgeEvent) => {
@@ -175,13 +226,46 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
           setRelockAtMs(performance.now() + ev.relockWaitMs);
           setNowMs(performance.now());
           break;
+        case "shop":
+          setPlayDialogueId(null);
+          setShop({
+            shopId: ev.shopId,
+            nameRu: ev.nameRu,
+            wallet: ev.wallet,
+            listings: ev.listings,
+            sellable: ev.sellable,
+            errorRu: ev.errorRu,
+          });
+          break;
+        case "shop_close":
+          setShop(null);
+          break;
+        case "inventory":
+          setInventory({
+            items: ev.items,
+            equipment: ev.equipment,
+            atk: ev.atk,
+            def: ev.def,
+            arenaAtk: ev.arenaAtk,
+            errorRu: ev.errorRu,
+          });
+          break;
+        case "inventory_close":
+          setInventory(null);
+          break;
+        case "dialogue":
+          setPlayDialogueId(ev.sceneId);
+          break;
+        case "explore_autosave":
+          persistExplore(ev.reason);
+          break;
         default: {
           const _n: never = ev;
           void _n;
         }
       }
     },
-    [stopGame],
+    [stopGame, persistExplore],
   );
 
   const start = async () => {
@@ -194,6 +278,7 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
     const requestId = engineRequestRef.current;
     setResult(null);
     setSceneId(null);
+    setPlayDialogueId(null);
     rewardedRef.current = false;
     setEngineLoading(true);
     setLoadProgress({ ratio: 0.04, labelRu: "Движок…" });
@@ -212,12 +297,20 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
       const startMap = startStage ? pack.maps[startStage.mapId] : undefined;
       const exploreRun =
         startMap != null && resolveMapPlayProfile(startMap) === "explore";
+      const exploreSave = exploreRun
+        ? readExploreSave(
+            saveBackend,
+            pack.meta.id,
+            getActiveExploreSaveSlot(saveBackend, pack.meta.id),
+          )
+        : null;
       const api = createEmberThreeGame({
         parent: hostRef.current,
         pack,
         stageId: stageIdToStart,
         onBridge,
         shortMode: exploreRun ? false : shortMode,
+        exploreSave,
       });
       apiRef.current = api;
       api.lockLook();
@@ -251,6 +344,7 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
   };
 
   const quitToLobby = () => {
+    persistExplore("quit");
     setResult(null);
     stopGame();
   };
@@ -345,6 +439,7 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
               type="button"
               className="ghost"
               onClick={() => {
+                persistExplore("quit");
                 stopGame();
                 setResult(null);
               }}
@@ -442,6 +537,17 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
                   ? "WASD — гулять по деревне · без волн и орды · фонари и окна"
                   : "Движение WASD · атаки сами · XP и сундуки качают билд"}
               </p>
+              {pack && explore ? (
+                <EmberSavePanel
+                  packId={pack.meta.id}
+                  backend={saveBackend}
+                  mode="editor"
+                  onToast={(textRu) => {
+                    setToast(textRu);
+                    window.setTimeout(() => setToast(null), 1800);
+                  }}
+                />
+              ) : null}
 
               {explore ? null : (
                 <label className="ember-check ember-play__short">
@@ -475,6 +581,8 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
                     <li>Карта: {selectedMap?.nameRu ?? selectedStage?.mapId}</li>
                     <li>Редактор → Карты → «Деревня Ху Тао»</li>
                     <li>WASD — движение · мышь — камера · Esc — меню</li>
+                    <li>F у прилавка — магазин · F у сундука — лут</li>
+                    <li>I — инвентарь и экипировка (пока открыт магазин — нет)</li>
                     <li>Фонари и окна — локальный свет с гибридными тенями</li>
                   </>
                 ) : (
@@ -515,6 +623,22 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
                 <p className="muted ember-play__menu-hint">
                   После Esc браузер ~1.5 с не даёт снова захватить мышь
                 </p>
+              ) : null}
+              {pack && explore ? (
+                <EmberSavePanel
+                  packId={pack.meta.id}
+                  backend={saveBackend}
+                  mode="pause"
+                  capture={() => apiRef.current?.captureExploreSave() ?? null}
+                  apply={(save) => apiRef.current?.applyExploreSave(save) ?? false}
+                  onNewRun={() => {
+                    void start();
+                  }}
+                  onToast={(textRu) => {
+                    setToast(textRu);
+                    window.setTimeout(() => setToast(null), 1800);
+                  }}
+                />
               ) : null}
               <button type="button" className="ghost" onClick={quitToLobby}>
                 Выйти
@@ -561,6 +685,46 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
               <span className="ember-hud__chip ember-hud__filth">Filth</span>
             ) : null}
             <span className="ember-hud__chip">☠ {hud.killed}</span>
+            <button
+              type="button"
+              className="ghost ember-hud__inv"
+              disabled={shop != null}
+              title={
+                shop
+                  ? "Сначала закрой лавку"
+                  : "Инвентарь (I)"
+              }
+              onClick={() => apiRef.current?.toggleInventory()}
+            >
+              Сумка
+            </button>
+            {explore && pack ? (
+              <button
+                type="button"
+                className="ghost ember-hud__inv"
+                onClick={() => setSaveDebugOpen((open) => !open)}
+              >
+                Сейвы
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        {saveDebugOpen && running && explore && pack ? (
+          <div className="ember-save-debug">
+            <EmberSavePanel
+              packId={pack.meta.id}
+              backend={saveBackend}
+              mode="play"
+              capture={() => apiRef.current?.captureExploreSave() ?? null}
+              apply={(save) => apiRef.current?.applyExploreSave(save) ?? false}
+              onNewRun={() => {
+                void start();
+              }}
+              onToast={(textRu) => {
+                setToast(textRu);
+                window.setTimeout(() => setToast(null), 1800);
+              }}
+            />
           </div>
         ) : null}
       </div>
@@ -573,6 +737,29 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
           options={loot.options}
           targetId={loot.targetId}
           onDone={takeLoot}
+        />
+      ) : null}
+
+      {shop && pack ? (
+        <EmberShopPanel
+          shop={shop}
+          items={pack.items}
+          itemIcons={pack.itemIcons}
+          onBuy={(itemId) => apiRef.current?.buyShopItem(itemId)}
+          onSell={(itemId) => apiRef.current?.sellShopItem(itemId)}
+          onClose={() => apiRef.current?.closeShop()}
+        />
+      ) : null}
+
+      {inventory && pack && !shop ? (
+        <EmberInventoryPanel
+          inventory={inventory}
+          items={pack.items}
+          itemIcons={pack.itemIcons}
+          onEquip={(itemId) => apiRef.current?.equipItem(itemId)}
+          onUnequip={(slot) => apiRef.current?.unequipSlot(slot)}
+          onUse={(itemId) => apiRef.current?.useItem(itemId)}
+          onClose={() => apiRef.current?.closeInventory()}
         />
       ) : null}
 
@@ -594,11 +781,27 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
         </div>
       ) : null}
 
+      {playDialogueId && pack && !shop ? (
+        <div className="ember-scene-host ember-scene-host--overlay">
+          <ScenePlayer
+            pack={pack}
+            sceneId={playDialogueId}
+            variant="play"
+            onGrantCinders={onReward}
+            onClose={() => {
+              setPlayDialogueId(null);
+              apiRef.current?.advanceDialogue();
+            }}
+          />
+        </div>
+      ) : null}
+
       {sceneId && pack ? (
         <div className="ember-scene-host">
           <ScenePlayer
             pack={pack}
             sceneId={sceneId}
+            variant="stage"
             onGrantCinders={onReward}
             onClose={() => setSceneId(null)}
           />
