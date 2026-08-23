@@ -106,17 +106,126 @@ function leafPal(x, y, z, dark, mid, lite) {
   return mid;
 }
 
-/** Tall evergreen: 4×4 trunk, stacked conical shelves. */
+/** Shift the trunk as it rises: lean plus a shallow S-curve (1–2 voxels). */
+function trunkBend(y, y0, y1, leanX, leanZ, curveX, curveZ) {
+  const t = (y - y0) / Math.max(1, y1 - y0);
+  return {
+    ox: leanX * t + curveX * Math.sin(t * Math.PI),
+    oz: leanZ * t + curveZ * Math.sin(t * Math.PI * 1.7),
+  };
+}
+
+/**
+ * Irregular thick trunk: flared roots, missing corners, nubs, optional knot.
+ * Cross-section stays ~3×3 / 4×4+, never a perfect extruded square.
+ */
+function paintTrunk(g, spec) {
+  const {
+    cx,
+    cz,
+    y0,
+    y1,
+    rx,
+    rz,
+    leanX,
+    leanZ,
+    curveX,
+    curveZ,
+    palBark,
+    palCore,
+    palDark,
+    knotY,
+    nubs,
+    marks,
+  } = spec;
+
+  for (let y = y0; y < y1; y++) {
+    const t = (y - y0) / Math.max(1, y1 - y0);
+    const { ox, oz } = trunkBend(y, y0, y1, leanX, leanZ, curveX, curveZ);
+    const flare = y <= y0 + 2 ? 1.45 : y <= y0 + 4 ? 1.2 : 1;
+    const knot = knotY != null && Math.abs(y - knotY) <= 1 ? 1.28 : 1;
+    const sliceRx = rx * flare * knot * (1 - t * 0.12);
+    const sliceRz = rz * flare * knot * (1 - t * 0.08);
+    const scx = cx + ox;
+    const scz = cz + oz;
+    const chop = hash32(y * 97 + 3) % 4;
+
+    for (let z = 0; z < g.sz; z++) {
+      for (let x = 0; x < g.sx; x++) {
+        const dx = x + 0.5 - scx;
+        const dz = z + 0.5 - scz;
+        if ((dx * dx) / (sliceRx * sliceRx) + (dz * dz) / (sliceRz * sliceRz) > 1) {
+          continue;
+        }
+        if (chop === 0 && dx > sliceRx * 0.35 && dz > sliceRz * 0.35 && y % 3 === 1) {
+          continue;
+        }
+        if (chop === 1 && dx < -sliceRx * 0.4 && y % 4 === 2) continue;
+        const n = hash32(x * 13 + y * 29 + z * 11) % 7;
+        let pal = n === 0 ? palDark : n === 1 ? palCore : palBark;
+        if (marks) {
+          const mark = marks(x, y, z, scx, scz);
+          if (mark != null) pal = mark;
+        }
+        setV(g, x, y, z, pal);
+      }
+    }
+  }
+
+  for (const nub of nubs ?? []) {
+    const { ox, oz } = trunkBend(nub.y, y0, y1, leanX, leanZ, curveX, curveZ);
+    const x = Math.round(cx + ox + nub.dx);
+    const z = Math.round(cz + oz + nub.dz);
+    box(g, x, nub.y, z, x + 2, nub.y + nub.h, z + 2, nub.pal ?? palBark);
+  }
+
+  const { ox: ox0, oz: oz0 } = trunkBend(y0, y0, y1, leanX, leanZ, curveX, curveZ);
+  const bx = Math.round(cx + ox0);
+  const bz = Math.round(cz + oz0);
+  for (const root of spec.roots ?? []) {
+    box(
+      g,
+      bx + root.dx,
+      y0,
+      bz + root.dz,
+      bx + root.dx + root.w,
+      y0 + root.h,
+      bz + root.dz + root.d,
+      root.pal ?? palBark,
+    );
+  }
+}
+
+/** Tall evergreen: irregular leaning trunk, stacked conical shelves. */
 function modelPine() {
   const h = 40;
   const g = emptyGrid(V, h, V);
-  const cx = 8;
+  const cx = 7.5;
   const cz = 8;
+  const lean = { leanX: 1.4, leanZ: -0.6, curveX: 0.7, curveZ: 1.1 };
 
-  box(g, 6, 0, 6, 10, 18, 10, 1);
-  box(g, 7, 0, 7, 9, 18, 9, 2);
-  box(g, 5, 0, 6, 7, 3, 9, 1);
-  box(g, 9, 0, 7, 11, 2, 10, 1);
+  paintTrunk(g, {
+    cx,
+    cz,
+    y0: 0,
+    y1: 18,
+    rx: 2.35,
+    rz: 2.15,
+    ...lean,
+    palBark: 1,
+    palCore: 2,
+    palDark: 1,
+    knotY: 8,
+    nubs: [
+      { y: 6, dx: 2, dz: 0, h: 3, pal: 2 },
+      { y: 12, dx: -2, dz: 1, h: 2, pal: 1 },
+    ],
+    roots: [
+      { dx: -3, dz: -1, w: 3, d: 2, h: 3, pal: 1 },
+      { dx: 2, dz: 1, w: 3, d: 2, h: 2, pal: 2 },
+      { dx: 0, dz: -3, w: 2, d: 3, h: 2, pal: 1 },
+    ],
+  });
 
   const layers = [
     { y0: 10, y1: 15, r: 7.1, ox: 0, oz: 0.2 },
@@ -128,13 +237,17 @@ function modelPine() {
     { y0: 34, y1: 40, r: 2.1, ox: 0, oz: 0 },
   ];
   for (const L of layers) {
+    const midY = (L.y0 + L.y1) / 2;
+    const bend = trunkBend(midY, 0, 18, lean.leanX, lean.leanZ, lean.curveX, lean.curveZ);
     for (let y = L.y0; y < L.y1; y++) {
       const t = (y - L.y0) / Math.max(1, L.y1 - L.y0 - 1);
       const r = L.r * (1 - t * 0.38);
+      const lcx = cx + bend.ox + L.ox;
+      const lcz = cz + bend.oz + L.oz;
       for (let z = 0; z < V; z++) {
         for (let x = 0; x < V; x++) {
-          if (!inDisk(x, z, cx + L.ox, cz + L.oz, r)) continue;
-          const edge = !inDisk(x, z, cx + L.ox, cz + L.oz, r - 0.9);
+          if (!inDisk(x, z, lcx, lcz, r)) continue;
+          const edge = !inDisk(x, z, lcx, lcz, r - 0.9);
           const n = hash32(x * 13 + y * 29 + z * 11) % 6;
           if (edge && n === 0) continue;
           setV(g, x, y, z, leafPal(x, y, z, 3, 4, 5));
@@ -142,7 +255,8 @@ function modelPine() {
       }
     }
   }
-  box(g, 7, 36, 7, 9, 40, 9, 6);
+  const tip = trunkBend(18, 0, 18, lean.leanX, lean.leanZ, lean.curveX, lean.curveZ);
+  box(g, Math.round(cx + tip.ox), 36, Math.round(cz + tip.oz), Math.round(cx + tip.ox) + 2, 40, Math.round(cz + tip.oz) + 2, 6);
 
   return finishModel(g, {
     id: "vox_fan_pine",
@@ -169,16 +283,36 @@ function modelOak() {
   const h = 42;
   const S = V * 2;
   const g = emptyGrid(S, h, S);
-  const cx = 16;
+  const cx = 15.5;
   const cz = 16;
+  const lean = { leanX: -1.6, leanZ: 1.2, curveX: 1.1, curveZ: -0.8 };
 
-  box(g, 13, 0, 13, 19, 20, 19, 1);
-  box(g, 14, 0, 14, 18, 20, 18, 2);
-  box(g, 15, 0, 15, 17, 20, 17, 3);
-  box(g, 10, 0, 14, 14, 4, 18, 1);
-  box(g, 18, 0, 15, 22, 3, 19, 1);
-  box(g, 14, 0, 10, 18, 3, 14, 2);
+  paintTrunk(g, {
+    cx,
+    cz,
+    y0: 0,
+    y1: 20,
+    rx: 3.15,
+    rz: 2.85,
+    ...lean,
+    palBark: 1,
+    palCore: 2,
+    palDark: 3,
+    knotY: 11,
+    nubs: [
+      { y: 7, dx: 3, dz: -1, h: 3, pal: 2 },
+      { y: 14, dx: -3, dz: 2, h: 3, pal: 1 },
+      { y: 9, dx: 1, dz: 3, h: 2, pal: 3 },
+    ],
+    roots: [
+      { dx: -5, dz: -1, w: 4, d: 3, h: 4, pal: 1 },
+      { dx: 3, dz: 2, w: 4, d: 3, h: 3, pal: 2 },
+      { dx: -1, dz: -5, w: 3, d: 4, h: 3, pal: 3 },
+      { dx: 2, dz: 4, w: 3, d: 3, h: 2, pal: 1 },
+    ],
+  });
 
+  const crown = trunkBend(18, 0, 20, lean.leanX, lean.leanZ, lean.curveX, lean.curveZ);
   const clumps = [
     { cx: 15, cz: 16, y0: 16, y1: 34, r: 10.4 },
     { cx: 21, cz: 13, y0: 18, y1: 33, r: 7.2 },
@@ -191,17 +325,28 @@ function modelOak() {
     for (let y = c.y0; y < c.y1; y++) {
       const mid = 1 - Math.abs((y - (c.y0 + c.y1) / 2) / ((c.y1 - c.y0) / 2));
       const r = c.r * (0.55 + mid * 0.45);
+      const lcx = c.cx + crown.ox;
+      const lcz = c.cz + crown.oz;
       for (let z = 0; z < S; z++) {
         for (let x = 0; x < S; x++) {
-          if (!inDisk(x, z, c.cx, c.cz, r)) continue;
+          if (!inDisk(x, z, lcx, lcz, r)) continue;
           const n = hash32(x * 17 + y * 23 + z * 5) % 9;
-          if (n === 0 && !inDisk(x, z, c.cx, c.cz, r - 1.4)) continue;
+          if (n === 0 && !inDisk(x, z, lcx, lcz, r - 1.4)) continue;
           setV(g, x, y, z, leafPal(x, y, z, 4, 5, 6));
         }
       }
     }
   }
-  box(g, 14, 18, 14, 18, 24, 18, 2);
+  box(
+    g,
+    Math.round(14 + crown.ox),
+    18,
+    Math.round(14 + crown.oz),
+    Math.round(18 + crown.ox),
+    24,
+    Math.round(18 + crown.oz),
+    2,
+  );
 
   return finishModel(g, {
     id: "vox_fan_oak",
@@ -227,17 +372,40 @@ function modelOak() {
 function modelBirch() {
   const h = 38;
   const g = emptyGrid(V, h, V);
-  const cx = 8;
+  const cx = 7.5;
   const cz = 8;
+  const lean = { leanX: 1.2, leanZ: 1.5, curveX: -1.0, curveZ: 0.8 };
 
-  box(g, 6, 0, 6, 10, 22, 10, 1);
-  box(g, 7, 0, 7, 9, 22, 9, 2);
-  for (let y = 3; y < 21; y += 3) {
-    box(g, 6, y, 7, 7, y + 1, 9, 3);
-    box(g, 9, y + 1, 7, 10, y + 2, 9, 3);
-    if (y % 6 === 0) box(g, 7, y, 6, 9, y + 1, 7, 4);
-  }
+  paintTrunk(g, {
+    cx,
+    cz,
+    y0: 0,
+    y1: 22,
+    rx: 2.05,
+    rz: 1.9,
+    ...lean,
+    palBark: 1,
+    palCore: 2,
+    palDark: 4,
+    knotY: 10,
+    nubs: [
+      { y: 8, dx: 2, dz: 0, h: 2, pal: 2 },
+      { y: 15, dx: -2, dz: 1, h: 2, pal: 4 },
+    ],
+    roots: [
+      { dx: -2, dz: -2, w: 3, d: 2, h: 2, pal: 2 },
+      { dx: 2, dz: 1, w: 2, d: 3, h: 2, pal: 4 },
+    ],
+    marks: (x, y, z, scx, scz) => {
+      if (y % 3 !== 0 && y % 3 !== 1) return null;
+      const side = Math.abs(x - scx) > Math.abs(z - scz);
+      if (side && x > scx && (y + z) % 5 === 0) return 3;
+      if (!side && z < scz && (y + x) % 6 === 0) return 3;
+      return null;
+    },
+  });
 
+  const crown = trunkBend(20, 0, 22, lean.leanX, lean.leanZ, lean.curveX, lean.curveZ);
   const clumps = [
     { cx: 7.2, cz: 8.0, y0: 16, y1: 28, r: 5.2 },
     { cx: 9.0, cz: 7.0, y0: 20, y1: 32, r: 4.4 },
@@ -248,9 +416,11 @@ function modelBirch() {
     for (let y = c.y0; y < c.y1; y++) {
       const mid = 1 - Math.abs((y - (c.y0 + c.y1) / 2) / ((c.y1 - c.y0) / 2));
       const r = c.r * (0.6 + mid * 0.4);
+      const lcx = c.cx + crown.ox;
+      const lcz = c.cz + crown.oz;
       for (let z = 0; z < V; z++) {
         for (let x = 0; x < V; x++) {
-          if (!inDisk(x, z, c.cx, c.cz, r)) continue;
+          if (!inDisk(x, z, lcx, lcz, r)) continue;
           setV(g, x, y, z, leafPal(x, y, z, 5, 6, 7));
         }
       }
