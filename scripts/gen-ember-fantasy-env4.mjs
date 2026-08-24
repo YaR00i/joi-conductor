@@ -116,8 +116,8 @@ function trunkBend(y, y0, y1, leanX, leanZ, curveX, curveZ) {
 }
 
 /**
- * Irregular thick trunk: flared roots, missing corners, nubs, optional knot.
- * Cross-section stays ~3×3 / 4×4+, never a perfect extruded square.
+ * Irregular trunk: slight root flare, missing corners, nubs, optional knot.
+ * Mid-trunk reads ~2×2 to 3×3 — thinner than the canopy, not a fat plinth.
  */
 function paintTrunk(g, spec) {
   const {
@@ -142,8 +142,8 @@ function paintTrunk(g, spec) {
   for (let y = y0; y < y1; y++) {
     const t = (y - y0) / Math.max(1, y1 - y0);
     const { ox, oz } = trunkBend(y, y0, y1, leanX, leanZ, curveX, curveZ);
-    const flare = y <= y0 + 2 ? 1.45 : y <= y0 + 4 ? 1.2 : 1;
-    const knot = knotY != null && Math.abs(y - knotY) <= 1 ? 1.28 : 1;
+    const flare = y <= y0 + 1 ? 1.12 : y <= y0 + 3 ? 1.05 : 1;
+    const knot = knotY != null && Math.abs(y - knotY) <= 1 ? 1.12 : 1;
     const sliceRx = rx * flare * knot * (1 - t * 0.12);
     const sliceRz = rz * flare * knot * (1 - t * 0.08);
     const scx = cx + ox;
@@ -209,21 +209,20 @@ function modelPine() {
     cz,
     y0: 0,
     y1: 18,
-    rx: 2.35,
-    rz: 2.15,
+    rx: 1.45,
+    rz: 1.35,
     ...lean,
     palBark: 1,
     palCore: 2,
     palDark: 1,
     knotY: 8,
     nubs: [
-      { y: 6, dx: 2, dz: 0, h: 3, pal: 2 },
+      { y: 6, dx: 1, dz: 0, h: 2, pal: 2 },
       { y: 12, dx: -2, dz: 1, h: 2, pal: 1 },
     ],
     roots: [
-      { dx: -3, dz: -1, w: 3, d: 2, h: 3, pal: 1 },
-      { dx: 2, dz: 1, w: 3, d: 2, h: 2, pal: 2 },
-      { dx: 0, dz: -3, w: 2, d: 3, h: 2, pal: 1 },
+      { dx: -2, dz: 0, w: 2, d: 2, h: 2, pal: 1 },
+      { dx: 1, dz: 1, w: 2, d: 2, h: 2, pal: 2 },
     ],
   });
 
@@ -292,23 +291,22 @@ function modelOak() {
     cz,
     y0: 0,
     y1: 20,
-    rx: 3.15,
-    rz: 2.85,
+    rx: 1.7,
+    rz: 1.55,
     ...lean,
     palBark: 1,
     palCore: 2,
     palDark: 3,
     knotY: 11,
     nubs: [
-      { y: 7, dx: 3, dz: -1, h: 3, pal: 2 },
-      { y: 14, dx: -3, dz: 2, h: 3, pal: 1 },
-      { y: 9, dx: 1, dz: 3, h: 2, pal: 3 },
+      { y: 7, dx: 2, dz: -1, h: 2, pal: 2 },
+      { y: 14, dx: -2, dz: 1, h: 2, pal: 1 },
+      { y: 9, dx: 1, dz: 2, h: 2, pal: 3 },
     ],
     roots: [
-      { dx: -5, dz: -1, w: 4, d: 3, h: 4, pal: 1 },
-      { dx: 3, dz: 2, w: 4, d: 3, h: 3, pal: 2 },
-      { dx: -1, dz: -5, w: 3, d: 4, h: 3, pal: 3 },
-      { dx: 2, dz: 4, w: 3, d: 3, h: 2, pal: 1 },
+      { dx: -2, dz: -1, w: 2, d: 2, h: 2, pal: 1 },
+      { dx: 2, dz: 1, w: 2, d: 2, h: 2, pal: 2 },
+      { dx: 0, dz: -2, w: 2, d: 2, h: 2, pal: 3 },
     ],
   });
 
@@ -381,20 +379,20 @@ function modelBirch() {
     cz,
     y0: 0,
     y1: 22,
-    rx: 2.05,
-    rz: 1.9,
+    rx: 1.2,
+    rz: 1.15,
     ...lean,
     palBark: 1,
     palCore: 2,
     palDark: 4,
     knotY: 10,
     nubs: [
-      { y: 8, dx: 2, dz: 0, h: 2, pal: 2 },
+      { y: 8, dx: 1, dz: 0, h: 2, pal: 2 },
       { y: 15, dx: -2, dz: 1, h: 2, pal: 4 },
     ],
     roots: [
-      { dx: -2, dz: -2, w: 3, d: 2, h: 2, pal: 2 },
-      { dx: 2, dz: 1, w: 2, d: 3, h: 2, pal: 4 },
+      { dx: -2, dz: 0, w: 2, d: 2, h: 2, pal: 2 },
+      { dx: 1, dz: 1, w: 2, d: 2, h: 2, pal: 4 },
     ],
     marks: (x, y, z, scx, scz) => {
       if (y % 3 !== 0 && y % 3 !== 1) return null;
