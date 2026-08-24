@@ -94,6 +94,7 @@ import { blockStoryHeight, elevFromWorldY, elevStoryWorldSpan } from "../../../g
 import type { VoxelSculptSession } from "./VoxelSculptPanel";
 import {
   normalizePixelSprite,
+  prunePaletteFavorites,
   serializePixelSprite,
 } from "../../../game/content/pixelSprite";
 import type {
@@ -2900,7 +2901,7 @@ export function MapEditorPanel({
       };
       onPackChange({ ...pack, sprites: nextSprites });
       void writeEmberJson("sprites/registry.json", {
-        paletteFavorites: pack.paletteFavorites ?? [],
+        paletteFavorites: prunePaletteFavorites(pack.paletteFavorites ?? []),
         sprites: Object.values(nextSprites).map(serializePixelSprite),
       }).then((result) => {
         onSaved(result.ok ? label : `Ошибка записи ассета: ${result.error}`);

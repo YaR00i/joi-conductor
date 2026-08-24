@@ -1,0 +1,35 @@
+{
+  "id": "vox_chr_mt6dvmhm_hair__side_r",
+  "nameRu": "Волосы · side_r",
+  "mesh": {
+    "kind": "vox",
+    "file": "voxels/models/vox_chr_mt6dvmhm_hair__side_r.vox"
+  },
+  "model": {
+    "id": "vox_chr_mt6dvmhm_hair__side_r",
+    "nameRu": "Волосы · side_r",
+    "tags": [
+      "character",
+      "chibi",
+      "slasher"
+    ],
+    "sizeBlocks": {
+      "x": 1,
+      "y": 1,
+      "z": 1
+    },
+    "heightVoxels": 6,
+    "palette": [
+      "",
+      "#e02824"
+    ],
+    "voxels": [],
+    "material": "cloth",
+    "physical": false
+  },
+  "tags": [
+    "character",
+    "chibi",
+    "slasher"
+  ]
+}

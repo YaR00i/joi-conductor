@@ -1,0 +1,38 @@
+{
+  "id": "vox_chr_mt6dvmhm_head__side_r",
+  "nameRu": "Голова · side_r",
+  "mesh": {
+    "kind": "vox",
+    "file": "voxels/models/vox_chr_mt6dvmhm_head__side_r.vox"
+  },
+  "model": {
+    "id": "vox_chr_mt6dvmhm_head__side_r",
+    "nameRu": "Голова · side_r",
+    "tags": [
+      "character",
+      "chibi",
+      "slasher"
+    ],
+    "sizeBlocks": {
+      "x": 1,
+      "y": 1,
+      "z": 1
+    },
+    "heightVoxels": 12,
+    "palette": [
+      "",
+      "#f0c8a4",
+      "#4a3024",
+      "#e02824",
+      "#1c1a1e"
+    ],
+    "voxels": [],
+    "material": "cloth",
+    "physical": true
+  },
+  "tags": [
+    "character",
+    "chibi",
+    "slasher"
+  ]
+}

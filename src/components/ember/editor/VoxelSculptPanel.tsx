@@ -13,6 +13,7 @@ import {
 } from "react";
 import * as THREE from "three";
 import type {
+  EmberCharacterArtStyle,
   EmberPack,
   EmberVoxelCharacterTemplate,
   EmberVoxelModel,
@@ -178,6 +179,8 @@ import {
   characterCapsule,
   characterCapsuleCenterRelativeTo,
   characterModelIdForSlotView,
+  characterPresetNameRu,
+  characterPresetToastRu,
   characterSlotForObject,
   createVoxelCharacter,
   isCharacterScene,
@@ -4971,13 +4974,17 @@ export function VoxelSculptPanel({
     resetHistory();
   };
 
-  const createCharacter = (templateId: EmberVoxelCharacterTemplate) => {
+  const createCharacter = (
+    templateId: EmberVoxelCharacterTemplate,
+    style: EmberCharacterArtStyle = "chibi",
+  ) => {
     if (variantMode) return;
     const id = newVoxelCharacterId();
     const built = createVoxelCharacter(
       templateId,
       id,
-      templateId === "chibi_25d" ? "Новый чиби 2.5D" : "Новый чиби",
+      characterPresetNameRu(templateId, style),
+      style,
     );
     const modelsMap = { ...pack.voxelModels, ...built.models };
     const scenesMap = { ...voxelScenes, [built.scene.id]: built.scene };
@@ -4996,11 +5003,7 @@ export function VoxelSculptPanel({
     markEditorOpened("voxel", built.scene.id);
     onActiveModelChange?.(pelvis?.modelId ?? id);
     resetHistory();
-    onSaved?.(
-      templateId === "chibi_25d"
-        ? "Чиби 2.5D: карточка 3 vx + объём волос/носа · капсула 22 vx"
-        : "Чиби: шаблон chibi_32 · капсула 22 vx, макушка 32",
-    );
+    onSaved?.(characterPresetToastRu(templateId, style));
   };
 
   const deleteLibraryModel = () => {
@@ -6284,6 +6287,30 @@ export function VoxelSculptPanel({
                 }}
               >
                 + 2.5D
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="ember-voxel-sculpt__menu-item"
+                disabled={variantMode}
+                onClick={() => {
+                  createCharacter("chibi_32", "slasher");
+                  setSculptMenu(null);
+                }}
+              >
+                + Slasher
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="ember-voxel-sculpt__menu-item"
+                disabled={variantMode}
+                onClick={() => {
+                  createCharacter("chibi_25d", "slasher");
+                  setSculptMenu(null);
+                }}
+              >
+                + Slasher 2.5D
               </button>
               <div className="ember-voxel-sculpt__menu-sep" role="separator" />
               <p className="ember-voxel-sculpt__menu-hint">Из источника</p>

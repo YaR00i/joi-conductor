@@ -52,6 +52,7 @@ import {
   VOXEL_SCENES_DIR,
 } from "../voxel/voxelLibrary";
 import { hydrateVoxelPrefab } from "../voxel/voxelRegistry";
+import { prunePaletteFavorites } from "./pixelSprite";
 
 async function loadJson<T>(rel: string): Promise<T> {
   const res = await readEmberJson<T>(rel);
@@ -375,7 +376,9 @@ export async function loadEmberPack(): Promise<{
     voxelLibraryFiles: voxelLibs.sources,
     lightPresets,
     lookPresets,
-    paletteFavorites: spritesFile.paletteFavorites ?? [],
+    paletteFavorites: prunePaletteFavorites(
+      spritesFile.paletteFavorites ?? [],
+    ),
   };
 
   const loadIssues = [

@@ -1,11 +1,28 @@
 import { normalizeEmberLibraryTags } from "./libraryTags";
 import type {
+  EmberCharacterCardView,
   EmberEmissiveAnim,
   EmberEmissiveTriggerWhen,
   EmberMaterialKind,
   EmberPixelSprite,
+  EmberSpriteAnimFrame,
+  EmberSpriteCardExtraView,
+  EmberSpriteCardFace,
   EmberSpriteSize,
 } from "./types";
+import { EMBER_SPRITE_CARD_EXTRA_VIEWS } from "./types";
+import {
+  cloneArtLayers,
+  compositeArtLayers,
+  packArtLayers,
+  parseArtLayers,
+  resizeArtLayers,
+} from "./spriteArtLayers";
+import {
+  MAX_SPRITE_ANIM_FRAMES,
+  clampSpriteFrameDuration,
+  newSpriteFrameId,
+} from "./spriteAnimFrames";
 import {
   DEFAULT_EMISSIVE_LIGHT_RANGE,
   DEFAULT_EMISSIVE_STRENGTH,
@@ -113,25 +130,11 @@ function normalizeEmissiveLightRange(raw: unknown): number | undefined {
   return Math.round(v * 100) / 100;
 }
 
-function fitEmissiveBuffer(
-  raw: string[] | undefined,
-  need: number,
-  width: number,
-  height: number,
-): string[] | undefined {
-  if (!Array.isArray(raw) || !spriteFaceHasInk(raw)) return undefined;
-  if (raw.length === need) return [...raw];
-  return copyPixelRect(
-    raw,
-    width,
-    Math.floor(raw.length / Math.max(1, width)) || height,
-    width,
-    height,
-  );
-}
-
 export const SPRITE_DIM_MIN = 4;
 export const SPRITE_DIM_MAX = 64;
+export const SPRITE_BLANK_WIDTH = 32;
+export const SPRITE_BLANK_HEIGHT = 48;
+export const SPRITE_DECOR_SIZE = 16;
 export const SPRITE_WALL_H_MIN = 1;
 export const SPRITE_WALL_H_MAX = 64;
 export const SPRITE_WALL_MAX_STRIPS = 8;
@@ -163,8 +166,415 @@ export function emptySpritePixels(width: number, height: number): string[] {
   return new Array(n).fill("");
 }
 
+/** Cap extra swatches; color-picker drag trails collapse into one slot. */
+export const MAX_PALETTE_FAVORITES = 24;
+const PALETTE_NEAR_RGB = 16;
+
+function parsePaletteRgb(
+  hex: string,
+): { r: number; g: number; b: number } | null {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const n = Number.parseInt(m[1]!, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function paletteRgbDist(
+  a: { r: number; g: number; b: number },
+  b: { r: number; g: number; b: number },
+): number {
+  const dr = a.r - b.r;
+  const dg = a.g - b.g;
+  const db = a.b - b.b;
+  return Math.sqrt(dr * dr + dg * dg + db * db);
+}
+
+export function prunePaletteFavorites(colors: string[]): string[] {
+  const kept: string[] = [];
+  for (const raw of colors) {
+    const hex = raw.trim().toLowerCase();
+    if (!hex.startsWith("#") || (hex.length !== 7 && hex !== "#00000000")) {
+      continue;
+    }
+    if (kept.includes(hex)) continue;
+    const rgb = parsePaletteRgb(hex);
+    if (!rgb) {
+      kept.push(hex);
+      continue;
+    }
+    const nearIdx = kept.findIndex((c) => {
+      const other = parsePaletteRgb(c);
+      return other ? paletteRgbDist(rgb, other) < PALETTE_NEAR_RGB : false;
+    });
+    if (nearIdx >= 0) {
+      kept[nearIdx] = hex;
+      continue;
+    }
+    kept.push(hex);
+  }
+  return kept.length > MAX_PALETTE_FAVORITES
+    ? kept.slice(kept.length - MAX_PALETTE_FAVORITES)
+    : kept;
+}
+
 export function spriteFaceHasInk(pixels?: string[] | null): boolean {
   return !!pixels?.some((c) => c && c !== "#00000000");
+}
+
+function optionalInkChannel(
+  pixels: string[] | undefined,
+): string[] | undefined {
+  return spriteFaceHasInk(pixels) ? pixels : undefined;
+}
+
+function parseSpriteCardFace(
+  raw: unknown,
+  width: number,
+  height: number,
+): EmberSpriteCardFace | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const rec = raw as Record<string, unknown>;
+  const artLayers = parseArtLayers(rec.artLayers, width, height);
+  const hasPixelBuf =
+    Array.isArray(rec.pixels) && rec.pixels.length === width * height;
+  if (!hasPixelBuf && !artLayers?.length) return undefined;
+  const pixels = artLayers?.length
+    ? compositeArtLayers(artLayers, width, height)
+    : (rec.pixels as unknown[]).map((c) => (typeof c === "string" ? c : ""));
+  const emissivePixels = Array.isArray(rec.emissivePixels)
+    ? matchChannelSize(
+        rec.emissivePixels as string[],
+        width,
+        height,
+        width,
+        height,
+      )
+    : undefined;
+  const shinePixels = Array.isArray(rec.shinePixels)
+    ? matchChannelSize(
+        rec.shinePixels as string[],
+        width,
+        height,
+        width,
+        height,
+      )
+    : undefined;
+  return {
+    pixels,
+    emissivePixels: optionalInkChannel(emissivePixels),
+    shinePixels: optionalInkChannel(shinePixels),
+    artLayers,
+  };
+}
+
+export function parseSpriteCardViews(
+  raw: unknown,
+  width: number,
+  height: number,
+): EmberPixelSprite["views"] {
+  if (!raw || typeof raw !== "object") return undefined;
+  const rec = raw as Record<string, unknown>;
+  const views: NonNullable<EmberPixelSprite["views"]> = {};
+  for (const key of EMBER_SPRITE_CARD_EXTRA_VIEWS) {
+    const face = parseSpriteCardFace(rec[key], width, height);
+    if (face) views[key] = face;
+  }
+  return Object.keys(views).length ? views : undefined;
+}
+
+function serializeSpriteCardFace(face: EmberSpriteCardFace): EmberSpriteCardFace {
+  return {
+    pixels: [...face.pixels],
+    emissivePixels: face.emissivePixels
+      ? [...face.emissivePixels]
+      : undefined,
+    shinePixels: face.shinePixels ? [...face.shinePixels] : undefined,
+    artLayers: packArtLayers(face.artLayers),
+  };
+}
+
+function serializeSpriteCardViews(
+  views: EmberPixelSprite["views"],
+): EmberPixelSprite["views"] {
+  if (!views) return undefined;
+  const next: NonNullable<EmberPixelSprite["views"]> = {};
+  for (const key of EMBER_SPRITE_CARD_EXTRA_VIEWS) {
+    const face = views[key];
+    if (face) next[key] = serializeSpriteCardFace(face);
+  }
+  return Object.keys(next).length ? next : undefined;
+}
+
+function cloneSpriteCardFace(face: EmberSpriteCardFace): EmberSpriteCardFace {
+  return {
+    pixels: [...face.pixels],
+    emissivePixels: face.emissivePixels
+      ? [...face.emissivePixels]
+      : undefined,
+    shinePixels: face.shinePixels ? [...face.shinePixels] : undefined,
+    artLayers: cloneArtLayers(face.artLayers),
+  };
+}
+
+function cloneSpriteCardViews(
+  views: EmberPixelSprite["views"],
+): EmberPixelSprite["views"] {
+  if (!views) return undefined;
+  const next: NonNullable<EmberPixelSprite["views"]> = {};
+  for (const key of EMBER_SPRITE_CARD_EXTRA_VIEWS) {
+    const face = views[key];
+    if (face) next[key] = cloneSpriteCardFace(face);
+  }
+  return Object.keys(next).length ? next : undefined;
+}
+
+function parseAnimFrame(
+  raw: unknown,
+  width: number,
+  height: number,
+): EmberSpriteAnimFrame | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const rec = raw as Record<string, unknown>;
+  const artLayers = parseArtLayers(rec.artLayers, width, height);
+  const need = width * height;
+  const hasPixels = Array.isArray(rec.pixels) && rec.pixels.length === need;
+  if (!hasPixels && !artLayers?.length) return undefined;
+  const pixels = artLayers?.length
+    ? compositeArtLayers(artLayers, width, height)
+    : (rec.pixels as unknown[]).map((c) => (typeof c === "string" ? c : ""));
+  const emissivePixels = Array.isArray(rec.emissivePixels)
+    ? matchChannelSize(
+        rec.emissivePixels as string[],
+        width,
+        height,
+        width,
+        height,
+      )
+    : undefined;
+  const shinePixels = Array.isArray(rec.shinePixels)
+    ? matchChannelSize(rec.shinePixels as string[], width, height, width, height)
+    : undefined;
+  return {
+    id:
+      typeof rec.id === "string" && rec.id.trim()
+        ? rec.id.trim()
+        : newSpriteFrameId(),
+    durationMs: clampSpriteFrameDuration(rec.durationMs),
+    pixels,
+    emissivePixels: optionalInkChannel(emissivePixels),
+    shinePixels: optionalInkChannel(shinePixels),
+    artLayers,
+    views: parseSpriteCardViews(rec.views, width, height),
+  };
+}
+
+function parseAnimFrames(
+  raw: unknown,
+  width: number,
+  height: number,
+): EmberSpriteAnimFrame[] | undefined {
+  if (!Array.isArray(raw) || raw.length < 2) return undefined;
+  const frames: EmberSpriteAnimFrame[] = [];
+  for (const item of raw.slice(0, MAX_SPRITE_ANIM_FRAMES)) {
+    const frame = parseAnimFrame(item, width, height);
+    if (frame) frames.push(frame);
+  }
+  return frames.length >= 2 ? frames : undefined;
+}
+
+function resizeAnimFrames(
+  frames: EmberSpriteAnimFrame[] | undefined,
+  srcW: number,
+  srcH: number,
+  dstW: number,
+  dstH: number,
+): EmberSpriteAnimFrame[] | undefined {
+  if (!frames?.length) return undefined;
+  return frames.map((frame) => {
+    const artLayers = resizeArtLayers(
+      frame.artLayers,
+      srcW,
+      srcH,
+      dstW,
+      dstH,
+    );
+    return {
+      id: frame.id,
+      durationMs: frame.durationMs,
+      pixels: artLayers?.length
+        ? compositeArtLayers(artLayers, dstW, dstH)
+        : copyPixelRect(frame.pixels, srcW, srcH, dstW, dstH),
+      emissivePixels: fitChannelBuffer(
+        frame.emissivePixels,
+        srcW,
+        srcH,
+        dstW,
+        dstH,
+      ),
+      shinePixels: fitChannelBuffer(frame.shinePixels, srcW, srcH, dstW, dstH),
+      artLayers,
+      views: resizeSpriteCardViews(frame.views, srcW, srcH, dstW, dstH),
+    };
+  });
+}
+
+function serializeAnimFrame(frame: EmberSpriteAnimFrame): EmberSpriteAnimFrame {
+  return {
+    id: frame.id,
+    durationMs: clampSpriteFrameDuration(frame.durationMs),
+    pixels: [...frame.pixels],
+    emissivePixels: frame.emissivePixels
+      ? [...frame.emissivePixels]
+      : undefined,
+    shinePixels: frame.shinePixels ? [...frame.shinePixels] : undefined,
+    artLayers: packArtLayers(frame.artLayers),
+    views: serializeSpriteCardViews(frame.views),
+  };
+}
+
+function packAnimFrames(
+  frames: EmberSpriteAnimFrame[] | undefined,
+): EmberSpriteAnimFrame[] | undefined {
+  if (!frames || frames.length < 2) return undefined;
+  return frames.slice(0, MAX_SPRITE_ANIM_FRAMES).map(serializeAnimFrame);
+}
+
+function applyAnimFrameToSprite(
+  sprite: EmberPixelSprite,
+  frame: EmberSpriteAnimFrame,
+): EmberPixelSprite {
+  return {
+    ...sprite,
+    pixels: [...frame.pixels],
+    emissivePixels: frame.emissivePixels
+      ? [...frame.emissivePixels]
+      : undefined,
+    shinePixels: frame.shinePixels ? [...frame.shinePixels] : undefined,
+    artLayers: cloneArtLayers(frame.artLayers),
+    views: cloneSpriteCardViews(frame.views),
+  };
+}
+
+function withAnimFrames(
+  sprite: EmberPixelSprite,
+  raw: { frames?: unknown } | undefined,
+): EmberPixelSprite {
+  const frames = parseAnimFrames(
+    raw?.frames,
+    sprite.width,
+    spriteTotalHeight(sprite),
+  );
+  if (!frames?.length) return sprite;
+  return { ...applyAnimFrameToSprite(sprite, frames[0]!), frames };
+}
+
+export function spriteHasAnimFrames(sprite: EmberPixelSprite): boolean {
+  return (sprite.frames?.length ?? 0) >= 2;
+}
+
+/** Overlay a timeline cel onto the sprite for rendering. */
+export function composeSpriteForFrame(
+  sprite: EmberPixelSprite,
+  frameIndex: number,
+): EmberPixelSprite {
+  const frames = sprite.frames;
+  if (!frames || frames.length < 2) return sprite;
+  const i = Math.max(0, Math.min(frames.length - 1, frameIndex));
+  const frame = frames[i];
+  if (!frame) return sprite;
+  return applyAnimFrameToSprite(sprite, frame);
+}
+
+function resizeSpriteCardViews(
+  views: EmberPixelSprite["views"],
+  srcW: number,
+  srcH: number,
+  dstW: number,
+  dstH: number,
+): EmberPixelSprite["views"] {
+  if (!views) return undefined;
+  const next: NonNullable<EmberPixelSprite["views"]> = {};
+  for (const key of EMBER_SPRITE_CARD_EXTRA_VIEWS) {
+    const face = views[key];
+    if (!face) continue;
+    const artLayers = resizeArtLayers(
+      face.artLayers,
+      srcW,
+      srcH,
+      dstW,
+      dstH,
+    );
+    next[key] = {
+      pixels: artLayers?.length
+        ? compositeArtLayers(artLayers, dstW, dstH)
+        : copyPixelRect(face.pixels, srcW, srcH, dstW, dstH),
+      emissivePixels: fitChannelBuffer(
+        face.emissivePixels,
+        srcW,
+        srcH,
+        dstW,
+        dstH,
+      ),
+      shinePixels: fitChannelBuffer(face.shinePixels, srcW, srcH, dstW, dstH),
+      artLayers,
+    };
+  }
+  return Object.keys(next).length ? next : undefined;
+}
+
+function withCardViews(
+  sprite: EmberPixelSprite,
+  raw: { views?: unknown },
+): EmberPixelSprite {
+  const views = parseSpriteCardViews(
+    raw.views,
+    sprite.width,
+    spriteTotalHeight(sprite),
+  );
+  return views ? { ...sprite, views } : sprite;
+}
+
+function withArtLayers(
+  sprite: EmberPixelSprite,
+  raw: { artLayers?: unknown } | undefined,
+): EmberPixelSprite {
+  const artLayers = parseArtLayers(
+    raw?.artLayers,
+    sprite.width,
+    spriteTotalHeight(sprite),
+  );
+  if (!artLayers?.length) return sprite;
+  return {
+    ...sprite,
+    artLayers,
+    pixels: compositeArtLayers(
+      artLayers,
+      sprite.width,
+      spriteTotalHeight(sprite),
+    ),
+  };
+}
+
+export function spriteHasExtraCardViews(sprite: EmberPixelSprite): boolean {
+  const views = sprite.views;
+  if (!views) return false;
+  return EMBER_SPRITE_CARD_EXTRA_VIEWS.some((key) => Boolean(views[key]));
+}
+
+/** Overlay an extra face onto `pixels` for rendering. Missing face = front. */
+export function composeSpriteForView(
+  sprite: EmberPixelSprite,
+  view: EmberCharacterCardView,
+): EmberPixelSprite {
+  if (view === "front") return sprite;
+  const face = sprite.views?.[view as EmberSpriteCardExtraView];
+  if (!face) return sprite;
+  return {
+    ...sprite,
+    pixels: face.pixels,
+    emissivePixels: face.emissivePixels,
+    shinePixels: face.shinePixels,
+  };
 }
 
 /** Slice a horizontal band from a width×total buffer. */
@@ -222,6 +632,46 @@ export function copyPixelRect(
   return next;
 }
 
+/**
+ * Fit glow/shine (or any channel) from srcW×srcH into dstW×dstH.
+ * Uses the same top-left copy as color — never the destination width as srcW.
+ */
+export function fitChannelBuffer(
+  raw: string[] | undefined,
+  srcW: number,
+  srcH: number,
+  dstW: number,
+  dstH: number,
+): string[] | undefined {
+  if (!Array.isArray(raw) || !spriteFaceHasInk(raw)) return undefined;
+  const w = Math.max(1, srcW);
+  const inferredH = Math.floor(raw.length / w) || srcH;
+  const h = inferredH > 0 ? inferredH : srcH;
+  if (w === dstW && h === dstH && raw.length === dstW * dstH) {
+    return [...raw];
+  }
+  return copyPixelRect(raw, w, h, dstW, dstH);
+}
+
+/**
+ * Always return a dstW×dstH buffer. Same-length copy, otherwise top-left fit
+ * from srcW×srcH — never treat the destination width as the source stride.
+ */
+export function matchChannelSize(
+  raw: string[] | undefined,
+  srcW: number,
+  srcH: number,
+  dstW: number,
+  dstH: number,
+): string[] {
+  const need = Math.max(0, dstW) * Math.max(0, dstH);
+  if (Array.isArray(raw) && raw.length === need) return [...raw];
+  return (
+    fitChannelBuffer(raw, srcW, srcH, dstW, dstH) ??
+    emptySpritePixels(dstW, dstH)
+  );
+}
+
 /** Rebuild unified pixels from top + wall bands. */
 export function joinSpriteBands(
   width: number,
@@ -263,73 +713,37 @@ export function joinSpriteBands(
   return out;
 }
 
-/**
- * Resize geometry while preserving overlapping pixel content per band.
- */
-export function resizeSpriteGeometry(
+function spriteWithResizedCanvas(
   sprite: EmberPixelSprite,
-  nextWidth: number,
-  nextTopH: number,
-  nextWallHeights: number[],
+  w: number,
+  h: number,
+  pixels: string[],
+  emissivePixels: string[] | undefined,
+  shinePixels: string[] | undefined,
 ): EmberPixelSprite {
-  const w = clampSpriteDim(
-    nextWidth,
-    SPRITE_DIM_MIN,
-    SPRITE_DIM_MAX,
+  const artLayers = resizeArtLayers(
+    sprite.artLayers,
     sprite.width,
-  );
-  const topH = clampSpriteDim(
-    nextTopH,
-    SPRITE_DIM_MIN,
-    SPRITE_DIM_MAX,
-    sprite.topHeight,
-  );
-  const walls = nextWallHeights
-    .slice(0, SPRITE_WALL_MAX_STRIPS)
-    .map((h) =>
-      clampSpriteDim(h, SPRITE_WALL_H_MIN, SPRITE_WALL_H_MAX, 8),
-    );
-  const top = copyPixelRect(
-    sliceSpriteTop(sprite),
-    sprite.width,
-    sprite.topHeight,
+    spriteTotalHeight(sprite),
     w,
-    topH,
+    h,
   );
-  const wallBands: string[][] = [];
-  for (let i = 0; i < walls.length; i++) {
-    const h = walls[i]!;
-    const prev =
-      i < sprite.wallHeights.length
-        ? sliceSpriteWall(sprite, i)
-        : emptySpritePixels(sprite.width, h);
-    const prevH =
-      i < sprite.wallHeights.length ? sprite.wallHeights[i]! : h;
-    wallBands.push(copyPixelRect(prev, sprite.width, prevH, w, h));
-  }
-  const pixels = joinSpriteBands(w, top, topH, wallBands, walls);
-  const totalH = topH + walls.reduce((a, h) => a + h, 0);
-  const emissivePixels = fitEmissiveBuffer(
-    sprite.emissivePixels,
-    w * totalH,
-    w,
-    totalH,
-  );
-  const shinePixels = fitEmissiveBuffer(
-    sprite.shinePixels,
-    w * totalH,
-    w,
-    totalH,
-  );
-  return {
+  const next: EmberPixelSprite = {
     id: sprite.id,
     nameRu: sprite.nameRu,
+    tags: sprite.tags ? [...sprite.tags] : undefined,
+    componentStates: sprite.componentStates
+      ? { ...sprite.componentStates }
+      : undefined,
     width: w,
-    topHeight: topH,
-    wallHeights: walls,
-    pixels,
+    topHeight: h,
+    wallHeights: [],
+    pixels: artLayers?.length
+      ? compositeArtLayers(artLayers, w, h)
+      : pixels,
     emissivePixels,
     shinePixels,
+    artLayers,
     emissiveAnim: normalizeEmissiveAnim(sprite.emissiveAnim),
     emissiveStrength: normalizeEmissiveStrength(sprite.emissiveStrength),
     emissiveBloomColor: normalizeEmissiveBloomColor(sprite.emissiveBloomColor),
@@ -361,8 +775,133 @@ export function resizeSpriteGeometry(
     color: sprite.color,
     roles: sprite.roles ? [...sprite.roles] : undefined,
     solid: sprite.solid || undefined,
+    collider: sprite.collider ? { ...sprite.collider } : undefined,
     glow: sprite.glow || undefined,
+    material: sprite.material,
+    views: resizeSpriteCardViews(
+      sprite.views,
+      sprite.width,
+      spriteTotalHeight(sprite),
+      w,
+      h,
+    ),
+    frames: resizeAnimFrames(
+      sprite.frames,
+      sprite.width,
+      spriteTotalHeight(sprite),
+      w,
+      h,
+    ),
   };
+  return next.frames?.[0]
+    ? { ...applyAnimFrameToSprite(next, next.frames[0]), frames: next.frames }
+    : next;
+}
+
+/**
+ * Resize the paintable W×H canvas. Color, glow, and shine share one
+ * top-left copy. Result is always flat (`topHeight = H`, `wallHeights = []`).
+ */
+export function resizeSpriteCanvas(
+  sprite: EmberPixelSprite,
+  nextWidth: number,
+  nextHeight: number,
+): EmberPixelSprite {
+  const srcW = sprite.width;
+  const srcH = spriteTotalHeight(sprite);
+  const w = clampSpriteDim(
+    nextWidth,
+    SPRITE_DIM_MIN,
+    SPRITE_DIM_MAX,
+    srcW,
+  );
+  const h = clampSpriteDim(
+    nextHeight,
+    SPRITE_DIM_MIN,
+    SPRITE_DIM_MAX,
+    srcH,
+  );
+  const pixels = copyPixelRect(sprite.pixels, srcW, srcH, w, h);
+  const emissivePixels = fitChannelBuffer(
+    sprite.emissivePixels,
+    srcW,
+    srcH,
+    w,
+    h,
+  );
+  const shinePixels = fitChannelBuffer(
+    sprite.shinePixels,
+    srcW,
+    srcH,
+    w,
+    h,
+  );
+  return spriteWithResizedCanvas(
+    sprite,
+    w,
+    h,
+    pixels,
+    emissivePixels,
+    shinePixels,
+  );
+}
+
+/**
+ * Editor save adapter: one image, `topHeight = H`, no wall strips.
+ * Does not change pixel contents besides matching W×H length.
+ */
+export function flattenSpriteForEditor(
+  sprite: EmberPixelSprite,
+): EmberPixelSprite {
+  const h = spriteTotalHeight(sprite);
+  if (sprite.wallHeights.length === 0 && sprite.topHeight === h) {
+    return sprite;
+  }
+  return spriteWithResizedCanvas(
+    sprite,
+    sprite.width,
+    h,
+    copyPixelRect(sprite.pixels, sprite.width, h, sprite.width, h),
+    fitChannelBuffer(
+      sprite.emissivePixels,
+      sprite.width,
+      h,
+      sprite.width,
+      h,
+    ),
+    fitChannelBuffer(
+      sprite.shinePixels,
+      sprite.width,
+      h,
+      sprite.width,
+      h,
+    ),
+  );
+}
+
+/**
+ * Resize geometry. Destination size is a single rectangle (sum of requested
+ * bands). Glow/shine follow the same W×H copy as color.
+ */
+export function resizeSpriteGeometry(
+  sprite: EmberPixelSprite,
+  nextWidth: number,
+  nextTopH: number,
+  nextWallHeights: number[],
+): EmberPixelSprite {
+  const walls = nextWallHeights
+    .slice(0, SPRITE_WALL_MAX_STRIPS)
+    .map((h) =>
+      clampSpriteDim(h, SPRITE_WALL_H_MIN, SPRITE_WALL_H_MAX, 8),
+    );
+  const topH = clampSpriteDim(
+    nextTopH,
+    SPRITE_DIM_MIN,
+    SPRITE_DIM_MAX,
+    sprite.topHeight,
+  );
+  const nextH = topH + walls.reduce((a, h) => a + h, 0);
+  return resizeSpriteCanvas(sprite, nextWidth, nextH);
 }
 
 export function spriteHasVisual(sprite: EmberPixelSprite): boolean {
@@ -403,6 +942,9 @@ export function serializePixelSprite(sprite: EmberPixelSprite): EmberPixelSprite
     collider: n.collider ? { ...n.collider } : undefined,
     glow: n.glow || undefined,
     material: n.material,
+    artLayers: packArtLayers(n.artLayers),
+    views: serializeSpriteCardViews(n.views),
+    frames: packAnimFrames(n.frames),
   };
 }
 
@@ -491,19 +1033,23 @@ export function normalizePixelSprite(raw: LegacySprite): EmberPixelSprite {
         totalH,
       );
     }
-    const emissivePixels = fitEmissiveBuffer(
+    const emissivePixels = fitChannelBuffer(
       raw.emissivePixels,
-      need,
+      width,
+      Math.floor((raw.emissivePixels?.length ?? 0) / Math.max(1, width)) ||
+        totalH,
       width,
       totalH,
     );
-    const shinePixels = fitEmissiveBuffer(
+    const shinePixels = fitChannelBuffer(
       raw.shinePixels,
-      need,
+      width,
+      Math.floor((raw.shinePixels?.length ?? 0) / Math.max(1, width)) ||
+        totalH,
       width,
       totalH,
     );
-    return {
+    return withAnimFrames(withArtLayers(withCardViews({
       id,
       nameRu,
       tags,
@@ -532,7 +1078,7 @@ export function normalizePixelSprite(raw: LegacySprite): EmberPixelSprite {
       collider,
       glow,
       material,
-    };
+    }, raw), raw), raw);
   }
 
   const size = clampSpriteDim(
@@ -554,7 +1100,7 @@ export function normalizePixelSprite(raw: LegacySprite): EmberPixelSprite {
 
   if (legacyWall) {
     const pixels = [...top, ...legacyWall];
-    return {
+    return withAnimFrames(withArtLayers(withCardViews({
       id,
       nameRu,
       tags,
@@ -563,15 +1109,19 @@ export function normalizePixelSprite(raw: LegacySprite): EmberPixelSprite {
       topHeight: size,
       wallHeights: [size],
       pixels,
-      emissivePixels: fitEmissiveBuffer(
+      emissivePixels: fitChannelBuffer(
         raw.emissivePixels,
-        pixels.length,
+        size,
+        Math.floor((raw.emissivePixels?.length ?? 0) / Math.max(1, size)) ||
+          size * 2,
         size,
         size * 2,
       ),
-      shinePixels: fitEmissiveBuffer(
+      shinePixels: fitChannelBuffer(
         raw.shinePixels,
-        pixels.length,
+        size,
+        Math.floor((raw.shinePixels?.length ?? 0) / Math.max(1, size)) ||
+          size * 2,
         size,
         size * 2,
       ),
@@ -593,10 +1143,10 @@ export function normalizePixelSprite(raw: LegacySprite): EmberPixelSprite {
       collider,
       glow,
       material,
-    };
+    }, raw), raw), raw);
   }
 
-  return {
+  return withAnimFrames(withArtLayers(withCardViews({
     id,
     nameRu,
     tags,
@@ -605,8 +1155,14 @@ export function normalizePixelSprite(raw: LegacySprite): EmberPixelSprite {
     topHeight: size,
     wallHeights: [],
     pixels: top,
-    emissivePixels: fitEmissiveBuffer(raw.emissivePixels, size * size, size, size),
-    shinePixels: fitEmissiveBuffer(raw.shinePixels, size * size, size, size),
+    emissivePixels: fitChannelBuffer(
+      raw.emissivePixels,
+      size,
+      size,
+      size,
+      size,
+    ),
+    shinePixels: fitChannelBuffer(raw.shinePixels, size, size, size, size),
     emissiveAnim,
     emissiveStrength,
     emissiveBloomColor,
@@ -625,5 +1181,5 @@ export function normalizePixelSprite(raw: LegacySprite): EmberPixelSprite {
     collider,
     glow,
     material,
-  };
+  }, raw), raw), raw);
 }

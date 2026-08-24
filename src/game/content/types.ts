@@ -472,11 +472,15 @@ export type EmberPixelSprite = {
   componentStates?: Partial<Record<"collider", boolean>>;
   /** Width of all bands (px), 4…64. */
   width: number;
-  /** Height of the top face (px), 4…64. */
+  /**
+   * Image / top-face height (px), 4…64.
+   * Sprites saved from the pixel editor are one canvas: `topHeight = H`,
+   * `wallHeights = []`. Legacy assets may still split top + wall strips.
+   */
   topHeight: number;
   /**
    * Wall strip heights top→bottom (px each, 1…64).
-   * Empty = top only (flush on floor).
+   * Empty = top only (flush on floor / full-canvas billboard).
    */
   wallHeights: number[];
   /**
@@ -539,6 +543,21 @@ export type EmberPixelSprite = {
   glow?: boolean;
   /** How this sprite receives light (when lit billboards are used). */
   material?: EmberMaterialKind;
+  /**
+   * Extra Octopath faces. `pixels` is always front.
+   * Missing faces fall back to front in play; the plane is not yawed.
+   */
+  views?: Partial<Record<EmberSpriteCardExtraView, EmberSpriteCardFace>>;
+  /**
+   * Optional color stack for the front canvas. Play samples `pixels`
+   * (the composite). Glow/shine stay separate material channels.
+   */
+  artLayers?: EmberSpriteArtLayer[];
+  /**
+   * Optional cel timeline. `pixels` / `views` / `artLayers` are always frame 0
+   * so a static billboard still works. Omit when there is only one cel.
+   */
+  frames?: EmberSpriteAnimFrame[];
   /** @deprecated legacy square size — normalized on load. */
   size?: EmberSpriteSize;
   /** @deprecated legacy single wall face — normalized on load. */
@@ -836,6 +855,11 @@ export const EMBER_VOXEL_CHARACTER_TEMPLATES = [
 export type EmberVoxelCharacterTemplate =
   (typeof EMBER_VOXEL_CHARACTER_TEMPLATES)[number];
 
+/** Visual language on top of a chibi skeleton. Default / omitted = block chibi. */
+export const EMBER_CHARACTER_ART_STYLES = ["chibi", "slasher"] as const;
+export type EmberCharacterArtStyle =
+  (typeof EMBER_CHARACTER_ART_STYLES)[number];
+
 export const EMBER_CHIBI32_SLOTS = [
   "pelvis",
   "torso",
@@ -869,12 +893,61 @@ export const EMBER_CHARACTER_CARD_VIEWS = [
 export type EmberCharacterCardView =
   (typeof EMBER_CHARACTER_CARD_VIEWS)[number];
 
+export const EMBER_SPRITE_CARD_EXTRA_VIEWS = [
+  "back",
+  "side_l",
+  "side_r",
+] as const;
+export type EmberSpriteCardExtraView =
+  (typeof EMBER_SPRITE_CARD_EXTRA_VIEWS)[number];
+
+/** One paintable color stack entry. Composited into `pixels` for play. */
+export type EmberSpriteArtLayer = {
+  id: string;
+  nameRu?: string;
+  /** Default true. */
+  visible?: boolean;
+  /** 0..1, default 1. */
+  opacity?: number;
+  /** Same W×H as the sprite canvas. */
+  pixels: string[];
+};
+
+/** Extra drawing for one sprite card face. Same W×H as `pixels`. */
+export type EmberSpriteCardFace = {
+  pixels: string[];
+  emissivePixels?: string[];
+  shinePixels?: string[];
+  artLayers?: EmberSpriteArtLayer[];
+};
+
+/**
+ * One playback cel. `pixels` is the front composite; extra faces live on `views`.
+ * Not a voxel `EmberVoxelAnimClip` (no joints / tracks).
+ */
+export type EmberSpriteAnimFrame = {
+  id: string;
+  /** Hold time in ms. Default 120. */
+  durationMs?: number;
+  pixels: string[];
+  emissivePixels?: string[];
+  shinePixels?: string[];
+  artLayers?: EmberSpriteArtLayer[];
+  views?: Partial<Record<EmberSpriteCardExtraView, EmberSpriteCardFace>>;
+};
+
 /**
  * Character profile on a voxel scene. Visual mesh can be taller than
  * the gameplay capsule (hair / ears stay outside collision).
  */
 export type EmberVoxelCharacterDef = {
   templateId: EmberVoxelCharacterTemplate;
+  /**
+   * Paint language for the starter mesh. Same slots / capsule as the template.
+   * Omit = classic block chibi. `slasher` = Dungeon Slasher roguelike
+   * (docs/EMBER_CHARACTER_STYLE.md).
+   */
+  style?: EmberCharacterArtStyle;
   /** Capsule height in voxels, typically to the shoulders. */
   bodyHeightVoxels: number;
   bodyRadiusVoxels: number;

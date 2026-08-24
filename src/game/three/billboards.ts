@@ -4,11 +4,29 @@
  */
 import * as THREE from "three";
 import {
+  composeSpriteForFrame,
+  composeSpriteForView,
   normalizePixelSprite,
+  spriteHasAnimFrames,
+  spriteHasExtraCardViews,
   spriteHasVisual,
   spriteTotalHeight,
 } from "../content/pixelSprite";
-import type { EmberPixelSprite, EmberTransformScale } from "../content/types";
+import {
+  clampSpriteFrameDuration,
+  spriteFrameIndexAt,
+} from "../content/spriteAnimFrames";
+import type {
+  EmberCharacterCardView,
+  EmberPixelSprite,
+  EmberTransformScale,
+} from "../content/types";
+import { EMBER_CHARACTER_CARD_VIEWS } from "../content/types";
+import {
+  characterCardViewSticky,
+  lookYawToward,
+  type CharacterCardViewState,
+} from "../voxel/characterView";
 import {
   hasEmissiveInk,
   resolveEmissiveBloomRgb,
@@ -222,7 +240,135 @@ export function createPixelBillboard(
   const n = normalizePixelSprite(spr);
   const h = Math.max(1, spriteTotalHeight(n));
   const aspect = h / Math.max(1, n.width);
-  return makeYawBillboard(tex, worldW, worldW * aspect);
+  const mesh = makeYawBillboard(tex, worldW, worldW * aspect);
+  attachSpriteCardMaps(mesh, n, tex);
+  return mesh;
+}
+
+function applyBillboardMap(mesh: THREE.Mesh, tex: THREE.Texture): void {
+  const mat = mesh.material;
+  if (!Array.isArray(mat) && "map" in mat) {
+    mat.map = tex;
+    mat.needsUpdate = true;
+  }
+  if (mesh.customDepthMaterial && "map" in mesh.customDepthMaterial) {
+    mesh.customDepthMaterial.map = tex;
+    mesh.customDepthMaterial.needsUpdate = true;
+  }
+  if (mesh.customDistanceMaterial && "map" in mesh.customDistanceMaterial) {
+    mesh.customDistanceMaterial.map = tex;
+    mesh.customDistanceMaterial.needsUpdate = true;
+  }
+}
+
+function attachSpriteCardMaps(
+  mesh: THREE.Mesh,
+  spr: EmberPixelSprite,
+  frontTex: THREE.Texture,
+): void {
+  const hasAnim = spriteHasAnimFrames(spr);
+  const hasExtras = spriteHasExtraCardViews(spr);
+  if (!hasAnim && !hasExtras) return;
+
+  const mapsForSprite = (
+    cel: EmberPixelSprite,
+    reuseFront?: THREE.Texture,
+  ): Partial<Record<EmberCharacterCardView, THREE.Texture>> => {
+    const maps: Partial<Record<EmberCharacterCardView, THREE.Texture>> = {};
+    if (reuseFront) maps.front = reuseFront;
+    else {
+      const tex = makePixelSpriteTexture(cel);
+      if (tex) maps.front = tex;
+    }
+    for (const view of EMBER_CHARACTER_CARD_VIEWS) {
+      if (view === "front") continue;
+      const composed = composeSpriteForView(cel, view);
+      if (composed === cel) continue;
+      const tex = makePixelSpriteTexture(composed);
+      if (tex) maps[view] = tex;
+    }
+    return maps;
+  };
+
+  if (hasAnim) {
+    const frames = spr.frames ?? [];
+    const maps = frames.map((_, i) =>
+      mapsForSprite(
+        composeSpriteForFrame(spr, i),
+        i === 0 ? frontTex : undefined,
+      ),
+    );
+    mesh.userData.spriteAnim = {
+      startedAt: performance.now(),
+      index: 0,
+      durations: frames.map((frame) =>
+        clampSpriteFrameDuration(frame.durationMs),
+      ),
+      maps,
+    };
+    mesh.userData.spriteCardMaps = maps[0];
+  } else {
+    mesh.userData.spriteCardMaps = mapsForSprite(spr, frontTex);
+  }
+  mesh.userData.spriteCardState = {
+    view: "front",
+  } satisfies CharacterCardViewState;
+  mesh.userData.spriteCharYaw = 0;
+}
+
+function syncSpriteCardView(
+  obj: THREE.Object3D,
+  camera: THREE.Camera,
+  force = false,
+): boolean {
+  const maps = obj.userData.spriteCardMaps as
+    | Partial<Record<EmberCharacterCardView, THREE.Texture>>
+    | undefined;
+  if (!maps || !(obj instanceof THREE.Mesh)) return false;
+  const state = (obj.userData.spriteCardState ?? {
+    view: "front",
+  }) as CharacterCardViewState;
+  const charYaw =
+    typeof obj.userData.spriteCharYaw === "number"
+      ? obj.userData.spriteCharYaw
+      : 0;
+  const look = lookYawToward(
+    { x: camera.position.x, z: camera.position.z },
+    { x: obj.position.x, z: obj.position.z },
+  );
+  const prev = state.view;
+  const view = characterCardViewSticky(look, state, charYaw);
+  obj.userData.spriteCardState = state;
+  if (view === prev && !force) return false;
+  const tex = maps[view] ?? maps.front;
+  if (!tex) return false;
+  applyBillboardMap(obj, tex);
+  return true;
+}
+
+function syncSpriteAnim(
+  obj: THREE.Object3D,
+  camera: THREE.Camera,
+): boolean {
+  const anim = obj.userData.spriteAnim as
+    | {
+        startedAt: number;
+        index: number;
+        durations: number[];
+        maps: Array<Partial<Record<EmberCharacterCardView, THREE.Texture>>>;
+      }
+    | undefined;
+  if (!anim) return syncSpriteCardView(obj, camera);
+  const idx = spriteFrameIndexAt(
+    anim.durations,
+    performance.now() - anim.startedAt,
+  );
+  const force = idx !== anim.index;
+  if (force) {
+    anim.index = idx;
+    obj.userData.spriteCardMaps = anim.maps[idx];
+  }
+  return syncSpriteCardView(obj, camera, force);
 }
 
 /** Apply authored Ember X/Y-ground + Z-up scale without compounding updates. */
@@ -267,7 +413,9 @@ export function updateYawBillboards(
 ): boolean {
   let changed = false;
   root.traverse((o) => {
-    if (o.userData.yawBillboard && faceCameraYawOnly(o, camera)) changed = true;
+    if (!o.userData.yawBillboard) return;
+    if (faceCameraYawOnly(o, camera)) changed = true;
+    if (syncSpriteAnim(o, camera)) changed = true;
   });
   return changed;
 }

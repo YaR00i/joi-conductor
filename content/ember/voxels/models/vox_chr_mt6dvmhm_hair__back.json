@@ -1,0 +1,36 @@
+{
+  "id": "vox_chr_mt6dvmhm_hair__back",
+  "nameRu": "Волосы · back",
+  "mesh": {
+    "kind": "vox",
+    "file": "voxels/models/vox_chr_mt6dvmhm_hair__back.vox"
+  },
+  "model": {
+    "id": "vox_chr_mt6dvmhm_hair__back",
+    "nameRu": "Волосы · back",
+    "tags": [
+      "character",
+      "chibi",
+      "slasher"
+    ],
+    "sizeBlocks": {
+      "x": 1,
+      "y": 1,
+      "z": 1
+    },
+    "heightVoxels": 6,
+    "palette": [
+      "",
+      "#a01818",
+      "#e02824"
+    ],
+    "voxels": [],
+    "material": "cloth",
+    "physical": false
+  },
+  "tags": [
+    "character",
+    "chibi",
+    "slasher"
+  ]
+}

@@ -11,10 +11,11 @@ import {
   EMBER_CHARACTER_CARD_VIEW_LABEL_RU,
 } from "../../../game/voxel/characterView";
 import {
-  CHIBI32_SLOT_LABEL_RU,
+  CHARACTER_ART_STYLE_LABEL_RU,
   CHIBI32_VISUAL_HEIGHT_VOXELS,
   CHIBI_TEMPLATE_LABEL_RU,
   characterCapsule,
+  chibiSlotLabelRu,
   isCharacterScene,
 } from "../../../game/voxel/voxelCharacter";
 
@@ -40,6 +41,7 @@ export function VoxelCharacterPanel({
   const slots = scene.character?.slots ?? {};
 
   const templateId = scene.character?.templateId ?? "chibi_32";
+  const artStyle = scene.character?.style ?? "chibi";
   let metaExtra: string;
   switch (templateId) {
     case "chibi_25d":
@@ -58,6 +60,9 @@ export function VoxelCharacterPanel({
     <div className="ember-voxel-character">
       <p className="ember-voxel-sculpt__section">
         Персонаж · {CHIBI_TEMPLATE_LABEL_RU[templateId]}
+        {artStyle === "slasher"
+          ? ` · ${CHARACTER_ART_STYLE_LABEL_RU[artStyle]}`
+          : ""}
       </p>
       <p className="muted ember-hint ember-voxel-character__meta">
         Капсула {cap.radius}×{cap.height} vx · макушка {CHIBI32_VISUAL_HEIGHT_VOXELS} ·
@@ -102,13 +107,17 @@ export function VoxelCharacterPanel({
                 className={`ember-voxel-character__slot ${active ? "is-active" : ""} ${hidden ? "is-hidden" : ""}`}
                 onClick={() => onSelectSlot(obj.id)}
               >
-                {CHIBI32_SLOT_LABEL_RU[slot]}
+                {chibiSlotLabelRu(slot, artStyle)}
               </button>
               <button
                 type="button"
                 className={`ember-voxel-character__eye ${hidden ? "is-off" : ""}`}
                 title={hidden ? "Показать" : "Скрыть"}
-                aria-label={hidden ? `Показать ${CHIBI32_SLOT_LABEL_RU[slot]}` : `Скрыть ${CHIBI32_SLOT_LABEL_RU[slot]}`}
+                aria-label={
+                  hidden
+                    ? `Показать ${chibiSlotLabelRu(slot, artStyle)}`
+                    : `Скрыть ${chibiSlotLabelRu(slot, artStyle)}`
+                }
                 onClick={() => onToggleVisible(obj.id)}
               >
                 {hidden ? "×" : "○"}

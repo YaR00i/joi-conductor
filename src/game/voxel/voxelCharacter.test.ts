@@ -14,6 +14,7 @@ import {
   isCharacterScene,
   isLockedCharacterObject,
   normalizeVoxelCharacterDef,
+  SLASHER_HAIR_HEX,
 } from "./voxelCharacter";
 import { normalizeVoxelScene } from "./voxelScene";
 
@@ -124,5 +125,46 @@ describe("chibi_25d character template", () => {
     expect(getVoxel(models.vox_chr_25d_head__back!, 5, 6, 9)).not.toBe(4);
     expect(scene.character?.facing).toBe("card4");
     expect(scene.character?.views?.back?.head).toBe("vox_chr_25d_head__back");
+  });
+});
+
+describe("slasher character style", () => {
+  it("paints red hair, persists style, and keeps the chibi capsule", () => {
+    const { scene, models } = createVoxelCharacter(
+      "chibi_32",
+      "vox_chr_sl",
+      "Slasher",
+      "slasher",
+    );
+    expect(scene.character?.style).toBe("slasher");
+    expect(scene.character?.templateId).toBe("chibi_32");
+    const hair = models.vox_chr_sl_hair!;
+    expect(hair.palette).toContain(SLASHER_HAIR_HEX);
+    expect(hair.voxels.some((v) => v > 0)).toBe(true);
+    expect(models.vox_chr_sl_ears?.voxels.some((v) => v > 0)).toBe(true);
+    expect(models.vox_chr_sl_hair?.tags).toContain("slasher");
+    const cap = characterCapsule(scene);
+    expect(cap.height).toBe(CHIBI32_BODY_HEIGHT_VOXELS);
+    const again = normalizeVoxelCharacterDef(
+      JSON.parse(JSON.stringify(scene.character)),
+    );
+    expect(again?.style).toBe("slasher");
+    const chibi = normalizeVoxelCharacterDef({
+      ...scene.character,
+      style: "chibi",
+    });
+    expect(chibi?.style).toBeUndefined();
+  });
+
+  it("keeps the 2.5D card thin when styled as slasher", () => {
+    const { scene, models } = createVoxelCharacter(
+      "chibi_25d",
+      "vox_chr_sl25",
+      "Slasher 2.5D",
+      "slasher",
+    );
+    expect(scene.character?.style).toBe("slasher");
+    expect(scene.character?.facing).toBe("card4");
+    expect(solidZSpan(models.vox_chr_sl25_torso!)).toBeLessThanOrEqual(5);
   });
 });

@@ -1,31 +1,72 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { writeEmberJson } from "../../../game/content/io";
+import { createSlasherCharacterSprite } from "../../../game/content/slasherCharacterPreset";
 import {
-  clampSpriteDim,
+  formatEmberLibraryTags,
+  libraryAssetMatchesQuery,
+  normalizeEmberLibraryTags,
+} from "../../../game/content/libraryTags";
+import {
   emptySpritePixels,
-  joinSpriteBands,
+  flattenSpriteForEditor,
+  matchChannelSize,
   normalizePixelSprite,
-  resizeSpriteGeometry,
+  prunePaletteFavorites,
+  resizeSpriteCanvas,
   serializePixelSprite,
-  SPRITE_DIM_MAX,
-  SPRITE_DIM_MIN,
-  SPRITE_WALL_H_MAX,
-  SPRITE_WALL_H_MIN,
-  SPRITE_WALL_MAX_STRIPS,
+  spriteFaceHasInk,
   spriteTotalHeight,
   spriteWallHeight,
+  SPRITE_BLANK_HEIGHT,
+  SPRITE_BLANK_WIDTH,
+  SPRITE_DECOR_SIZE,
+  SPRITE_DIM_MAX,
+  SPRITE_DIM_MIN,
+  clampSpriteDim,
 } from "../../../game/content/pixelSprite";
+import {
+  MAX_SPRITE_ART_LAYERS,
+  cloneArtLayers,
+  compositeArtLayers,
+  ensureArtLayerStack,
+  makeEmptyArtLayer,
+  packArtLayers,
+  resizeArtLayers,
+} from "../../../game/content/spriteArtLayers";
+import {
+  DEFAULT_SPRITE_FRAME_MS,
+  MAX_SPRITE_ANIM_FRAMES,
+  MAX_SPRITE_FRAME_MS,
+  MIN_SPRITE_FRAME_MS,
+  clampSpriteFrameDuration,
+  newSpriteFrameId,
+} from "../../../game/content/spriteAnimFrames";
+import {
+  isArtBrushTool,
+  stampArtBrush,
+  type SpriteArtBrushKind,
+} from "../../../game/content/spriteArtBrushes";
 import type {
+  EmberCharacterCardView,
   EmberEmissiveAnim,
   EmberEmissiveTriggerWhen,
   EmberEnemyDef,
   EmberMaterialKind,
   EmberPack,
   EmberPixelSprite,
+  EmberSpriteAnimFrame,
+  EmberSpriteArtLayer,
+  EmberSpriteCardExtraView,
+  EmberSpriteCardFace,
   EmberSpriteRole,
   EmberTileset,
 } from "../../../game/content/types";
-import { MAX_ELEVATION } from "../../../game/content/types";
+import {
+  EMBER_CHARACTER_CARD_VIEWS,
+  EMBER_SPRITE_CARD_EXTRA_VIEWS,
+  MAX_ELEVATION,
+} from "../../../game/content/types";
+import { EMBER_CHARACTER_CARD_VIEW_LABEL_RU } from "../../../game/voxel/characterView";
 import {
   EMBER_MATERIAL_KINDS,
   EMBER_MATERIAL_LABELS_RU,
@@ -50,15 +91,16 @@ import {
 } from "../../../game/tile/emissivePaint";
 import { WALL_HEIGHT } from "../../../game/tile/extruded";
 import {
+  paintPixelGrid,
   paintSpriteDecorOnFloor,
   paintTileFace,
   spriteHasVisual,
 } from "../../../game/tile/tileTextures";
 import { EmberSpriteThumb, EmberThumbGrid } from "./EmberThumbGrid";
 import {
-  copyPixelArt,
+  copyPixelArtChannels,
   hasPixelClipboard,
-  pastePixelArt,
+  pastePixelArtChannels,
 } from "./pixelClipboard";
 import {
   getLastOpenedId,
@@ -74,7 +116,46 @@ type Props = {
   initialSpriteId?: string | null;
 };
 
-type DrawTool = "paint" | "eyedrop" | "glow" | "shine";
+type DrawTool = "paint" | "eyedrop" | "glow" | "shine" | SpriteArtBrushKind;
+type DrawLayer = "color" | "glow" | "shine";
+
+const ART_BRUSH_TOOLS: Array<{
+  id: SpriteArtBrushKind;
+  label: string;
+  title: string;
+}> = [
+  { id: "soften", label: "См", title: "Смягчение · без смены hue" },
+  { id: "burn", label: "Тн", title: "Затемнение по тону" },
+  { id: "dodge", label: "Св", title: "Осветление по тону" },
+  { id: "smudge", label: "Рз", title: "Размазывание" },
+];
+
+function isTypingTarget(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  const tag = el.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  return el.isContentEditable;
+}
+
+function channelForTool(tool: DrawTool): DrawLayer {
+  switch (tool) {
+    case "paint":
+    case "eyedrop":
+    case "soften":
+    case "burn":
+    case "dodge":
+    case "smudge":
+      return "color";
+    case "glow":
+      return "glow";
+    case "shine":
+      return "shine";
+    default: {
+      const _never: never = tool;
+      return _never;
+    }
+  }
+}
 
 const EMISSIVE_ANIM_OPTS: Array<{ id: EmberEmissiveAnim; label: string }> = [
   { id: "always", label: "Всегда" },
@@ -141,17 +222,211 @@ function dominantColor(pixels: string[]): string | null {
   return best;
 }
 
-function bandBoundaries(
-  topHeight: number,
-  wallHeights: number[],
-): number[] {
-  const rows = [0, topHeight];
-  let y = topHeight;
-  for (const h of wallHeights) {
-    y += h;
-    rows.push(y);
+type SpriteCardBuf = {
+  pixels: string[];
+  emissive: string[];
+  shine: string[];
+  artLayers?: EmberSpriteArtLayer[];
+  activeLayerId?: string;
+};
+
+type ExtraCardViews = Partial<Record<EmberSpriteCardExtraView, SpriteCardBuf>>;
+
+function emptyCardBuf(width: number, height: number): SpriteCardBuf {
+  return {
+    pixels: emptySpritePixels(width, height),
+    emissive: emptySpritePixels(width, height),
+    shine: emptySpritePixels(width, height),
+  };
+}
+
+function cardBufHasInk(buf: SpriteCardBuf): boolean {
+  return (
+    spriteFaceHasInk(buf.pixels) ||
+    spriteFaceHasInk(buf.emissive) ||
+    spriteFaceHasInk(buf.shine) ||
+    Boolean(buf.artLayers?.some((layer) => spriteFaceHasInk(layer.pixels)))
+  );
+}
+
+function bufFromFace(
+  face: EmberSpriteCardFace | undefined,
+  width: number,
+  height: number,
+): SpriteCardBuf | undefined {
+  if (!face) return undefined;
+  return {
+    pixels: matchChannelSize(face.pixels, width, height, width, height),
+    emissive: matchChannelSize(
+      face.emissivePixels,
+      width,
+      height,
+      width,
+      height,
+    ),
+    shine: matchChannelSize(face.shinePixels, width, height, width, height),
+    artLayers: cloneArtLayers(face.artLayers),
+    activeLayerId: face.artLayers?.at(-1)?.id,
+  };
+}
+
+function extrasFromSprite(
+  sprite: EmberPixelSprite,
+  width: number,
+  height: number,
+): ExtraCardViews {
+  const extras: ExtraCardViews = {};
+  for (const key of EMBER_SPRITE_CARD_EXTRA_VIEWS) {
+    const buf = bufFromFace(sprite.views?.[key], width, height);
+    if (buf) extras[key] = buf;
   }
-  return rows;
+  return extras;
+}
+
+function resizeCardBuf(
+  buf: SpriteCardBuf | undefined,
+  srcW: number,
+  srcH: number,
+  dstW: number,
+  dstH: number,
+): SpriteCardBuf | undefined {
+  if (!buf) return undefined;
+  const artLayers = resizeArtLayers(
+    buf.artLayers,
+    srcW,
+    srcH,
+    dstW,
+    dstH,
+  );
+  return {
+    pixels: artLayers?.length
+      ? compositeArtLayers(artLayers, dstW, dstH)
+      : matchChannelSize(buf.pixels, srcW, srcH, dstW, dstH),
+    emissive: matchChannelSize(buf.emissive, srcW, srcH, dstW, dstH),
+    shine: matchChannelSize(buf.shine, srcW, srcH, dstW, dstH),
+    artLayers,
+    activeLayerId: buf.activeLayerId,
+  };
+}
+
+function packCardViews(
+  extras: ExtraCardViews,
+): EmberPixelSprite["views"] {
+  const views: NonNullable<EmberPixelSprite["views"]> = {};
+  for (const key of EMBER_SPRITE_CARD_EXTRA_VIEWS) {
+    const buf = extras[key];
+    if (!buf || !cardBufHasInk(buf)) continue;
+    views[key] = {
+      pixels: [...buf.pixels],
+      emissivePixels: spriteFaceHasInk(buf.emissive)
+        ? [...buf.emissive]
+        : undefined,
+      shinePixels: spriteFaceHasInk(buf.shine) ? [...buf.shine] : undefined,
+      artLayers: packArtLayers(buf.artLayers),
+    };
+  }
+  return Object.keys(views).length ? views : undefined;
+}
+
+function cloneCardBuf(buf: SpriteCardBuf): SpriteCardBuf {
+  return {
+    pixels: [...buf.pixels],
+    emissive: [...buf.emissive],
+    shine: [...buf.shine],
+    artLayers: cloneArtLayers(buf.artLayers),
+    activeLayerId: buf.activeLayerId,
+  };
+}
+
+function cloneExtras(extras: ExtraCardViews): ExtraCardViews {
+  const next: ExtraCardViews = {};
+  for (const key of EMBER_SPRITE_CARD_EXTRA_VIEWS) {
+    const buf = extras[key];
+    if (buf) next[key] = cloneCardBuf(buf);
+  }
+  return next;
+}
+
+type SpriteFrameBuf = {
+  id: string;
+  durationMs: number;
+  front: SpriteCardBuf;
+  extras: ExtraCardViews;
+};
+
+function cloneFrameBuf(frame: SpriteFrameBuf): SpriteFrameBuf {
+  return {
+    id: frame.id,
+    durationMs: frame.durationMs,
+    front: cloneCardBuf(frame.front),
+    extras: cloneExtras(frame.extras),
+  };
+}
+
+function frameBufFromAnim(
+  frame: EmberSpriteAnimFrame,
+  width: number,
+  height: number,
+): SpriteFrameBuf {
+  return {
+    id: frame.id,
+    durationMs: clampSpriteFrameDuration(frame.durationMs),
+    front: {
+      pixels: matchChannelSize(frame.pixels, width, height, width, height),
+      emissive: matchChannelSize(
+        frame.emissivePixels,
+        width,
+        height,
+        width,
+        height,
+      ),
+      shine: matchChannelSize(
+        frame.shinePixels,
+        width,
+        height,
+        width,
+        height,
+      ),
+      artLayers: cloneArtLayers(frame.artLayers),
+      activeLayerId: frame.artLayers?.at(-1)?.id,
+    },
+    extras: extrasFromSprite(
+      { views: frame.views } as EmberPixelSprite,
+      width,
+      height,
+    ),
+  };
+}
+
+function animFrameFromBuf(frame: SpriteFrameBuf): EmberSpriteAnimFrame {
+  return {
+    id: frame.id,
+    durationMs: frame.durationMs,
+    pixels: [...frame.front.pixels],
+    emissivePixels: spriteFaceHasInk(frame.front.emissive)
+      ? [...frame.front.emissive]
+      : undefined,
+    shinePixels: spriteFaceHasInk(frame.front.shine)
+      ? [...frame.front.shine]
+      : undefined,
+    artLayers: cloneArtLayers(frame.front.artLayers),
+    views: packCardViews(frame.extras),
+  };
+}
+
+function packEditorFrames(
+  frames: SpriteFrameBuf[] | undefined,
+): EmberSpriteAnimFrame[] | undefined {
+  if (!frames || frames.length < 2) return undefined;
+  return frames.slice(0, MAX_SPRITE_ANIM_FRAMES).map(animFrameFromBuf);
+}
+
+const CELL_SCALE_MIN = 4;
+const CELL_SCALE_MAX = 40;
+
+function clampCellScale(n: number): number {
+  if (!Number.isFinite(n)) return 12;
+  return Math.max(CELL_SCALE_MIN, Math.min(CELL_SCALE_MAX, Math.round(n)));
 }
 
 export function SpriteEditorPanel({
@@ -203,9 +478,7 @@ export function SpriteEditorPanel({
     : undefined;
 
   const width = sprite?.width ?? 16;
-  const topHeight = sprite?.topHeight ?? 16;
-  const wallHeights = sprite?.wallHeights ?? [];
-  const totalH = sprite ? spriteTotalHeight(sprite) : 16;
+  const canvasH = sprite ? spriteTotalHeight(sprite) : 16;
 
   const [nameRu, setNameRu] = useState("");
   const [color, setColor] = useState("#c45c26");
@@ -245,12 +518,12 @@ export function SpriteEditorPanel({
     useState<EmberEmissiveTriggerWhen>("player");
   const [emissiveTriggerRadius, setEmissiveTriggerRadius] = useState(3);
   const [emissiveTriggerEventId, setEmissiveTriggerEventId] = useState("");
-  const [favDraft, setFavDraft] = useState("#ff8866");
   const [enemyBind, setEnemyBind] = useState("");
   /** Floor elevation for on-tile preview (0 = flat). */
   const [previewElev, setPreviewElev] = useState(0);
   const [widthDraft, setWidthDraft] = useState(16);
-  const [topHDraft, setTopHDraft] = useState(16);
+  const [heightDraft, setHeightDraft] = useState(16);
+  const [cardView, setCardView] = useState<EmberCharacterCardView>("front");
 
   const tileset = useMemo(() => {
     const id = Object.keys(pack.tilesets)[0];
@@ -285,7 +558,16 @@ export function SpriteEditorPanel({
   const strokeSaved = useRef(false);
   const toolRef = useRef(tool);
   const brushSizeRef = useRef(brushSize);
-  const geomRef = useRef({ width, topHeight, wallHeights, totalH });
+  const geomRef = useRef({ width, height: canvasH });
+  const cardViewRef = useRef<EmberCharacterCardView>("front");
+  const frontBufRef = useRef<SpriteCardBuf | null>(null);
+  const extraViewsRef = useRef<ExtraCardViews>({});
+  const artLayersRef = useRef<EmberSpriteArtLayer[] | undefined>(undefined);
+  const activeLayerIdRef = useRef<string | undefined>(undefined);
+  const framesRef = useRef<SpriteFrameBuf[] | undefined>(undefined);
+  const activeFrameIdRef = useRef<string | undefined>(undefined);
+  const showFrameRef = useRef<(frame: SpriteFrameBuf) => void>(() => {});
+  const smudgePrevRef = useRef<{ x: number; y: number } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -293,6 +575,12 @@ export function SpriteEditorPanel({
     pixels: string[];
     emissive: string[];
     shine: string[];
+    artLayers?: EmberSpriteArtLayer[];
+    activeLayerId?: string;
+    frames?: SpriteFrameBuf[];
+    activeFrameId?: string;
+    width: number;
+    height: number;
   };
   const undoRef = useRef<PaintSnapshot[]>([]);
   const redoRef = useRef<PaintSnapshot[]>([]);
@@ -300,13 +588,25 @@ export function SpriteEditorPanel({
   const [redoLen, setRedoLen] = useState(0);
   const [clipReady, setClipReady] = useState(() => hasPixelClipboard());
   const [cellScale, setCellScale] = useState(14);
+  const [tagsDraft, setTagsDraft] = useState("");
+  const [pickerQuery, setPickerQuery] = useState("");
+  const [showColor, setShowColor] = useState(true);
+  const [showGlow, setShowGlow] = useState(true);
+  const [showShine, setShowShine] = useState(true);
+  const [artLayers, setArtLayers] = useState<EmberSpriteArtLayer[] | undefined>();
+  const [activeLayerId, setActiveLayerId] = useState<string | undefined>();
+  const [frames, setFrames] = useState<SpriteFrameBuf[] | undefined>();
+  const [activeFrameId, setActiveFrameId] = useState<string | undefined>();
+  const [previewPlaying, setPreviewPlaying] = useState(false);
 
   toolRef.current = tool;
   brushSizeRef.current = brushSize;
   pixelsRef.current = pixels;
   emissiveRef.current = emissivePixels;
   shineRef.current = shinePixels;
-  geomRef.current = { width, topHeight, wallHeights, totalH };
+  artLayersRef.current = artLayers;
+  activeLayerIdRef.current = activeLayerId;
+  geomRef.current = { width, height: canvasH };
   const cellScaleRef = useRef(cellScale);
   cellScaleRef.current = cellScale;
 
@@ -316,23 +616,45 @@ export function SpriteEditorPanel({
     return [...BASE_PALETTE, ...extra];
   }, [favorites]);
 
-  // Fit pixel scale to the available artboard (canvas is the focus).
+  const packRef = useRef(pack);
+  packRef.current = pack;
+  useEffect(() => {
+    const pruned = prunePaletteFavorites(favorites);
+    if (
+      pruned.length === favorites.length &&
+      pruned.every((c, i) => c === favorites[i])
+    ) {
+      return;
+    }
+    onChangePack({ ...packRef.current, paletteFavorites: pruned });
+  }, [favorites, onChangePack]);
+
+  const stepZoom = (dir: 1 | -1) => {
+    setCellScale((prev) => clampCellScale(prev + dir));
+  };
+
+  const fitStage = useCallback(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const padX = 32;
+    const padY = 32;
+    const sx = Math.floor((rect.width - padX) / Math.max(1, width));
+    const sy = Math.floor((rect.height - padY) / Math.max(1, canvasH));
+    setCellScale(clampCellScale(Math.min(sx, sy) || 8));
+  }, [width, canvasH]);
+
   useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
-    const fit = () => {
-      const rect = el.getBoundingClientRect();
-      const padX = 88;
-      const padY = 56;
-      const sx = Math.floor((rect.width - padX) / Math.max(1, width));
-      const sy = Math.floor((rect.height - padY) / Math.max(1, totalH));
-      setCellScale(Math.max(8, Math.min(28, Math.min(sx, sy) || 8)));
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const dir: 1 | -1 = e.deltaY < 0 ? 1 : -1;
+      setCellScale((prev) => clampCellScale(prev + dir));
     };
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [width, totalH, spriteId]);
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [spriteId]);
 
   // Load sprite into editor
   useEffect(() => {
@@ -348,7 +670,21 @@ export function SpriteEditorPanel({
       setGlow(false);
       setMaterial("");
       setWidthDraft(16);
-      setTopHDraft(16);
+      setHeightDraft(16);
+      setTagsDraft("");
+      cardViewRef.current = "front";
+      setCardView("front");
+      frontBufRef.current = null;
+      extraViewsRef.current = {};
+      artLayersRef.current = undefined;
+      activeLayerIdRef.current = undefined;
+      setArtLayers(undefined);
+      setActiveLayerId(undefined);
+      framesRef.current = undefined;
+      activeFrameIdRef.current = undefined;
+      setFrames(undefined);
+      setActiveFrameId(undefined);
+      setPreviewPlaying(false);
       return;
     }
     setNameRu(sprite.nameRu ?? "");
@@ -369,6 +705,44 @@ export function SpriteEditorPanel({
         ? [...sprite.shinePixels]
         : emptySpritePixels(sprite.width, spriteTotalHeight(sprite)),
     );
+    {
+      const h = spriteTotalHeight(sprite);
+      const em =
+        sprite.emissivePixels && sprite.emissivePixels.length === need
+          ? [...sprite.emissivePixels]
+          : emptySpritePixels(sprite.width, h);
+      const sh =
+        sprite.shinePixels && sprite.shinePixels.length === need
+          ? [...sprite.shinePixels]
+          : emptySpritePixels(sprite.width, h);
+      const layers = cloneArtLayers(sprite.artLayers);
+      const activeId = layers?.at(-1)?.id;
+      frontBufRef.current = {
+        pixels: [...sprite.pixels],
+        emissive: em,
+        shine: sh,
+        artLayers: layers,
+        activeLayerId: activeId,
+      };
+      extraViewsRef.current = extrasFromSprite(sprite, sprite.width, h);
+      cardViewRef.current = "front";
+      setCardView("front");
+      artLayersRef.current = layers;
+      activeLayerIdRef.current = activeId;
+      setArtLayers(layers);
+      setActiveLayerId(activeId);
+      const loadedFrames =
+        sprite.frames && sprite.frames.length >= 2
+          ? sprite.frames.map((frame) =>
+              frameBufFromAnim(frame, sprite.width, h),
+            )
+          : undefined;
+      framesRef.current = loadedFrames;
+      activeFrameIdRef.current = loadedFrames?.[0]?.id;
+      setFrames(loadedFrames);
+      setActiveFrameId(loadedFrames?.[0]?.id);
+      setPreviewPlaying(false);
+    }
     setEmissiveAnim(sprite.emissiveAnim ?? "always");
     setEmissiveStrength(
       Number.isFinite(sprite.emissiveStrength)
@@ -403,7 +777,8 @@ export function SpriteEditorPanel({
     );
     setEmissiveTriggerEventId(sprite.emissiveTriggerEventId ?? "");
     setWidthDraft(sprite.width);
-    setTopHDraft(sprite.topHeight);
+    setHeightDraft(spriteTotalHeight(sprite));
+    setTagsDraft(formatEmberLibraryTags(sprite.tags));
     undoRef.current = [];
     redoRef.current = [];
     setHistoryLen(0);
@@ -416,23 +791,22 @@ export function SpriteEditorPanel({
     }
   }, [pack.sprites, spriteId, spriteList]);
 
-  // Paint unified canvas + band dividers
+  // Paint unified canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const bounds = bandBoundaries(topHeight, wallHeights);
     canvas.width = width * cellScale;
-    canvas.height = totalH * cellScale;
+    canvas.height = canvasH * cellScale;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (let y = 0; y < totalH; y++) {
+    for (let y = 0; y < canvasH; y++) {
       for (let x = 0; x < width; x++) {
         const c = pixels[y * width + x];
         const px = x * cellScale;
         const py = y * cellScale;
-        if (!c || c === "#00000000") {
+        if (!showColor || !c || c === "#00000000") {
           ctx.fillStyle = (x + y) % 2 === 0 ? "#1a120e" : "#241810";
           ctx.fillRect(px, py, cellScale, cellScale);
         } else {
@@ -440,7 +814,7 @@ export function SpriteEditorPanel({
           ctx.fillRect(px, py, cellScale, cellScale);
         }
         const em = emissivePixels[y * width + x];
-        if (em && em !== "#00000000") {
+        if (showGlow && em && em !== "#00000000") {
           ctx.fillStyle = em;
           ctx.globalAlpha = 0.55 + emissiveStrength * 0.35;
           ctx.fillRect(px, py, cellScale, cellScale);
@@ -455,7 +829,7 @@ export function SpriteEditorPanel({
           );
         }
         const sh = shinePixels[y * width + x];
-        if (sh && sh !== "#00000000") {
+        if (showShine && sh && sh !== "#00000000") {
           ctx.fillStyle = sh;
           ctx.globalAlpha = 0.5;
           ctx.fillRect(px, py, cellScale, cellScale);
@@ -471,27 +845,17 @@ export function SpriteEditorPanel({
         }
       }
     }
-    // Soft band separators (top / walls) — labels live in the side gutter HUD.
-    ctx.strokeStyle = "rgba(255, 190, 110, 0.55)";
-    ctx.lineWidth = Math.max(1, Math.round(cellScale * 0.12));
-    for (let i = 1; i < bounds.length - 1; i++) {
-      const row = bounds[i]!;
-      const y = row * cellScale + 0.5;
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
-    }
   }, [
     pixels,
     emissivePixels,
     shinePixels,
     emissiveStrength,
     width,
-    topHeight,
-    wallHeights,
-    totalH,
+    canvasH,
     cellScale,
+    showColor,
+    showGlow,
+    showShine,
   ]);
 
   // On-tile preview (compact; elevation Z0…MAX)
@@ -503,19 +867,28 @@ export function SpriteEditorPanel({
       tileset.tiles.find((t) => t.id !== 0);
     const tilePx = tileset.tileSize;
     const elev = Math.max(0, Math.min(MAX_ELEVATION, previewElev));
-    const storyHSrc = spriteWallHeight(sprite);
+    const live: EmberPixelSprite = {
+      ...sprite,
+      pixels,
+      emissivePixels,
+      shinePixels,
+      width,
+      topHeight: canvasH,
+      wallHeights: [],
+    };
+    const storyHSrc = spriteWallHeight(live);
     const maxBox = 88;
     const roughH =
       tilePx +
       elev * WALL_HEIGHT +
-      (storyHSrc > 0 ? storyHSrc + topHeight : Math.max(topHeight, tilePx));
+      (storyHSrc > 0 ? storyHSrc + canvasH : Math.max(canvasH, tilePx));
     const viewScale = Math.max(
       2,
       Math.min(6, Math.floor(maxBox / Math.max(tilePx, roughH * 0.45))),
     );
     const tileDraw = tilePx * viewScale;
     const storyH = Math.round(storyHSrc * viewScale);
-    const topDrawH = Math.round(topHeight * viewScale);
+    const topDrawH = Math.round(canvasH * viewScale);
     const elevOff = elev * Math.round(WALL_HEIGHT * viewScale);
     const hasVisual = spriteHasVisual({ ...sprite, pixels });
     const stackRaise =
@@ -563,9 +936,48 @@ export function SpriteEditorPanel({
       ctx.fillStyle = "#2f4a30";
       ctx.fillRect(padX, floorY, tileDraw, tileDraw);
     }
-    const live: EmberPixelSprite = { ...sprite, pixels };
     if (hasVisual) {
       paintSpriteDecorOnFloor(ctx, live, padX, floorY, tileDraw, viewScale);
+    }
+    const wallH = Math.round(storyHSrc * viewScale);
+    const topH = Math.max(1, Math.round(canvasH * viewScale));
+    const tw = Math.max(1, Math.round(width * viewScale));
+    const cx = padX + tileDraw / 2;
+    const cy =
+      wallH > 0
+        ? floorY + tileDraw - wallH - topH / 2
+        : floorY + tileDraw / 2;
+    const overlayX = Math.round(cx - tw / 2);
+    const overlayY = Math.round(cy - topH / 2);
+    if (spriteFaceHasInk(emissivePixels)) {
+      ctx.save();
+      ctx.globalAlpha = 0.55 + emissiveStrength * 0.35;
+      paintPixelGrid(
+        ctx,
+        emissivePixels,
+        width,
+        canvasH,
+        overlayX,
+        overlayY,
+        tw,
+        topH,
+      );
+      ctx.restore();
+    }
+    if (spriteFaceHasInk(shinePixels)) {
+      ctx.save();
+      ctx.globalAlpha = 0.45;
+      paintPixelGrid(
+        ctx,
+        shinePixels,
+        width,
+        canvasH,
+        overlayX,
+        overlayY,
+        tw,
+        topH,
+      );
+      ctx.restore();
     }
     ctx.strokeStyle = "rgba(255, 220, 160, 0.35)";
     ctx.lineWidth = 1;
@@ -577,21 +989,31 @@ export function SpriteEditorPanel({
     }
   }, [
     pixels,
+    emissivePixels,
+    shinePixels,
+    emissiveStrength,
     width,
-    topHeight,
-    totalH,
-    wallHeights,
+    canvasH,
     tileset,
     previewTileId,
     sprite,
     previewElev,
   ]);
 
-  const capturePaintSnapshot = (): PaintSnapshot => ({
-    pixels: [...pixelsRef.current],
-    emissive: [...emissiveRef.current],
-    shine: [...shineRef.current],
-  });
+  const capturePaintSnapshot = (): PaintSnapshot => {
+    const g = geomRef.current;
+    return {
+      pixels: [...pixelsRef.current],
+      emissive: [...emissiveRef.current],
+      shine: [...shineRef.current],
+      artLayers: cloneArtLayers(artLayersRef.current),
+      activeLayerId: activeLayerIdRef.current,
+      frames: framesRef.current?.map(cloneFrameBuf),
+      activeFrameId: activeFrameIdRef.current,
+      width: g.width,
+      height: g.height,
+    };
+  };
 
   const pushHistory = () => {
     undoRef.current = [
@@ -607,24 +1029,79 @@ export function SpriteEditorPanel({
     (nextPixels: string[], overrides?: Partial<EmberPixelSprite>) => {
       if (!spriteId || !sprite) return;
       const g = geomRef.current;
-      const need = g.width * g.totalH;
-      const px =
-        nextPixels.length === need
-          ? nextPixels
-          : emptySpritePixels(g.width, g.totalH);
-      const emRaw = emissiveRef.current;
-      const em =
-        emRaw.length === need
-          ? emRaw
-          : emptySpritePixels(g.width, g.totalH);
-      const shRaw = shineRef.current;
-      const sh =
-        shRaw.length === need
-          ? shRaw
-          : emptySpritePixels(g.width, g.totalH);
+      const widthOut = overrides?.width ?? g.width;
+      const heightOut = overrides?.topHeight ?? g.height;
+      const pxSrc = overrides?.pixels ?? nextPixels;
+      const px = matchChannelSize(pxSrc, g.width, g.height, widthOut, heightOut);
+      const emRaw = overrides?.emissivePixels ?? emissiveRef.current;
+      const em = matchChannelSize(emRaw, g.width, g.height, widthOut, heightOut);
+      const shRaw = overrides?.shinePixels ?? shineRef.current;
+      const sh = matchChannelSize(shRaw, g.width, g.height, widthOut, heightOut);
       const colorDom = dominantColor(px) || color;
-      const hasEm = em.some((c) => c && c !== "#00000000");
-      const hasShine = sh.some((c) => c && c !== "#00000000");
+      const view = cardViewRef.current;
+      const currentBuf: SpriteCardBuf = {
+        pixels: [...px],
+        emissive: [...em],
+        shine: [...sh],
+        artLayers: cloneArtLayers(artLayersRef.current),
+        activeLayerId: activeLayerIdRef.current,
+      };
+      if (view === "front") {
+        frontBufRef.current = currentBuf;
+      } else {
+        extraViewsRef.current = {
+          ...extraViewsRef.current,
+          [view]: currentBuf,
+        };
+      }
+      let timeline = framesRef.current;
+      if (timeline?.length) {
+        const fid = activeFrameIdRef.current ?? timeline[0]!.id;
+        timeline = timeline.map((frame) =>
+          frame.id !== fid
+            ? frame
+            : {
+                ...frame,
+                front:
+                  view === "front"
+                    ? currentBuf
+                    : (frontBufRef.current ?? currentBuf),
+                extras: extraViewsRef.current,
+              },
+        );
+        framesRef.current = timeline;
+        setFrames(timeline);
+      }
+      const packedFrames = packEditorFrames(timeline);
+      const frame0 = timeline?.[0];
+      const frontBuf = frame0?.front
+        ?? (view === "front" ? currentBuf : (frontBufRef.current ?? currentBuf));
+      const extras = frame0?.extras ?? extraViewsRef.current;
+      const views = packCardViews(extras);
+      const channelHasInk = (buf: SpriteCardBuf, kind: "emissive" | "shine") =>
+        buf[kind].some((c) => c && c !== "#00000000");
+      const extrasHave = (
+        bag: ExtraCardViews,
+        kind: "emissive" | "shine",
+      ) =>
+        EMBER_SPRITE_CARD_EXTRA_VIEWS.some((key) => {
+          const buf = bag[key];
+          return buf ? channelHasInk(buf, kind) : false;
+        });
+      const hasEm = timeline?.length
+        ? timeline.some(
+            (frame) =>
+              channelHasInk(frame.front, "emissive") ||
+              extrasHave(frame.extras, "emissive"),
+          )
+        : channelHasInk(frontBuf, "emissive") || extrasHave(extras, "emissive");
+      const hasShine = timeline?.length
+        ? timeline.some(
+            (frame) =>
+              channelHasInk(frame.front, "shine") ||
+              extrasHave(frame.extras, "shine"),
+          )
+        : channelHasInk(frontBuf, "shine") || extrasHave(extras, "shine");
       const anim = hasEm ? emissiveAnim : undefined;
       const isTrig = anim === "trigger";
       const isPulse = anim === "pulse";
@@ -635,50 +1112,57 @@ export function SpriteEditorPanel({
             emissiveAnimPeriodMax,
           )
         : null;
-      const nextSpr: EmberPixelSprite = serializePixelSprite({
-        ...sprite,
-        nameRu: nameRu.trim() || sprite.nameRu,
-        color: colorDom,
-        width: g.width,
-        topHeight: g.topHeight,
-        wallHeights: [...g.wallHeights],
-        pixels: [...px],
-        emissivePixels: hasEm ? [...em] : undefined,
-        shinePixels: hasShine ? [...sh] : undefined,
-        emissiveAnim: anim,
-        emissiveStrength: hasEm ? emissiveStrength : undefined,
-        emissiveBloomColor:
-          hasEm && emissiveBloomCustom
-            ? normalizeEmissiveBloomColor(emissiveBloomColor)
-            : undefined,
-        emissiveCastsLight: hasEm && emissiveCastsLight ? true : undefined,
-        emissiveLightRange:
-          hasEm && emissiveCastsLight
-            ? resolveEmissiveLightRange(emissiveLightRange)
-            : undefined,
-        emissiveLightShadows:
-          hasEm && emissiveCastsLight && emissiveLightShadows
-            ? true
-            : undefined,
-        emissiveAnimPeriod: isPulse ? emissiveAnimPeriod : undefined,
-        emissiveAnimPeriodMin: flickerRange?.min,
-        emissiveAnimPeriodMax: flickerRange?.max,
-        emissiveTriggerWhen: isTrig ? emissiveTriggerWhen : undefined,
-        emissiveTriggerRadius: isTrig ? emissiveTriggerRadius : undefined,
-        emissiveTriggerEventId:
-          isTrig && emissiveTriggerWhen === "event"
-            ? emissiveTriggerEventId || undefined
-            : undefined,
-        roles: [...roles],
-        solid,
-        glow,
-        material: material || undefined,
-        ...overrides,
-      });
+      const nextSpr: EmberPixelSprite = serializePixelSprite(
+        flattenSpriteForEditor({
+          ...sprite,
+          nameRu: nameRu.trim() || sprite.nameRu,
+          color: colorDom,
+          emissiveAnim: anim,
+          emissiveStrength: hasEm ? emissiveStrength : undefined,
+          emissiveBloomColor:
+            hasEm && emissiveBloomCustom
+              ? normalizeEmissiveBloomColor(emissiveBloomColor)
+              : undefined,
+          emissiveCastsLight: hasEm && emissiveCastsLight ? true : undefined,
+          emissiveLightRange:
+            hasEm && emissiveCastsLight
+              ? resolveEmissiveLightRange(emissiveLightRange)
+              : undefined,
+          emissiveLightShadows:
+            hasEm && emissiveCastsLight && emissiveLightShadows
+              ? true
+              : undefined,
+          emissiveAnimPeriod: isPulse ? emissiveAnimPeriod : undefined,
+          emissiveAnimPeriodMin: flickerRange?.min,
+          emissiveAnimPeriodMax: flickerRange?.max,
+          emissiveTriggerWhen: isTrig ? emissiveTriggerWhen : undefined,
+          emissiveTriggerRadius: isTrig ? emissiveTriggerRadius : undefined,
+          emissiveTriggerEventId:
+            isTrig && emissiveTriggerWhen === "event"
+              ? emissiveTriggerEventId || undefined
+              : undefined,
+          roles: [...roles],
+          tags: normalizeEmberLibraryTags(tagsDraft),
+          solid,
+          glow,
+          material: material || undefined,
+          ...overrides,
+          width: widthOut,
+          topHeight: heightOut,
+          wallHeights: [],
+          pixels: [...frontBuf.pixels],
+          emissivePixels: hasEm ? [...frontBuf.emissive] : undefined,
+          shinePixels: hasShine ? [...frontBuf.shine] : undefined,
+          artLayers: packArtLayers(frontBuf.artLayers),
+          views,
+          frames: packedFrames,
+        }),
+      );
       onChangePack({
         ...pack,
         sprites: { ...pack.sprites, [spriteId]: nextSpr },
       });
+      return nextSpr;
     },
     [
       spriteId,
@@ -686,6 +1170,7 @@ export function SpriteEditorPanel({
       nameRu,
       color,
       roles,
+      tagsDraft,
       solid,
       glow,
       material,
@@ -710,39 +1195,13 @@ export function SpriteEditorPanel({
   const toggleSolid = () => {
     const next = !solid;
     setSolid(next);
-    if (!spriteId || !sprite) return;
-    onChangePack({
-      ...pack,
-      sprites: {
-        ...pack.sprites,
-        [spriteId]: serializePixelSprite({
-          ...sprite,
-          pixels: pixelsRef.current,
-          roles: [...roles],
-          solid: next,
-          glow,
-        }),
-      },
-    });
+    commitToPack(pixelsRef.current, { solid: next });
   };
 
   const toggleGlow = () => {
     const next = !glow;
     setGlow(next);
-    if (!spriteId || !sprite) return;
-    onChangePack({
-      ...pack,
-      sprites: {
-        ...pack.sprites,
-        [spriteId]: serializePixelSprite({
-          ...sprite,
-          pixels: pixelsRef.current,
-          roles: [...roles],
-          solid,
-          glow: next,
-        }),
-      },
-    });
+    commitToPack(pixelsRef.current, { glow: next });
   };
 
   const applyLive = (
@@ -763,33 +1222,248 @@ export function SpriteEditorPanel({
     commitToPack(next);
   };
 
+  const applyLayers = (
+    layers: EmberSpriteArtLayer[] | undefined,
+    activeId?: string,
+  ) => {
+    artLayersRef.current = layers;
+    activeLayerIdRef.current = activeId ?? layers?.at(-1)?.id;
+    setArtLayers(layers);
+    setActiveLayerId(activeLayerIdRef.current);
+  };
+
+  const writeColorPixels = (nextLayerPixels: string[]) => {
+    const g = geomRef.current;
+    const layers = artLayersRef.current;
+    if (layers?.length) {
+      const id = activeLayerIdRef.current ?? layers[layers.length - 1]!.id;
+      const nextLayers = layers.map((layer) =>
+        layer.id === id ? { ...layer, pixels: nextLayerPixels } : layer,
+      );
+      const composed = compositeArtLayers(nextLayers, g.width, g.height);
+      applyLayers(nextLayers, id);
+      pixelsRef.current = composed;
+      setPixels(composed);
+      commitToPack(composed);
+      return;
+    }
+    pixelsRef.current = nextLayerPixels;
+    setPixels(nextLayerPixels);
+    commitToPack(nextLayerPixels);
+  };
+
+  const colorTargetPixels = (): string[] => {
+    const layers = artLayersRef.current;
+    if (!layers?.length) return pixelsRef.current;
+    const id = activeLayerIdRef.current;
+    const layer =
+      layers.find((item) => item.id === id) ?? layers[layers.length - 1]!;
+    return layer.pixels;
+  };
+
+  const flushCurrentView = () => {
+    const buf: SpriteCardBuf = {
+      pixels: [...pixelsRef.current],
+      emissive: [...emissiveRef.current],
+      shine: [...shineRef.current],
+      artLayers: cloneArtLayers(artLayersRef.current),
+      activeLayerId: activeLayerIdRef.current,
+    };
+    if (cardViewRef.current === "front") frontBufRef.current = buf;
+    else extraViewsRef.current[cardViewRef.current] = buf;
+    return buf;
+  };
+
+  const switchCardView = (next: EmberCharacterCardView) => {
+    const prev = cardViewRef.current;
+    if (next === prev) return;
+    flushCurrentView();
+    const g = geomRef.current;
+    const incoming =
+      next === "front"
+        ? (frontBufRef.current ?? emptyCardBuf(g.width, g.height))
+        : (extraViewsRef.current[next] ?? emptyCardBuf(g.width, g.height));
+    if (next !== "front" && !extraViewsRef.current[next]) {
+      extraViewsRef.current[next] = incoming;
+    }
+    cardViewRef.current = next;
+    setCardView(next);
+    applyLayers(cloneArtLayers(incoming.artLayers), incoming.activeLayerId);
+    applyLive(incoming.pixels, incoming.emissive, incoming.shine);
+  };
+
+  const syncActiveFrameFromLive = () => {
+    flushCurrentView();
+    const timeline = framesRef.current;
+    if (!timeline?.length) return;
+    const view = cardViewRef.current;
+    const currentBuf: SpriteCardBuf = {
+      pixels: [...pixelsRef.current],
+      emissive: [...emissiveRef.current],
+      shine: [...shineRef.current],
+      artLayers: cloneArtLayers(artLayersRef.current),
+      activeLayerId: activeLayerIdRef.current,
+    };
+    if (view === "front") frontBufRef.current = currentBuf;
+    else extraViewsRef.current[view] = currentBuf;
+    const fid = activeFrameIdRef.current ?? timeline[0]!.id;
+    const next = timeline.map((frame) =>
+      frame.id !== fid
+        ? frame
+        : {
+            ...frame,
+            front:
+              view === "front"
+                ? currentBuf
+                : (frontBufRef.current ?? currentBuf),
+            extras: extraViewsRef.current,
+          },
+    );
+    framesRef.current = next;
+    setFrames(next);
+  };
+
+  const showFrame = (frame: SpriteFrameBuf) => {
+    frontBufRef.current = cloneCardBuf(frame.front);
+    extraViewsRef.current = cloneExtras(frame.extras);
+    activeFrameIdRef.current = frame.id;
+    setActiveFrameId(frame.id);
+    const g = geomRef.current;
+    const view = cardViewRef.current;
+    const incoming =
+      view === "front"
+        ? frontBufRef.current
+        : (extraViewsRef.current[view] ?? emptyCardBuf(g.width, g.height));
+    if (view !== "front" && !extraViewsRef.current[view]) {
+      extraViewsRef.current[view] = incoming;
+    }
+    applyLayers(cloneArtLayers(incoming.artLayers), incoming.activeLayerId);
+    applyLive(incoming.pixels, incoming.emissive, incoming.shine);
+  };
+  showFrameRef.current = showFrame;
+
   const restorePaintSnapshot = (snap: PaintSnapshot) => {
-    applyLive([...snap.pixels], [...snap.emissive], [...snap.shine]);
+    geomRef.current = { width: snap.width, height: snap.height };
+    const restoredFrames = snap.frames?.map(cloneFrameBuf);
+    framesRef.current = restoredFrames;
+    setFrames(restoredFrames);
+    const fid =
+      snap.activeFrameId &&
+      restoredFrames?.some((frame) => frame.id === snap.activeFrameId)
+        ? snap.activeFrameId
+        : restoredFrames?.[0]?.id;
+    activeFrameIdRef.current = fid;
+    setActiveFrameId(fid);
+    if (fid && restoredFrames) {
+      const frame =
+        restoredFrames.find((item) => item.id === fid) ?? restoredFrames[0]!;
+      frontBufRef.current = cloneCardBuf(frame.front);
+      extraViewsRef.current = cloneExtras(frame.extras);
+    }
+    pixelsRef.current = [...snap.pixels];
+    emissiveRef.current = [...snap.emissive];
+    shineRef.current = [...snap.shine];
+    geomRef.current = { width: snap.width, height: snap.height };
+    applyLayers(cloneArtLayers(snap.artLayers), snap.activeLayerId);
+    setPixels(pixelsRef.current);
+    setEmissivePixels(emissiveRef.current);
+    setShinePixels(shineRef.current);
+    setWidthDraft(snap.width);
+    setHeightDraft(snap.height);
+    commitToPack(snap.pixels, {
+      width: snap.width,
+      topHeight: snap.height,
+      wallHeights: [],
+      emissivePixels: snap.emissive,
+      shinePixels: snap.shine,
+    });
   };
 
   const applyGeometry = (next: EmberPixelSprite) => {
-    const n = serializePixelSprite(next);
     pushHistory();
-    const totalH = n.topHeight + n.wallHeights.reduce((a, h) => a + h, 0);
+    const prevG = geomRef.current;
+    syncActiveFrameFromLive();
+
+    const flushedFront = frontBufRef.current;
+    const n = flattenSpriteForEditor(serializePixelSprite(next));
+    const h = spriteTotalHeight(n);
+    geomRef.current = { width: n.width, height: h };
+    const loadedFrames =
+      n.frames && n.frames.length >= 2
+        ? n.frames.map((frame) => frameBufFromAnim(frame, n.width, h))
+        : undefined;
+    framesRef.current = loadedFrames;
+    setFrames(loadedFrames);
+    if (loadedFrames?.length) {
+      const frame =
+        loadedFrames.find((item) => item.id === activeFrameIdRef.current) ??
+        loadedFrames[0]!;
+      showFrame(frame);
+      setWidthDraft(n.width);
+      setHeightDraft(h);
+      return;
+    }
     const emSized =
-      n.emissivePixels && n.emissivePixels.length === n.width * totalH
+      n.emissivePixels && n.emissivePixels.length === n.width * h
         ? [...n.emissivePixels]
-        : emptySpritePixels(n.width, totalH);
+        : emptySpritePixels(n.width, h);
     const shSized =
-      n.shinePixels && n.shinePixels.length === n.width * totalH
+      n.shinePixels && n.shinePixels.length === n.width * h
         ? [...n.shinePixels]
-        : emptySpritePixels(n.width, totalH);
-    setPixels([...n.pixels]);
-    pixelsRef.current = [...n.pixels];
-    emissiveRef.current = emSized;
-    setEmissivePixels(emSized);
-    shineRef.current = shSized;
-    setShinePixels(shSized);
+        : emptySpritePixels(n.width, h);
+    const resizedFrontLayers =
+      cloneArtLayers(n.artLayers) ??
+      resizeArtLayers(
+        flushedFront?.artLayers,
+        prevG.width,
+        prevG.height,
+        n.width,
+        h,
+      );
+    frontBufRef.current = {
+      pixels: [...n.pixels],
+      emissive: emSized,
+      shine: shSized,
+      artLayers: resizedFrontLayers,
+      activeLayerId:
+        flushedFront?.activeLayerId &&
+        resizedFrontLayers?.some((layer) => layer.id === flushedFront.activeLayerId)
+          ? flushedFront.activeLayerId
+          : resizedFrontLayers?.at(-1)?.id,
+    };
+    const nextExtras: ExtraCardViews = {};
+    for (const key of EMBER_SPRITE_CARD_EXTRA_VIEWS) {
+      const resized = resizeCardBuf(
+        extraViewsRef.current[key],
+        prevG.width,
+        prevG.height,
+        n.width,
+        h,
+      );
+      if (resized) nextExtras[key] = resized;
+    }
+    extraViewsRef.current = nextExtras;
+    const view = cardViewRef.current;
+    const show =
+      view === "front"
+        ? frontBufRef.current
+        : (extraViewsRef.current[view] ?? emptyCardBuf(n.width, h));
+    pixelsRef.current = [...show.pixels];
+    emissiveRef.current = [...show.emissive];
+    shineRef.current = [...show.shine];
+    applyLayers(cloneArtLayers(show.artLayers), show.activeLayerId);
+    geomRef.current = { width: n.width, height: h };
+    setPixels(pixelsRef.current);
+    setEmissivePixels(emissiveRef.current);
+    setShinePixels(shineRef.current);
     setWidthDraft(n.width);
-    setTopHDraft(n.topHeight);
-    onChangePack({
-      ...pack,
-      sprites: { ...pack.sprites, [n.id]: n },
+    setHeightDraft(h);
+    commitToPack(show.pixels, {
+      width: n.width,
+      topHeight: h,
+      wallHeights: [],
+      emissivePixels: show.emissive,
+      shinePixels: show.shine,
     });
   };
 
@@ -817,6 +1491,81 @@ export function SpriteEditorPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commitToPack]);
 
+  const copyCanvas = useCallback(() => {
+    const g = geomRef.current;
+    copyPixelArtChannels(g.width, g.height, {
+      pixels: pixelsRef.current,
+      emissivePixels: emissiveRef.current,
+      shinePixels: shineRef.current,
+    });
+    setClipReady(true);
+  }, []);
+
+  const pasteCanvas = useCallback(() => {
+    const g = geomRef.current;
+    const next = pastePixelArtChannels(g.width, g.height);
+    if (!next) return;
+    pushHistory();
+    if (artLayersRef.current?.length) {
+      writeColorPixels(next.pixels);
+      applyLive(pixelsRef.current, next.emissivePixels, next.shinePixels);
+    } else {
+      applyLive(next.pixels, next.emissivePixels, next.shinePixels);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commitToPack]);
+
+  const fillCanvas = () => {
+    const g = geomRef.current;
+    const fill = color === "#00000000" ? "" : color;
+    const filled = emptySpritePixels(g.width, g.height).map(() => fill);
+    pushHistory();
+    const layer = channelForTool(tool);
+    switch (layer) {
+      case "color":
+        writeColorPixels(filled);
+        return;
+      case "glow":
+        applyLive(pixelsRef.current, filled);
+        return;
+      case "shine":
+        applyLive(pixelsRef.current, undefined, filled);
+        return;
+      default: {
+        const _never: never = layer;
+        return _never;
+      }
+    }
+  };
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (showOpenPicker) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setShowOpenPicker(false);
+        }
+        return;
+      }
+      if (isTypingTarget(e.target)) return;
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const isUndo = e.code === "KeyZ" && !e.shiftKey;
+      const isRedo =
+        e.code === "KeyY" || (e.code === "KeyZ" && e.shiftKey);
+      const isCopy = e.code === "KeyC";
+      const isPaste = e.code === "KeyV";
+      if (!isUndo && !isRedo && !isCopy && !isPaste) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (isUndo) undo();
+      else if (isRedo) redo();
+      else if (isCopy) copyCanvas();
+      else pasteCanvas();
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [showOpenPicker, undo, redo, copyCanvas, pasteCanvas]);
+
   const pixelFromEvent = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
@@ -829,7 +1578,7 @@ export function SpriteEditorPanel({
     const y = Math.floor(
       ((clientY - rect.top) * canvas.height) / rect.height / scale,
     );
-    if (x < 0 || y < 0 || x >= g.width || y >= g.totalH) return null;
+    if (x < 0 || y < 0 || x >= g.width || y >= g.height) return null;
     return { x, y, idx: y * g.width + x };
   };
 
@@ -848,30 +1597,50 @@ export function SpriteEditorPanel({
   };
 
   const paintAt = (clientX: number, clientY: number) => {
+    if (previewPlaying) setPreviewPlaying(false);
     const pos = pixelFromEvent(clientX, clientY);
     if (!pos) return;
     const g = geomRef.current;
     const paintColor = color === "#00000000" ? "" : color;
-    const glowMode = toolRef.current === "glow";
-    const shineMode = toolRef.current === "shine";
-    const prev = glowMode
+    const kind = toolRef.current;
+    const glowMode = kind === "glow";
+    const shineMode = kind === "shine";
+    const target = glowMode
       ? emissiveRef.current
       : shineMode
         ? shineRef.current
-        : pixelsRef.current;
+        : colorTargetPixels();
     const b = Math.max(1, Math.min(4, brushSizeRef.current));
-    const origin = Math.floor((b - 1) / 2);
     let changed = false;
-    const next = [...prev];
-    for (let dy = 0; dy < b; dy++) {
-      for (let dx = 0; dx < b; dx++) {
-        const x = pos.x - origin + dx;
-        const y = pos.y - origin + dy;
-        if (x < 0 || y < 0 || x >= g.width || y >= g.totalH) continue;
-        const idx = y * g.width + x;
-        if (next[idx] === paintColor) continue;
-        next[idx] = paintColor;
-        changed = true;
+    let next = [...target];
+    if (isArtBrushTool(kind)) {
+      const prev = smudgePrevRef.current ?? { x: pos.x, y: pos.y };
+      const stamped = stampArtBrush(
+        next,
+        g.width,
+        g.height,
+        pos.x,
+        pos.y,
+        b,
+        kind,
+        prev.x,
+        prev.y,
+      );
+      next = stamped.pixels;
+      changed = stamped.changed;
+      smudgePrevRef.current = { x: pos.x, y: pos.y };
+    } else {
+      const origin = Math.floor((b - 1) / 2);
+      for (let dy = 0; dy < b; dy++) {
+        for (let dx = 0; dx < b; dx++) {
+          const x = pos.x - origin + dx;
+          const y = pos.y - origin + dy;
+          if (x < 0 || y < 0 || x >= g.width || y >= g.height) continue;
+          const idx = y * g.width + x;
+          if (next[idx] === paintColor) continue;
+          next[idx] = paintColor;
+          changed = true;
+        }
       }
     }
     if (!changed) return;
@@ -886,23 +1655,213 @@ export function SpriteEditorPanel({
       shineRef.current = next;
       setShinePixels(next);
     } else {
-      pixelsRef.current = next;
-      setPixels(next);
+      writeColorPixels(next);
     }
   };
 
-  const createSprite = () => {
+  const addArtLayer = () => {
+    const g = geomRef.current;
+    const stack = ensureArtLayerStack(
+      pixelsRef.current,
+      g.width,
+      g.height,
+      artLayersRef.current,
+    );
+    if (stack.length >= MAX_SPRITE_ART_LAYERS) return;
+    pushHistory();
+    const added = makeEmptyArtLayer(g.width, g.height, stack.length + 1);
+    const next = [...stack, added];
+    applyLayers(next, added.id);
+    writeColorPixels(added.pixels);
+  };
+
+  const selectFrame = (id: string) => {
+    if (id === activeFrameIdRef.current) return;
+    setPreviewPlaying(false);
+    syncActiveFrameFromLive();
+    const frame = framesRef.current?.find((item) => item.id === id);
+    if (!frame) return;
+    showFrame(frame);
+  };
+
+  const addFrame = () => {
+    setPreviewPlaying(false);
+    const g = geomRef.current;
+    syncActiveFrameFromLive();
+    let timeline = framesRef.current;
+    if (!timeline?.length) {
+      timeline = [
+        {
+          id: newSpriteFrameId(),
+          durationMs: DEFAULT_SPRITE_FRAME_MS,
+          front: cloneCardBuf(
+            frontBufRef.current ?? emptyCardBuf(g.width, g.height),
+          ),
+          extras: cloneExtras(extraViewsRef.current),
+        },
+      ];
+    }
+    if (timeline.length >= MAX_SPRITE_ANIM_FRAMES) return;
+    pushHistory();
+    const src =
+      timeline.find((frame) => frame.id === activeFrameIdRef.current) ??
+      timeline[timeline.length - 1]!;
+    const added: SpriteFrameBuf = {
+      ...cloneFrameBuf(src),
+      id: newSpriteFrameId(),
+    };
+    const next = [...timeline, added];
+    framesRef.current = next;
+    setFrames(next);
+    showFrame(added);
+  };
+
+  const removeFrame = (id: string) => {
+    const timeline = framesRef.current;
+    if (!timeline?.length) return;
+    setPreviewPlaying(false);
+    pushHistory();
+    syncActiveFrameFromLive();
+    if (timeline.length <= 2) {
+      const keep = timeline.find((frame) => frame.id !== id) ?? timeline[0]!;
+      framesRef.current = undefined;
+      setFrames(undefined);
+      showFrame(keep);
+      activeFrameIdRef.current = undefined;
+      setActiveFrameId(undefined);
+      return;
+    }
+    const next = timeline.filter((frame) => frame.id !== id);
+    framesRef.current = next;
+    setFrames(next);
+    const shown =
+      next.find((frame) => frame.id === activeFrameIdRef.current) ?? next[0]!;
+    showFrame(shown);
+  };
+
+  const setFrameDurationMs = (id: string, raw: number) => {
+    const timeline = framesRef.current;
+    if (!timeline) return;
+    const durationMs = clampSpriteFrameDuration(raw);
+    const next = timeline.map((frame) =>
+      frame.id === id ? { ...frame, durationMs } : frame,
+    );
+    framesRef.current = next;
+    setFrames(next);
+    commitToPack(pixelsRef.current);
+  };
+
+  useEffect(() => {
+    if (!previewPlaying) return;
+    const timeline = framesRef.current;
+    if (!timeline || timeline.length < 2) {
+      setPreviewPlaying(false);
+      return;
+    }
+    let cancelled = false;
+    let timer = 0;
+    const tick = () => {
+      if (cancelled) return;
+      const list = framesRef.current;
+      if (!list || list.length < 2) {
+        setPreviewPlaying(false);
+        return;
+      }
+      const fid = activeFrameIdRef.current;
+      const i = Math.max(
+        0,
+        list.findIndex((frame) => frame.id === fid),
+      );
+      const cur = list[i] ?? list[0]!;
+      const next = list[(i + 1) % list.length]!;
+      timer = window.setTimeout(() => {
+        if (cancelled) return;
+        showFrameRef.current(next);
+        tick();
+      }, cur.durationMs);
+    };
+    tick();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [previewPlaying]);
+
+  const removeArtLayer = (id: string) => {
+    const layers = artLayersRef.current;
+    if (!layers?.length) return;
+    pushHistory();
+    if (layers.length <= 1) {
+      applyLayers(undefined, undefined);
+      commitToPack(pixelsRef.current);
+      return;
+    }
+    const next = layers.filter((layer) => layer.id !== id);
+    const g = geomRef.current;
+    const composed = compositeArtLayers(next, g.width, g.height);
+    applyLayers(next, next[next.length - 1]?.id);
+    pixelsRef.current = composed;
+    setPixels(composed);
+    commitToPack(composed);
+  };
+
+  const toggleArtLayerVisible = (id: string) => {
+    const layers = artLayersRef.current;
+    if (!layers?.length) return;
+    pushHistory();
+    const next = layers.map((layer) =>
+      layer.id === id
+        ? { ...layer, visible: layer.visible === false ? undefined : false }
+        : layer,
+    );
+    const g = geomRef.current;
+    const composed = compositeArtLayers(next, g.width, g.height);
+    applyLayers(next, activeLayerIdRef.current);
+    pixelsRef.current = composed;
+    setPixels(composed);
+    commitToPack(composed);
+  };
+
+  const createBlankSprite = (w: number, h: number, nameRu: string) => {
     const id = `spr_${Date.now().toString(36)}`;
     const spr = serializePixelSprite({
       id,
-      nameRu: `Спрайт ${spriteList.length + 1}`,
-      width: 16,
-      topHeight: 16,
-      wallHeights: [10],
-      pixels: emptySpritePixels(16, 26),
+      nameRu,
+      width: w,
+      topHeight: h,
+      wallHeights: [],
+      pixels: emptySpritePixels(w, h),
       color: "#c45c26",
       roles: ["decor"],
     });
+    onChangePack({
+      ...pack,
+      sprites: { ...pack.sprites, [id]: spr },
+    });
+    selectSprite(id);
+  };
+
+  const createSprite = () => {
+    createBlankSprite(
+      SPRITE_BLANK_WIDTH,
+      SPRITE_BLANK_HEIGHT,
+      `Спрайт ${spriteList.length + 1}`,
+    );
+  };
+
+  const createDecorSprite = () => {
+    createBlankSprite(
+      SPRITE_DECOR_SIZE,
+      SPRITE_DECOR_SIZE,
+      `Декор ${spriteList.length + 1}`,
+    );
+  };
+
+  const createSlasherSprite = () => {
+    const id = `spr_${Date.now().toString(36)}`;
+    const spr = serializePixelSprite(
+      createSlasherCharacterSprite(id, "Персонаж Slasher"),
+    );
     onChangePack({
       ...pack,
       sprites: { ...pack.sprites, [id]: spr },
@@ -929,114 +1888,52 @@ export function SpriteEditorPanel({
     }
   };
 
-  const commitWidthTop = () => {
+  const commitSize = () => {
     if (!sprite) return;
     const w = clampSpriteDim(widthDraft, SPRITE_DIM_MIN, SPRITE_DIM_MAX, width);
-    const th = clampSpriteDim(
-      topHDraft,
+    const h = clampSpriteDim(
+      heightDraft,
       SPRITE_DIM_MIN,
       SPRITE_DIM_MAX,
-      topHeight,
+      canvasH,
     );
-    if (w === width && th === topHeight) return;
+    if (w === width && h === canvasH) return;
+    syncActiveFrameFromLive();
+    const front = frontBufRef.current;
+    const timeline = framesRef.current;
+    const frame0 = timeline?.[0];
     applyGeometry(
-      resizeSpriteGeometry(
-        { ...sprite, pixels: pixelsRef.current },
+      resizeSpriteCanvas(
+        {
+          ...sprite,
+          pixels: frame0?.front.pixels ?? front?.pixels ?? pixelsRef.current,
+          emissivePixels:
+            frame0?.front.emissive ?? front?.emissive ?? emissiveRef.current,
+          shinePixels: frame0?.front.shine ?? front?.shine ?? shineRef.current,
+          artLayers: frame0?.front.artLayers ?? front?.artLayers,
+          views: packCardViews(frame0?.extras ?? extraViewsRef.current),
+          frames: timeline?.map(animFrameFromBuf),
+        },
         w,
-        th,
-        wallHeights,
+        h,
       ),
     );
-  };
-
-  const setWallHeightAt = (index: number, h: number) => {
-    if (!sprite) return;
-    const next = [...wallHeights];
-    next[index] = clampSpriteDim(
-      h,
-      SPRITE_WALL_H_MIN,
-      SPRITE_WALL_H_MAX,
-      next[index] ?? 8,
-    );
-    applyGeometry(
-      resizeSpriteGeometry(
-        { ...sprite, pixels: pixelsRef.current },
-        width,
-        topHeight,
-        next,
-      ),
-    );
-  };
-
-  const addWallStrip = () => {
-    if (!sprite || wallHeights.length >= SPRITE_WALL_MAX_STRIPS) return;
-    applyGeometry(
-      resizeSpriteGeometry(
-        { ...sprite, pixels: pixelsRef.current },
-        width,
-        topHeight,
-        [...wallHeights, 10],
-      ),
-    );
-  };
-
-  const removeWallStrip = (index: number) => {
-    if (!sprite) return;
-    const next = wallHeights.filter((_, i) => i !== index);
-    applyGeometry(
-      resizeSpriteGeometry(
-        { ...sprite, pixels: pixelsRef.current },
-        width,
-        topHeight,
-        next,
-      ),
-    );
-  };
-
-  const moveWallStrip = (index: number, dir: -1 | 1) => {
-    if (!sprite) return;
-    const j = index + dir;
-    if (j < 0 || j >= wallHeights.length) return;
-    const nextH = [...wallHeights];
-    const tmpH = nextH[index]!;
-    nextH[index] = nextH[j]!;
-    nextH[j] = tmpH;
-    const bands = wallHeights.map((_, i) => {
-      let row = topHeight;
-      for (let k = 0; k < i; k++) row += wallHeights[k]!;
-      const h = wallHeights[i]!;
-      const band: string[] = [];
-      for (let y = 0; y < h; y++) {
-        for (let x = 0; x < width; x++) {
-          band.push(pixelsRef.current[(row + y) * width + x] ?? "");
-        }
-      }
-      return band;
-    });
-    const swapped = [...bands];
-    const tb = swapped[index]!;
-    swapped[index] = swapped[j]!;
-    swapped[j] = tb;
-    const top: string[] = [];
-    for (let y = 0; y < topHeight; y++) {
-      for (let x = 0; x < width; x++) {
-        top.push(pixelsRef.current[y * width + x] ?? "");
-      }
-    }
-    applyGeometry({
-      ...sprite,
-      wallHeights: nextH,
-      pixels: joinSpriteBands(width, top, topHeight, swapped, nextH),
-    });
   };
 
   const addFavorite = (hex: string) => {
     const n = hex.toLowerCase();
     if (!n.startsWith("#") || (n.length !== 7 && n !== "#00000000")) return;
-    if (favorites.includes(n) || BASE_PALETTE.includes(n)) return;
+    if (BASE_PALETTE.includes(n)) return;
+    const next = prunePaletteFavorites([...favorites, n]);
+    if (
+      next.length === favorites.length &&
+      next.every((c, i) => c === favorites[i])
+    ) {
+      return;
+    }
     onChangePack({
       ...pack,
-      paletteFavorites: [...favorites, n],
+      paletteFavorites: next,
     });
   };
 
@@ -1058,17 +1955,26 @@ export function SpriteEditorPanel({
       ? roles
       : [...roles, "enemy" as const];
     setRoles(nextRoles);
-    const sprites = {
-      ...pack.sprites,
-      [spriteId]: {
-        ...serializePixelSprite({
-          ...sprite!,
-          pixels: pixelsRef.current,
-          roles: nextRoles,
-        }),
-      },
-    };
-    onChangePack({ ...pack, enemies, sprites });
+    flushCurrentView();
+    const front = frontBufRef.current;
+    const live = serializePixelSprite(
+      flattenSpriteForEditor({
+        ...sprite!,
+        pixels: [...(front?.pixels ?? pixelsRef.current)],
+        emissivePixels: [...(front?.emissive ?? emissiveRef.current)],
+        shinePixels: [...(front?.shine ?? shineRef.current)],
+        views: packCardViews(extraViewsRef.current),
+        width,
+        topHeight: canvasH,
+        wallHeights: [],
+        roles: nextRoles,
+      }),
+    );
+    onChangePack({
+      ...pack,
+      enemies,
+      sprites: { ...pack.sprites, [spriteId]: live },
+    });
   };
 
   const addAsDecorTile = () => {
@@ -1076,42 +1982,20 @@ export function SpriteEditorPanel({
     const tilesetId = Object.keys(pack.tilesets)[0];
     if (!tilesetId) return;
     const ts = pack.tilesets[tilesetId]!;
-    if (width !== ts.tileSize || topHeight !== ts.tileSize) {
+    if (width !== ts.tileSize || canvasH !== ts.tileSize) {
       onSaved(
-        `Для декора в тайлы нужен квадрат ${ts.tileSize}×${ts.tileSize} (сейчас ${width}×${topHeight})`,
+        `Для декора в тайлы нужен квадрат ${ts.tileSize}×${ts.tileSize} (сейчас ${width}×${canvasH})`,
       );
       return;
     }
     const maxId = Math.max(0, ...ts.tiles.map((t) => t.id));
     const id = maxId + 1;
-    const topPx = pixelsRef.current.slice(0, width * topHeight);
-    const wallH = wallHeights[0] ?? 0;
-    const wallPx =
-      wallH > 0
-        ? pixelsRef.current.slice(
-            width * topHeight,
-            width * topHeight + width * wallH,
-          )
-        : undefined;
-    // Resize first wall band to tileSize square if needed
-    let wallOut: string[] | undefined;
-    if (wallPx && wallH === ts.tileSize) {
-      wallOut = wallPx;
-    } else if (wallPx && wallH > 0) {
-      wallOut = emptySpritePixels(ts.tileSize, ts.tileSize);
-      const ch = Math.min(wallH, ts.tileSize);
-      for (let y = 0; y < ch; y++) {
-        for (let x = 0; x < ts.tileSize; x++) {
-          wallOut[y * ts.tileSize + x] = wallPx[y * width + x] ?? "";
-        }
-      }
-    }
+    const topPx = pixelsRef.current.slice(0, width * canvasH);
     const nextTile = {
       id,
       name: nameRu.trim() || sprite.nameRu || `decor_${id}`,
       color: dominantColor(topPx) || sprite.color,
       pixels: [...topPx],
-      wallPixels: wallOut,
     };
     const nextTs: EmberTileset = {
       ...ts,
@@ -1123,11 +2007,18 @@ export function SpriteEditorPanel({
       tilesets: { ...pack.tilesets, [tilesetId]: nextTs },
       sprites: {
         ...pack.sprites,
-        [spriteId]: serializePixelSprite({
-          ...sprite,
-          pixels: pixelsRef.current,
-          roles: roles.includes("decor") ? roles : [...roles, "decor"],
-        }),
+        [spriteId]: serializePixelSprite(
+          flattenSpriteForEditor({
+            ...sprite,
+            pixels: pixelsRef.current,
+            emissivePixels: emissiveRef.current,
+            shinePixels: shineRef.current,
+            width,
+            topHeight: canvasH,
+            wallHeights: [],
+            roles: roles.includes("decor") ? roles : [...roles, "decor"],
+          }),
+        ),
       },
     });
     void writeEmberJson(`tilesets/${tilesetId}.json`, nextTs).then((res) => {
@@ -1140,29 +2031,25 @@ export function SpriteEditorPanel({
   };
 
   const save = async () => {
-    if (spriteId && sprite) {
-      commitToPack(pixelsRef.current, {
-        nameRu: nameRu.trim() || sprite.nameRu,
-        roles: [...roles],
-      });
-    }
-    const spritesMap =
+    const live =
       spriteId && sprite
-        ? {
-            ...pack.sprites,
-            [spriteId]: serializePixelSprite({
-              ...sprite,
-              nameRu: nameRu.trim() || sprite.nameRu,
-              pixels: [...pixelsRef.current],
-              color: dominantColor(pixelsRef.current) || color,
-              roles: [...roles],
-              solid,
-              glow,
-            }),
-          }
+        ? commitToPack(pixelsRef.current, {
+            nameRu: nameRu.trim() || sprite.nameRu,
+            roles: [...roles],
+            tags: normalizeEmberLibraryTags(tagsDraft),
+            solid,
+            glow,
+            material: material || undefined,
+            emissivePixels: [...emissiveRef.current],
+            shinePixels: [...shineRef.current],
+          })
+        : undefined;
+    const spritesMap =
+      live && spriteId
+        ? { ...pack.sprites, [spriteId]: live }
         : pack.sprites;
     const file = {
-      paletteFavorites: pack.paletteFavorites ?? [],
+      paletteFavorites: prunePaletteFavorites(pack.paletteFavorites ?? []),
       sprites: Object.values(spritesMap).map((s) =>
         serializePixelSprite(normalizePixelSprite(s)),
       ),
@@ -1181,16 +2068,19 @@ export function SpriteEditorPanel({
   };
 
   const toggleRole = (r: EmberSpriteRole) => {
-    setRoles((prev) =>
-      prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r],
-    );
+    const next = roles.includes(r)
+      ? roles.filter((x) => x !== r)
+      : [...roles, r];
+    setRoles(next);
+    commitToPack(pixelsRef.current, { roles: next });
   };
 
   const spritePickerItems = useMemo(
     () =>
       spriteList.map((s) => {
-        const badges: string[] = [`${s.width}×${s.topHeight}`];
-        if (s.wallHeights.length) badges.push(`+${s.wallHeights.length}ст`);
+        const badges: string[] = [
+          `${s.width}×${spriteTotalHeight(s)}`,
+        ];
         if (s.solid) badges.push("физ");
         if (s.glow) badges.push("свет");
         return {
@@ -1202,6 +2092,32 @@ export function SpriteEditorPanel({
         };
       }),
     [spriteList],
+  );
+
+  const openPickerItems = useMemo(
+    () =>
+      spriteList
+        .filter((s) =>
+          libraryAssetMatchesQuery(
+            { id: s.id, nameRu: s.nameRu, tags: s.tags },
+            pickerQuery,
+          ),
+        )
+        .map((s) => {
+          const badges: string[] = [
+            `${s.width}×${spriteTotalHeight(s)}`,
+          ];
+          if (s.solid) badges.push("физ");
+          if (s.glow) badges.push("свет");
+          return {
+            id: s.id,
+            label: s.nameRu ?? s.id,
+            title: s.nameRu ?? s.id,
+            badges,
+            thumb: <EmberSpriteThumb sprite={s} size={44} />,
+          };
+        }),
+    [spriteList, pickerQuery],
   );
 
   return (
@@ -1218,21 +2134,61 @@ export function SpriteEditorPanel({
                   последний выбранный.
                 </p>
               </div>
-              <button
-                type="button"
-                className="primary ember-ed-open-picker__create"
-                onClick={createSprite}
-              >
-                Создать новый
-              </button>
+              <div className="ember-ed-open-picker__hero-actions">
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => setShowOpenPicker(false)}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="primary ember-ed-open-picker__create"
+                  onClick={createSprite}
+                >
+                  Создать 32×48
+                </button>
+                <button
+                  type="button"
+                  className="ember-ed-open-picker__create"
+                  onClick={createDecorSprite}
+                >
+                  Декор 16×16
+                </button>
+                <button
+                  type="button"
+                  className="ember-ed-open-picker__create"
+                  onClick={createSlasherSprite}
+                >
+                  Slasher персонаж
+                </button>
+              </div>
             </header>
+            <label className="ember-ed-open-picker__search">
+              <input
+                type="search"
+                placeholder="Поиск по имени, id или тегу…"
+                value={pickerQuery}
+                onChange={(e) => setPickerQuery(e.target.value)}
+                autoFocus
+                aria-label="Поиск спрайтов"
+              />
+            </label>
             <div className="ember-ed-open-picker__scroll">
               <EmberThumbGrid
                 size="md"
                 className="ember-ed-open-picker__thumbs"
                 selectedId={null}
                 onSelect={selectSprite}
-                items={spritePickerItems}
+                items={openPickerItems}
+                empty={
+                  <p className="muted ember-hint">
+                    {pickerQuery.trim()
+                      ? "Ничего не найдено"
+                      : "Библиотека пуста — создайте спрайт"}
+                  </p>
+                }
               />
             </div>
           </div>
@@ -1242,14 +2198,32 @@ export function SpriteEditorPanel({
         <aside className="ember-sprite-list">
           <div className="ember-sprite-list__head">
             <h3 className="ember-sprite-list__title">Ассеты</h3>
-            <button
-              type="button"
-              className="ember-chip ember-chip--sm"
-              onClick={createSprite}
-              title="Создать спрайт"
-            >
-              +
-            </button>
+            <div className="ember-sprite-list__create">
+              <button
+                type="button"
+                className="ember-chip ember-chip--sm"
+                onClick={createSprite}
+                title="Пустой спрайт 32×48"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                className="ember-chip ember-chip--sm"
+                onClick={createDecorSprite}
+                title="Декор 16×16"
+              >
+                16
+              </button>
+              <button
+                type="button"
+                className="ember-chip ember-chip--sm"
+                onClick={createSlasherSprite}
+                title="Персонаж Dungeon Slasher 32×56"
+              >
+                S
+              </button>
+            </div>
           </div>
           <EmberThumbGrid
             size="sm"
@@ -1270,49 +2244,8 @@ export function SpriteEditorPanel({
           ) : (
             <>
               <div className="ember-sprite-chrome">
-                <label className="ember-sprite-chrome__name">
-                  <span className="muted">Имя</span>
-                  <input
-                    value={nameRu}
-                    onChange={(e) => setNameRu(e.target.value)}
-                    onBlur={() => commitToPack(pixelsRef.current)}
-                  />
-                </label>
-                <label className="ember-sprite-chrome__num">
-                  <span className="muted">W</span>
-                  <input
-                    type="number"
-                    min={SPRITE_DIM_MIN}
-                    max={SPRITE_DIM_MAX}
-                    value={widthDraft}
-                    onChange={(e) => setWidthDraft(Number(e.target.value) || 0)}
-                    onBlur={commitWidthTop}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitWidthTop();
-                    }}
-                    title="Ширина"
-                  />
-                </label>
-                <label className="ember-sprite-chrome__num">
-                  <span className="muted">H↑</span>
-                  <input
-                    type="number"
-                    min={SPRITE_DIM_MIN}
-                    max={SPRITE_DIM_MAX}
-                    value={topHDraft}
-                    onChange={(e) => setTopHDraft(Number(e.target.value) || 0)}
-                    onBlur={commitWidthTop}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitWidthTop();
-                    }}
-                    title="Высота верха"
-                  />
-                </label>
                 <span className="muted ember-sprite-chrome__dim">
-                  {width}×{totalH}
-                  {wallHeights.length
-                    ? ` · ст.${spriteWallHeight(sprite)}`
-                    : ""}
+                  {width}×{canvasH}
                 </span>
                 <div className="ember-sprite-chrome__actions">
                   <button
@@ -1334,15 +2267,38 @@ export function SpriteEditorPanel({
               </div>
 
               <div
+                className="ember-chip-row ember-sprite-views"
+                role="tablist"
+                aria-label="Вид персонажа"
+              >
+                {EMBER_CHARACTER_CARD_VIEWS.map((view) => (
+                  <button
+                    key={view}
+                    type="button"
+                    role="tab"
+                    aria-selected={cardView === view}
+                    className={`ember-chip ember-chip--sm ${cardView === view ? "is-active" : ""}`}
+                    title={EMBER_CHARACTER_CARD_VIEW_LABEL_RU[view]}
+                    onClick={() => switchCardView(view)}
+                  >
+                    {EMBER_CHARACTER_CARD_VIEW_LABEL_RU[view]}
+                  </button>
+                ))}
+              </div>
+
+              <div
                 className="ember-sprite-toolstrip"
                 role="toolbar"
                 aria-label="Кисть и правки"
               >
-                <div className="ember-chip-row">
+                <div className="ember-chip-row ember-sprite-toolstrip__group">
                   <button
                     type="button"
                     className={`ember-chip ember-chip--sm ${tool === "paint" ? "is-active" : ""}`}
-                    onClick={() => setTool("paint")}
+                    onClick={() => {
+                      setTool("paint");
+                      setShowColor(true);
+                    }}
                     title="Кисть · ЛКМ"
                   >
                     B
@@ -1350,7 +2306,10 @@ export function SpriteEditorPanel({
                   <button
                     type="button"
                     className={`ember-chip ember-chip--sm ${tool === "glow" ? "is-active" : ""}`}
-                    onClick={() => setTool("glow")}
+                    onClick={() => {
+                      setTool("glow");
+                      setShowGlow(true);
+                    }}
                     title="Светящиеся пиксели · bloom"
                   >
                     ✦
@@ -1358,7 +2317,10 @@ export function SpriteEditorPanel({
                   <button
                     type="button"
                     className={`ember-chip ember-chip--sm ${tool === "shine" ? "is-active" : ""}`}
-                    onClick={() => setTool("shine")}
+                    onClick={() => {
+                      setTool("shine");
+                      setShowShine(true);
+                    }}
                     title="Блеск · wet / metal · на полу в 3D даёт зеркало сцены"
                   >
                     ✧
@@ -1371,8 +2333,22 @@ export function SpriteEditorPanel({
                   >
                     I
                   </button>
+                  {ART_BRUSH_TOOLS.map((brush) => (
+                    <button
+                      key={brush.id}
+                      type="button"
+                      className={`ember-chip ember-chip--sm ${tool === brush.id ? "is-active" : ""}`}
+                      onClick={() => {
+                        setTool(brush.id);
+                        setShowColor(true);
+                      }}
+                      title={brush.title}
+                    >
+                      {brush.label}
+                    </button>
+                  ))}
                 </div>
-                <div className="ember-chip-row ember-sprite-toolstrip__sizes">
+                <div className="ember-chip-row ember-sprite-toolstrip__group ember-sprite-toolstrip__sizes">
                   {([1, 2, 3, 4] as const).map((n) => (
                     <button
                       key={n}
@@ -1388,7 +2364,7 @@ export function SpriteEditorPanel({
                     </button>
                   ))}
                 </div>
-                <div className="ember-chip-row">
+                <div className="ember-chip-row ember-sprite-toolstrip__group">
                   <button
                     type="button"
                     className="ghost ember-chip--sm"
@@ -1410,11 +2386,8 @@ export function SpriteEditorPanel({
                   <button
                     type="button"
                     className="ghost ember-chip--sm"
-                    title="Копировать холст"
-                    onClick={() => {
-                      copyPixelArt(pixelsRef.current, width, totalH);
-                      setClipReady(true);
-                    }}
+                    title="Копировать холст (цвет + свет + блеск)"
+                    onClick={copyCanvas}
                   >
                     Copy
                   </button>
@@ -1423,26 +2396,15 @@ export function SpriteEditorPanel({
                     className="ghost ember-chip--sm"
                     disabled={!clipReady}
                     title="Вставить"
-                    onClick={() => {
-                      const next = pastePixelArt(width, totalH);
-                      if (!next) return;
-                      pushHistory();
-                      applyLive(next);
-                    }}
+                    onClick={pasteCanvas}
                   >
                     Paste
                   </button>
                   <button
                     type="button"
                     className="ghost ember-chip--sm"
-                    title="Залить цветом"
-                    onClick={() => {
-                      pushHistory();
-                      const fill = color === "#00000000" ? "" : color;
-                      applyLive(
-                        emptySpritePixels(width, totalH).map(() => fill),
-                      );
-                    }}
+                    title="Залить активный слой"
+                    onClick={fillCanvas}
                   >
                     Fill
                   </button>
@@ -1452,14 +2414,146 @@ export function SpriteEditorPanel({
                     title="Очистить"
                     onClick={() => {
                       pushHistory();
-                      const blank = emptySpritePixels(width, totalH);
+                      const blank = emptySpritePixels(width, canvasH);
                       applyLive(blank, blank, blank);
                     }}
                   >
                     Clear
                   </button>
                 </div>
-                <div className="ember-chip-row ember-sprite-toolstrip__flags">
+                <div
+                  className="ember-chip-row ember-sprite-toolstrip__group"
+                  role="group"
+                  aria-label="Видимость слоёв"
+                >
+                  <button
+                    type="button"
+                    className={`ember-chip ember-chip--sm ${showColor ? "is-active" : ""}`}
+                    aria-pressed={showColor}
+                    onClick={() => setShowColor((v) => !v)}
+                    title="Показать цвет"
+                  >
+                    Цвет
+                  </button>
+                  <button
+                    type="button"
+                    className={`ember-chip ember-chip--sm ${showGlow ? "is-active" : ""}`}
+                    aria-pressed={showGlow}
+                    onClick={() => setShowGlow((v) => !v)}
+                    title="Показать свечение"
+                  >
+                    ✦
+                  </button>
+                  <button
+                    type="button"
+                    className={`ember-chip ember-chip--sm ${showShine ? "is-active" : ""}`}
+                    aria-pressed={showShine}
+                    onClick={() => setShowShine((v) => !v)}
+                    title="Показать блеск"
+                  >
+                    ✧
+                  </button>
+                </div>
+                <div
+                  className="ember-sprite-zoom ember-sprite-toolstrip__group"
+                  role="group"
+                  aria-label="Масштаб"
+                >
+                  <button
+                    type="button"
+                    className="ghost ember-chip--sm"
+                    onClick={() => stepZoom(-1)}
+                    title="Отдалить"
+                  >
+                    −
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost ember-chip--sm"
+                    onClick={fitStage}
+                    title="Вписать в окно"
+                  >
+                    Fit
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost ember-chip--sm"
+                    onClick={() => stepZoom(1)}
+                    title="Приблизить"
+                  >
+                    +
+                  </button>
+                  <span className="muted ember-sprite-zoom__label">
+                    {cellScale}px
+                  </span>
+                </div>
+              </div>
+
+              <div className="ember-sprite-body">
+              <aside className="ember-sprite-inspector" aria-label="Свойства спрайта">
+                <label className="ember-sprite-inspector__field">
+                  <span className="muted">Имя</span>
+                  <input
+                    value={nameRu}
+                    onChange={(e) => setNameRu(e.target.value)}
+                    onBlur={() => commitToPack(pixelsRef.current)}
+                  />
+                </label>
+                <div className="ember-sprite-inspector__row">
+                  <label className="ember-sprite-inspector__num">
+                    <span className="muted">W</span>
+                    <input
+                      type="number"
+                      min={SPRITE_DIM_MIN}
+                      max={SPRITE_DIM_MAX}
+                      value={widthDraft}
+                      onChange={(e) =>
+                        setWidthDraft(Number(e.target.value) || 0)
+                      }
+                      onBlur={commitSize}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitSize();
+                      }}
+                      title="Ширина"
+                    />
+                  </label>
+                  <label className="ember-sprite-inspector__num">
+                    <span className="muted">H</span>
+                    <input
+                      type="number"
+                      min={SPRITE_DIM_MIN}
+                      max={SPRITE_DIM_MAX}
+                      value={heightDraft}
+                      onChange={(e) =>
+                        setHeightDraft(Number(e.target.value) || 0)
+                      }
+                      onBlur={commitSize}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitSize();
+                      }}
+                      title="Высота холста"
+                    />
+                  </label>
+                  <span className="muted">{width}×{canvasH}</span>
+                </div>
+                <label className="ember-sprite-inspector__field">
+                  <span className="muted">Теги</span>
+                  <input
+                    value={tagsDraft}
+                    placeholder="character, slasher"
+                    onChange={(e) => setTagsDraft(e.target.value)}
+                    onBlur={() => {
+                      const tags = normalizeEmberLibraryTags(tagsDraft);
+                      setTagsDraft(formatEmberLibraryTags(tags));
+                      commitToPack(pixelsRef.current, { tags });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                    }}
+                  />
+                </label>
+                <p className="muted ember-sprite-inspector__label">Роли</p>
+                <div className="ember-sprite-inspector__roles">
                   {ROLES.map((r) => (
                     <button
                       key={r.id}
@@ -1470,6 +2564,8 @@ export function SpriteEditorPanel({
                       {r.label}
                     </button>
                   ))}
+                </div>
+                <div className="ember-sprite-inspector__flags">
                   <button
                     type="button"
                     className={`ember-chip ember-chip--sm ${solid ? "is-active" : ""}`}
@@ -1484,45 +2580,158 @@ export function SpriteEditorPanel({
                     onClick={toggleGlow}
                     title="Источник фонаря (flood), не путать с кистью ✦"
                   >
-                    Фонарь
-                  </button>
-                  <label
+                      Фонарь
+                    </button>
+                </div>
+                <p className="muted ember-sprite-inspector__label">Слои</p>
+                <div className="ember-sprite-layers">
+                  {(artLayers?.length
+                    ? [...artLayers].reverse()
+                    : [
+                        {
+                          id: "flat",
+                          nameRu: "Слой 1",
+                          visible: true as boolean | undefined,
+                        },
+                      ]
+                  ).map((layer) => {
+                    const isFlat = !artLayers?.length;
+                    const active = isFlat || layer.id === activeLayerId;
+                    const hidden = layer.visible === false;
+                    return (
+                      <div
+                        key={layer.id}
+                        className={`ember-sprite-layers__row ${active ? "is-active" : ""}`}
+                      >
+                        <button
+                          type="button"
+                          className="ghost ember-chip--sm"
+                          title={hidden ? "Показать" : "Скрыть"}
+                          disabled={isFlat}
+                          onClick={() => toggleArtLayerVisible(layer.id)}
+                        >
+                          {hidden ? "○" : "●"}
+                        </button>
+                        <button
+                          type="button"
+                          className={`ember-sprite-layers__name ${active ? "is-active" : ""}`}
+                          onClick={() => {
+                            if (isFlat) return;
+                            setActiveLayerId(layer.id);
+                            activeLayerIdRef.current = layer.id;
+                          }}
+                        >
+                          {layer.nameRu ?? "Слой"}
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost ember-chip--sm ember-danger"
+                          title="Удалить слой"
+                          disabled={isFlat}
+                          onClick={() => removeArtLayer(layer.id)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <button
+                    type="button"
                     className="ember-chip ember-chip--sm"
-                    title="Материал (на lit-спрайтах / будущий свет)"
+                    disabled={(artLayers?.length ?? 1) >= MAX_SPRITE_ART_LAYERS}
+                    onClick={addArtLayer}
+                    title="Добавить слой"
                   >
-                    <select
-                      value={material}
-                      onChange={(e) => {
-                        const v = e.target.value as EmberMaterialKind | "";
-                        setMaterial(v);
-                        if (!spriteId || !sprite) return;
-                        onChangePack({
-                          ...pack,
-                          sprites: {
-                            ...pack.sprites,
-                            [spriteId]: serializePixelSprite({
-                              ...sprite,
-                              pixels: pixelsRef.current,
-                              roles: [...roles],
-                              solid,
-                              glow,
-                              material: v || undefined,
-                            }),
-                          },
-                        });
-                      }}
+                    + слой
+                  </button>
+                </div>
+                <p className="muted ember-sprite-inspector__label">Кадры</p>
+                <div className="ember-sprite-frames">
+                  {(frames ?? []).map((frame, index) => {
+                    const active = frame.id === activeFrameId;
+                    return (
+                      <div
+                        key={frame.id}
+                        className={`ember-sprite-frames__row ${active ? "is-active" : ""}`}
+                      >
+                        <button
+                          type="button"
+                          className={`ember-sprite-frames__name ${active ? "is-active" : ""}`}
+                          onClick={() => selectFrame(frame.id)}
+                        >
+                          {index + 1}
+                        </button>
+                        <input
+                          className="ember-sprite-frames__ms"
+                          type="number"
+                          min={MIN_SPRITE_FRAME_MS}
+                          max={MAX_SPRITE_FRAME_MS}
+                          step={10}
+                          value={frame.durationMs}
+                          title="Длительность кадра, мс"
+                          onChange={(e) =>
+                            setFrameDurationMs(frame.id, Number(e.target.value))
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="ghost ember-chip--sm ember-danger"
+                          title="Удалить кадр"
+                          onClick={() => removeFrame(frame.id)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <div className="ember-sprite-frames__toolbar">
+                    <button
+                      type="button"
+                      className="ember-chip ember-chip--sm"
+                      disabled={(frames?.length ?? 1) >= MAX_SPRITE_ANIM_FRAMES}
+                      onClick={addFrame}
+                      title="Добавить кадр"
                     >
-                      <option value="">Материал</option>
-                      {EMBER_MATERIAL_KINDS.map((kind) => (
-                        <option key={kind} value={kind}>
-                          {EMBER_MATERIAL_LABELS_RU[kind]}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      + кадр
+                    </button>
+                    <button
+                      type="button"
+                      className={`ember-chip ember-chip--sm ${previewPlaying ? "is-active" : ""}`}
+                      disabled={(frames?.length ?? 0) < 2}
+                      onClick={() => setPreviewPlaying((on) => !on)}
+                      title="Проиграть цикл кадров"
+                    >
+                      {previewPlaying ? "Стоп" : "▶"}
+                    </button>
+                  </div>
+                </div>
+                <label
+                  className="ember-sprite-inspector__field"
+                  title="Материал (на lit-спрайтах / будущий свет)"
+                >
+                  <span className="muted">Материал</span>
+                  <select
+                    className="ember-sprite-inspector__select"
+                    value={material}
+                    onChange={(e) => {
+                      const v = e.target.value as EmberMaterialKind | "";
+                      setMaterial(v);
+                      commitToPack(pixelsRef.current, {
+                        material: v || undefined,
+                      });
+                    }}
+                  >
+                    <option value="">Нет</option>
+                    {EMBER_MATERIAL_KINDS.map((kind) => (
+                      <option key={kind} value={kind}>
+                        {EMBER_MATERIAL_LABELS_RU[kind]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                   {tool === "glow" ||
                   emissivePixels.some((c) => c && c !== "#00000000") ? (
-                    <>
+                    <div className="ember-chip-row ember-sprite-inspector__emissive">
                       <label
                         className="ember-chip ember-chip--sm ember-sprite-emissive-anim"
                         title="Режим свечения"
@@ -1905,129 +3114,23 @@ export function SpriteEditorPanel({
                           )}
                         </>
                       ) : null}
-                    </>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="ember-sprite-stage" ref={stageRef}>
-                <div className="ember-sprite-stage__center">
-                  <div
-                    className="ember-sprite-artboard"
-                    style={{
-                      height: totalH * cellScale,
-                    }}
-                  >
-                    <div
-                      className="ember-sprite-bands"
-                      aria-label="Полосы спрайта"
-                    >
-                      <div
-                        className="ember-sprite-bands__band ember-sprite-bands__band--top"
-                        style={{ height: topHeight * cellScale }}
-                      >
-                        <span className="ember-sprite-bands__name">Верх</span>
-                        <span className="ember-sprite-bands__px muted">
-                          {topHeight}px
-                        </span>
-                        {wallHeights.length === 0 ? (
-                          <button
-                            type="button"
-                            className="ember-sprite-bands__add"
-                            disabled={
-                              wallHeights.length >= SPRITE_WALL_MAX_STRIPS
-                            }
-                            onClick={addWallStrip}
-                            title="Добавить полосу стены снизу"
-                          >
-                            + стена
-                          </button>
-                        ) : null}
-                      </div>
-                      {wallHeights.map((h, i) => {
-                        const isLast = i === wallHeights.length - 1;
-                        return (
-                          <div
-                            key={`band-${i}-${h}`}
-                            className={`ember-sprite-bands__band ${isLast ? "ember-sprite-bands__band--last" : ""}`}
-                            style={{ height: h * cellScale }}
-                          >
-                            <span className="ember-sprite-bands__name">
-                              Стена {i + 1}
-                            </span>
-                            <label className="ember-sprite-bands__edit">
-                              <input
-                                type="number"
-                                min={SPRITE_WALL_H_MIN}
-                                max={SPRITE_WALL_H_MAX}
-                                defaultValue={h}
-                                title={`Высота стены ${i + 1}`}
-                                onBlur={(e) =>
-                                  setWallHeightAt(
-                                    i,
-                                    Number(e.target.value) || 1,
-                                  )
-                                }
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    (e.target as HTMLInputElement).blur();
-                                  }
-                                }}
-                              />
-                            </label>
-                            <div className="ember-sprite-bands__ops">
-                              <button
-                                type="button"
-                                className="ghost"
-                                disabled={i === 0}
-                                onClick={() => moveWallStrip(i, -1)}
-                                title="Выше"
-                              >
-                                ↑
-                              </button>
-                              <button
-                                type="button"
-                                className="ghost"
-                                disabled={i >= wallHeights.length - 1}
-                                onClick={() => moveWallStrip(i, 1)}
-                                title="Ниже"
-                              >
-                                ↓
-                              </button>
-                              <button
-                                type="button"
-                                className="ghost ember-danger"
-                                onClick={() => removeWallStrip(i)}
-                                title="Убрать полосу"
-                              >
-                                ×
-                              </button>
-                            </div>
-                            {isLast ? (
-                              <button
-                                type="button"
-                                className="ember-sprite-bands__add"
-                                disabled={
-                                  wallHeights.length >= SPRITE_WALL_MAX_STRIPS
-                                }
-                                onClick={addWallStrip}
-                                title="Добавить полосу стены снизу"
-                              >
-                                + стена
-                              </button>
-                            ) : null}
-                          </div>
-                        );
-                      })}
                     </div>
-                    <canvas
-                      ref={canvasRef}
-                      className="ember-sprite-paint__canvas"
-                      style={{
-                        width: width * cellScale,
-                        height: totalH * cellScale,
-                        cursor: tool === "eyedrop" ? "crosshair" : "cell",
-                      }}
+                  ) : null}
+              </aside>
+
+              <div className="ember-sprite-draw">
+              <div className="ember-sprite-stage">
+                <div className="ember-sprite-stage__scroll" ref={stageRef}>
+                  <div className="ember-sprite-stage__center">
+                    <div className="ember-sprite-artboard">
+                      <canvas
+                        ref={canvasRef}
+                        className="ember-sprite-paint__canvas"
+                        style={{
+                          width: width * cellScale,
+                          height: canvasH * cellScale,
+                          cursor: tool === "eyedrop" ? "crosshair" : "cell",
+                        }}
                       onContextMenu={(e) => e.preventDefault()}
                       onMouseDown={(e) => {
                         if (
@@ -2051,16 +3154,19 @@ export function SpriteEditorPanel({
                         if (!painting.current) return;
                         painting.current = false;
                         strokeSaved.current = false;
+                        smudgePrevRef.current = null;
                         commitToPack(pixelsRef.current);
                       }}
                       onMouseLeave={() => {
                         if (painting.current) {
                           painting.current = false;
                           strokeSaved.current = false;
+                          smudgePrevRef.current = null;
                           commitToPack(pixelsRef.current);
                         }
                       }}
                     />
+                    </div>
                   </div>
                 </div>
 
@@ -2137,6 +3243,8 @@ export function SpriteEditorPanel({
                   Привязать
                 </button>
               </div>
+              </div>
+              </div>
             </>
           )}
         </div>
@@ -2155,24 +3263,6 @@ export function SpriteEditorPanel({
               title={color}
             />
           </div>
-          {favorites.length > 0 ? (
-            <div className="ember-tile-palette-grid ember-tile-palette-grid--fav">
-              {favorites.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className={`ember-palette-swatch ${color === c ? "is-active" : ""}`}
-                  style={{ background: c }}
-                  title={`${c} · ПКМ убрать`}
-                  onClick={() => setColor(c)}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    removeFavorite(c);
-                  }}
-                />
-              ))}
-            </div>
-          ) : null}
           <div className="ember-tile-palette-grid">
             {palette.map((c) => (
               <button
@@ -2185,46 +3275,45 @@ export function SpriteEditorPanel({
                       ? "repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 50% / 10px 10px"
                       : c,
                 }}
-                title={c === "#00000000" ? "Прозрачный" : c}
+                title={
+                  c === "#00000000"
+                    ? "Прозрачный"
+                    : BASE_PALETTE.includes(c)
+                      ? c
+                      : `${c} · ПКМ убрать`
+                }
                 onClick={() => setColor(c)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  if (!BASE_PALETTE.includes(c)) removeFavorite(c);
+                }}
               />
             ))}
-          </div>
-          <div className="ember-sprite-palette__extras">
-            <input
-              type="color"
-              value={
-                color.startsWith("#") && color.length === 7 ? color : "#c45c26"
-              }
-              onChange={(e) => setColor(e.target.value)}
-              title="Свой цвет"
-            />
-            <button
-              type="button"
-              className="ghost ember-chip--sm"
-              title="Текущий в избранное"
-              onClick={() => {
-                if (color.startsWith("#") && color.length === 7) {
-                  addFavorite(color);
+            <label
+              className="ember-palette-swatch ember-palette-swatch--add"
+              title="Добавить цвет"
+            >
+              <span aria-hidden>+</span>
+              <input
+                type="color"
+                aria-label="Добавить цвет в палитру"
+                value={
+                  color.startsWith("#") && color.length === 7
+                    ? color
+                    : "#c45c26"
                 }
-              }}
-            >
-              ★
-            </button>
-            <input
-              type="color"
-              value={favDraft}
-              onChange={(e) => setFavDraft(e.target.value)}
-              title="Новый для избранного"
-            />
-            <button
-              type="button"
-              className="ghost ember-chip--sm"
-              onClick={() => addFavorite(favDraft)}
-              title="Добавить цвет в избранное"
-            >
-              +★
-            </button>
+                ref={(node) => {
+                  if (!node) return;
+                  // Native `change` fires when the picker closes.
+                  // React onChange is the `input` event and would save every drag step.
+                  node.onchange = () => {
+                    setColor(node.value);
+                    addFavorite(node.value);
+                  };
+                }}
+                onInput={(e) => setColor(e.currentTarget.value)}
+              />
+            </label>
           </div>
         </aside>
       </div>

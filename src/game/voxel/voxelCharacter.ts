@@ -4,6 +4,7 @@
  */
 import type {
   EmberChibi32Slot,
+  EmberCharacterArtStyle,
   EmberCharacterCardView,
   EmberCharacterFacing,
   EmberVoxelAnimClip,
@@ -15,6 +16,7 @@ import type {
   EmberVoxelSceneObject,
 } from "../content/types";
 import {
+  EMBER_CHARACTER_ART_STYLES,
   EMBER_CHARACTER_CARD_VIEWS,
   EMBER_CHARACTER_CLIP_ROLES,
   EMBER_CHIBI32_SLOTS,
@@ -37,6 +39,25 @@ export const CHIBI_TEMPLATE_LABEL_RU: Record<
   chibi_32: "объём",
   chibi_25d: "2.5D",
 };
+
+export const CHARACTER_ART_STYLE_LABEL_RU: Record<
+  EmberCharacterArtStyle,
+  string
+> = {
+  chibi: "чиби",
+  slasher: "slasher",
+};
+
+/** Shared hair hex for voxel + sprite slasher presets. */
+export const SLASHER_HAIR_HEX = "#e02824";
+
+export function chibiSlotLabelRu(
+  slot: EmberChibi32Slot,
+  style?: EmberCharacterArtStyle,
+): string {
+  if (style === "slasher" && slot === "ears") return "Ахоге";
+  return CHIBI32_SLOT_LABEL_RU[slot];
+}
 
 /** Play camera yaws 360°; a 1-voxel card vanishes in profile. */
 export const CHIBI25D_SLAB_DEPTH = 3;
@@ -94,6 +115,32 @@ const PI = {
   accent: 6,
 } as const;
 
+const SLASHER_PALETTE = [
+  "",
+  "#f0c8a4",
+  SLASHER_HAIR_HEX,
+  "#ece8e4",
+  "#32303a",
+  "#1c1a1e",
+  "#a01818",
+  "#8a868e",
+  "#4a3024",
+  "#d8a07c",
+  ...DEFAULT_VOXEL_PALETTE.slice(10),
+];
+
+const SPI = {
+  skin: 1,
+  hair: 2,
+  cloth: 3,
+  clothDark: 4,
+  band: 5,
+  hairDark: 6,
+  clothMid: 7,
+  eye: 8,
+  skinDark: 9,
+} as const;
+
 type Vec3 = { x: number; y: number; z: number };
 
 export type VoxelCharacterBuild = {
@@ -106,6 +153,15 @@ function isTemplateId(raw: unknown): raw is EmberVoxelCharacterTemplate {
     typeof raw === "string" &&
     (EMBER_VOXEL_CHARACTER_TEMPLATES as readonly string[]).includes(raw)
   );
+}
+
+function persistCharacterStyle(
+  raw: unknown,
+): EmberCharacterArtStyle | undefined {
+  return raw === "slasher" &&
+    (EMBER_CHARACTER_ART_STYLES as readonly string[]).includes(raw)
+    ? "slasher"
+    : undefined;
 }
 
 function isSlotName(raw: string): raw is EmberChibi32Slot {
@@ -178,8 +234,10 @@ export function normalizeVoxelCharacterDef(
       if (Object.keys(next).length) views[viewKey] = next;
     }
   }
+  const style = persistCharacterStyle(rec.style);
   return {
     templateId,
+    ...(style ? { style } : {}),
     bodyHeightVoxels,
     bodyRadiusVoxels,
     facing,
@@ -328,6 +386,7 @@ function partModel(
   physical: boolean,
   material: EmberVoxelModel["material"],
   palette: readonly string[] = CHIBI_PALETTE,
+  extraTags: readonly string[] = [],
 ): EmberVoxelModel {
   const empty = createEmptyVoxelModel(
     id,
@@ -338,7 +397,7 @@ function partModel(
   return {
     ...empty,
     palette: [...palette],
-    tags: ["character", "chibi"],
+    tags: ["character", "chibi", ...extraTags],
     physical,
     material,
   };
@@ -375,7 +434,11 @@ function walkClip(id: string, joints: Record<string, string>): EmberVoxelAnimCli
 export function createChibi32Character(
   baseId: string,
   nameRu: string,
+  style: EmberCharacterArtStyle = "chibi",
 ): VoxelCharacterBuild {
+  const slasher = style === "slasher";
+  const palette = slasher ? SLASHER_PALETTE : CHIBI_PALETTE;
+  const extraTags = slasher ? (["slasher"] as const) : [];
   const origin: Vec3 = { x: 0, y: 0, z: 0 };
   const off = {
     pelvis: { x: 0, y: 12, z: 0 },
@@ -406,12 +469,20 @@ export function createChibi32Character(
     const modelId = `${baseId}_${slot}`;
     const objectId = `obj_${slot}`;
     const model = paint(
-      partModel(modelId, CHIBI32_SLOT_LABEL_RU[slot], height, physical, material),
+      partModel(
+        modelId,
+        chibiSlotLabelRu(slot, style),
+        height,
+        physical,
+        material,
+        palette,
+        extraTags,
+      ),
     );
     models[modelId] = model;
     objects.push({
       id: objectId,
-      nameRu: CHIBI32_SLOT_LABEL_RU[slot],
+      nameRu: chibiSlotLabelRu(slot, style),
       modelId,
       offset: { ...off[slot] },
       visible: true,
@@ -420,53 +491,121 @@ export function createChibi32Character(
     return { modelId, objectId };
   };
 
-  addPart("pelvis", 4, true, "cloth", (m) =>
-    fillBox(m, 5, 0, 5, 6, 4, 5, PI.clothDark),
-  );
-  addPart("torso", 8, true, "cloth", (m) => {
-    let next = fillBox(m, 4, 0, 5, 8, 8, 6, PI.cloth);
-    next = fillBox(next, 4, 0, 5, 8, 2, 6, PI.clothDark);
-    return next;
-  });
-  addPart("head", 12, true, "cloth", (m) => {
-    let next = fillBox(m, 2, 0, 2, 12, 12, 12, PI.skin);
-    next = fillBox(next, 2, 9, 2, 12, 3, 12, PI.hair);
-    next = setCell(next, 5, 8, 13, PI.dark);
-    next = setCell(next, 10, 8, 13, PI.dark);
-    return next;
-  });
-  addPart("arm_l", 10, true, "cloth", (m) => {
-    let next = fillBox(m, 1, 2, 6, 3, 8, 3, PI.cloth);
-    next = fillBox(next, 1, 0, 6, 3, 2, 3, PI.skin);
-    return next;
-  });
-  addPart("arm_r", 10, true, "cloth", (m) => {
-    let next = fillBox(m, 12, 2, 6, 3, 8, 3, PI.cloth);
-    next = fillBox(next, 12, 0, 6, 3, 2, 3, PI.skin);
-    return next;
-  });
-  addPart("leg_l", 12, true, "cloth", (m) => {
-    let next = fillBox(m, 4, 4, 6, 4, 8, 4, PI.skin);
-    next = fillBox(next, 4, 0, 6, 4, 4, 4, PI.dark);
-    return next;
-  });
-  addPart("leg_r", 12, true, "cloth", (m) => {
-    let next = fillBox(m, 8, 4, 6, 4, 8, 4, PI.skin);
-    next = fillBox(next, 8, 0, 6, 4, 4, 4, PI.dark);
-    return next;
-  });
-  addPart("hair", 6, false, "cloth", (m) => fillBox(m, 2, 0, 2, 12, 6, 12, PI.hair));
-  addPart("twin_l", 18, false, "cloth", (m) =>
-    fillBox(m, 1, 0, 2, 3, 18, 3, PI.hair),
-  );
-  addPart("twin_r", 18, false, "cloth", (m) =>
-    fillBox(m, 12, 0, 2, 3, 18, 3, PI.hair),
-  );
-  addPart("ears", 4, false, "cloth", (m) => {
-    let next = fillBox(m, 3, 0, 6, 3, 3, 3, PI.cloth);
-    next = fillBox(next, 10, 0, 6, 3, 3, 3, PI.cloth);
-    return next;
-  });
+  if (slasher) {
+    addPart("pelvis", 4, true, "cloth", (m) =>
+      fillBox(m, 4, 0, 5, 8, 4, 5, SPI.clothDark),
+    );
+    addPart("torso", 8, true, "cloth", (m) => {
+      let next = fillBox(m, 4, 0, 5, 8, 3, 6, SPI.clothMid);
+      next = fillBox(next, 4, 3, 5, 8, 3, 6, SPI.clothDark);
+      next = fillBox(next, 4, 6, 5, 8, 2, 6, SPI.cloth);
+      return next;
+    });
+    addPart("head", 12, true, "cloth", (m) => {
+      let next = fillBox(m, 2, 0, 2, 12, 12, 12, SPI.skin);
+      next = fillBox(next, 2, 9, 2, 12, 3, 12, SPI.hair);
+      next = fillBox(next, 2, 8, 2, 12, 1, 2, SPI.band);
+      next = fillBox(next, 2, 8, 12, 12, 1, 2, SPI.band);
+      next = setCell(next, 5, 6, 13, SPI.eye);
+      next = setCell(next, 10, 6, 13, SPI.eye);
+      next = setCell(next, 5, 7, 13, SPI.eye);
+      next = setCell(next, 10, 7, 13, SPI.eye);
+      return next;
+    });
+    addPart("arm_l", 10, true, "cloth", (m) => {
+      let next = fillBox(m, 1, 2, 6, 3, 8, 3, SPI.clothDark);
+      next = fillBox(next, 1, 0, 6, 3, 2, 3, SPI.skin);
+      return next;
+    });
+    addPart("arm_r", 10, true, "cloth", (m) => {
+      let next = fillBox(m, 12, 2, 6, 3, 8, 3, SPI.clothDark);
+      next = fillBox(next, 12, 0, 6, 3, 2, 3, SPI.skin);
+      return next;
+    });
+    addPart("leg_l", 12, true, "cloth", (m) => {
+      let next = fillBox(m, 4, 9, 6, 4, 3, 4, SPI.skin);
+      next = fillBox(next, 4, 3, 6, 4, 6, 4, SPI.clothDark);
+      next = fillBox(next, 4, 0, 6, 4, 3, 4, SPI.band);
+      return next;
+    });
+    addPart("leg_r", 12, true, "cloth", (m) => {
+      let next = fillBox(m, 8, 9, 6, 4, 3, 4, SPI.skin);
+      next = fillBox(next, 8, 3, 6, 4, 6, 4, SPI.clothDark);
+      next = fillBox(next, 8, 0, 6, 4, 3, 4, SPI.band);
+      return next;
+    });
+    addPart("hair", 6, false, "cloth", (m) => {
+      let next = fillBox(m, 1, 0, 1, 14, 6, 14, SPI.hair);
+      next = fillBox(next, 1, 0, 1, 5, 6, 14, SPI.hairDark);
+      return next;
+    });
+    addPart("twin_l", 18, false, "cloth", (m) => {
+      let next = fillBox(m, 1, 0, 2, 4, 18, 4, SPI.hair);
+      next = fillBox(next, 1, 0, 2, 4, 8, 4, SPI.hairDark);
+      return next;
+    });
+    addPart("twin_r", 18, false, "cloth", (m) => {
+      let next = fillBox(m, 11, 0, 2, 4, 18, 4, SPI.hair);
+      next = fillBox(next, 11, 0, 2, 4, 8, 4, SPI.hairDark);
+      return next;
+    });
+    addPart("ears", 4, false, "cloth", (m) => {
+      let next = fillBox(m, 7, 1, 7, 2, 3, 2, SPI.hair);
+      next = fillBox(next, 8, 2, 6, 2, 2, 2, SPI.hair);
+      next = setCell(next, 9, 3, 6, SPI.hairDark);
+      return next;
+    });
+  } else {
+    addPart("pelvis", 4, true, "cloth", (m) =>
+      fillBox(m, 5, 0, 5, 6, 4, 5, PI.clothDark),
+    );
+    addPart("torso", 8, true, "cloth", (m) => {
+      let next = fillBox(m, 4, 0, 5, 8, 8, 6, PI.cloth);
+      next = fillBox(next, 4, 0, 5, 8, 2, 6, PI.clothDark);
+      return next;
+    });
+    addPart("head", 12, true, "cloth", (m) => {
+      let next = fillBox(m, 2, 0, 2, 12, 12, 12, PI.skin);
+      next = fillBox(next, 2, 9, 2, 12, 3, 12, PI.hair);
+      next = setCell(next, 5, 8, 13, PI.dark);
+      next = setCell(next, 10, 8, 13, PI.dark);
+      return next;
+    });
+    addPart("arm_l", 10, true, "cloth", (m) => {
+      let next = fillBox(m, 1, 2, 6, 3, 8, 3, PI.cloth);
+      next = fillBox(next, 1, 0, 6, 3, 2, 3, PI.skin);
+      return next;
+    });
+    addPart("arm_r", 10, true, "cloth", (m) => {
+      let next = fillBox(m, 12, 2, 6, 3, 8, 3, PI.cloth);
+      next = fillBox(next, 12, 0, 6, 3, 2, 3, PI.skin);
+      return next;
+    });
+    addPart("leg_l", 12, true, "cloth", (m) => {
+      let next = fillBox(m, 4, 4, 6, 4, 8, 4, PI.skin);
+      next = fillBox(next, 4, 0, 6, 4, 4, 4, PI.dark);
+      return next;
+    });
+    addPart("leg_r", 12, true, "cloth", (m) => {
+      let next = fillBox(m, 8, 4, 6, 4, 8, 4, PI.skin);
+      next = fillBox(next, 8, 0, 6, 4, 4, 4, PI.dark);
+      return next;
+    });
+    addPart("hair", 6, false, "cloth", (m) =>
+      fillBox(m, 2, 0, 2, 12, 6, 12, PI.hair),
+    );
+    addPart("twin_l", 18, false, "cloth", (m) =>
+      fillBox(m, 1, 0, 2, 3, 18, 3, PI.hair),
+    );
+    addPart("twin_r", 18, false, "cloth", (m) =>
+      fillBox(m, 12, 0, 2, 3, 18, 3, PI.hair),
+    );
+    addPart("ears", 4, false, "cloth", (m) => {
+      let next = fillBox(m, 3, 0, 6, 3, 3, 3, PI.cloth);
+      next = fillBox(next, 10, 0, 6, 3, 3, 3, PI.cloth);
+      return next;
+    });
+  }
 
   const joint = (
     id: string,
@@ -512,6 +651,7 @@ export function createChibi32Character(
 
   const character: EmberVoxelCharacterDef = {
     templateId: "chibi_32",
+    ...(slasher ? { style: "slasher" as const } : {}),
     bodyHeightVoxels: CHIBI32_BODY_HEIGHT_VOXELS,
     bodyRadiusVoxels: CHIBI32_BODY_RADIUS_VOXELS,
     slots,
@@ -563,7 +703,11 @@ const P25 = {
 export function createChibi25dCharacter(
   baseId: string,
   nameRu: string,
+  style: EmberCharacterArtStyle = "chibi",
 ): VoxelCharacterBuild {
+  const slasher = style === "slasher";
+  const palette = slasher ? SLASHER_PALETTE : CHIBI_25D_PALETTE;
+  const extraTags = slasher ? (["slasher"] as const) : [];
   const origin: Vec3 = { x: 0, y: 0, z: 0 };
   const off = {
     pelvis: { x: 0, y: 12, z: 0 },
@@ -596,17 +740,18 @@ export function createChibi25dCharacter(
     const model = paint(
       partModel(
         modelId,
-        CHIBI32_SLOT_LABEL_RU[slot],
+        chibiSlotLabelRu(slot, style),
         height,
         physical,
         material,
-        CHIBI_25D_PALETTE,
+        palette,
+        extraTags,
       ),
     );
     models[modelId] = model;
     objects.push({
       id: objectId,
-      nameRu: CHIBI32_SLOT_LABEL_RU[slot],
+      nameRu: chibiSlotLabelRu(slot, style),
       modelId,
       offset: { ...off[slot] },
       visible: true,
@@ -616,82 +761,155 @@ export function createChibi25dCharacter(
   };
 
   // Front is +Z (sculpt iso SE + play 3/4). Card lives in z=7..9.
-  addPart("pelvis", 4, true, "cloth", (m) =>
-    fillBox(m, 4, 0, 7, 8, 4, 3, P25.dress),
-  );
-  addPart("torso", 8, true, "cloth", (m) => {
-    let next = fillBox(m, 4, 2, 7, 8, 6, 3, P25.dress);
-    next = fillBox(next, 3, 0, 6, 10, 3, 5, P25.dress);
-    next = fillBox(next, 3, 0, 6, 10, 1, 5, P25.teal);
-    next = fillBox(next, 4, 4, 7, 8, 1, 3, P25.pink);
-    next = fillBox(next, 7, 0, 10, 2, 5, 1, P25.pink);
-    return next;
-  });
-  addPart("head", 12, true, "cloth", (m) => {
-    let next = fillBox(m, 3, 0, 7, 10, 10, 3, P25.skin);
-    next = fillBox(next, 3, 8, 6, 10, 4, 5, P25.hair);
-    next = fillBox(next, 3, 7, 9, 10, 2, 2, P25.hair);
-    next = fillBox(next, 3, 8, 6, 10, 2, 1, P25.hairDark);
-    next = setCell(next, 5, 5, 9, P25.eye);
-    next = setCell(next, 5, 6, 9, P25.eye);
-    next = setCell(next, 10, 5, 9, P25.eye);
-    next = setCell(next, 10, 6, 9, P25.eye);
-    next = setCell(next, 5, 6, 10, P25.white);
-    next = setCell(next, 10, 6, 10, P25.white);
-    next = setCell(next, 7, 4, 10, P25.skin);
-    next = setCell(next, 8, 4, 10, P25.skin);
-    next = setCell(next, 7, 3, 9, P25.dark);
-    next = setCell(next, 8, 3, 9, P25.dark);
-    return next;
-  });
-  addPart("arm_l", 10, true, "cloth", (m) => {
-    let next = fillBox(m, 2, 2, 7, 2, 8, 3, P25.dress);
-    next = fillBox(next, 2, 0, 7, 2, 2, 3, P25.skin);
-    return next;
-  });
-  addPart("arm_r", 10, true, "cloth", (m) => {
-    let next = fillBox(m, 12, 2, 7, 2, 8, 3, P25.dress);
-    next = fillBox(next, 12, 0, 7, 2, 2, 3, P25.skin);
-    return next;
-  });
-  addPart("leg_l", 12, true, "cloth", (m) => {
-    let next = fillBox(m, 5, 3, 7, 3, 9, 3, P25.skin);
-    next = fillBox(next, 5, 0, 7, 3, 3, 3, P25.teal);
-    return next;
-  });
-  addPart("leg_r", 12, true, "cloth", (m) => {
-    let next = fillBox(m, 8, 3, 7, 3, 9, 3, P25.skin);
-    next = fillBox(next, 8, 0, 7, 3, 3, 3, P25.teal);
-    return next;
-  });
-  addPart("hair", 6, false, "cloth", (m) => {
-    let next = fillBox(m, 3, 0, 5, 10, 6, 6, P25.hair);
-    next = fillBox(next, 4, 2, 4, 8, 4, 2, P25.hairDark);
-    return next;
-  });
-  addPart("twin_l", 18, false, "cloth", (m) => {
-    let next = m;
-    for (let y = 0; y < 18; y++) {
-      const wave = Math.floor(y / 3) % 2;
-      next = fillBox(next, 1 + wave, y, 5, 2, 1, 4, P25.hair);
-    }
-    return next;
-  });
-  addPart("twin_r", 18, false, "cloth", (m) => {
-    let next = m;
-    for (let y = 0; y < 18; y++) {
-      const wave = Math.floor(y / 3) % 2;
-      next = fillBox(next, 12 - wave, y, 5, 2, 1, 4, P25.hair);
-    }
-    return next;
-  });
-  addPart("ears", 4, false, "cloth", (m) => {
-    let next = fillBox(m, 2, 0, 8, 2, 3, 2, P25.hair);
-    next = fillBox(next, 12, 0, 8, 2, 3, 2, P25.hair);
-    next = setCell(next, 2, 1, 9, P25.pink);
-    next = setCell(next, 13, 1, 9, P25.pink);
-    return next;
-  });
+  if (slasher) {
+    addPart("pelvis", 4, true, "cloth", (m) =>
+      fillBox(m, 4, 0, 7, 8, 4, 3, SPI.clothDark),
+    );
+    addPart("torso", 8, true, "cloth", (m) => {
+      let next = fillBox(m, 4, 2, 7, 8, 6, 3, SPI.clothDark);
+      next = fillBox(next, 3, 0, 6, 10, 3, 5, SPI.clothMid);
+      next = fillBox(next, 4, 6, 7, 8, 2, 3, SPI.cloth);
+      return next;
+    });
+    addPart("head", 12, true, "cloth", (m) => {
+      let next = fillBox(m, 3, 0, 7, 10, 10, 3, SPI.skin);
+      next = fillBox(next, 3, 8, 6, 10, 4, 5, SPI.hair);
+      next = fillBox(next, 3, 7, 7, 10, 1, 3, SPI.band);
+      next = setCell(next, 5, 5, 9, SPI.eye);
+      next = setCell(next, 5, 6, 9, SPI.eye);
+      next = setCell(next, 10, 5, 9, SPI.eye);
+      next = setCell(next, 10, 6, 9, SPI.eye);
+      next = setCell(next, 5, 6, 10, SPI.cloth);
+      next = setCell(next, 10, 6, 10, SPI.cloth);
+      return next;
+    });
+    addPart("arm_l", 10, true, "cloth", (m) => {
+      let next = fillBox(m, 2, 2, 7, 2, 8, 3, SPI.clothDark);
+      next = fillBox(next, 2, 0, 7, 2, 2, 3, SPI.skin);
+      return next;
+    });
+    addPart("arm_r", 10, true, "cloth", (m) => {
+      let next = fillBox(m, 12, 2, 7, 2, 8, 3, SPI.clothDark);
+      next = fillBox(next, 12, 0, 7, 2, 2, 3, SPI.skin);
+      return next;
+    });
+    addPart("leg_l", 12, true, "cloth", (m) => {
+      let next = fillBox(m, 5, 9, 7, 3, 3, 3, SPI.skin);
+      next = fillBox(next, 5, 3, 7, 3, 6, 3, SPI.clothDark);
+      next = fillBox(next, 5, 0, 7, 3, 3, 3, SPI.band);
+      return next;
+    });
+    addPart("leg_r", 12, true, "cloth", (m) => {
+      let next = fillBox(m, 8, 9, 7, 3, 3, 3, SPI.skin);
+      next = fillBox(next, 8, 3, 7, 3, 6, 3, SPI.clothDark);
+      next = fillBox(next, 8, 0, 7, 3, 3, 3, SPI.band);
+      return next;
+    });
+    addPart("hair", 6, false, "cloth", (m) => {
+      let next = fillBox(m, 3, 0, 5, 10, 6, 6, SPI.hair);
+      next = fillBox(next, 4, 2, 4, 8, 4, 2, SPI.hairDark);
+      return next;
+    });
+    addPart("twin_l", 18, false, "cloth", (m) => {
+      let next = m;
+      for (let y = 0; y < 18; y++) {
+        const wave = Math.floor(y / 3) % 2;
+        next = fillBox(next, 1 + wave, y, 5, 2, 1, 4, SPI.hair);
+      }
+      return next;
+    });
+    addPart("twin_r", 18, false, "cloth", (m) => {
+      let next = m;
+      for (let y = 0; y < 18; y++) {
+        const wave = Math.floor(y / 3) % 2;
+        next = fillBox(next, 12 - wave, y, 5, 2, 1, 4, SPI.hair);
+      }
+      return next;
+    });
+    addPart("ears", 4, false, "cloth", (m) => {
+      let next = fillBox(m, 7, 0, 8, 2, 4, 2, SPI.hair);
+      next = fillBox(next, 8, 2, 7, 2, 2, 2, SPI.hair);
+      next = setCell(next, 9, 3, 7, SPI.hairDark);
+      return next;
+    });
+  } else {
+    addPart("pelvis", 4, true, "cloth", (m) =>
+      fillBox(m, 4, 0, 7, 8, 4, 3, P25.dress),
+    );
+    addPart("torso", 8, true, "cloth", (m) => {
+      let next = fillBox(m, 4, 2, 7, 8, 6, 3, P25.dress);
+      next = fillBox(next, 3, 0, 6, 10, 3, 5, P25.dress);
+      next = fillBox(next, 3, 0, 6, 10, 1, 5, P25.teal);
+      next = fillBox(next, 4, 4, 7, 8, 1, 3, P25.pink);
+      next = fillBox(next, 7, 0, 10, 2, 5, 1, P25.pink);
+      return next;
+    });
+    addPart("head", 12, true, "cloth", (m) => {
+      let next = fillBox(m, 3, 0, 7, 10, 10, 3, P25.skin);
+      next = fillBox(next, 3, 8, 6, 10, 4, 5, P25.hair);
+      next = fillBox(next, 3, 7, 9, 10, 2, 2, P25.hair);
+      next = fillBox(next, 3, 8, 6, 10, 2, 1, P25.hairDark);
+      next = setCell(next, 5, 5, 9, P25.eye);
+      next = setCell(next, 5, 6, 9, P25.eye);
+      next = setCell(next, 10, 5, 9, P25.eye);
+      next = setCell(next, 10, 6, 9, P25.eye);
+      next = setCell(next, 5, 6, 10, P25.white);
+      next = setCell(next, 10, 6, 10, P25.white);
+      next = setCell(next, 7, 4, 10, P25.skin);
+      next = setCell(next, 8, 4, 10, P25.skin);
+      next = setCell(next, 7, 3, 9, P25.dark);
+      next = setCell(next, 8, 3, 9, P25.dark);
+      return next;
+    });
+    addPart("arm_l", 10, true, "cloth", (m) => {
+      let next = fillBox(m, 2, 2, 7, 2, 8, 3, P25.dress);
+      next = fillBox(next, 2, 0, 7, 2, 2, 3, P25.skin);
+      return next;
+    });
+    addPart("arm_r", 10, true, "cloth", (m) => {
+      let next = fillBox(m, 12, 2, 7, 2, 8, 3, P25.dress);
+      next = fillBox(next, 12, 0, 7, 2, 2, 3, P25.skin);
+      return next;
+    });
+    addPart("leg_l", 12, true, "cloth", (m) => {
+      let next = fillBox(m, 5, 3, 7, 3, 9, 3, P25.skin);
+      next = fillBox(next, 5, 0, 7, 3, 3, 3, P25.teal);
+      return next;
+    });
+    addPart("leg_r", 12, true, "cloth", (m) => {
+      let next = fillBox(m, 8, 3, 7, 3, 9, 3, P25.skin);
+      next = fillBox(next, 8, 0, 7, 3, 3, 3, P25.teal);
+      return next;
+    });
+    addPart("hair", 6, false, "cloth", (m) => {
+      let next = fillBox(m, 3, 0, 5, 10, 6, 6, P25.hair);
+      next = fillBox(next, 4, 2, 4, 8, 4, 2, P25.hairDark);
+      return next;
+    });
+    addPart("twin_l", 18, false, "cloth", (m) => {
+      let next = m;
+      for (let y = 0; y < 18; y++) {
+        const wave = Math.floor(y / 3) % 2;
+        next = fillBox(next, 1 + wave, y, 5, 2, 1, 4, P25.hair);
+      }
+      return next;
+    });
+    addPart("twin_r", 18, false, "cloth", (m) => {
+      let next = m;
+      for (let y = 0; y < 18; y++) {
+        const wave = Math.floor(y / 3) % 2;
+        next = fillBox(next, 12 - wave, y, 5, 2, 1, 4, P25.hair);
+      }
+      return next;
+    });
+    addPart("ears", 4, false, "cloth", (m) => {
+      let next = fillBox(m, 2, 0, 8, 2, 3, 2, P25.hair);
+      next = fillBox(next, 12, 0, 8, 2, 3, 2, P25.hair);
+      next = setCell(next, 2, 1, 9, P25.pink);
+      next = setCell(next, 13, 1, 9, P25.pink);
+      return next;
+    });
+  }
 
   const viewModel = (
     slot: EmberChibi32Slot,
@@ -704,11 +922,12 @@ export function createChibi25dCharacter(
     models[modelId] = paint(
       partModel(
         modelId,
-        `${CHIBI32_SLOT_LABEL_RU[slot]} · ${view}`,
+        `${chibiSlotLabelRu(slot, style)} · ${view}`,
         height,
         physical,
         "cloth",
-        CHIBI_25D_PALETTE,
+        palette,
+        extraTags,
       ),
     );
     return modelId;
@@ -716,6 +935,12 @@ export function createChibi25dCharacter(
 
   const xFlip = (x: number, sx = 1) => 16 - x - sx;
   const paintHeadBack = (m: EmberVoxelModel) => {
+    if (slasher) {
+      let next = fillBox(m, 3, 0, 7, 10, 10, 3, SPI.hair);
+      next = fillBox(next, 3, 0, 6, 10, 5, 2, SPI.hairDark);
+      next = fillBox(next, 3, 7, 7, 10, 1, 3, SPI.band);
+      return next;
+    }
     let next = fillBox(m, 3, 0, 7, 10, 10, 3, P25.hair);
     next = fillBox(next, 3, 0, 6, 10, 5, 2, P25.hairDark);
     next = fillBox(next, 4, 3, 9, 8, 6, 2, P25.hair);
@@ -723,6 +948,14 @@ export function createChibi25dCharacter(
   };
   const paintHeadProfile = (flip: boolean) => (m: EmberVoxelModel) => {
     const x = (v: number, s = 1) => (flip ? xFlip(v, s) : v);
+    if (slasher) {
+      let next = fillBox(m, x(5, 7), 0, 7, 7, 10, 3, SPI.skin);
+      next = fillBox(next, x(4, 8), 6, 6, 8, 6, 5, SPI.hair);
+      next = fillBox(next, x(4, 8), 7, 7, 8, 1, 3, SPI.band);
+      next = setCell(next, x(10), 5, 9, SPI.eye);
+      next = setCell(next, x(10), 6, 9, SPI.eye);
+      return next;
+    }
     let next = fillBox(m, x(5, 7), 0, 7, 7, 10, 3, P25.skin);
     next = fillBox(next, x(4, 8), 6, 6, 8, 6, 5, P25.hair);
     next = setCell(next, x(10), 5, 9, P25.eye);
@@ -733,21 +966,43 @@ export function createChibi25dCharacter(
     return next;
   };
   const paintHairBack = (m: EmberVoxelModel) => {
+    if (slasher) {
+      let next = fillBox(m, 3, 0, 5, 10, 6, 6, SPI.hair);
+      next = fillBox(next, 4, 0, 4, 8, 5, 3, SPI.hairDark);
+      return next;
+    }
     let next = fillBox(m, 3, 0, 5, 10, 6, 6, P25.hair);
     next = fillBox(next, 4, 0, 4, 8, 5, 3, P25.hairDark);
     return next;
   };
   const paintHairProfile = (flip: boolean) => (m: EmberVoxelModel) => {
     const x = (v: number, s = 1) => (flip ? xFlip(v, s) : v);
-    return fillBox(m, x(4, 8), 0, 5, 8, 6, 6, P25.hair);
+    return fillBox(
+      m,
+      x(4, 8),
+      0,
+      5,
+      8,
+      6,
+      6,
+      slasher ? SPI.hair : P25.hair,
+    );
   };
   const paintEarsBack = (m: EmberVoxelModel) => {
+    if (slasher) {
+      let next = fillBox(m, 7, 0, 7, 2, 4, 3, SPI.hair);
+      next = fillBox(next, 8, 2, 6, 2, 2, 3, SPI.hair);
+      return next;
+    }
     let next = fillBox(m, 2, 0, 7, 2, 3, 3, P25.hair);
     next = fillBox(next, 12, 0, 7, 2, 3, 3, P25.hair);
     return next;
   };
   const paintEarsProfile = (flip: boolean) => (m: EmberVoxelModel) => {
     const x = (v: number, s = 1) => (flip ? xFlip(v, s) : v);
+    if (slasher) {
+      return fillBox(m, x(7, 2), 0, 8, 2, 4, 2, SPI.hair);
+    }
     return fillBox(m, x(12, 2), 0, 8, 2, 3, 2, P25.hair);
   };
 
@@ -813,6 +1068,7 @@ export function createChibi25dCharacter(
 
   const character: EmberVoxelCharacterDef = {
     templateId: "chibi_25d",
+    ...(slasher ? { style: "slasher" as const } : {}),
     bodyHeightVoxels: CHIBI32_BODY_HEIGHT_VOXELS,
     bodyRadiusVoxels: CHIBI32_BODY_RADIUS_VOXELS,
     facing: "card4",
@@ -834,16 +1090,85 @@ export function createChibi25dCharacter(
   return { scene, models };
 }
 
+export function characterPresetNameRu(
+  templateId: EmberVoxelCharacterTemplate,
+  style: EmberCharacterArtStyle = "chibi",
+): string {
+  switch (style) {
+    case "slasher":
+      switch (templateId) {
+        case "chibi_25d":
+          return "Новый Slasher 2.5D";
+        case "chibi_32":
+          return "Новый Slasher";
+        default: {
+          const _n: never = templateId;
+          return _n;
+        }
+      }
+    case "chibi":
+      switch (templateId) {
+        case "chibi_25d":
+          return "Новый чиби 2.5D";
+        case "chibi_32":
+          return "Новый чиби";
+        default: {
+          const _n: never = templateId;
+          return _n;
+        }
+      }
+    default: {
+      const _n: never = style;
+      return _n;
+    }
+  }
+}
+
+export function characterPresetToastRu(
+  templateId: EmberVoxelCharacterTemplate,
+  style: EmberCharacterArtStyle = "chibi",
+): string {
+  switch (style) {
+    case "slasher":
+      switch (templateId) {
+        case "chibi_25d":
+          return "Slasher 2.5D: карточка 3 vx · красные волосы, капсула 22 vx";
+        case "chibi_32":
+          return "Slasher: шаблон chibi_32 · капсула 22 vx, макушка 32";
+        default: {
+          const _n: never = templateId;
+          return _n;
+        }
+      }
+    case "chibi":
+      switch (templateId) {
+        case "chibi_25d":
+          return "Чиби 2.5D: карточка 3 vx + объём волос/носа · капсула 22 vx";
+        case "chibi_32":
+          return "Чиби: шаблон chibi_32 · капсула 22 vx, макушка 32";
+        default: {
+          const _n: never = templateId;
+          return _n;
+        }
+      }
+    default: {
+      const _n: never = style;
+      return _n;
+    }
+  }
+}
+
 export function createVoxelCharacter(
   templateId: EmberVoxelCharacterTemplate,
   baseId: string,
   nameRu: string,
+  style: EmberCharacterArtStyle = "chibi",
 ): VoxelCharacterBuild {
   switch (templateId) {
     case "chibi_32":
-      return createChibi32Character(baseId, nameRu);
+      return createChibi32Character(baseId, nameRu, style);
     case "chibi_25d":
-      return createChibi25dCharacter(baseId, nameRu);
+      return createChibi25dCharacter(baseId, nameRu, style);
     default: {
       const _n: never = templateId;
       return _n;
