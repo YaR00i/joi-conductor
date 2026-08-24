@@ -249,6 +249,13 @@ Ember — кубичный/воксельный мир внутри Electron-п�
 `vox_fan_crate_stack`, `vox_fan_flowerbox` (`physical: false`).
 Теги: `fantasy`, `outdoor`, `town`, `market`.
 
+**Env13 — входы зданий / городской kit (сделано).** `scripts/gen-ember-fantasy-env13.mjs`
+
+`vox_fan_door` (~24h, 1×1), `vox_fan_window` (elev 1, tag `light`, без cube-теней),
+`vox_fan_shop_front` (2×1, shallow facade), `vox_fan_awning_stripe` (2×1, `physical: false`),
+`vox_fan_chimney`, `vox_fan_porch`, `vox_fan_mail_box`, `vox_fan_banner` (`physical: false`).
+Теги: `fantasy`, `outdoor`, `town`, `building`. Дверь — только меш; `kind:door` вешается на карте.
+
 **Крупные вещи** (мельница, лодка, мост) — несколько пропов или voxel scene, не один гигантский массив.
 
 ---
