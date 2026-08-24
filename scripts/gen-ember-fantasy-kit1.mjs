@@ -610,8 +610,8 @@ function modelJewelTray() {
   });
 }
 
-/** Fat parchment cylinder. Axis 0 = X, 1 = Z. */
-function scroll(g, cx, cy, cz, len, r, axis, pal, palShade, palSeal, palRibbon) {
+/** Fat parchment cylinder. Axis 0 = X, 1 = Z. Ends read as a roll, not a loaf. */
+function scroll(g, cx, cy, cz, len, r, axis, pal, palShade, palEnd, palRibbon, palSeal) {
   const hlen = len / 2;
   for (let i = -Math.ceil(hlen) - 1; i <= Math.ceil(hlen) + 1; i++) {
     for (let a = -Math.ceil(r) - 1; a <= Math.ceil(r) + 1; a++) {
@@ -624,27 +624,57 @@ function scroll(g, cx, cy, cz, len, r, axis, pal, palShade, palSeal, palRibbon) 
         const db = y + 0.5 - cy;
         if (Math.abs(along) > hlen) continue;
         if (da * da + db * db > r * r) continue;
-        const end = Math.abs(along) > hlen - 0.7;
+        const end = Math.abs(along) > hlen - 0.85;
+        const core = da * da + db * db <= (r * 0.42) * (r * 0.42);
         let palI = pal;
-        if (db < -0.2) palI = palShade;
-        if (end) palI = palShade;
+        if (db < -0.35) palI = palShade;
+        if (end) palI = core ? palEnd : palShade;
         setV(g, Math.round(x), Math.round(y), Math.round(z), palI);
       }
     }
   }
-  if (palRibbon) {
-    box(
-      g,
-      Math.round(cx) - 1,
-      Math.round(cy) - 1,
-      Math.round(cz) - 1,
-      Math.round(cx) + 2,
-      Math.round(cy) + 2,
-      Math.round(cz) + 2,
-      palRibbon,
-    );
-    setV(g, Math.round(cx), Math.round(cy + r - 0.2), Math.round(cz), palSeal);
+  if (!palRibbon) return;
+  for (let a = -Math.ceil(r) - 1; a <= Math.ceil(r) + 1; a++) {
+    for (let b = -Math.ceil(r) - 1; b <= Math.ceil(r) + 1; b++) {
+      const da = a + 0.5;
+      const db = b + 0.5;
+      const d2 = da * da + db * db;
+      if (d2 > r * r || d2 < (r - 1.15) * (r - 1.15)) continue;
+      if (axis === 0) {
+        box(
+          g,
+          Math.round(cx) - 1,
+          Math.round(cy + b),
+          Math.round(cz + a),
+          Math.round(cx) + 2,
+          Math.round(cy + b) + 1,
+          Math.round(cz + a) + 1,
+          palRibbon,
+        );
+      } else {
+        box(
+          g,
+          Math.round(cx + a),
+          Math.round(cy + b),
+          Math.round(cz) - 1,
+          Math.round(cx + a) + 1,
+          Math.round(cy + b) + 1,
+          Math.round(cz) + 2,
+          palRibbon,
+        );
+      }
+    }
   }
+  if (!palSeal) return;
+  setV(g, Math.round(cx), Math.round(cy + r - 0.3), Math.round(cz), palSeal);
+  setV(
+    g,
+    Math.round(cx) + (axis === 0 ? 1 : 0),
+    Math.round(cy + r - 0.3),
+    Math.round(cz) + (axis === 1 ? 1 : 0),
+    palSeal,
+  );
+  setV(g, Math.round(cx), Math.round(cy + r - 1.1), Math.round(cz), palSeal);
 }
 
 /** Messy pile of rolled parchment. Not a lectern grimoire. */
@@ -652,18 +682,13 @@ function modelScrollPile() {
   const h = 10;
   const g = emptyGrid(V, h, V);
 
-  scroll(g, 7.5, 2.2, 6.2, 11, 2.2, 0, 1, 2, 4, 5);
-  scroll(g, 8.2, 2.1, 10.6, 10, 2.05, 0, 2, 1, 4, 0);
-  scroll(g, 5.2, 2.2, 8.4, 9, 2.0, 1, 1, 3, 4, 5);
-  scroll(g, 11.2, 2.3, 8.0, 9, 1.95, 1, 3, 2, 4, 0);
-  scroll(g, 7.0, 5.2, 7.8, 10, 2.1, 0, 1, 2, 4, 5);
-  scroll(g, 10.0, 4.8, 10.4, 8, 1.85, 1, 3, 1, 4, 0);
-  scroll(g, 6.2, 7.0, 6.8, 8, 1.8, 0, 2, 3, 4, 5);
-  scroll(g, 9.2, 6.6, 9.2, 7, 1.7, 1, 1, 6, 4, 5);
-
-  box(g, 6, 4, 7, 9, 6, 9, 4);
-  box(g, 10, 2, 7, 12, 4, 9, 4);
-  box(g, 5, 7, 6, 8, 8, 8, 5);
+  scroll(g, 8.0, 2.2, 5.2, 12, 2.15, 0, 1, 2, 6, 5, 4);
+  scroll(g, 7.5, 2.1, 10.8, 11, 2.05, 0, 3, 1, 6, 0, 0);
+  scroll(g, 4.4, 2.2, 8.0, 10, 2.0, 1, 1, 2, 6, 5, 4);
+  scroll(g, 12.0, 2.3, 8.4, 9, 1.9, 1, 2, 3, 6, 0, 0);
+  scroll(g, 8.2, 5.4, 7.4, 10, 2.0, 0, 3, 2, 6, 5, 4);
+  scroll(g, 10.4, 5.0, 11.0, 8, 1.8, 1, 1, 6, 6, 0, 0);
+  scroll(g, 5.6, 6.8, 6.2, 8, 1.75, 0, 2, 1, 6, 5, 4);
 
   return finishModel(g, {
     id: "vox_fan_scroll_pile",
@@ -678,7 +703,7 @@ function modelScrollPile() {
       "#f4ead0",
       "#a02830",
       "#6a4a88",
-      "#8a7048",
+      "#6a5030",
     ],
     material: "cloth",
     physical: true,
