@@ -133,13 +133,14 @@ function pushBoxEdges(
   }
 }
 
-/** Live Shift+LMB group frame on one work-plane story (not terrain-following). */
+/** Live Shift+LMB coordinate volume between two visible surface stories. */
 export type PlanarMarqueeMark = {
   x0: number;
   y0: number;
   x1: number;
   y1: number;
   elev: number;
+  elevEnd?: number;
 };
 
 export function addPlanarMarqueeOutline(
@@ -150,29 +151,34 @@ export function addPlanarMarqueeOutline(
   if (mark.x1 < mark.x0 || mark.y1 < mark.y0) return;
   const ts = map.tileSize;
   const storyH = blockStoryHeight(ts);
-  const { y0, y1 } = elevStoryWorldSpan(mark.elev, storyH);
+  const minElev = Math.min(mark.elev, mark.elevEnd ?? mark.elev);
+  const maxElev = Math.max(mark.elev, mark.elevEnd ?? mark.elev);
+  const lowY = elevStoryWorldSpan(minElev, storyH).y0;
+  const highY = elevStoryWorldSpan(maxElev, storyH).y1;
   const pad = 0.22;
   const minX = mark.x0 * ts - pad;
   const maxX = (mark.x1 + 1) * ts + pad;
   const minZ = mark.y0 * ts - pad;
   const maxZ = (mark.y1 + 1) * ts + pad;
-  const y = y1 + 0.18;
   const positions: number[] = [];
-  const corners: [number, number][] = [
-    [minX, minZ],
-    [maxX, minZ],
-    [maxX, maxZ],
-    [minX, maxZ],
-  ];
-  for (let i = 0; i < 4; i++) {
-    const a = corners[i]!;
-    const b = corners[(i + 1) % 4]!;
-    positions.push(a[0], y, a[1], b[0], y, b[1]);
-  }
-  const post = Math.max(2.4, storyH * 0.4);
-  for (const [x, z] of corners) {
-    positions.push(x, y0 - 0.1, z, x, y, z);
-    positions.push(x, y, z, x, y + post * 0.15, z);
+  pushBoxEdges(
+    positions,
+    minX,
+    lowY - pad,
+    minZ,
+    maxX,
+    highY + pad,
+    maxZ,
+  );
+  // Story separators make a multi-Z drag readable without filling the volume.
+  for (let story = minElev; story < maxElev; story++) {
+    const y = elevStoryWorldSpan(story, storyH).y1 + 0.08;
+    positions.push(
+      minX, y, minZ, maxX, y, minZ,
+      maxX, y, minZ, maxX, y, maxZ,
+      maxX, y, maxZ, minX, y, maxZ,
+      minX, y, maxZ, minX, y, minZ,
+    );
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
@@ -182,7 +188,7 @@ export function addPlanarMarqueeOutline(
       color: 0x7ec8ff,
       transparent: true,
       opacity: 0.96,
-      depthTest: false,
+      depthTest: true,
       depthWrite: false,
       toneMapped: false,
     }),
@@ -196,15 +202,19 @@ export function addPlanarMarqueeOutline(
     new THREE.MeshBasicMaterial({
       color: 0x5aa8e8,
       transparent: true,
-      opacity: 0.16,
-      depthTest: false,
+      opacity: 0.1,
+      depthTest: true,
       depthWrite: false,
       toneMapped: false,
       side: THREE.DoubleSide,
     }),
   );
   fill.rotation.x = -Math.PI / 2;
-  fill.position.set((minX + maxX) * 0.5, y, (minZ + maxZ) * 0.5);
+  fill.position.set(
+    (minX + maxX) * 0.5,
+    highY + pad * 0.5,
+    (minZ + maxZ) * 0.5,
+  );
   fill.renderOrder = 33;
   fill.frustumCulled = false;
   root.add(fill);

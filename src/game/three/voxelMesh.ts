@@ -59,7 +59,23 @@ export type VoxelMeshRegion = Readonly<{
 export type VoxelMeshOptions = Readonly<{
   /** Editor has no player trigger, so identical animated tiles can share a material. */
   perCellEmissiveMaterials?: boolean;
+  /** Runtime needs cell-level roof/wall visibility; editor can merge them. */
+  cutawayMeshes?: boolean;
 }>;
+
+export function terrainCellCutawayRole(
+  tile: Pick<EmberTilesetTile, "name" | "solid">,
+  elev: number,
+  kind: "floor" | "wall",
+  cutawayMeshes: boolean,
+): CutawayRole {
+  if (!cutawayMeshes) return "floor";
+  return cutawayRoleForCell(
+    tile.name,
+    elev,
+    kind === "wall" && tile.solid ? "wall" : "floor",
+  );
+}
 
 /**
  * Box with side-face UVs scaled to world height / tileSize (top-aligned).
@@ -247,6 +263,7 @@ export function buildVoxelMesh(
   const voxUnit = ts / 16;
   const perCellEmissiveMaterials =
     options.perCellEmissiveMaterials !== false;
+  const cutawayMeshes = options.cutawayMeshes !== false;
 
   const floorMats = new Map<number, THREE.Material>();
   const wallMats = new Map<number, THREE.Material>();
@@ -473,7 +490,7 @@ export function buildVoxelMesh(
       tx,
       ty,
       elev,
-      role: cutawayRoleForCell(tile.name, elev, "floor"),
+      role: terrainCellCutawayRole(tile, elev, "floor", cutawayMeshes),
     };
     if (
       perCellEmissiveMaterials &&
@@ -504,7 +521,7 @@ export function buildVoxelMesh(
       tx,
       ty,
       elev,
-      role: cutawayRoleForCell(tile.name, elev, "wall"),
+      role: terrainCellCutawayRole(tile, elev, "wall", cutawayMeshes),
     };
     if (
       perCellEmissiveMaterials &&

@@ -9,6 +9,24 @@ type TimerQueryExt = {
   GPU_DISJOINT_EXT: number;
 };
 
+export type EmberProfilerWork = {
+  worldMs: number;
+  weaponsMs: number;
+  bulletsMs: number;
+  orbitalsMs: number;
+  spawnsMs: number;
+  aiMs: number;
+  terrainMs: number;
+  cameraMs: number;
+  billboardsMs: number;
+  environmentMs: number;
+  shadowsMs: number;
+  hudMs: number;
+  reflectionMs: number;
+  mainRenderMs: number;
+  profilerMs: number;
+};
+
 export type EmberProfilerExtras = {
   chunks?: {
     loaded: number;
@@ -33,6 +51,8 @@ export type EmberProfilerExtras = {
     npcs?: number;
     batches: number;
     bullets: number;
+    bulletCollisionExact?: number;
+    bulletCollisionOpen?: number;
     effects: number;
     logicHz?: number;
     logicSteps?: number;
@@ -42,7 +62,13 @@ export type EmberProfilerExtras = {
     pooledTransient?: number;
     createdTransient?: number;
     stressTarget?: number;
+    stressNoXp?: boolean;
     physicsMoves?: number;
+    openFieldMoves?: number;
+    kinematicMoves?: number;
+    deferredCollisionMoves?: number;
+    heightTransitionMoves?: number;
+    heightTransitionDeferred?: number;
     contactSkips?: number;
     cadenceFull?: number;
     cadenceHalf?: number;
@@ -50,6 +76,17 @@ export type EmberProfilerExtras = {
     cadenceQuarter?: number;
     avoidanceActors?: number;
     avoidanceNeighbors?: number;
+    flowGuided?: number;
+    flowMisses?: number;
+    flowReachableCells?: number;
+    flowRebuilds?: number;
+    flowRoutesUsed?: number;
+    flowRoutesAvailable?: number;
+    flowBakedCells?: number;
+    flowBakedTransitions?: number;
+    flowTargets?: number;
+    flowComponents?: number;
+    flowFallbackDistanceCells?: number;
   };
   renderables?: {
     terrain: number;
@@ -58,6 +95,8 @@ export type EmberProfilerExtras = {
     instances: number;
   };
   reflection?: { updated: boolean; ageMs: number };
+  work?: EmberProfilerWork;
+  look?: { locked: boolean };
 };
 
 export type EmberFrameProfiler = {
@@ -80,6 +119,17 @@ function pushSample(samples: number[], value: number): void {
   if (samples.length > SAMPLE_LIMIT) samples.shift();
 }
 
+export function emberProfilerUnaccountedMs(
+  cpuMs: number,
+  work: EmberProfilerWork,
+): number {
+  const accountedMs = Object.values(work).reduce(
+    (sum, value) => sum + value,
+    0,
+  );
+  return Math.max(0, cpuMs - accountedMs);
+}
+
 function fmt(value: number | null, digits = 1): string {
   return value == null || !Number.isFinite(value)
     ? "n/a"
@@ -96,6 +146,25 @@ export function createEmberFrameProfiler(
   const cpuSamples: number[] = [];
   const gpuSamples: number[] = [];
   const intervalSamples: number[] = [];
+  const workSamples = {
+    world: [] as number[],
+    combat: [] as number[],
+    weapons: [] as number[],
+    bullets: [] as number[],
+    orbitals: [] as number[],
+    spawns: [] as number[],
+    ai: [] as number[],
+    terrain: [] as number[],
+    camera: [] as number[],
+    billboards: [] as number[],
+    environment: [] as number[],
+    shadows: [] as number[],
+    hud: [] as number[],
+    reflection: [] as number[],
+    mainRender: [] as number[],
+    profiler: [] as number[],
+    other: [] as number[],
+  };
   let frameStartedAt = performance.now();
   let previousFrameEndedAt = frameStartedAt;
   let lastHudAt = 0;
@@ -179,6 +248,7 @@ export function createEmberFrameProfiler(
       cpuSamples.length = 0;
       gpuSamples.length = 0;
       intervalSamples.length = 0;
+      for (const samples of Object.values(workSamples)) samples.length = 0;
       previousFrameEndedAt = performance.now();
       lastHudAt = 0;
     }
@@ -241,8 +311,37 @@ export function createEmberFrameProfiler(
     endFrame(extras = {}) {
       if (disposed) return;
       const now = performance.now();
-      pushSample(cpuSamples, now - frameStartedAt);
+      const cpuMs = now - frameStartedAt;
+      pushSample(cpuSamples, cpuMs);
       pushSample(intervalSamples, now - previousFrameEndedAt);
+      if (extras.work) {
+        pushSample(workSamples.world, extras.work.worldMs);
+        pushSample(workSamples.weapons, extras.work.weaponsMs);
+        pushSample(workSamples.bullets, extras.work.bulletsMs);
+        pushSample(workSamples.orbitals, extras.work.orbitalsMs);
+        pushSample(workSamples.spawns, extras.work.spawnsMs);
+        pushSample(
+          workSamples.combat,
+          extras.work.weaponsMs +
+            extras.work.bulletsMs +
+            extras.work.orbitalsMs +
+            extras.work.spawnsMs,
+        );
+        pushSample(workSamples.ai, extras.work.aiMs);
+        pushSample(workSamples.terrain, extras.work.terrainMs);
+        pushSample(workSamples.camera, extras.work.cameraMs);
+        pushSample(workSamples.billboards, extras.work.billboardsMs);
+        pushSample(workSamples.environment, extras.work.environmentMs);
+        pushSample(workSamples.shadows, extras.work.shadowsMs);
+        pushSample(workSamples.hud, extras.work.hudMs);
+        pushSample(workSamples.reflection, extras.work.reflectionMs);
+        pushSample(workSamples.mainRender, extras.work.mainRenderMs);
+        pushSample(workSamples.profiler, extras.work.profilerMs);
+        pushSample(
+          workSamples.other,
+          emberProfilerUnaccountedMs(cpuMs, extras.work),
+        );
+      }
       previousFrameEndedAt = now;
       pollGpu();
       if (!visible || now - lastHudAt < HUD_REFRESH_MS) return;
@@ -259,7 +358,8 @@ export function createEmberFrameProfiler(
       const info = renderer.info;
       const lines = [
         `EMBER ${label} PROFILER  [F3]`,
-        `FPS ${fmt(1000 / Math.max(0.01, intervalAvg), 0)}  CPU ${fmt(cpuAvg)} ms  p95 ${fmt(percentile95(cpuSamples))}`,
+        `FPS ${fmt(1000 / Math.max(0.01, intervalAvg), 0)}  frame p95 ${fmt(percentile95(intervalSamples))} ms`,
+        `CPU ${fmt(cpuAvg)} ms  p95 ${fmt(percentile95(cpuSamples))}`,
         `GPU ${fmt(gpuAvg)} ms  p95 ${gpuSamples.length ? fmt(percentile95(gpuSamples)) : "n/a"}`,
         `Draw ${info.render.calls}  Tri ${info.render.triangles.toLocaleString("ru-RU")}`,
         `Geo ${info.memory.geometries}  Tex ${info.memory.textures}`,
@@ -309,13 +409,26 @@ export function createEmberFrameProfiler(
             `FX ${extras.actors.effectInstances ?? 0} in ${extras.actors.effectBatches} batches  pool ${extras.actors.pooledTransient ?? 0}/${extras.actors.createdTransient ?? 0}`,
           );
         }
+        if (extras.actors.bulletCollisionExact != null) {
+          lines.push(
+            `Bullet collision exact ${extras.actors.bulletCollisionExact}  open ${extras.actors.bulletCollisionOpen ?? 0}`,
+          );
+        }
         if (extras.actors.stressTarget) {
-          lines.push(`Stress target ${extras.actors.stressTarget}  invulnerable`);
+          lines.push(
+            `Stress target ${extras.actors.stressTarget}  invulnerable${extras.actors.stressNoXp ? "  no XP" : ""}`,
+          );
         }
         if (extras.actors.physicsMoves != null) {
           lines.push(
-            `Move physics ${extras.actors.physicsMoves}  contact skip ${extras.actors.contactSkips ?? 0}  LOD ${extras.actors.cadenceFull ?? 0}/${extras.actors.cadenceHalf ?? 0}/${extras.actors.cadenceThird ?? 0}/${extras.actors.cadenceQuarter ?? 0}`,
+            `Move exact ${extras.actors.physicsMoves}  open ${extras.actors.openFieldMoves ?? 0}  free ${extras.actors.kinematicMoves ?? 0}  defer ${extras.actors.deferredCollisionMoves ?? 0}`,
+            `Move stairs ${extras.actors.heightTransitionMoves ?? 0}  defer ${extras.actors.heightTransitionDeferred ?? 0}`,
+            `Move contact skip ${extras.actors.contactSkips ?? 0}`,
+            `Move LOD ${extras.actors.cadenceFull ?? 0}/${extras.actors.cadenceHalf ?? 0}/${extras.actors.cadenceThird ?? 0}/${extras.actors.cadenceQuarter ?? 0}`,
             `Avoid ${extras.actors.avoidanceActors ?? 0} actors / ${extras.actors.avoidanceNeighbors ?? 0} local neighbors`,
+            `Flow guided ${extras.actors.flowGuided ?? 0}  miss ${extras.actors.flowMisses ?? 0}  cells ${extras.actors.flowReachableCells ?? 0}`,
+            `Flow baked ${extras.actors.flowBakedCells ?? 0} cells  ${extras.actors.flowBakedTransitions ?? 0} edges`,
+            `Flow goals ${extras.actors.flowTargets ?? 0}/${extras.actors.flowComponents ?? 0}  fallback ${extras.actors.flowFallbackDistanceCells != null && extras.actors.flowFallbackDistanceCells >= 0 ? fmt(extras.actors.flowFallbackDistanceCells, 1) : "n/a"} tiles  rebuild ${extras.actors.flowRebuilds ?? 0}`,
           );
         }
       }
@@ -331,6 +444,18 @@ export function createEmberFrameProfiler(
             ? "Reflection updated"
             : `Reflection cached ${fmt(extras.reflection.ageMs, 0)} ms`,
         );
+      }
+      if (extras.work && workSamples.ai.length > 0) {
+        lines.push(
+          `Work p95  world ${fmt(percentile95(workSamples.world))}  combat ${fmt(percentile95(workSamples.combat))}  AI ${fmt(percentile95(workSamples.ai))}  terrain ${fmt(percentile95(workSamples.terrain))}`,
+          `Combat p95  weapon ${fmt(percentile95(workSamples.weapons))}  bullets ${fmt(percentile95(workSamples.bullets))}  orbit ${fmt(percentile95(workSamples.orbitals))}  spawn ${fmt(percentile95(workSamples.spawns))}`,
+          `Work p95  camera ${fmt(percentile95(workSamples.camera))}  bill ${fmt(percentile95(workSamples.billboards))}  env ${fmt(percentile95(workSamples.environment))}  HUD ${fmt(percentile95(workSamples.hud))}`,
+          `Work p95  shadow ${fmt(percentile95(workSamples.shadows))}  reflect ${fmt(percentile95(workSamples.reflection))}  main ${fmt(percentile95(workSamples.mainRender))}`,
+          `Work p95  profile ${fmt(percentile95(workSamples.profiler))}  other ${fmt(percentile95(workSamples.other))}`,
+        );
+      }
+      if (extras.look) {
+        lines.push(`Look ${extras.look.locked ? "POINTER LOCK" : "WARP FALLBACK"}`);
       }
       if (!timerExt) lines.push("GPU timer: n/a (driver/extension)");
       hud.textContent = lines.join("\n");

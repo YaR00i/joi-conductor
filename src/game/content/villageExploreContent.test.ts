@@ -91,7 +91,7 @@ describe("hu_tao_village explore content", () => {
     expect(map.voxelProps?.find((p) => p.id === "vil_house_door")).toMatchObject({
       modelId: "vox_vil_door",
       x: 12,
-      y: 9,
+      y: 8,
       interactivity: { kind: "door", triggerId: "house_enter" },
     });
     expect(map.regions.find((r) => r.id === "house_enter")).toMatchObject({
@@ -317,12 +317,16 @@ describe("hu_tao_village explore content", () => {
 
     expect(map.voxelProps?.find((p) => p.id === "vil_house_door")).toMatchObject({
       x: 12,
-      y: 9,
+      y: 8,
       elev: 0,
     });
+    expect(canStandAtElev(map, tileset, 12, 8, 0)).toBe(true);
+    expect(elevTileIdAt(map, 12, 8, 1)).toBe(0);
     expect(canStandAtElev(map, tileset, 12, 9, 0)).toBe(true);
+    expect(elevTileIdAt(map, 12, 9, 0)).toBeGreaterThan(0);
     expect(elevTileIdAt(map, 12, 9, 1)).toBe(0);
-    expect(canStandAtElev(map, tileset, 12, 7, 0)).toBe(true);
+    expect(elevTileIdAt(map, 12, 9, 2)).toBe(0);
+    expect(canStandAtElev(map, tileset, 12, 7, 0)).toBe(false);
     expect(elevTileIdAt(map, 12, 7, 0)).toBeGreaterThan(0);
     expect(elevTileIdAt(map, 12, 7, 1)).toBe(0);
     expect(elevTileIdAt(map, 12, 7, 2)).toBe(14);

@@ -9,13 +9,19 @@ import type {
 type Props = {
   scene: EmberVoxelScene | null;
   activeObjectId: string | null;
-  onSelectObject: (objectId: string) => void;
+  selectedObjectIds: readonly string[];
+  onSelectObject: (
+    objectId: string,
+    modifiers: { toggle: boolean; range: boolean },
+  ) => void;
+  onSelectAll: () => void;
   onToggleVisible: (objectId: string) => void;
+  onSetSelectionVisible: (visible: boolean) => void;
   onSeparate: () => void;
   canSeparate: boolean;
-  onDuplicate?: (objectId: string) => void;
-  onRemove?: (objectId: string) => void;
-  canRemove?: boolean;
+  onDuplicateSelection: () => void;
+  onRemoveSelection: () => void;
+  canRemoveSelection: boolean;
 };
 
 function EyeIcon({ crossed }: { crossed: boolean }) {
@@ -41,13 +47,16 @@ function EyeIcon({ crossed }: { crossed: boolean }) {
 export function VoxelSceneOutliner({
   scene,
   activeObjectId,
+  selectedObjectIds,
   onSelectObject,
+  onSelectAll,
   onToggleVisible,
+  onSetSelectionVisible,
   onSeparate,
   canSeparate,
-  onDuplicate,
-  onRemove,
-  canRemove = false,
+  onDuplicateSelection,
+  onRemoveSelection,
+  canRemoveSelection,
 }: Props) {
   if (!scene) {
     return (
@@ -55,11 +64,30 @@ export function VoxelSceneOutliner({
     );
   }
 
+  const selected = new Set(selectedObjectIds);
+  const selectionCount = selected.size;
+  const allSelectionHidden =
+    selectionCount > 0 &&
+    scene.objects
+      .filter((object) => selected.has(object.id))
+      .every((object) => object.visible === false);
+
   return (
     <div className="ember-voxel-outliner">
       <div className="ember-voxel-outliner__head">
-        <p className="ember-voxel-sculpt__section">Объекты</p>
+        <p className="ember-voxel-sculpt__section">
+          Объекты{selectionCount ? ` · ${selectionCount}` : ""}
+        </p>
         <div className="ember-voxel-outliner__head-actions">
+          <button
+            type="button"
+            className="ghost"
+            disabled={scene.objects.length === 0}
+            title="Выбрать все объекты сцены"
+            onClick={onSelectAll}
+          >
+            Все
+          </button>
           <button
             type="button"
             className="ghost"
@@ -71,9 +99,38 @@ export function VoxelSceneOutliner({
           </button>
         </div>
       </div>
+      <div className="ember-voxel-outliner__bulk" aria-label="Операции с выбранными объектами">
+        <button
+          type="button"
+          className="ghost"
+          disabled={!selectionCount}
+          title="Дублировать выбранные объекты вместе с внутренними связями"
+          onClick={onDuplicateSelection}
+        >
+          Дубль
+        </button>
+        <button
+          type="button"
+          className="ghost"
+          disabled={!selectionCount}
+          onClick={() => onSetSelectionVisible(allSelectionHidden)}
+        >
+          {allSelectionHidden ? "Показать" : "Скрыть"}
+        </button>
+        <button
+          type="button"
+          className="ghost ember-danger"
+          disabled={!canRemoveSelection}
+          title="Убрать выбранные объекты со сцены"
+          onClick={onRemoveSelection}
+        >
+          Убрать
+        </button>
+      </div>
       <ul className="ember-voxel-outliner__list" role="listbox">
         {scene.objects.map((o: EmberVoxelSceneObject) => {
           const active = o.id === activeObjectId;
+          const isSelected = selected.has(o.id);
           const hidden = o.visible === false;
           return (
             <li
@@ -81,6 +138,7 @@ export function VoxelSceneOutliner({
               className={[
                 "ember-voxel-outliner__card",
                 active ? "is-active" : "",
+                isSelected ? "is-selected" : "",
                 hidden ? "is-hidden" : "",
               ]
                 .filter(Boolean)
@@ -90,12 +148,22 @@ export function VoxelSceneOutliner({
                 <button
                   type="button"
                   role="option"
-                  aria-selected={active}
+                  aria-selected={isSelected}
                   className="ember-voxel-outliner__item"
-                  onClick={() => onSelectObject(o.id)}
+                  title="Клик — выбрать · Ctrl — добавить/убрать · Shift — диапазон"
+                  onClick={(event) =>
+                    onSelectObject(o.id, {
+                      toggle: event.ctrlKey || event.metaKey,
+                      range: event.shiftKey,
+                    })
+                  }
                 >
                   <span className="ember-voxel-outliner__name">
                     {o.nameRu?.trim() || o.modelId}
+                  </span>
+                  <span className="ember-voxel-outliner__meta">
+                    {o.modelId} · {o.offset.x}, {o.offset.y}, {o.offset.z}
+                    {o.rot ? ` · R${o.rot * 90}°` : ""}
                   </span>
                 </button>
                 <button
@@ -111,33 +179,6 @@ export function VoxelSceneOutliner({
                 >
                   <EyeIcon crossed={hidden} />
                 </button>
-                {onDuplicate ? (
-                  <button
-                    type="button"
-                    className="ghost ember-voxel-outliner__op"
-                    title="Дублировать объект сцены"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDuplicate(o.id);
-                    }}
-                  >
-                    Дубль
-                  </button>
-                ) : null}
-                {onRemove ? (
-                  <button
-                    type="button"
-                    className="ghost ember-danger ember-voxel-outliner__op"
-                    title="Убрать объект со сцены"
-                    disabled={!canRemove || !active}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemove(o.id);
-                    }}
-                  >
-                    Убрать
-                  </button>
-                ) : null}
               </div>
             </li>
           );

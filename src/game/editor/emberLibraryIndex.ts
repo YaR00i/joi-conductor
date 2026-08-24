@@ -10,6 +10,11 @@ import {
 
 export type EmberLibraryAssetKind = "voxel" | "sprite";
 
+export type EmberLibraryReferenceCountIndex = {
+  voxel: ReadonlyMap<string, number>;
+  sprite: ReadonlyMap<string, number>;
+};
+
 export type EmberAssetReference = {
   mapId?: string;
   mapNameRu?: string;
@@ -38,6 +43,32 @@ export function uniqueLibraryTags(pack: EmberPack): string[] {
     collectAssetTags(sprite.id, sprite.tags, seen);
   }
   return [...seen].sort((a, b) => a.localeCompare(b, "en"));
+}
+
+/** Build all library reference counts in one pass over maps and voxel scenes. */
+export function buildLibraryReferenceCountIndex(
+  pack: EmberPack,
+): EmberLibraryReferenceCountIndex {
+  const voxel = new Map<string, number>();
+  const sprite = new Map<string, number>();
+  const add = (into: Map<string, number>, id: string | undefined) => {
+    if (!id) return;
+    into.set(id, (into.get(id) ?? 0) + 1);
+  };
+  for (const map of Object.values(pack.maps ?? {})) {
+    for (const place of map.voxelProps ?? []) add(voxel, place.modelId);
+    for (const place of map.sprites ?? []) add(sprite, place.spriteId);
+    for (const region of map.regions ?? []) {
+      add(voxel, region.closedModelId);
+      add(voxel, region.sceneId);
+    }
+  }
+  for (const scene of Object.values(pack.voxelScenes ?? {})) {
+    for (const object of scene.objects ?? []) {
+      if (object.modelId !== scene.id) add(voxel, object.modelId);
+    }
+  }
+  return { voxel, sprite };
 }
 
 export function assetHasLibraryTag(

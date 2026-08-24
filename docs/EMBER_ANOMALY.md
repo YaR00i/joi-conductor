@@ -11,7 +11,7 @@
 **Текущий стек:** Three.js + TypeScript (`src/game/three/`), оболочка React/Electron. `src/game/phaser/` сохранён как legacy/reference и не является активным runtime.
 Level-up / сундуки / диалоги — React-оверлеи поверх canvas (переиспользуем эстетику рулетки).
 
-**Связанные доки:** [AI handoff и архитектурный контракт](EMBER_AI_HANDOFF.md), [wallet / угольки](../src/lib/wallet.ts), [mistress packs](mistress-packs.md), [Hu Tao bible](character/hu-tao.md).
+**Связанные доки:** [правила для AI-агентов](../AGENTS.md), [AI handoff и архитектурный контракт](EMBER_AI_HANDOFF.md), [план реструктуризации](EMBER_RESTRUCTURE_PLAN.md), [wallet / угольки](../src/lib/wallet.ts), [mistress packs](mistress-packs.md), [Hu Tao bible](character/hu-tao.md).
 
 ---
 
@@ -333,6 +333,8 @@ content/ember/
 
 **Semantic tile fields (optional):** тайлы в tileset могут задавать `slow` (`true` или `{ "multiplier": 0.7 }`), `stain` (`true` или `{ "kind": "filth", "durationMs": 2500 }`), `hazard` (`true` или `{ "damage": 6, "stripDamage": 0, "intervalMs": 800 }`), `portal` (`true` или `{ "targetMapId": "...", "targetRegionId": "...", "targetX": 1, "targetY": 2, "cooldownMs": 500 }`) и `trigger` (`true` или `{ "eventId": "...", "scriptId": "...", "once": true, "note": "..." }`). Сейчас runtime легко обрабатывает `slow` / `stain` / `hazard`; `portal` / `trigger` — authoring metadata под будущие tile-based системы.
 
+**Высота gameplay-регионов:** region без `elev` наследует локальную поверхность карты, а не действует на всех этажах. Runtime-проверки `player_start` / `spawn` / `chest` / `teleport` / `trigger` / NPC и интерактивных placement-объектов используют X/Y/Z. Для зоны под крышей нужен явный `elev: 0`; вертикальные телепорты с одинаковыми X/Y валидны при разных `elev` / `targetElevation`.
+
 #### D. Stage Editor
 
 - Привязка `mapId`, duration, bossAt, pools, cinders, `onClearEventId`.
@@ -437,9 +439,33 @@ P1 сознательно режет **сюжетный хаб**, чтобы б�
 
 Уже закрытая база: `EditorCore`/CommandStack, единый `EmberWorldObject`, компонентный Inspector, Outliner и группы, библиотечная постановка, pick-cycle, воксельные prefab/variant/material/chest workflows, высотная физика и плавное падение. Региональные телепорты и события `on_region_enter` исполняются в runtime; tile-based `portal`/`trigger` и прямой `scriptId` пока нет. Этап производительности закрыт текущим профилем: terrain worker/chunks, voxel instancing, merged terrain, light streaming/budgets, batched debug overlays и reflection scheduling; повторный аудит нужен на большой наполненной карте.
 
+Selection contract уточнён 2026-08-25: `Shift+ЛКМ` в World Editor создаёт координатный X/Y/Z-параллелепипед между двумя ближайшими видимыми поверхностями. Начало и конец больше не смешивают surface-raycast с paint/work-plane: это устраняет скачок конечной точки на ряды за стеной. Диапазон Z равен высотам начальной и конечной поверхности, поэтому горизонтальный drag по стене Z1 выбирает только Z1, а несколько этажей выбираются drag между реально видимыми этажами. `Alt+Shift+ЛКМ` намеренно фиксирует только начальный Z. Preview рисует depth-aware wireframe координатного объёма с разделителями этажей и не просвечивает сквозь геометрию. Tiles разрешены в multi-selection и получают общий translate gizmo с атомарным clear-then-set переносом; общий Inspector показывает пересечение совместимых полей (`Z`, высота стены, voxel rotation/direct light), а `mixed` означает разные значения. Все пакетные изменения образуют один CommandStack/undo шаг. Реализация и регрессии находятся в `mapPlanarMarquee.ts` / `mapPlanarMarquee.test.ts`.
+
 Перед Creative mode закрыта стабильность динамического света (2026-08-20): retained object lights сохраняют яркость/animation state при смене streaming-окна; runtime flicker меняет видимый cutoff внутри заранее запечённого объёма и не пересобирает cube depth каждый кадр; static PointLight shadow bake временно расширяет сам `PointLight.distance` до 1.5 authored radius, потому что Three.js иначе перезаписывает `shadow.camera.far` текущим cutoff перед рендером. После bake живой радиус возвращается, а полная cube-depth карта и её decode range сохраняются. В локальные карты входят только статические объекты слоя 0; игрок и враги исключены. Редактор автоматически инвалидирует bake после правок геометрии/света и имеет ручную кнопку «Пересчитать статические тени». Bias/near приведены к масштабу вокселя, чтобы не терялась самотень. Вариант с динамическими cube maps был отклонён как слишком дорогой (~1880 draw calls уже при четырёх врагах).
 
-Повторный crowd-аудит runtime начат 2026-08-20. Этап 1 закрыт: PointLight cube shadows теперь запекают только статический слой мира и не пересчитываются от движения толпы; игрок/враги остаются в плавной направленной тени, а пули, XP и orbit-эффекты не являются дорогими shadow casters. Этап 2 закрыт: одинаковые враги собраны в плотные runtime `InstancedMesh`-батчи по enemy visual key со swap-remove и общей alpha-cutout тенью. Этап 3 закрыт: voxel props, модели chest-регионов и solid sprites живут в постоянном tile-bucket collision index; движение запрашивает только соседние кандидаты с allocation-free дедупликацией, сохраняя точную проверку voxel-колонок, Scale и вертикального clearance. Этап 4 закрыт: AI/физика врагов работают fixed-step 30 Hz, а billboard-поза и направленная тень интерполируются на каждом render frame; отдельный переиспользуемый spatial hash обслуживает bullets, nova, orbit и nearest-target без полного прохода по `actors`. Этап 5 закрыт: bullets, XP gems и orbit сведены в четыре не отбрасывающих тень instanced-батча, transient Actor/proxy переиспользуются через pool, а общие `actors.filter()` заменены плотными списками со swap-remove. В dev добавлен воспроизводимый stress-mode: `F4` = 120 врагов, `Shift+F4` = 180 и неуязвимость. Этап 6 закрыт: combat/contact остаются 30 Hz, но дорогие `moveWithVoxels` распределяются по distance/crowd LOD на 10–15 Hz с индивидуальной фазой и накопленным travel time; уже касающиеся игрока melee не вызывают лишнюю map-физику, а render-поза интерполируется на протяжении своего LOD-интервала. Этап 7 закрыт: локальное separation steering использует тот же spatial hash, учитывает максимум 12 соседей, симметрично раздвигает даже совпавшие позиции и смешивается с направлением погони до единственной map-физики. Для экстремальных >160 врагов movement LOD снижается до 7.5 Hz. Финальный stress на 180 врагах: CPU 14.6 ms, GPU 3.7 ms, ~536 draw calls; толпа визуально распределена, ошибок консоли нет. Обычная волна до 16 врагов остаётся full-rate и показывает около 6 ms CPU. Crowd/runtime pass закрыт; следующий этап по roadmap — Creative Mode.
+Повторный crowd-аудит runtime начат 2026-08-20. Этап 1 закрыт: PointLight cube shadows теперь запекают только статический слой мира и не пересчитываются от движения толпы; игрок/враги остаются в плавной направленной тени, а пули, XP и orbit-эффекты не являются дорогими shadow casters. Этап 2 закрыт: одинаковые враги собраны в плотные runtime `InstancedMesh`-батчи по enemy visual key со swap-remove и общей alpha-cutout тенью. Этап 3 закрыт: voxel props, модели chest-регионов и solid sprites живут в постоянном tile-bucket collision index; движение запрашивает только соседние кандидаты с allocation-free дедупликацией, сохраняя точную проверку voxel-колонок, Scale и вертикального clearance. Этап 4 закрыт: AI/физика врагов работают fixed-step 30 Hz, а billboard-поза и направленная тень интерполируются на каждом render frame; отдельный переиспользуемый spatial hash обслуживает bullets, nova, orbit и nearest-target без полного прохода по `actors`. Этап 5 закрыт: bullets, XP gems и orbit сведены в четыре не отбрасывающих тень instanced-батча, transient Actor/proxy переиспользуются через pool, а общие `actors.filter()` заменены плотными списками со swap-remove. В dev добавлен воспроизводимый stress-mode: `F4` = 120 врагов, `Shift+F4` = 180; оба дают неуязвимость, отключают получение XP, stage waves и убийства врагов, поэтому target не дрейфует во время замера. Этап 6 закрыт: combat/contact остаются 30 Hz, но дорогие `moveWithVoxels` распределяются по distance/crowd LOD на 10–15 Hz с индивидуальной фазой и накопленным travel time; уже касающиеся игрока melee не вызывают лишнюю map-физику, а render-поза интерполируется на протяжении своего LOD-интервала. Этап 7 закрыт: локальное separation steering использует тот же spatial hash, учитывает максимум 12 соседей, симметрично раздвигает даже совпавшие позиции и смешивается с направлением погони до единственной map-физики. Для экстремальных ≥160 врагов movement LOD снижается до 7.5 Hz, а planar reflection обновляется адаптивно: 2 Hz при неподвижной камере и 30 Hz при её движении. Обычная сцена использует 30 Hz в покое и не чаще 60 Hz в движении; cadence clock сохраняет дробный остаток между render frames. Actor-aware PointLight cube отключается только при ≥160; обычный F4 не режет динамический свет. Electron явно разрешает permission `pointerLock`; F3 показывает `POINTER LOCK`/`WARP FALLBACK`, frame p95 и p95 отдельных work-pass. Этап 8 закрыт после пользовательского F4-замера, показавшего реальное узкое место: `AI p95 9.2 ms`, `Move exact 31`, тогда как `shadow p95 0.2 ms`. Для толпы построена консервативная typed-array карта свободного плоского пространства; она пропускает безопасное swept-circle движение без дорогого `moveWithVoxels`, но сохраняет точный fallback у стен, перепадов, connectors, solid sprites и voxel props. Exact collision имеет вращающийся бюджет 8 проверок на fixed step при 120 врагах и 6 при >160; отложенное движение сохраняет накопленный travel time. F3 показывает `exact/open/free/defer`. В локальных фазовых прогонах F4 exact-путь ограничен 8, а `AI p95` составил примерно 0.1–2.5 ms вместо 9.2 ms. Обычная волна до 16 врагов остаётся full-rate. Общий FPS оценивается отдельно по frame p95, поскольку отражение, main render и свет остаются независимыми проходами. Crowd/runtime pass закрыт; следующий этап по roadmap — Creative Mode.
+
+Terrain batching 2026-08-24: `voxelMesh` создаёт клеточные meshes только для настоящих solid wall/roof cutaway-объектов; обычный ground объединяется по material. Editor вообще не применяет player-cutaway, поэтому его elevated-слои также объединяются и допускаются в terrain worker. На `hu_tao_yard`: editor Draw 2799 → 195 и terrain renderables 3423 → 84; play Shift+F4 cached Draw 746 → 377 при сохранённых 180 врагах, static point cubes 9, dynamic 0 и shadow bank dirty 0.
+
+Crowd flow field 2026-08-24: baked typed-array open-field теперь является статической навигационной базой карты. Для толпы >40 один BFS от клетки игрока строит общие distance/direction arrays и обновляется только при смене tile или elevation-story; враги читают O(1) waypoint, после чего сохраняют local separation и точную collision-страховку. Corner cutting запрещён, blocked target привязывается к ближайшей открытой клетке того же этажа, а stairs/connector, underpass и несовпавший Z безопасно используют прежний fallback. На F4 `hu_tao_yard` поле охватывало 1393 клетки; открытая фаза: 38 guided / 1 miss, exact 0, `AI p95 0.4 ms`; плотный контакт: contact skip 93, `AI p95 0.1 ms`. F3 показывает `Flow guided/miss/cells/rebuild`.
+
+Расширенные dev stress-пресеты: F6 = 400 врагов, Shift+F6 = 700. Они используют те же фиксированные условия, что F4: HP не теряется, XP остаётся 0, stage waves и убийства отключены. Повторное нажатие другого stress-shortcut приводит количество врагов ровно к новому target, поэтому после 700 можно без перезапуска вернуться к 400/180/120.
+
+Flow fallback 2026-08-24: прежний поиск ближайшей открытой target-клетки в радиусе 4 мог полностью обнулить поле внутри большой blocked-зоны (`cells 0`, 175 misses на Electron Shift+F6). Теперь все открытые клетки текущего этажа маркируются по связным компонентам, каждая компонента получает ближайшую к игроку approach-cell, и единый multi-source BFS строит направления сразу для всех островов. F3 показывает `goals/components` и расстояние fallback. Повторная Shift+F6-проверка: 700 врагов, `cells 1394`, `goals 2/2`, `guided 174`, `miss 1`.
+
+Full-frame profiling 2026-08-24: F3 больше не ограничен пятью несводимыми work-pass. CPU tick разбит на `world`, `combat`, `AI`, `terrain`, `camera`, `billboards`, `environment`, `HUD`, `shadows`, `reflection`, `main render` и стоимость сбора самого `profile`; остаток выводится как `other`. Это позволяет отличить постоянный игровой проход от GC/неразмеченного разрыва и проверить, действительно ли сумма объясняет высокий Electron CPU p95. Browser-контроль с ~700 врагами дал `other p95 0.1 ms`, то есть покрытие кадра сходится; окончательное узкое место медленного desktop-прогона определяется новым F3 после Reload.
+
+Crowd-adjacent runtime hotspots 2026-08-24: Electron-разбивка при 700 врагах показала `environment 20.1 ms`, а не AI или тени. Emissive `player` trigger ошибочно делал all-pairs proximity против всей толпы для каждой светящейся ячейки, хотя enemy amount не участвовал в результате. Режимы теперь вычисляют только нужный источник; настоящие `enemy/either` proximity используют actor spatial hash. Browser environment p95 после исправления — 0.7–0.8 ms без урезания света. Combat дополнительно разбит на `weapon/bullets/orbit/spawn`: следующим hotspot были точные voxel collision-проверки каждой пули каждый render frame. Пули получили тот же conservative baked open-field broad phase, точный fallback сохранён у любой сомнительной геометрии. Контроль 700 врагов / 86 пуль: 72 open, 14 exact, bullets p95 1.7 ms вместо 3.7–5.5; F3 выводит `Bullet collision exact/open`.
+
+Пользовательский Electron after-check: при 700 врагах FPS вырос с 31 до 102, CPU p95 снизился с 36.2 до 13.1 ms, frame p95 с 37.9 до 13.9 ms, environment с 20.1 до 0.7 ms; AI 1.7, shadow 0.2, other 0.1. Он также показал `cells 10`, guided 0 и bullets `exact 50/open 0` на террасе: flat-grid не связывал этажи, поэтому враги снизу не находили лестницу к игроку.
+
+Height-aware navigation/collision 2026-08-24: единая baked-база врагов и пуль теперь хранит surface elevation, flat-safe collision mask и connector axis/low/high. Raised walkable surfaces входят в быстрый путь; лестница соединяет stories только своими физическими концами, без бокового схода и corner cutting. Flow строится по всем высотам одной карты, а connector exact collision получает отдельный бюджет 16 за fixed step; F3 показывает `Move stairs/defer`. Пули используют быстрый путь на безопасных raised-площадках, но stairs/сомнительная геометрия остаются exact. Интеграционный тест доводит врага с Z0 по stair на Z1. Browser 700: flow cells `10 → 2278`, guided 84, bullets `exact 16/open 51`, около 153 FPS.
+
+Voxel stairs and multi-lane flow 2026-08-24: реальные лестницы `hu_tao_yard` состоят из physical voxel props, а не stair-тайлов. Навигационный bake распознаёт их по монотонному auto-step-safe профилю колонок, переносит направление через `rot` и создаёт Z0→Z3 connector-цепочки; обычные physical props остаются blockers. Враги теперь передают voxel libraries в exact collision, а поддержка высоты не исчезает на общей границе соседних секций. Проверка реальной карты: найдены все 9 секций, 24/24 тестовых маршрутов поднялись к цели без miss. Flow хранит несколько near-optimal downhill-направлений и стабильно назначает lane по `uid`, поэтому равные пути не схлопываются в одну колонну; на height transition боковое separation отключается. Бюджет лестничных exact-move растёт с 16 до 48 для 700 врагов. Browser Shift+F6 на плоскости: FPS 154, CPU p95 7.1 ms, AI p95 0.6 ms, видны несколько потоков вместо единственной линии.
+
+Administrator routing correction 2026-08-24: neighbour-mask не является независимым маршрутом, поэтому она заменена отдельными integration layers для каждой connector-цепочки. Остальные лестницы закрываются внутри слоя; враг выбирает ворота по полной длине от своей клетки, а стабильный hash добавляет максимум три клетки только для распределения почти равных вариантов. На полностью открытом общем этаже используется проверенный direct corridor, поэтому орда подходит широким фронтом без искусственного общего пути. Распознанные voxel stairs двигают толпу по дешёвому baked center-lane с непрерывной высотой, exact остаётся для бокового/сомнительного входа. Если игрок находится внутри connector-cell, AI продолжает движение до его target Z вместо остановки у нижнего края этой же клетки. F3: `Flow routes used/available`. Проверка южной лестницы карты — 31/31 врагов Z0→Z3, miss 0; открытая browser-сцена с 700 врагами — радиальный фронт, AI p95 около 1.7–1.8 ms.
+
+Height-surface rebake 2026-08-25: навигация больше не зависит от специального определения цельной voxel-лестницы. На загрузке/смене карты запекается 2×2 height-grid внутри каждого tile с пробами центра и четырёх границ; направленные переходы используют общее с игроком ограничение подъёма `MAX_AUTO_STEP_VOXELS = 4`, а реальная высота берётся из terrain, ramps и колонок physical `.vox`. Для `hu_tao_yard` это 96×96 / 9216 узлов. Составные лестницы поэтому переживают редактирование без ручных маршрутов: Save + новый запуск/Reload строит bake заново. Компоненты считаются один раз, target flow использует их повторно. На ступенях отключается альтернативный lane tie-break, сохраняется поперечная полоса врага и используется быстрый baked-height move без прежнего лимита 44 точных подъёма за такт; exact collision остаётся страховкой. F3 теперь показывает `Flow baked cells/edges`. Глобальный placement физических voxel props также получает симметричный horizontal seam bleed 0.05 voxel на сторону; renderer, instancing и collision footprint используют одну величину, authored Z/высота ступеней не меняются.
 
 Текущие реальные точки кода: `src/pages/EmberEditorPage.tsx`, `src/components/ember/editor/MapEditorPanel.tsx`, `src/components/ember/editor/VoxelSculptPanel.tsx`, `src/components/ember/editor/StageEditorPanel.tsx`, content pack в `content/ember/`.
 
@@ -453,23 +479,24 @@ P1 сознательно режет **сюжетный хаб**, чтобы б�
 │  SideNav → «Аномалия» (play) / «Ember Editor» (author)      │
 │                                                             │
 │  ┌────────────────────┐   ┌──────────────────────────────┐  │
-│  │ React Shell        │   │ Phaser Game (src/game)       │  │
-│  │  Result / Roulette │◄─►│  ArenaScene, systems         │  │
+│  │ React Shell        │   │ Three runtime (src/game/three)│ │
+│  │  Result / Roulette │◄─►│  EmberThreeWorld façade      │  │
 │  │  ScenePlayer       │   │  reads content/ember         │  │
 │  │  Wallet credit     │   └──────────────────────────────┘  │
 │  └────────────────────┘                                     │
 │  ┌────────────────────────────────────────────────────────┐ │
-│  │ Ember Editor (React + shared tile view)                │ │
+│  │ Ember Editor (React + shared Three preview/contracts)  │ │
 │  │  writes content/ember/**                               │ │
 │  └────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Модули кода (предложение)
+### Активные модули кода
 
 ```
 src/game/
-  phaser/           # config, ArenaScene, entities, systems
+  three/            # активный runtime и Three preview редактора
+  phaser/           # legacy/reference; новые системы сюда не дублировать
   content/          # loaders + zod/types для JSON
   bridge/           # events → React (levelUp, chest, scene, result)
 src/pages/
@@ -481,6 +508,8 @@ src/components/ember/
   editor/           # MapEditor, SceneEditor, …
 content/ember/      # data pack (git)
 ```
+
+Декомпозиция выполняется постепенно по [`EMBER_RESTRUCTURE_PLAN.md`](EMBER_RESTRUCTURE_PLAN.md): существующие entry points остаются façade, ответственность переносится в предметные модули без второй реализации и без изменения JSON-контракта.
 
 ### Bridge события (черновик)
 
@@ -533,7 +562,7 @@ content/ember/      # data pack (git)
 |--------|----------|--------|
 | Tile size | 16 vs 32 | 16 — плотнее орды; 32 — проще рисовать |
 | Strip: от общего HP или отдельный meter | linked / separate | linked проще для MVP |
-| Editor map backend | Phaser vs Pixi | Phaser shared с игрой |
+| Editor map backend | отдельный backend vs общий preview | Three preview и общие world-контракты |
 | Где хранить pack в prod | `resources/ember` vs userData | userData — если хочешь моды; resources — ship default |
 | Смерть на арене | soft fail + ивент стыда / hard fail | soft fail лучше для JOI-тона |
 
@@ -545,7 +574,7 @@ content/ember/      # data pack (git)
 
 **Runtime**
 
-- [x] Phaser arena boot from Electron page  
+- [x] Three.js arena/explore runtime from Electron page
 - [x] Hu Tao pixel player + 3 strip tiers  
 - [x] 4 enemy types + 1 boss  
 - [x] XP, level-up roulette, chest roulette  

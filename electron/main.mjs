@@ -212,12 +212,15 @@ function createWindow() {
   void mainWindow.loadURL(startUrl);
 }
 
-function allowMicrophoneCapture() {
+function configureSessionPermissions() {
   const ses = session.defaultSession;
   const allow = (permission) =>
     permission === "media" ||
     permission === "audioCapture" ||
-    permission === "mediaKeySystem";
+    permission === "mediaKeySystem" ||
+    // Ember's relative mouse-look depends on Pointer Lock. Denying it forces
+    // the OS cursor-warp fallback, whose synthetic moves are less regular.
+    permission === "pointerLock";
   ses.setPermissionRequestHandler((_wc, permission, callback) => {
     callback(allow(permission));
   });
@@ -872,7 +875,7 @@ ipcMain.handle("tts:speak", async (_e, payload) => {
 });
 
 app.whenReady().then(() => {
-  allowMicrophoneCapture();
+  configureSessionPermissions();
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

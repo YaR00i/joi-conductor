@@ -14,13 +14,18 @@ import {
   type EmberVoxelPlacement,
   type MapRegionKind,
 } from "./types";
-import { pointInRegion } from "../tile/mapUtils";
+import {
+  elevNearlyEqual,
+  pointInRegion,
+  tileSurfaceElev,
+} from "../tile/mapUtils";
 
 export type InteractiveProp = {
   id: string;
   source: "voxel" | "sprite";
   x: number;
   y: number;
+  elev: number;
   w: number;
   h: number;
   interactivity: EmberInteractivityModifier;
@@ -116,7 +121,7 @@ export function pickInteractHit(
   if (occupying) {
     return { kind: "region", region: occupying, via: "occupying" };
   }
-  const occupyingProp = findInteractivePropAt(map, x, y, voxelModels);
+  const occupyingProp = findInteractivePropAt(map, x, y, voxelModels, elev);
   if (occupyingProp) {
     return { kind: "prop", prop: occupyingProp, via: "occupying" };
   }
@@ -131,7 +136,7 @@ export function pickInteractHit(
   if (facingHit) {
     return { kind: "region", region: facingHit, via: "facing" };
   }
-  const facingProp = findInteractivePropAt(map, fx, fy, voxelModels);
+  const facingProp = findInteractivePropAt(map, fx, fy, voxelModels, elev);
   if (facingProp) {
     return { kind: "prop", prop: facingProp, via: "facing" };
   }
@@ -284,17 +289,25 @@ export function listInteractiveProps(
   for (const place of map.voxelProps ?? []) {
     const interactivity = parseInteractivity(place.interactivity);
     if (!interactivity) continue;
-    out.push(interactiveVoxelProp(place, interactivity, voxelModels?.[place.modelId]));
+    out.push(
+      interactiveVoxelProp(
+        map,
+        place,
+        interactivity,
+        voxelModels?.[place.modelId],
+      ),
+    );
   }
   for (const place of map.sprites ?? []) {
     const interactivity = parseInteractivity(place.interactivity);
     if (!interactivity) continue;
-    out.push(interactiveSpriteProp(place, interactivity));
+    out.push(interactiveSpriteProp(map, place, interactivity));
   }
   return out;
 }
 
 function interactiveVoxelProp(
+  map: EmberMap,
   place: EmberVoxelPlacement,
   interactivity: EmberInteractivityModifier,
   model: EmberVoxelModel | undefined,
@@ -306,6 +319,7 @@ function interactiveVoxelProp(
     source: "voxel",
     x: place.x,
     y: place.y,
+    elev: place.elev ?? tileSurfaceElev(map, place.x, place.y),
     w,
     h,
     interactivity,
@@ -313,6 +327,7 @@ function interactiveVoxelProp(
 }
 
 function interactiveSpriteProp(
+  map: EmberMap,
   place: EmberSpritePlacement,
   interactivity: EmberInteractivityModifier,
 ): InteractiveProp {
@@ -321,6 +336,7 @@ function interactiveSpriteProp(
     source: "sprite",
     x: place.x,
     y: place.y,
+    elev: place.elev ?? tileSurfaceElev(map, place.x, place.y),
     w: 1,
     h: 1,
     interactivity,
@@ -332,13 +348,15 @@ export function pointHitsInteractiveProp(
   prop: InteractiveProp,
   x: number,
   y: number,
+  elev?: number,
 ): boolean {
   const ts = map.tileSize;
   const left = prop.x * ts;
   const top = prop.y * ts;
   const right = (prop.x + prop.w) * ts;
   const bottom = (prop.y + prop.h) * ts;
-  return x >= left && x < right && y >= top && y < bottom;
+  if (!(x >= left && x < right && y >= top && y < bottom)) return false;
+  return elev == null || elevNearlyEqual(prop.elev, elev);
 }
 
 export function findInteractivePropAt(
@@ -346,10 +364,11 @@ export function findInteractivePropAt(
   x: number,
   y: number,
   voxelModels?: Record<string, EmberVoxelModel | undefined>,
+  elev?: number,
 ): InteractiveProp | null {
   return (
     listInteractiveProps(map, voxelModels).find((prop) =>
-      pointHitsInteractiveProp(map, prop, x, y),
+      pointHitsInteractiveProp(map, prop, x, y, elev),
     ) ?? null
   );
 }

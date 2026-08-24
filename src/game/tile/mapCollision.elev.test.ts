@@ -300,6 +300,36 @@ describe("elevation collision: fall + voxel stairs", () => {
     expect(top.x).toBeGreaterThan(3 * ts + 6);
   });
 
+  it("keeps support across adjacent rotated stair sections", () => {
+    const model = makeSteppedStairModel(
+      "joinedFlight",
+      [2, 4, 6, 8, 10, 12, 14, 16],
+    );
+    const map = openYard();
+    map.voxelProps = [0, 1, 2].map((elev) => ({
+      id: `joined-${elev}`,
+      modelId: "joinedFlight",
+      x: 2 + elev,
+      y: 3,
+      rot: 1,
+      elev,
+    }));
+    setElevTileId(map, 5, 3, 3, 1);
+    const models = { joinedFlight: model };
+    const ts = map.tileSize;
+    const start = {
+      x: 2 * ts - 3,
+      y: 3 * ts + ts / 2,
+      elev: 0,
+    };
+
+    const top = stepMany(map, start, 0.8, 0, 80, models);
+
+    expect(top.peakElev).toBeGreaterThan(2.8);
+    expect(top.x).toBeGreaterThan(5 * ts);
+    expect(top.elev).toBeCloseTo(3, 1);
+  });
+
   it("blocks rotated stair high-side approach at ground", () => {
     const model = makeSteppedStairModel("rotFlight", [2, 4, 6, 8]);
     const map = openYard();

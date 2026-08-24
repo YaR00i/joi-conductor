@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { writeEmberJson } from "../../../game/content/io";
 import { createSlasherCharacterSprite } from "../../../game/content/slasherCharacterPreset";
 import {
@@ -11,7 +18,9 @@ import {
   flattenSpriteForEditor,
   matchChannelSize,
   normalizePixelSprite,
+  normalizeSpriteWorldOffsetVoxels,
   prunePaletteFavorites,
+  resolveSpriteWorldOffsetVoxels,
   resizeSpriteCanvas,
   serializePixelSprite,
   spriteFaceHasInk,
@@ -26,10 +35,13 @@ import {
 } from "../../../game/content/pixelSprite";
 import {
   MAX_SPRITE_ART_LAYERS,
+  SPRITE_ART_LAYER_BLEND_MODES,
   cloneArtLayers,
   compositeArtLayers,
+  constrainArtLayerPixels,
   ensureArtLayerStack,
   makeEmptyArtLayer,
+  newArtLayerId,
   packArtLayers,
   resizeArtLayers,
 } from "../../../game/content/spriteArtLayers";
@@ -40,6 +52,8 @@ import {
   MIN_SPRITE_FRAME_MS,
   clampSpriteFrameDuration,
   newSpriteFrameId,
+  nextSpritePreviewIndex,
+  normalizeSpriteFrameRange,
 } from "../../../game/content/spriteAnimFrames";
 import {
   isArtBrushTool,
@@ -56,6 +70,7 @@ import type {
   EmberPixelSprite,
   EmberSpriteAnimFrame,
   EmberSpriteArtLayer,
+  EmberSpriteArtLayerBlendMode,
   EmberSpriteCardExtraView,
   EmberSpriteCardFace,
   EmberSpriteRole,
@@ -98,15 +113,74 @@ import {
 } from "../../../game/tile/tileTextures";
 import { EmberSpriteThumb, EmberThumbGrid } from "./EmberThumbGrid";
 import {
+  PixelCanvasOverlays,
+  PixelCanvasReferenceLayer,
+} from "./PixelCanvasOverlays";
+import { PixelCanvasNavigator } from "./PixelCanvasNavigator";
+import { PixelCanvasViewPanel } from "./PixelCanvasViewPanel";
+import { PixelPalettePanel } from "./PixelPalettePanel";
+import { PixelToolIcon } from "./PixelToolIcon";
+import {
   copyPixelArtChannels,
   hasPixelClipboard,
+  peekPixelClipboard,
   pastePixelArtChannels,
 } from "./pixelClipboard";
+import {
+  clearPixelSelection,
+  combinePixelSelections,
+  duplicatePixelSelection,
+  extractPixelSelection,
+  invertPixelSelection,
+  magicWandSelection,
+  movePixelSelection,
+  pastePixelSelection,
+  pixelMaskSvgPaths,
+  pixelRectFromPoints,
+  pixelRectFromScaleHandle,
+  pixelSelectionContains,
+  pixelSelectionFromPolygon,
+  resizePixelMask,
+  resizePixelSelection,
+  transformPixelSelection,
+  type PixelPoint,
+  type PixelRect,
+  type PixelScaleHandle,
+  type PixelSelectionCombineMode,
+  type PixelTransform,
+} from "./pixelSelection";
+import {
+  constrainPixelShapeEnd,
+  paintPixelShape,
+  type PixelShapeKind,
+} from "./pixelShape";
+import {
+  extendPixelStroke,
+  paintPixelBrushStroke,
+  paintPixelFill,
+  type PixelDitherCoverage,
+  type PixelStrokePath,
+} from "./pixelPaint";
+import type { PixelSymmetry } from "./pixelSymmetry";
+import {
+  pushRecentPixelColor,
+  replacePixelPaletteColor,
+} from "./pixelPalette";
+import {
+  adjustPixelColors,
+  outlinePixelColors,
+  quantizePixelColors,
+  type PixelColorAdjustments,
+  type PixelColorDitherMode,
+  type PixelColorOperationResult,
+} from "./pixelColorOperations";
 import {
   getLastOpenedId,
   hasOpenedEditor,
   markEditorOpened,
 } from "./editorOpenSession";
+import { usePixelCanvasView } from "./usePixelCanvasView";
+import { usePixelCanvasNavigation } from "./usePixelCanvasNavigation";
 
 type Props = {
   pack: EmberPack;
@@ -116,8 +190,22 @@ type Props = {
   initialSpriteId?: string | null;
 };
 
-type DrawTool = "paint" | "eyedrop" | "glow" | "shine" | SpriteArtBrushKind;
+type DrawTool =
+  | "paint"
+  | "eyedrop"
+  | "glow"
+  | "shine"
+  | "fill"
+  | "select"
+  | "lasso"
+  | "wand"
+  | PixelShapeKind
+  | SpriteArtBrushKind;
 type DrawLayer = "color" | "glow" | "shine";
+
+function pixelShapeKind(tool: DrawTool): PixelShapeKind | null {
+  return tool === "line" || tool === "rect" || tool === "ellipse" ? tool : null;
+}
 
 const ART_BRUSH_TOOLS: Array<{
   id: SpriteArtBrushKind;
@@ -141,6 +229,13 @@ function channelForTool(tool: DrawTool): DrawLayer {
   switch (tool) {
     case "paint":
     case "eyedrop":
+    case "select":
+    case "lasso":
+    case "wand":
+    case "fill":
+    case "line":
+    case "rect":
+    case "ellipse":
     case "soften":
     case "burn":
     case "dodge":
@@ -421,12 +516,49 @@ function packEditorFrames(
   return frames.slice(0, MAX_SPRITE_ANIM_FRAMES).map(animFrameFromBuf);
 }
 
-const CELL_SCALE_MIN = 4;
-const CELL_SCALE_MAX = 40;
-
-function clampCellScale(n: number): number {
-  if (!Number.isFinite(n)) return 12;
-  return Math.max(CELL_SCALE_MIN, Math.min(CELL_SCALE_MAX, Math.round(n)));
+function SpriteFrameThumb({
+  pixels,
+  width,
+  height,
+}: {
+  pixels: string[] | undefined;
+  width: number;
+  height: number;
+}) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const size = canvas.width;
+    ctx.imageSmoothingEnabled = false;
+    for (let y = 0; y < size; y += 4) {
+      for (let x = 0; x < size; x += 4) {
+        ctx.fillStyle = (x / 4 + y / 4) % 2 === 0 ? "#17120f" : "#261c17";
+        ctx.fillRect(x, y, 4, 4);
+      }
+    }
+    if (!pixels?.length || width <= 0 || height <= 0) return;
+    const scale = Math.min(size / width, size / height);
+    const drawW = width * scale;
+    const drawH = height * scale;
+    const offsetX = (size - drawW) / 2;
+    const offsetY = (size - drawH) / 2;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const color = pixels[y * width + x];
+        if (!color || color === "#00000000") continue;
+        ctx.fillStyle = color;
+        ctx.fillRect(
+          offsetX + x * scale,
+          offsetY + y * scale,
+          Math.max(1, scale),
+          Math.max(1, scale),
+        );
+      }
+    }
+  }, [height, pixels, width]);
+  return <canvas ref={ref} width={38} height={38} aria-hidden="true" />;
 }
 
 export function SpriteEditorPanel({
@@ -460,6 +592,9 @@ export function SpriteEditorPanel({
     if (initialSpriteId) return false;
     return !hasOpenedEditor("sprite");
   });
+  const canvasView = usePixelCanvasView({
+    referenceKey: spriteId ? `${pack.meta.id}:sprite:${spriteId}` : null,
+  });
 
   const selectSprite = useCallback((id: string) => {
     setSpriteId(id);
@@ -479,10 +614,37 @@ export function SpriteEditorPanel({
 
   const width = sprite?.width ?? 16;
   const canvasH = sprite ? spriteTotalHeight(sprite) : 16;
+  useEffect(() => {
+    canvasView.clampGuides(width, canvasH);
+  }, [canvasH, canvasView.clampGuides, width]);
 
   const [nameRu, setNameRu] = useState("");
   const [color, setColor] = useState("#c45c26");
+  const [backgroundColor, setBackgroundColor] = useState("#1a120e");
+  const [recentColors, setRecentColors] = useState<string[]>([]);
   const [tool, setTool] = useState<DrawTool>("paint");
+  const [selection, setSelection] = useState<PixelRect | null>(null);
+  const [selectionMask, setSelectionMask] = useState<boolean[] | null>(null);
+  const [wandTolerance, setWandTolerance] = useState(0);
+  const [wandContiguous, setWandContiguous] = useState(true);
+  const [wandCombineMode, setWandCombineMode] = useState<PixelSelectionCombineMode>("replace");
+  const [shapeChannel, setShapeChannel] = useState<DrawLayer>("color");
+  const [shapeFilled, setShapeFilled] = useState(false);
+  const [fillTolerance, setFillTolerance] = useState(0);
+  const [fillContiguous, setFillContiguous] = useState(true);
+  const [symmetryHorizontal, setSymmetryHorizontal] = useState(false);
+  const [symmetryVertical, setSymmetryVertical] = useState(false);
+  const [brushOpacity, setBrushOpacity] = useState(100);
+  const [brushDither, setBrushDither] = useState<PixelDitherCoverage>(100);
+  const [brushSpacing, setBrushSpacing] = useState(1);
+  const [brushPixelPerfect, setBrushPixelPerfect] = useState(true);
+  const selectionPaths = useMemo(
+    () =>
+      selection
+        ? pixelMaskSvgPaths(selectionMask ?? undefined, selection.w, selection.h)
+        : null,
+    [selection, selectionMask],
+  );
   const [brushSize, setBrushSize] = useState(1);
   const [roles, setRoles] = useState<EmberSpriteRole[]>(["decor"]);
   const [solid, setSolid] = useState(false);
@@ -558,6 +720,7 @@ export function SpriteEditorPanel({
   const strokeSaved = useRef(false);
   const toolRef = useRef(tool);
   const brushSizeRef = useRef(brushSize);
+  const symmetryRef = useRef<PixelSymmetry>({ horizontal: false, vertical: false });
   const geomRef = useRef({ width, height: canvasH });
   const cardViewRef = useRef<EmberCharacterCardView>("front");
   const frontBufRef = useRef<SpriteCardBuf | null>(null);
@@ -571,6 +734,26 @@ export function SpriteEditorPanel({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const cursorStatusRef = useRef<HTMLSpanElement>(null);
+  const selectionOverlayRef = useRef<HTMLDivElement>(null);
+  const selectionRef = useRef<PixelRect | null>(selection);
+  const selectionMaskRef = useRef<boolean[] | null>(selectionMask);
+  const selectionAnchorRef = useRef<PixelPoint | null>(null);
+  const lassoPointsRef = useRef<PixelPoint[] | null>(null);
+  const selectionMoveRef = useRef<{
+    start: PixelPoint;
+    rect: PixelRect;
+    dx: number;
+    dy: number;
+  } | null>(null);
+  const selectionScaleRef = useRef<{
+    handle: PixelScaleHandle;
+    source: PixelRect;
+    target: PixelRect;
+    mask?: boolean[];
+  } | null>(null);
+  selectionRef.current = selection;
+  selectionMaskRef.current = selectionMask;
   type PaintSnapshot = {
     pixels: string[];
     emissive: string[];
@@ -584,11 +767,61 @@ export function SpriteEditorPanel({
   };
   const undoRef = useRef<PaintSnapshot[]>([]);
   const redoRef = useRef<PaintSnapshot[]>([]);
+  const shapeDragRef = useRef<{
+    start: PixelPoint;
+    snapshot: PaintSnapshot;
+    base: string[];
+    kind: PixelShapeKind;
+    channel: DrawLayer;
+    color: string;
+    thickness: number;
+    filled: boolean;
+    symmetry: PixelSymmetry;
+    changed: boolean;
+  } | null>(null);
+  const brushStrokeRef = useRef<{
+    snapshot: PaintSnapshot;
+    base: string[];
+    channel: DrawLayer;
+    color: string;
+    size: number;
+    symmetry: PixelSymmetry;
+    opacity: number;
+    dither: PixelDitherCoverage;
+    spacing: number;
+    pixelPerfect: boolean;
+    path: PixelStrokePath;
+    changed: boolean;
+  } | null>(null);
+  const layerOpacityGestureRef = useRef<{
+    snapshot: PaintSnapshot;
+    changed: boolean;
+  } | null>(null);
+  const frameDurationGestureRef = useRef<{
+    snapshot: PaintSnapshot;
+    changed: boolean;
+  } | null>(null);
   const [historyLen, setHistoryLen] = useState(0);
   const [redoLen, setRedoLen] = useState(0);
   const [clipReady, setClipReady] = useState(() => hasPixelClipboard());
   const [cellScale, setCellScale] = useState(14);
+  const canvasNavigation = usePixelCanvasNavigation({
+    stageRef,
+    canvasRef,
+    scale: cellScale,
+    setScale: setCellScale,
+    width,
+    height: canvasH,
+    maxScale: 40,
+    fitPaddingX: 170,
+    fitPaddingY: 40,
+  });
   const [tagsDraft, setTagsDraft] = useState("");
+  const [worldOffsetVoxels, setWorldOffsetVoxels] = useState({
+    x: 0,
+    y: 0,
+    z: 0,
+  });
   const [pickerQuery, setPickerQuery] = useState("");
   const [showColor, setShowColor] = useState(true);
   const [showGlow, setShowGlow] = useState(true);
@@ -598,24 +831,51 @@ export function SpriteEditorPanel({
   const [frames, setFrames] = useState<SpriteFrameBuf[] | undefined>();
   const [activeFrameId, setActiveFrameId] = useState<string | undefined>();
   const [previewPlaying, setPreviewPlaying] = useState(false);
+  const [previewLoop, setPreviewLoop] = useState(true);
+  const [previewRangeStart, setPreviewRangeStart] = useState(0);
+  const [previewRangeEnd, setPreviewRangeEnd] = useState(
+    MAX_SPRITE_ANIM_FRAMES - 1,
+  );
+  const [onionSkin, setOnionSkin] = useState(false);
+  const [onionSkinOpacity, setOnionSkinOpacity] = useState(28);
+  useEffect(() => {
+    setSelection(null);
+    setSelectionMask(null);
+    selectionAnchorRef.current = null;
+    lassoPointsRef.current = null;
+    selectionMoveRef.current = null;
+    selectionScaleRef.current = null;
+    shapeDragRef.current = null;
+    brushStrokeRef.current = null;
+  }, [spriteId, cardView, activeLayerId, activeFrameId]);
 
   toolRef.current = tool;
   brushSizeRef.current = brushSize;
+  symmetryRef.current = {
+    horizontal: symmetryHorizontal,
+    vertical: symmetryVertical,
+  };
   pixelsRef.current = pixels;
   emissiveRef.current = emissivePixels;
   shineRef.current = shinePixels;
   artLayersRef.current = artLayers;
   activeLayerIdRef.current = activeLayerId;
   geomRef.current = { width, height: canvasH };
+  const selectedArtLayer =
+    artLayers?.find((layer) => layer.id === activeLayerId) ?? artLayers?.at(-1);
+  const selectedFrame =
+    frames?.find((frame) => frame.id === activeFrameId) ?? frames?.[0];
+  const selectedFrameIndex = selectedFrame
+    ? (frames?.findIndex((frame) => frame.id === selectedFrame.id) ?? -1)
+    : -1;
+  const colorRef = useRef(color);
+  const backgroundColorRef = useRef(backgroundColor);
+  colorRef.current = color;
+  backgroundColorRef.current = backgroundColor;
   const cellScaleRef = useRef(cellScale);
   cellScaleRef.current = cellScale;
 
   const favorites = pack.paletteFavorites ?? [];
-  const palette = useMemo(() => {
-    const extra = favorites.filter((c) => !BASE_PALETTE.includes(c));
-    return [...BASE_PALETTE, ...extra];
-  }, [favorites]);
-
   const packRef = useRef(pack);
   packRef.current = pack;
   useEffect(() => {
@@ -629,32 +889,33 @@ export function SpriteEditorPanel({
     onChangePack({ ...packRef.current, paletteFavorites: pruned });
   }, [favorites, onChangePack]);
 
-  const stepZoom = (dir: 1 | -1) => {
-    setCellScale((prev) => clampCellScale(prev + dir));
+  const chooseForegroundColor = (next: string) => {
+    setColor(next);
+    setRecentColors((recent) => pushRecentPixelColor(recent, next));
   };
 
-  const fitStage = useCallback(() => {
-    const el = stageRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const padX = 32;
-    const padY = 32;
-    const sx = Math.floor((rect.width - padX) / Math.max(1, width));
-    const sy = Math.floor((rect.height - padY) / Math.max(1, canvasH));
-    setCellScale(clampCellScale(Math.min(sx, sy) || 8));
-  }, [width, canvasH]);
+  const chooseBackgroundColor = (next: string) => {
+    setBackgroundColor(next);
+    setRecentColors((recent) => pushRecentPixelColor(recent, next));
+  };
 
-  useEffect(() => {
-    const el = stageRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const dir: 1 | -1 = e.deltaY < 0 ? 1 : -1;
-      setCellScale((prev) => clampCellScale(prev + dir));
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, [spriteId]);
+  const swapPaletteColors = () => {
+    const foreground = colorRef.current;
+    setColor(backgroundColorRef.current);
+    setBackgroundColor(foreground);
+  };
+
+  const resetPaletteColors = () => {
+    setColor("#1a120e");
+    setBackgroundColor("#f2e6d8");
+  };
+
+  const setPaletteFavorites = (colors: string[]) => {
+    onChangePack({
+      ...packRef.current,
+      paletteFavorites: prunePaletteFavorites(colors),
+    });
+  };
 
   // Load sprite into editor
   useEffect(() => {
@@ -672,6 +933,7 @@ export function SpriteEditorPanel({
       setWidthDraft(16);
       setHeightDraft(16);
       setTagsDraft("");
+      setWorldOffsetVoxels({ x: 0, y: 0, z: 0 });
       cardViewRef.current = "front";
       setCardView("front");
       frontBufRef.current = null;
@@ -685,6 +947,9 @@ export function SpriteEditorPanel({
       setFrames(undefined);
       setActiveFrameId(undefined);
       setPreviewPlaying(false);
+      setPreviewRangeStart(0);
+      setPreviewRangeEnd(MAX_SPRITE_ANIM_FRAMES - 1);
+      setOnionSkin(false);
       return;
     }
     setNameRu(sprite.nameRu ?? "");
@@ -742,6 +1007,9 @@ export function SpriteEditorPanel({
       setFrames(loadedFrames);
       setActiveFrameId(loadedFrames?.[0]?.id);
       setPreviewPlaying(false);
+      setPreviewRangeStart(0);
+      setPreviewRangeEnd(MAX_SPRITE_ANIM_FRAMES - 1);
+      setOnionSkin(false);
     }
     setEmissiveAnim(sprite.emissiveAnim ?? "always");
     setEmissiveStrength(
@@ -779,6 +1047,7 @@ export function SpriteEditorPanel({
     setWidthDraft(sprite.width);
     setHeightDraft(spriteTotalHeight(sprite));
     setTagsDraft(formatEmberLibraryTags(sprite.tags));
+    setWorldOffsetVoxels(resolveSpriteWorldOffsetVoxels(sprite));
     undoRef.current = [];
     redoRef.current = [];
     setHistoryLen(0);
@@ -790,6 +1059,24 @@ export function SpriteEditorPanel({
       setSpriteId(spriteList[0]?.id ?? null);
     }
   }, [pack.sprites, spriteId, spriteList]);
+
+  const onionNeighbors = useMemo(() => {
+    if (!onionSkin || previewPlaying || !frames?.length || !activeFrameId) {
+      return null;
+    }
+    const index = frames.findIndex((frame) => frame.id === activeFrameId);
+    if (index < 0) return null;
+    const pixelsForView = (frame: SpriteFrameBuf | undefined) => {
+      if (!frame) return undefined;
+      return cardView === "front"
+        ? frame.front.pixels
+        : frame.extras[cardView]?.pixels;
+    };
+    return {
+      previous: pixelsForView(frames[index - 1]),
+      next: pixelsForView(frames[index + 1]),
+    };
+  }, [activeFrameId, cardView, frames, onionSkin, previewPlaying]);
 
   // Paint unified canvas
   useEffect(() => {
@@ -806,10 +1093,24 @@ export function SpriteEditorPanel({
         const c = pixels[y * width + x];
         const px = x * cellScale;
         const py = y * cellScale;
-        if (!showColor || !c || c === "#00000000") {
-          ctx.fillStyle = (x + y) % 2 === 0 ? "#1a120e" : "#241810";
+        const previous = onionNeighbors?.previous?.[y * width + x];
+        const next = onionNeighbors?.next?.[y * width + x];
+        const previousVisible =
+          !!previous && !(previous.length === 9 && previous.endsWith("00"));
+        const nextVisible = !!next && !(next.length === 9 && next.endsWith("00"));
+        if (previousVisible) {
+          ctx.fillStyle = "#ff5a54";
+          ctx.globalAlpha = onionSkinOpacity / 100;
           ctx.fillRect(px, py, cellScale, cellScale);
-        } else {
+          ctx.globalAlpha = 1;
+        }
+        if (nextVisible) {
+          ctx.fillStyle = "#63d98b";
+          ctx.globalAlpha = onionSkinOpacity / 100;
+          ctx.fillRect(px, py, cellScale, cellScale);
+          ctx.globalAlpha = 1;
+        }
+        if (showColor && c && c !== "#00000000") {
           ctx.fillStyle = c;
           ctx.fillRect(px, py, cellScale, cellScale);
         }
@@ -856,6 +1157,8 @@ export function SpriteEditorPanel({
     showColor,
     showGlow,
     showShine,
+    onionNeighbors,
+    onionSkinOpacity,
   ]);
 
   // On-tile preview (compact; elevation Z0…MAX)
@@ -869,6 +1172,7 @@ export function SpriteEditorPanel({
     const elev = Math.max(0, Math.min(MAX_ELEVATION, previewElev));
     const live: EmberPixelSprite = {
       ...sprite,
+      worldOffsetVoxels: normalizeSpriteWorldOffsetVoxels(worldOffsetVoxels),
       pixels,
       emissivePixels,
       shinePixels,
@@ -947,8 +1251,12 @@ export function SpriteEditorPanel({
       wallH > 0
         ? floorY + tileDraw - wallH - topH / 2
         : floorY + tileDraw / 2;
-    const overlayX = Math.round(cx - tw / 2);
-    const overlayY = Math.round(cy - topH / 2);
+    const visualOffset = resolveSpriteWorldOffsetVoxels(live);
+    const voxelPx = tileDraw / 16;
+    const overlayX = Math.round(cx - tw / 2 + visualOffset.x * voxelPx);
+    const overlayY = Math.round(
+      cy - topH / 2 + (visualOffset.y - visualOffset.z) * voxelPx,
+    );
     if (spriteFaceHasInk(emissivePixels)) {
       ctx.save();
       ctx.globalAlpha = 0.55 + emissiveStrength * 0.35;
@@ -998,6 +1306,7 @@ export function SpriteEditorPanel({
     previewTileId,
     sprite,
     previewElev,
+    worldOffsetVoxels,
   ]);
 
   const capturePaintSnapshot = (): PaintSnapshot => {
@@ -1015,14 +1324,18 @@ export function SpriteEditorPanel({
     };
   };
 
-  const pushHistory = () => {
+  const pushPaintSnapshot = (snapshot: PaintSnapshot) => {
     undoRef.current = [
       ...undoRef.current.slice(-40),
-      capturePaintSnapshot(),
+      snapshot,
     ];
     redoRef.current = [];
     setHistoryLen(undoRef.current.length);
     setRedoLen(0);
+  };
+
+  const pushHistory = () => {
+    pushPaintSnapshot(capturePaintSnapshot());
   };
 
   const commitToPack = useCallback(
@@ -1143,6 +1456,9 @@ export function SpriteEditorPanel({
               : undefined,
           roles: [...roles],
           tags: normalizeEmberLibraryTags(tagsDraft),
+          worldOffsetVoxels: normalizeSpriteWorldOffsetVoxels(
+            worldOffsetVoxels,
+          ),
           solid,
           glow,
           material: material || undefined,
@@ -1171,6 +1487,7 @@ export function SpriteEditorPanel({
       color,
       roles,
       tagsDraft,
+      worldOffsetVoxels,
       solid,
       glow,
       material,
@@ -1208,6 +1525,7 @@ export function SpriteEditorPanel({
     next: string[],
     nextEmissive?: string[],
     nextShine?: string[],
+    save = true,
   ) => {
     pixelsRef.current = next;
     setPixels(next);
@@ -1219,7 +1537,7 @@ export function SpriteEditorPanel({
       shineRef.current = nextShine;
       setShinePixels(nextShine);
     }
-    commitToPack(next);
+    if (save) commitToPack(next);
   };
 
   const applyLayers = (
@@ -1232,19 +1550,39 @@ export function SpriteEditorPanel({
     setActiveLayerId(activeLayerIdRef.current);
   };
 
-  const writeColorPixels = (nextLayerPixels: string[]) => {
+  const activeArtLayer = (): EmberSpriteArtLayer | undefined => {
+    const layers = artLayersRef.current;
+    if (!layers?.length) return undefined;
+    const id = activeLayerIdRef.current;
+    return layers.find((layer) => layer.id === id) ?? layers[layers.length - 1];
+  };
+
+  const activeColorLayerLocked = () => activeArtLayer()?.locked === true;
+
+  const applyLayerStack = (
+    layers: EmberSpriteArtLayer[],
+    activeId = activeLayerIdRef.current,
+    save = true,
+  ) => {
     const g = geomRef.current;
+    const composed = compositeArtLayers(layers, g.width, g.height);
+    applyLayers(layers, activeId);
+    pixelsRef.current = composed;
+    setPixels(composed);
+    if (save) commitToPack(composed);
+  };
+
+  const writeColorPixels = (nextLayerPixels: string[]) => {
     const layers = artLayersRef.current;
     if (layers?.length) {
       const id = activeLayerIdRef.current ?? layers[layers.length - 1]!.id;
+      const active = layers.find((layer) => layer.id === id) ?? layers[layers.length - 1]!;
+      const constrained = constrainArtLayerPixels(active, nextLayerPixels);
+      if (constrained === active.pixels) return;
       const nextLayers = layers.map((layer) =>
-        layer.id === id ? { ...layer, pixels: nextLayerPixels } : layer,
+        layer.id === id ? { ...layer, pixels: constrained } : layer,
       );
-      const composed = compositeArtLayers(nextLayers, g.width, g.height);
-      applyLayers(nextLayers, id);
-      pixelsRef.current = composed;
-      setPixels(composed);
-      commitToPack(composed);
+      applyLayerStack(nextLayers, id);
       return;
     }
     pixelsRef.current = nextLayerPixels;
@@ -1289,7 +1627,7 @@ export function SpriteEditorPanel({
     cardViewRef.current = next;
     setCardView(next);
     applyLayers(cloneArtLayers(incoming.artLayers), incoming.activeLayerId);
-    applyLive(incoming.pixels, incoming.emissive, incoming.shine);
+    applyLive(incoming.pixels, incoming.emissive, incoming.shine, false);
   };
 
   const syncActiveFrameFromLive = () => {
@@ -1338,7 +1676,7 @@ export function SpriteEditorPanel({
       extraViewsRef.current[view] = incoming;
     }
     applyLayers(cloneArtLayers(incoming.artLayers), incoming.activeLayerId);
-    applyLive(incoming.pixels, incoming.emissive, incoming.shine);
+    applyLive(incoming.pixels, incoming.emissive, incoming.shine, false);
   };
   showFrameRef.current = showFrame;
 
@@ -1491,18 +1829,169 @@ export function SpriteEditorPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commitToPack]);
 
+  const currentSelectionChannels = () => ({
+    pixels: colorTargetPixels(),
+    emissivePixels: emissiveRef.current,
+    shinePixels: shineRef.current,
+  });
+
+  const applySelectionChannels = (channels: {
+    pixels: string[];
+    emissivePixels?: string[];
+    shinePixels?: string[];
+  }) => {
+    writeColorPixels(channels.pixels);
+    applyLive(
+      pixelsRef.current,
+      channels.emissivePixels ?? emissiveRef.current,
+      channels.shinePixels ?? shineRef.current,
+    );
+  };
+
+  const transformSelection = (transform: PixelTransform) => {
+    const active = selectionRef.current;
+    if (!active || activeColorLayerLocked()) return;
+    const g = geomRef.current;
+    pushHistory();
+    const next = transformPixelSelection(
+      currentSelectionChannels(),
+      g.width,
+      g.height,
+      active,
+      transform,
+      selectionMaskRef.current ?? undefined,
+    );
+    applySelectionChannels(next.channels);
+    setSelection(next.rect);
+    setSelectionMask(next.mask ?? null);
+    commitToPack(pixelsRef.current);
+  };
+
+  const deleteSelection = () => {
+    const active = selectionRef.current;
+    if (!active || activeColorLayerLocked()) return;
+    const g = geomRef.current;
+    pushHistory();
+    applySelectionChannels(
+      clearPixelSelection(
+        currentSelectionChannels(),
+        g.width,
+        g.height,
+        active,
+        selectionMaskRef.current ?? undefined,
+      ),
+    );
+    commitToPack(pixelsRef.current);
+  };
+
   const copyCanvas = useCallback(() => {
     const g = geomRef.current;
-    copyPixelArtChannels(g.width, g.height, {
-      pixels: pixelsRef.current,
-      emissivePixels: emissiveRef.current,
-      shinePixels: shineRef.current,
-    });
+    const active = selectionRef.current;
+    const clip = active
+      ? extractPixelSelection(
+          currentSelectionChannels(),
+          g.width,
+          g.height,
+          active,
+          selectionMaskRef.current ?? undefined,
+        )
+      : null;
+    copyPixelArtChannels(
+      clip?.width ?? g.width,
+      clip?.height ?? g.height,
+      clip ?? currentSelectionChannels(),
+      clip?.mask,
+    );
     setClipReady(true);
   }, []);
 
-  const pasteCanvas = useCallback(() => {
+  const selectAllPixels = () => {
     const g = geomRef.current;
+    setSelection({ x: 0, y: 0, w: g.width, h: g.height });
+    setSelectionMask(null);
+    setTool("select");
+    setPreviewPlaying(false);
+  };
+
+  const invertSelection = () => {
+    const g = geomRef.current;
+    const current = selectionRef.current
+      ? { rect: selectionRef.current, mask: selectionMaskRef.current ?? undefined }
+      : null;
+    const inverted = invertPixelSelection(current, g.width, g.height);
+    setSelection(inverted?.rect ?? null);
+    setSelectionMask(inverted?.mask ?? null);
+    setPreviewPlaying(false);
+  };
+
+  const cutSelection = () => {
+    const active = selectionRef.current;
+    if (!active || activeColorLayerLocked()) return;
+    const g = geomRef.current;
+    copyCanvas();
+    pushHistory();
+    applySelectionChannels(
+      clearPixelSelection(
+        currentSelectionChannels(),
+        g.width,
+        g.height,
+        active,
+        selectionMaskRef.current ?? undefined,
+      ),
+    );
+    commitToPack(pixelsRef.current);
+  };
+
+  const duplicateSelection = () => {
+    const active = selectionRef.current;
+    if (!active || activeColorLayerLocked()) return;
+    const g = geomRef.current;
+    const dx = active.x + active.w < g.width ? 1 : active.x > 0 ? -1 : 0;
+    const dy = active.y + active.h < g.height ? 1 : active.y > 0 ? -1 : 0;
+    if (dx === 0 && dy === 0) return;
+    pushHistory();
+    const duplicated = duplicatePixelSelection(
+      currentSelectionChannels(),
+      g.width,
+      g.height,
+      active,
+      dx,
+      dy,
+      selectionMaskRef.current ?? undefined,
+    );
+    applySelectionChannels(duplicated.channels);
+    setSelection(duplicated.rect);
+    setSelectionMask(duplicated.mask ?? null);
+    setTool("select");
+    setPreviewPlaying(false);
+    commitToPack(pixelsRef.current);
+  };
+
+  const pasteCanvas = useCallback(() => {
+    if (activeColorLayerLocked()) return;
+    const g = geomRef.current;
+    const active = selectionRef.current;
+    const clip = peekPixelClipboard();
+    if (
+      (active || toolRef.current === "select" || toolRef.current === "lasso" || toolRef.current === "wand") &&
+      clip
+    ) {
+      pushHistory();
+      const pasted = pastePixelSelection(
+        currentSelectionChannels(),
+        g.width,
+        g.height,
+        clip,
+        active?.x ?? 0,
+        active?.y ?? 0,
+      );
+      applySelectionChannels(pasted.channels);
+      setSelection(pasted.rect);
+      setSelectionMask(pasted.mask ?? null);
+      setTool("select");
+      commitToPack(pixelsRef.current);
+      return;
+    }
     const next = pastePixelArtChannels(g.width, g.height);
     if (!next) return;
     pushHistory();
@@ -1517,10 +2006,11 @@ export function SpriteEditorPanel({
 
   const fillCanvas = () => {
     const g = geomRef.current;
+    const layer = pixelShapeKind(tool) || tool === "fill" ? shapeChannel : channelForTool(tool);
+    if (layer === "color" && activeColorLayerLocked()) return;
     const fill = color === "#00000000" ? "" : color;
     const filled = emptySpritePixels(g.width, g.height).map(() => fill);
     pushHistory();
-    const layer = channelForTool(tool);
     switch (layer) {
       case "color":
         writeColorPixels(filled);
@@ -1548,23 +2038,126 @@ export function SpriteEditorPanel({
         return;
       }
       if (isTypingTarget(e.target)) return;
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.code === "Digit0") {
+        e.preventDefault();
+        canvasNavigation.fit();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.code === "Digit1") {
+        e.preventDefault();
+        canvasNavigation.zoom100();
+        return;
+      }
+      if (!(e.ctrlKey || e.metaKey) && !e.altKey) {
+        if (e.code === "Escape") {
+          const shapeDrag = shapeDragRef.current;
+          if (shapeDrag) {
+            shapeDragRef.current = null;
+            restorePaintSnapshot(shapeDrag.snapshot);
+          }
+          const brushStroke = brushStrokeRef.current;
+          if (brushStroke) {
+            brushStrokeRef.current = null;
+            restorePaintSnapshot(brushStroke.snapshot);
+          }
+          setSelection(null);
+          setSelectionMask(null);
+          selectionAnchorRef.current = null;
+          lassoPointsRef.current = null;
+          selectionMoveRef.current = null;
+          selectionScaleRef.current = null;
+          if (selectionOverlayRef.current) selectionOverlayRef.current.style.transform = "";
+        } else if (e.code === "KeyM") setTool("select");
+        else if (e.code === "KeyL") setTool("lasso");
+        else if (e.code === "KeyW") setTool("wand");
+        else if (e.code === "KeyF") setTool("fill");
+        else if (e.code === "KeyU") {
+          setTool((current) => current === "line" ? "rect" : current === "rect" ? "ellipse" : "line");
+        }
+        else if ((e.code === "Delete" || e.code === "Backspace") && selectionRef.current) {
+          deleteSelection();
+        } else if (
+          e.code.startsWith("Arrow") &&
+          selectionRef.current &&
+          !activeColorLayerLocked()
+        ) {
+          const g = geomRef.current;
+          const dx = e.code === "ArrowLeft" ? -1 : e.code === "ArrowRight" ? 1 : 0;
+          const dy = e.code === "ArrowUp" ? -1 : e.code === "ArrowDown" ? 1 : 0;
+          pushHistory();
+          const moved = movePixelSelection(
+            currentSelectionChannels(),
+            g.width,
+            g.height,
+            selectionRef.current,
+            dx,
+            dy,
+            selectionMaskRef.current ?? undefined,
+          );
+          applySelectionChannels(moved.channels);
+          setSelection(moved.rect);
+          setSelectionMask(moved.mask ?? null);
+          commitToPack(pixelsRef.current);
+        } else if (e.code === "KeyB") setTool("paint");
+        else if (e.code === "KeyI") setTool("eyedrop");
+        else if (e.code === "KeyG") setTool("glow");
+        else if (e.code === "KeyH") setTool("shine");
+        else if (e.code === "KeyX") swapPaletteColors();
+        else if (e.code === "KeyD") resetPaletteColors();
+        else if (/^Digit[1-4]$/.test(e.code)) {
+          setBrushSize(Number(e.code.slice(-1)));
+        } else if (e.code === "BracketLeft" || e.code === "BracketRight") {
+          setBrushSize((value) =>
+            Math.max(1, Math.min(4, value + (e.code === "BracketRight" ? 1 : -1))),
+          );
+        } else {
+          return;
+        }
+        e.preventDefault();
+        return;
+      }
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
       const isUndo = e.code === "KeyZ" && !e.shiftKey;
       const isRedo =
         e.code === "KeyY" || (e.code === "KeyZ" && e.shiftKey);
       const isCopy = e.code === "KeyC";
       const isPaste = e.code === "KeyV";
-      if (!isUndo && !isRedo && !isCopy && !isPaste) return;
+      const isSelectAll = e.code === "KeyA" && !e.shiftKey;
+      const isInvert = e.code === "KeyI" && e.shiftKey;
+      const isCut = e.code === "KeyX";
+      const isDuplicate = e.code === "KeyJ";
+      if (
+        !isUndo &&
+        !isRedo &&
+        !isCopy &&
+        !isPaste &&
+        !isSelectAll &&
+        !isInvert &&
+        !isCut &&
+        !isDuplicate
+      ) return;
       e.preventDefault();
       e.stopPropagation();
       if (isUndo) undo();
       else if (isRedo) redo();
+      else if (isSelectAll) selectAllPixels();
+      else if (isInvert) invertSelection();
+      else if (isCut) cutSelection();
+      else if (isDuplicate) duplicateSelection();
       else if (isCopy) copyCanvas();
       else pasteCanvas();
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [showOpenPicker, undo, redo, copyCanvas, pasteCanvas]);
+  }, [
+    showOpenPicker,
+    undo,
+    redo,
+    copyCanvas,
+    pasteCanvas,
+    canvasNavigation.fit,
+    canvasNavigation.zoom100,
+  ]);
 
   const pixelFromEvent = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
@@ -1582,6 +2175,217 @@ export function SpriteEditorPanel({
     return { x, y, idx: y * g.width + x };
   };
 
+  const updateCursorStatus = (clientX: number, clientY: number) => {
+    const pos = pixelFromEvent(clientX, clientY);
+    if (cursorStatusRef.current) {
+      cursorStatusRef.current.textContent = pos ? `X ${pos.x}  Y ${pos.y}` : "X —  Y —";
+    }
+  };
+
+  const clearCanvas = () => {
+    if (activeColorLayerLocked()) return;
+    const g = geomRef.current;
+    const blank = emptySpritePixels(g.width, g.height);
+    pushHistory();
+    if (artLayersRef.current?.length) {
+      writeColorPixels(blank);
+      applyLive(pixelsRef.current, blank, blank);
+      return;
+    }
+    applyLive(blank, blank, blank);
+  };
+
+  const resetSelectionDrag = () => {
+    selectionAnchorRef.current = null;
+    lassoPointsRef.current = null;
+    selectionMoveRef.current = null;
+    if (selectionOverlayRef.current) selectionOverlayRef.current.style.transform = "";
+  };
+
+  const selectWithMagicWand = (point: PixelPoint, shiftKey: boolean, altKey: boolean) => {
+    const g = geomRef.current;
+    const sampled = magicWandSelection(
+      colorTargetPixels(),
+      g.width,
+      g.height,
+      point,
+      wandTolerance,
+      wandContiguous,
+    );
+    const current = selectionRef.current
+      ? { rect: selectionRef.current, mask: selectionMaskRef.current ?? undefined }
+      : null;
+    const mode = shiftKey && altKey
+      ? "intersect"
+      : altKey
+        ? "subtract"
+        : shiftKey
+          ? "add"
+          : wandCombineMode;
+    const combined = combinePixelSelections(current, sampled, mode, g.width, g.height);
+    setSelection(combined?.rect ?? null);
+    setSelectionMask(combined?.mask ?? null);
+    setPreviewPlaying(false);
+  };
+
+  const beginSelection = (point: PixelPoint) => {
+    setPreviewPlaying(false);
+    const active = selectionRef.current;
+    if (active && pixelSelectionContains(active, selectionMaskRef.current ?? undefined, point)) {
+      selectionMoveRef.current = { start: point, rect: active, dx: 0, dy: 0 };
+      return;
+    }
+    if (toolRef.current === "lasso") {
+      lassoPointsRef.current = [point];
+      selectionAnchorRef.current = null;
+      setSelection({ x: point.x, y: point.y, w: 1, h: 1 });
+      setSelectionMask([true]);
+      return;
+    }
+    selectionAnchorRef.current = point;
+    setSelectionMask(null);
+    setSelection({ x: point.x, y: point.y, w: 1, h: 1 });
+  };
+
+  const updateSelectionDrag = (point: PixelPoint) => {
+    const g = geomRef.current;
+    const moving = selectionMoveRef.current;
+    if (moving) {
+      moving.dx = Math.max(
+        -moving.rect.x,
+        Math.min(g.width - moving.rect.x - moving.rect.w, point.x - moving.start.x),
+      );
+      moving.dy = Math.max(
+        -moving.rect.y,
+        Math.min(g.height - moving.rect.y - moving.rect.h, point.y - moving.start.y),
+      );
+      if (selectionOverlayRef.current) {
+        const scale = cellScaleRef.current;
+        selectionOverlayRef.current.style.transform = `translate(${moving.dx * scale}px, ${moving.dy * scale}px)`;
+      }
+      return;
+    }
+    const lassoPoints = lassoPointsRef.current;
+    if (lassoPoints) {
+      const previous = lassoPoints[lassoPoints.length - 1];
+      if (!previous || previous.x !== point.x || previous.y !== point.y) lassoPoints.push(point);
+      const shape = pixelSelectionFromPolygon(lassoPoints, g.width, g.height);
+      if (shape) {
+        setSelection(shape.rect);
+        setSelectionMask(shape.mask ?? null);
+      }
+      return;
+    }
+    const anchor = selectionAnchorRef.current;
+    if (anchor) setSelection(pixelRectFromPoints(anchor, point, g.width, g.height));
+  };
+
+  const finishSelectionDrag = () => {
+    const moving = selectionMoveRef.current;
+    if (
+      moving &&
+      !activeColorLayerLocked() &&
+      (moving.dx !== 0 || moving.dy !== 0)
+    ) {
+      const g = geomRef.current;
+      pushHistory();
+      const moved = movePixelSelection(
+        currentSelectionChannels(),
+        g.width,
+        g.height,
+        moving.rect,
+        moving.dx,
+        moving.dy,
+        selectionMaskRef.current ?? undefined,
+      );
+      applySelectionChannels(moved.channels);
+      setSelection(moved.rect);
+      setSelectionMask(moved.mask ?? null);
+      commitToPack(pixelsRef.current);
+    }
+    resetSelectionDrag();
+  };
+
+  const beginSelectionScale = (
+    handle: PixelScaleHandle,
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) => {
+    const active = selectionRef.current;
+    if (!active || activeColorLayerLocked()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    selectionScaleRef.current = {
+      handle,
+      source: active,
+      target: active,
+      mask: selectionMaskRef.current ? [...selectionMaskRef.current] : undefined,
+    };
+    setPreviewPlaying(false);
+  };
+
+  const updateSelectionScale = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const sizing = selectionScaleRef.current;
+    if (!sizing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = pixelFromEvent(event.clientX, event.clientY);
+    if (!point) return;
+    const g = geomRef.current;
+    const target = pixelRectFromScaleHandle(
+      sizing.source,
+      sizing.handle,
+      point,
+      g.width,
+      g.height,
+      event.shiftKey,
+    );
+    sizing.target = target;
+    setSelection(target);
+    setSelectionMask(
+      resizePixelMask(sizing.mask, sizing.source.w, sizing.source.h, target.w, target.h) ?? null,
+    );
+  };
+
+  const finishSelectionScale = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const sizing = selectionScaleRef.current;
+    if (!sizing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    selectionScaleRef.current = null;
+    const { source, target } = sizing;
+    if (
+      source.x === target.x &&
+      source.y === target.y &&
+      source.w === target.w &&
+      source.h === target.h
+    ) return;
+    const g = geomRef.current;
+    pushHistory();
+    const resized = resizePixelSelection(
+      currentSelectionChannels(),
+      g.width,
+      g.height,
+      source,
+      target,
+      sizing.mask,
+    );
+    applySelectionChannels(resized.channels);
+    setSelection(resized.rect);
+    setSelectionMask(resized.mask ?? null);
+    commitToPack(pixelsRef.current);
+  };
+
+  const cancelSelectionScale = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const sizing = selectionScaleRef.current;
+    if (!sizing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    selectionScaleRef.current = null;
+    setSelection(sizing.source);
+    setSelectionMask(sizing.mask ?? null);
+  };
+
   const pickColorAt = (clientX: number, clientY: number) => {
     const pos = pixelFromEvent(clientX, clientY);
     if (!pos) return;
@@ -1592,7 +2396,7 @@ export function SpriteEditorPanel({
       : fromShine
         ? (shineRef.current[pos.idx] ?? "")
         : (pixelsRef.current[pos.idx] ?? "");
-    setColor(c === "" ? "#00000000" : c);
+    chooseForegroundColor(c === "" ? "#00000000" : c);
     if (!fromEm && !fromShine) setTool("paint");
   };
 
@@ -1601,62 +2405,214 @@ export function SpriteEditorPanel({
     const pos = pixelFromEvent(clientX, clientY);
     if (!pos) return;
     const g = geomRef.current;
-    const paintColor = color === "#00000000" ? "" : color;
     const kind = toolRef.current;
-    const glowMode = kind === "glow";
-    const shineMode = kind === "shine";
-    const target = glowMode
-      ? emissiveRef.current
-      : shineMode
-        ? shineRef.current
-        : colorTargetPixels();
+    if (!isArtBrushTool(kind)) return;
+    if (activeColorLayerLocked()) return;
+    const target = colorTargetPixels();
     const b = Math.max(1, Math.min(4, brushSizeRef.current));
-    let changed = false;
     let next = [...target];
-    if (isArtBrushTool(kind)) {
-      const prev = smudgePrevRef.current ?? { x: pos.x, y: pos.y };
-      const stamped = stampArtBrush(
-        next,
-        g.width,
-        g.height,
-        pos.x,
-        pos.y,
-        b,
-        kind,
-        prev.x,
-        prev.y,
-      );
-      next = stamped.pixels;
-      changed = stamped.changed;
-      smudgePrevRef.current = { x: pos.x, y: pos.y };
-    } else {
-      const origin = Math.floor((b - 1) / 2);
-      for (let dy = 0; dy < b; dy++) {
-        for (let dx = 0; dx < b; dx++) {
-          const x = pos.x - origin + dx;
-          const y = pos.y - origin + dy;
-          if (x < 0 || y < 0 || x >= g.width || y >= g.height) continue;
-          const idx = y * g.width + x;
-          if (next[idx] === paintColor) continue;
-          next[idx] = paintColor;
-          changed = true;
-        }
-      }
-    }
-    if (!changed) return;
+    const prev = smudgePrevRef.current ?? { x: pos.x, y: pos.y };
+    const stamped = stampArtBrush(
+      next,
+      g.width,
+      g.height,
+      pos.x,
+      pos.y,
+      b,
+      kind,
+      prev.x,
+      prev.y,
+    );
+    next = stamped.pixels;
+    smudgePrevRef.current = { x: pos.x, y: pos.y };
+    if (!stamped.changed) return;
     if (!strokeSaved.current) {
       pushHistory();
       strokeSaved.current = true;
     }
-    if (glowMode) {
+    writeColorPixels(next);
+  };
+
+  const applyShapeTarget = (channel: DrawLayer, next: string[]) => {
+    if (channel === "glow") {
       emissiveRef.current = next;
       setEmissivePixels(next);
-    } else if (shineMode) {
+      return;
+    }
+    if (channel === "shine") {
       shineRef.current = next;
       setShinePixels(next);
-    } else {
-      writeColorPixels(next);
+      return;
     }
+    const g = geomRef.current;
+    const layers = artLayersRef.current;
+    if (layers?.length) {
+      const id = activeLayerIdRef.current ?? layers[layers.length - 1]!.id;
+      const active = layers.find((layer) => layer.id === id) ?? layers[layers.length - 1]!;
+      const constrained = constrainArtLayerPixels(active, next);
+      if (constrained === active.pixels) return;
+      const nextLayers = layers.map((layer) =>
+        layer.id === id ? { ...layer, pixels: constrained } : layer,
+      );
+      const composed = compositeArtLayers(nextLayers, g.width, g.height);
+      applyLayers(nextLayers, id);
+      pixelsRef.current = composed;
+      setPixels(composed);
+      return;
+    }
+    pixelsRef.current = next;
+    setPixels(next);
+  };
+
+  const updateBrushStroke = (point: PixelPoint) => {
+    const stroke = brushStrokeRef.current;
+    if (!stroke) return;
+    const g = geomRef.current;
+    stroke.path = extendPixelStroke(
+      stroke.path,
+      point,
+      stroke.spacing,
+      stroke.pixelPerfect && stroke.size === 1,
+    );
+    const preview = paintPixelBrushStroke(
+      stroke.base,
+      g.width,
+      g.height,
+      stroke.path.points,
+      stroke.color,
+      stroke.size,
+      stroke.symmetry,
+      {
+        opacity: stroke.opacity,
+        ditherCoverage: stroke.dither,
+      },
+    );
+    stroke.changed = preview.changed;
+    applyShapeTarget(stroke.channel, preview.pixels);
+  };
+
+  const beginBrushStroke = (point: PixelPoint) => {
+    setPreviewPlaying(false);
+    const channel: DrawLayer = toolRef.current === "glow"
+      ? "glow"
+      : toolRef.current === "shine"
+        ? "shine"
+        : "color";
+    if (channel === "color" && activeColorLayerLocked()) return;
+    const base = channel === "glow"
+      ? emissiveRef.current
+      : channel === "shine"
+        ? shineRef.current
+        : colorTargetPixels();
+    brushStrokeRef.current = {
+      snapshot: capturePaintSnapshot(),
+      base: [...base],
+      channel,
+      color: color === "#00000000" ? "" : color,
+      size: brushSizeRef.current,
+      symmetry: { ...symmetryRef.current },
+      opacity: brushOpacity / 100,
+      dither: brushDither,
+      spacing: brushSpacing,
+      pixelPerfect: brushPixelPerfect,
+      path: { points: [], last: null, distance: 0 },
+      changed: false,
+    };
+    updateBrushStroke(point);
+  };
+
+  const finishBrushStroke = () => {
+    const stroke = brushStrokeRef.current;
+    if (!stroke) return;
+    brushStrokeRef.current = null;
+    if (!stroke.changed) return;
+    pushPaintSnapshot(stroke.snapshot);
+    commitToPack(pixelsRef.current);
+  };
+
+  const fillAt = (point: PixelPoint) => {
+    setPreviewPlaying(false);
+    const g = geomRef.current;
+    const channel = shapeChannel;
+    if (channel === "color" && activeColorLayerLocked()) return;
+    const base = channel === "glow"
+      ? emissiveRef.current
+      : channel === "shine"
+        ? shineRef.current
+        : colorTargetPixels();
+    const filled = paintPixelFill(
+      base,
+      g.width,
+      g.height,
+      point,
+      color === "#00000000" ? "" : color,
+      fillTolerance,
+      fillContiguous,
+      symmetryRef.current,
+    );
+    if (!filled.changed) return;
+    pushHistory();
+    applyShapeTarget(channel, filled.pixels);
+    commitToPack(pixelsRef.current);
+  };
+
+  const updateShapeDrag = (point: PixelPoint, constrained: boolean) => {
+    const drag = shapeDragRef.current;
+    if (!drag) return;
+    const g = geomRef.current;
+    const rawEnd = constrainPixelShapeEnd(drag.kind, drag.start, point, constrained);
+    const end = {
+      x: Math.max(0, Math.min(g.width - 1, rawEnd.x)),
+      y: Math.max(0, Math.min(g.height - 1, rawEnd.y)),
+    };
+    const preview = paintPixelShape(
+      drag.base,
+      g.width,
+      g.height,
+      drag.kind,
+      drag.start,
+      end,
+      drag.color,
+      drag.thickness,
+      drag.filled,
+      drag.symmetry,
+    );
+    drag.changed = preview.changed;
+    applyShapeTarget(drag.channel, preview.pixels);
+  };
+
+  const beginShapeDrag = (point: PixelPoint, constrained: boolean) => {
+    const kind = pixelShapeKind(toolRef.current);
+    if (!kind) return;
+    if (shapeChannel === "color" && activeColorLayerLocked()) return;
+    setPreviewPlaying(false);
+    const base = shapeChannel === "glow"
+      ? emissiveRef.current
+      : shapeChannel === "shine"
+        ? shineRef.current
+        : colorTargetPixels();
+    shapeDragRef.current = {
+      start: point,
+      snapshot: capturePaintSnapshot(),
+      base: [...base],
+      kind,
+      channel: shapeChannel,
+      color: color === "#00000000" ? "" : color,
+      thickness: brushSizeRef.current,
+      filled: shapeFilled && kind !== "line",
+      symmetry: { ...symmetryRef.current },
+      changed: false,
+    };
+    updateShapeDrag(point, constrained);
+  };
+
+  const finishShapeDrag = () => {
+    const drag = shapeDragRef.current;
+    if (!drag) return;
+    shapeDragRef.current = null;
+    if (!drag.changed) return;
+    pushPaintSnapshot(drag.snapshot);
+    commitToPack(pixelsRef.current);
   };
 
   const addArtLayer = () => {
@@ -1671,8 +2627,30 @@ export function SpriteEditorPanel({
     pushHistory();
     const added = makeEmptyArtLayer(g.width, g.height, stack.length + 1);
     const next = [...stack, added];
-    applyLayers(next, added.id);
-    writeColorPixels(added.pixels);
+    applyLayerStack(next, added.id);
+  };
+
+  const duplicateArtLayer = (id = activeLayerIdRef.current) => {
+    const g = geomRef.current;
+    const stack = ensureArtLayerStack(
+      pixelsRef.current,
+      g.width,
+      g.height,
+      artLayersRef.current,
+    );
+    if (stack.length >= MAX_SPRITE_ART_LAYERS) return;
+    const index = Math.max(0, stack.findIndex((layer) => layer.id === id));
+    const source = stack[index]!;
+    const duplicate: EmberSpriteArtLayer = {
+      ...source,
+      id: newArtLayerId(),
+      nameRu: `${source.nameRu ?? "Слой"} копия`,
+      pixels: [...source.pixels],
+    };
+    pushHistory();
+    const next = [...stack];
+    next.splice(index + 1, 0, duplicate);
+    applyLayerStack(next, duplicate.id);
   };
 
   const selectFrame = (id: string) => {
@@ -1703,25 +2681,86 @@ export function SpriteEditorPanel({
     }
     if (timeline.length >= MAX_SPRITE_ANIM_FRAMES) return;
     pushHistory();
-    const src =
-      timeline.find((frame) => frame.id === activeFrameIdRef.current) ??
-      timeline[timeline.length - 1]!;
+    const sourceIndex = Math.max(
+      0,
+      timeline.findIndex((frame) => frame.id === activeFrameIdRef.current),
+    );
+    const src = timeline[sourceIndex] ?? timeline[timeline.length - 1]!;
     const added: SpriteFrameBuf = {
       ...cloneFrameBuf(src),
       id: newSpriteFrameId(),
     };
-    const next = [...timeline, added];
+    const next = [...timeline];
+    next.splice(sourceIndex + 1, 0, added);
     framesRef.current = next;
     setFrames(next);
     showFrame(added);
+    commitToPack(pixelsRef.current);
+  };
+
+  const addBlankFrame = () => {
+    setPreviewPlaying(false);
+    const g = geomRef.current;
+    syncActiveFrameFromLive();
+    let timeline = framesRef.current;
+    if (!timeline?.length) {
+      timeline = [
+        {
+          id: newSpriteFrameId(),
+          durationMs: DEFAULT_SPRITE_FRAME_MS,
+          front: cloneCardBuf(
+            frontBufRef.current ?? emptyCardBuf(g.width, g.height),
+          ),
+          extras: cloneExtras(extraViewsRef.current),
+        },
+      ];
+    }
+    if (timeline.length >= MAX_SPRITE_ANIM_FRAMES) return;
+    pushHistory();
+    const added: SpriteFrameBuf = {
+      id: newSpriteFrameId(),
+      durationMs: DEFAULT_SPRITE_FRAME_MS,
+      front: emptyCardBuf(g.width, g.height),
+      extras: {},
+    };
+    const activeIndex = timeline.findIndex(
+      (frame) => frame.id === activeFrameIdRef.current,
+    );
+    const insertAt = activeIndex >= 0 ? activeIndex + 1 : timeline.length;
+    const next = [...timeline];
+    next.splice(insertAt, 0, added);
+    framesRef.current = next;
+    setFrames(next);
+    showFrame(added);
+    commitToPack(pixelsRef.current);
+  };
+
+  const moveFrame = (id: string, direction: -1 | 1) => {
+    setPreviewPlaying(false);
+    syncActiveFrameFromLive();
+    const timeline = framesRef.current;
+    if (!timeline?.length) return;
+    const index = timeline.findIndex((frame) => frame.id === id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= timeline.length) return;
+    pushHistory();
+    const next = [...timeline];
+    [next[index], next[target]] = [next[target]!, next[index]!];
+    framesRef.current = next;
+    setFrames(next);
+    const active = next.find((frame) => frame.id === id)!;
+    showFrame(active);
+    commitToPack(pixelsRef.current);
   };
 
   const removeFrame = (id: string) => {
-    const timeline = framesRef.current;
+    let timeline = framesRef.current;
     if (!timeline?.length) return;
     setPreviewPlaying(false);
-    pushHistory();
     syncActiveFrameFromLive();
+    timeline = framesRef.current;
+    if (!timeline?.length) return;
+    pushHistory();
     if (timeline.length <= 2) {
       const keep = timeline.find((frame) => frame.id !== id) ?? timeline[0]!;
       framesRef.current = undefined;
@@ -1729,6 +2768,7 @@ export function SpriteEditorPanel({
       showFrame(keep);
       activeFrameIdRef.current = undefined;
       setActiveFrameId(undefined);
+      commitToPack(pixelsRef.current);
       return;
     }
     const next = timeline.filter((frame) => frame.id !== id);
@@ -1737,18 +2777,72 @@ export function SpriteEditorPanel({
     const shown =
       next.find((frame) => frame.id === activeFrameIdRef.current) ?? next[0]!;
     showFrame(shown);
+    commitToPack(pixelsRef.current);
   };
 
-  const setFrameDurationMs = (id: string, raw: number) => {
+  const beginFrameDuration = () => {
+    if (frameDurationGestureRef.current) return;
+    frameDurationGestureRef.current = {
+      snapshot: capturePaintSnapshot(),
+      changed: false,
+    };
+  };
+
+  const previewFrameDurationMs = (id: string, raw: number) => {
     const timeline = framesRef.current;
     if (!timeline) return;
+    beginFrameDuration();
     const durationMs = clampSpriteFrameDuration(raw);
+    const current = timeline.find((frame) => frame.id === id);
+    if (!current || current.durationMs === durationMs) return;
+    frameDurationGestureRef.current!.changed = true;
     const next = timeline.map((frame) =>
       frame.id === id ? { ...frame, durationMs } : frame,
     );
     framesRef.current = next;
     setFrames(next);
+  };
+
+  const finishFrameDuration = () => {
+    const gesture = frameDurationGestureRef.current;
+    frameDurationGestureRef.current = null;
+    if (!gesture?.changed) return;
+    pushPaintSnapshot(gesture.snapshot);
     commitToPack(pixelsRef.current);
+  };
+
+  const stepFrame = (direction: -1 | 1) => {
+    setPreviewPlaying(false);
+    syncActiveFrameFromLive();
+    const timeline = framesRef.current;
+    if (!timeline?.length) return;
+    const index = Math.max(
+      0,
+      timeline.findIndex((frame) => frame.id === activeFrameIdRef.current),
+    );
+    const target = Math.max(0, Math.min(timeline.length - 1, index + direction));
+    if (target === index) return;
+    showFrame(timeline[target]!);
+  };
+
+  const toggleFramePreview = () => {
+    if (previewPlaying) {
+      setPreviewPlaying(false);
+      return;
+    }
+    syncActiveFrameFromLive();
+    const timeline = framesRef.current;
+    if (!timeline || timeline.length < 2) return;
+    const { start, end } = normalizeSpriteFrameRange(
+      timeline.length,
+      previewRangeStart,
+      previewRangeEnd,
+    );
+    const index = timeline.findIndex(
+      (frame) => frame.id === activeFrameIdRef.current,
+    );
+    if (index < start || index > end) showFrame(timeline[start]!);
+    setPreviewPlaying(true);
   };
 
   useEffect(() => {
@@ -1767,16 +2861,29 @@ export function SpriteEditorPanel({
         setPreviewPlaying(false);
         return;
       }
-      const fid = activeFrameIdRef.current;
-      const i = Math.max(
-        0,
-        list.findIndex((frame) => frame.id === fid),
+      const { start, end } = normalizeSpriteFrameRange(
+        list.length,
+        previewRangeStart,
+        previewRangeEnd,
       );
-      const cur = list[i] ?? list[0]!;
-      const next = list[(i + 1) % list.length]!;
+      const fid = activeFrameIdRef.current;
+      const found = list.findIndex((frame) => frame.id === fid);
+      const i = found >= start && found <= end ? found : start;
+      const cur = list[i]!;
+      const nextIndex = nextSpritePreviewIndex(
+        list.length,
+        i,
+        start,
+        end,
+        previewLoop,
+      );
       timer = window.setTimeout(() => {
         if (cancelled) return;
-        showFrameRef.current(next);
+        if (nextIndex < 0) {
+          setPreviewPlaying(false);
+          return;
+        }
+        showFrameRef.current(list[nextIndex]!);
         tick();
       }, cur.durationMs);
     };
@@ -1785,7 +2892,7 @@ export function SpriteEditorPanel({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [previewPlaying]);
+  }, [previewLoop, previewPlaying, previewRangeEnd, previewRangeStart]);
 
   const removeArtLayer = (id: string) => {
     const layers = artLayersRef.current;
@@ -1797,12 +2904,9 @@ export function SpriteEditorPanel({
       return;
     }
     const next = layers.filter((layer) => layer.id !== id);
-    const g = geomRef.current;
-    const composed = compositeArtLayers(next, g.width, g.height);
-    applyLayers(next, next[next.length - 1]?.id);
-    pixelsRef.current = composed;
-    setPixels(composed);
-    commitToPack(composed);
+    const removedIndex = layers.findIndex((layer) => layer.id === id);
+    const nextActive = next[Math.min(Math.max(0, removedIndex - 1), next.length - 1)]?.id;
+    applyLayerStack(next, nextActive);
   };
 
   const toggleArtLayerVisible = (id: string) => {
@@ -1814,12 +2918,87 @@ export function SpriteEditorPanel({
         ? { ...layer, visible: layer.visible === false ? undefined : false }
         : layer,
     );
-    const g = geomRef.current;
-    const composed = compositeArtLayers(next, g.width, g.height);
-    applyLayers(next, activeLayerIdRef.current);
-    pixelsRef.current = composed;
-    setPixels(composed);
-    commitToPack(composed);
+    applyLayerStack(next);
+  };
+
+  const updateArtLayer = (
+    id: string,
+    update: (layer: EmberSpriteArtLayer) => EmberSpriteArtLayer,
+    history = true,
+    save = true,
+  ) => {
+    const layers = artLayersRef.current;
+    if (!layers?.some((layer) => layer.id === id)) return;
+    if (history) pushHistory();
+    const next = layers.map((layer) => (layer.id === id ? update(layer) : layer));
+    applyLayerStack(next, activeLayerIdRef.current, save);
+  };
+
+  const renameArtLayer = (id: string, raw: string) => {
+    const nameRu = raw.trim();
+    const current = artLayersRef.current?.find((layer) => layer.id === id);
+    if (!current || (current.nameRu ?? "Слой") === (nameRu || "Слой")) return;
+    updateArtLayer(id, (layer) => ({ ...layer, nameRu: nameRu || undefined }));
+  };
+
+  const toggleArtLayerLock = (id: string, kind: "pixels" | "alpha") => {
+    updateArtLayer(id, (layer) =>
+      kind === "pixels"
+        ? { ...layer, locked: layer.locked ? undefined : true }
+        : { ...layer, alphaLocked: layer.alphaLocked ? undefined : true },
+    );
+  };
+
+  const setArtLayerBlendMode = (
+    id: string,
+    blendMode: EmberSpriteArtLayerBlendMode,
+  ) => {
+    updateArtLayer(id, (layer) => ({
+      ...layer,
+      blendMode: blendMode === "normal" ? undefined : blendMode,
+    }));
+  };
+
+  const moveArtLayer = (id: string, direction: -1 | 1) => {
+    const layers = artLayersRef.current;
+    if (!layers?.length) return;
+    const index = layers.findIndex((layer) => layer.id === id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= layers.length) return;
+    pushHistory();
+    const next = [...layers];
+    [next[index], next[target]] = [next[target]!, next[index]!];
+    applyLayerStack(next, id);
+  };
+
+  const beginArtLayerOpacity = () => {
+    if (layerOpacityGestureRef.current) return;
+    layerOpacityGestureRef.current = {
+      snapshot: capturePaintSnapshot(),
+      changed: false,
+    };
+  };
+
+  const previewArtLayerOpacity = (id: string, percent: number) => {
+    beginArtLayerOpacity();
+    const opacity = Math.max(0, Math.min(100, percent)) / 100;
+    const current = artLayersRef.current?.find((layer) => layer.id === id);
+    if (!current || Math.abs((current.opacity ?? 1) - opacity) < 0.001) return;
+    layerOpacityGestureRef.current!.changed = true;
+    updateArtLayer(
+      id,
+      (layer) => ({ ...layer, opacity: opacity >= 0.999 ? undefined : opacity }),
+      false,
+      false,
+    );
+  };
+
+  const finishArtLayerOpacity = () => {
+    const gesture = layerOpacityGestureRef.current;
+    layerOpacityGestureRef.current = null;
+    if (!gesture?.changed) return;
+    pushPaintSnapshot(gesture.snapshot);
+    commitToPack(pixelsRef.current);
   };
 
   const createBlankSprite = (w: number, h: number, nameRu: string) => {
@@ -1920,28 +3099,85 @@ export function SpriteEditorPanel({
     );
   };
 
-  const addFavorite = (hex: string) => {
-    const n = hex.toLowerCase();
-    if (!n.startsWith("#") || (n.length !== 7 && n !== "#00000000")) return;
-    if (BASE_PALETTE.includes(n)) return;
-    const next = prunePaletteFavorites([...favorites, n]);
-    if (
-      next.length === favorites.length &&
-      next.every((c, i) => c === favorites[i])
-    ) {
-      return;
-    }
-    onChangePack({
-      ...pack,
-      paletteFavorites: next,
-    });
+  const replacePaletteColor = (tolerance: number) => {
+    if (activeColorLayerLocked()) return;
+    const g = geomRef.current;
+    const replaced = replacePixelPaletteColor(
+      colorTargetPixels(),
+      g.width,
+      g.height,
+      backgroundColorRef.current,
+      colorRef.current,
+      tolerance,
+      selectionRef.current
+        ? {
+            rect: selectionRef.current,
+            mask: selectionMaskRef.current ?? undefined,
+          }
+        : undefined,
+    );
+    if (!replaced.changed) return;
+    pushHistory();
+    writeColorPixels(replaced.pixels);
   };
 
-  const removeFavorite = (hex: string) => {
-    onChangePack({
-      ...pack,
-      paletteFavorites: favorites.filter((c) => c !== hex),
-    });
+  const currentColorSelection = () => selectionRef.current
+    ? {
+        rect: selectionRef.current,
+        mask: selectionMaskRef.current ?? undefined,
+      }
+    : undefined;
+
+  const commitColorOperation = (result: PixelColorOperationResult) => {
+    if (!result.changed || activeColorLayerLocked()) return;
+    const active = activeArtLayer();
+    if (active && constrainArtLayerPixels(active, result.pixels) === active.pixels) return;
+    pushHistory();
+    writeColorPixels(result.pixels);
+  };
+
+  const adjustActiveColors = (adjustments: PixelColorAdjustments) => {
+    if (activeColorLayerLocked()) return;
+    const g = geomRef.current;
+    commitColorOperation(adjustPixelColors(
+      colorTargetPixels(),
+      g.width,
+      g.height,
+      adjustments,
+      currentColorSelection(),
+    ));
+  };
+
+  const quantizeActiveColors = (
+    colors: number,
+    dither: PixelColorDitherMode,
+    strength: number,
+  ) => {
+    if (activeColorLayerLocked()) return;
+    const g = geomRef.current;
+    commitColorOperation(quantizePixelColors(
+      colorTargetPixels(),
+      g.width,
+      g.height,
+      colors,
+      dither,
+      strength,
+      currentColorSelection(),
+    ));
+  };
+
+  const outlineActiveColors = (thickness: number, diagonal: boolean) => {
+    if (activeColorLayerLocked()) return;
+    const g = geomRef.current;
+    commitColorOperation(outlinePixelColors(
+      colorTargetPixels(),
+      g.width,
+      g.height,
+      colorRef.current,
+      thickness,
+      diagonal,
+      currentColorSelection(),
+    ));
   };
 
   const bindEnemy = () => {
@@ -2077,7 +3313,14 @@ export function SpriteEditorPanel({
 
   const spritePickerItems = useMemo(
     () =>
-      spriteList.map((s) => {
+      spriteList
+        .filter((s) =>
+          libraryAssetMatchesQuery(
+            { id: s.id, nameRu: s.nameRu, tags: s.tags },
+            pickerQuery,
+          ),
+        )
+        .map((s) => {
         const badges: string[] = [
           `${s.width}×${spriteTotalHeight(s)}`,
         ];
@@ -2091,7 +3334,7 @@ export function SpriteEditorPanel({
           thumb: <EmberSpriteThumb sprite={s} size={44} />,
         };
       }),
-    [spriteList],
+    [spriteList, pickerQuery],
   );
 
   const openPickerItems = useMemo(
@@ -2197,7 +3440,7 @@ export function SpriteEditorPanel({
       <div className="ember-sprite-workspace">
         <aside className="ember-sprite-list">
           <div className="ember-sprite-list__head">
-            <h3 className="ember-sprite-list__title">Ассеты</h3>
+            <h3 className="ember-sprite-list__title">Навигатор ассетов</h3>
             <div className="ember-sprite-list__create">
               <button
                 type="button"
@@ -2225,6 +3468,16 @@ export function SpriteEditorPanel({
               </button>
             </div>
           </div>
+          <label className="ember-studio-search ember-studio-search--dock">
+            <span aria-hidden>⌕</span>
+            <input
+              type="search"
+              value={pickerQuery}
+              onChange={(e) => setPickerQuery(e.target.value)}
+              placeholder="Имя, ID или тег…"
+              aria-label="Фильтр спрайтов"
+            />
+          </label>
           <EmberThumbGrid
             size="sm"
             selectedId={spriteId}
@@ -2294,6 +3547,62 @@ export function SpriteEditorPanel({
                 <div className="ember-chip-row ember-sprite-toolstrip__group">
                   <button
                     type="button"
+                    className={`ember-chip ember-chip--sm ${tool === "select" ? "is-active" : ""}`}
+                    onClick={() => setTool("select")}
+                    title="Прямоугольное выделение и перемещение · M"
+                  >
+                    <PixelToolIcon name="marquee" /> Рамка
+                  </button>
+                  <button
+                    type="button"
+                    className={`ember-chip ember-chip--sm ${tool === "lasso" ? "is-active" : ""}`}
+                    onClick={() => setTool("lasso")}
+                    title="Свободное выделение лассо · L"
+                  >
+                    <PixelToolIcon name="lasso" /> Лассо
+                  </button>
+                  <button
+                    type="button"
+                    className={`ember-chip ember-chip--sm ${tool === "wand" ? "is-active" : ""}`}
+                    onClick={() => setTool("wand")}
+                    title="Выделение похожих цветов · W"
+                  >
+                    <PixelToolIcon name="wand" /> Палочка
+                  </button>
+                  <button
+                    type="button"
+                    className={`ember-chip ember-chip--sm ${tool === "line" ? "is-active" : ""}`}
+                    onClick={() => setTool("line")}
+                    title="Линия · U · Shift фиксирует 45°"
+                  >
+                    <PixelToolIcon name="line" /> Линия
+                  </button>
+                  <button
+                    type="button"
+                    className={`ember-chip ember-chip--sm ${tool === "rect" ? "is-active" : ""}`}
+                    onClick={() => setTool("rect")}
+                    title="Прямоугольник · U · Shift рисует квадрат"
+                  >
+                    <PixelToolIcon name="rect" /> Прямоуг.
+                  </button>
+                  <button
+                    type="button"
+                    className={`ember-chip ember-chip--sm ${tool === "ellipse" ? "is-active" : ""}`}
+                    onClick={() => setTool("ellipse")}
+                    title="Эллипс · U · Shift рисует круг"
+                  >
+                    <PixelToolIcon name="ellipse" /> Эллипс
+                  </button>
+                  <button
+                    type="button"
+                    className={`ember-chip ember-chip--sm ${tool === "fill" ? "is-active" : ""}`}
+                    onClick={() => setTool("fill")}
+                    title="Локальная заливка · F"
+                  >
+                    <PixelToolIcon name="fill" /> Заливка
+                  </button>
+                  <button
+                    type="button"
                     className={`ember-chip ember-chip--sm ${tool === "paint" ? "is-active" : ""}`}
                     onClick={() => {
                       setTool("paint");
@@ -2301,7 +3610,7 @@ export function SpriteEditorPanel({
                     }}
                     title="Кисть · ЛКМ"
                   >
-                    B
+                    <PixelToolIcon name="brush" /> Кисть
                   </button>
                   <button
                     type="button"
@@ -2312,7 +3621,7 @@ export function SpriteEditorPanel({
                     }}
                     title="Светящиеся пиксели · bloom"
                   >
-                    ✦
+                    <PixelToolIcon name="glow" /> Свет
                   </button>
                   <button
                     type="button"
@@ -2323,7 +3632,7 @@ export function SpriteEditorPanel({
                     }}
                     title="Блеск · wet / metal · на полу в 3D даёт зеркало сцены"
                   >
-                    ✧
+                    <PixelToolIcon name="shine" /> Блеск
                   </button>
                   <button
                     type="button"
@@ -2331,7 +3640,7 @@ export function SpriteEditorPanel({
                     onClick={() => setTool("eyedrop")}
                     title="Пипетка · ПКМ"
                   >
-                    I
+                    <PixelToolIcon name="eyedropper" /> Пипетка
                   </button>
                   {ART_BRUSH_TOOLS.map((brush) => (
                     <button
@@ -2364,6 +3673,26 @@ export function SpriteEditorPanel({
                     </button>
                   ))}
                 </div>
+                <div className="ember-chip-row ember-sprite-toolstrip__group ember-pixel-symmetry" role="group" aria-label="Симметрия рисования">
+                  <button
+                    type="button"
+                    className={`ghost ember-chip--sm ${symmetryHorizontal ? "is-active" : ""}`}
+                    aria-pressed={symmetryHorizontal}
+                    onClick={() => setSymmetryHorizontal((value) => !value)}
+                    title="Зеркально рисовать слева и справа"
+                  >
+                    X↔
+                  </button>
+                  <button
+                    type="button"
+                    className={`ghost ember-chip--sm ${symmetryVertical ? "is-active" : ""}`}
+                    aria-pressed={symmetryVertical}
+                    onClick={() => setSymmetryVertical((value) => !value)}
+                    title="Зеркально рисовать сверху и снизу"
+                  >
+                    Y↕
+                  </button>
+                </div>
                 <div className="ember-chip-row ember-sprite-toolstrip__group">
                   <button
                     type="button"
@@ -2372,7 +3701,7 @@ export function SpriteEditorPanel({
                     onClick={undo}
                     title="Undo"
                   >
-                    ↶
+                    <PixelToolIcon name="undo" /> Отмена
                   </button>
                   <button
                     type="button"
@@ -2381,7 +3710,7 @@ export function SpriteEditorPanel({
                     onClick={redo}
                     title="Redo"
                   >
-                    ↷
+                    <PixelToolIcon name="redo" /> Повтор
                   </button>
                   <button
                     type="button"
@@ -2389,37 +3718,45 @@ export function SpriteEditorPanel({
                     title="Копировать холст (цвет + свет + блеск)"
                     onClick={copyCanvas}
                   >
-                    Copy
+                    <PixelToolIcon name="copy" /> Копия
                   </button>
                   <button
                     type="button"
                     className="ghost ember-chip--sm"
-                    disabled={!clipReady}
+                    disabled={!clipReady || activeColorLayerLocked()}
                     title="Вставить"
                     onClick={pasteCanvas}
                   >
-                    Paste
+                    <PixelToolIcon name="paste" /> Вставить
                   </button>
                   <button
                     type="button"
                     className="ghost ember-chip--sm"
-                    title="Залить активный слой"
+                    title="Залить весь активный слой"
                     onClick={fillCanvas}
                   >
-                    Fill
+                    <PixelToolIcon name="fill" /> Залить всё
                   </button>
                   <button
                     type="button"
                     className="ghost ember-danger ember-chip--sm"
+                    disabled={activeColorLayerLocked()}
                     title="Очистить"
-                    onClick={() => {
-                      pushHistory();
-                      const blank = emptySpritePixels(width, canvasH);
-                      applyLive(blank, blank, blank);
-                    }}
+                    onClick={clearCanvas}
                   >
-                    Clear
+                    <PixelToolIcon name="clear" /> Очистить
                   </button>
+                </div>
+                <div className="ember-chip-row ember-sprite-toolstrip__group ember-pixel-selection-actions" aria-label="Трансформация выделения">
+                  <button type="button" className="ghost ember-chip--sm" disabled={!selection || activeColorLayerLocked()} onClick={() => transformSelection("flip_x")} title="Отразить выделение по горизонтали"><PixelToolIcon name="flipX" /> По X</button>
+                  <button type="button" className="ghost ember-chip--sm" disabled={!selection || activeColorLayerLocked()} onClick={() => transformSelection("flip_y")} title="Отразить выделение по вертикали"><PixelToolIcon name="flipY" /> По Y</button>
+                  <button type="button" className="ghost ember-chip--sm" disabled={!selection || activeColorLayerLocked()} onClick={() => transformSelection("rotate_cw")} title="Повернуть выделение на 90°"><PixelToolIcon name="rotate" /> 90°</button>
+                  <button type="button" className="ghost ember-chip--sm ember-danger" disabled={!selection || activeColorLayerLocked()} onClick={deleteSelection} title="Очистить выделенную область · Delete"><PixelToolIcon name="clear" /> Удалить</button>
+                  <button type="button" className="ghost ember-chip--sm" disabled={!selection || activeColorLayerLocked()} onClick={cutSelection} title="Вырезать выделение · Ctrl+X"><PixelToolIcon name="cut" /> Вырезать</button>
+                  <button type="button" className="ghost ember-chip--sm" disabled={!selection || activeColorLayerLocked()} onClick={duplicateSelection} title="Дублировать со сдвигом 1 px · Ctrl+J"><PixelToolIcon name="duplicate" /> Дубль</button>
+                  <button type="button" className="ghost ember-chip--sm" onClick={selectAllPixels} title="Выделить всё · Ctrl+A"><PixelToolIcon name="selectAll" /> Всё</button>
+                  <button type="button" className="ghost ember-chip--sm" onClick={invertSelection} title="Инвертировать выделение · Ctrl+Shift+I"><PixelToolIcon name="invert" /> Инверт.</button>
+                  <button type="button" className="ghost ember-chip--sm" disabled={!selection} onClick={() => { setSelection(null); setSelectionMask(null); }} title="Снять выделение · Esc">×</button>
                 </div>
                 <div
                   className="ember-chip-row ember-sprite-toolstrip__group"
@@ -2457,12 +3794,21 @@ export function SpriteEditorPanel({
                 <div
                   className="ember-sprite-zoom ember-sprite-toolstrip__group"
                   role="group"
-                  aria-label="Масштаб"
+                  aria-label="Навигация холста"
                 >
                   <button
                     type="button"
+                    className={`ghost ember-chip--sm ${canvasNavigation.handMode ? "is-active" : ""}`}
+                    aria-pressed={canvasNavigation.handMode}
+                    onClick={() => canvasNavigation.setHandMode((value) => !value)}
+                    title="Рука · удерживать Space или среднюю кнопку мыши"
+                  >
+                    <PixelToolIcon name="hand" /> Рука
+                  </button>
+                  <button
+                    type="button"
                     className="ghost ember-chip--sm"
-                    onClick={() => stepZoom(-1)}
+                    onClick={canvasNavigation.zoomOut}
                     title="Отдалить"
                   >
                     −
@@ -2470,23 +3816,200 @@ export function SpriteEditorPanel({
                   <button
                     type="button"
                     className="ghost ember-chip--sm"
-                    onClick={fitStage}
-                    title="Вписать в окно"
+                    onClick={canvasNavigation.fit}
+                    title="Вписать в окно · Ctrl+0"
                   >
-                    Fit
+                    <PixelToolIcon name="fit" /> Вписать
                   </button>
                   <button
                     type="button"
                     className="ghost ember-chip--sm"
-                    onClick={() => stepZoom(1)}
+                    onClick={canvasNavigation.zoom100}
+                    title="Масштаб 100% · Ctrl+1"
+                  >
+                    100%
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost ember-chip--sm"
+                    onClick={canvasNavigation.zoomIn}
                     title="Приблизить"
                   >
                     +
                   </button>
+                  <button
+                    type="button"
+                    className={`ghost ember-chip--sm ${canvasNavigation.navigatorVisible ? "is-active" : ""}`}
+                    aria-pressed={canvasNavigation.navigatorVisible}
+                    onClick={() => canvasNavigation.setNavigatorVisible((value) => !value)}
+                    title="Показать или скрыть навигатор"
+                  >
+                    <PixelToolIcon name="navigator" /> Навигатор
+                  </button>
                   <span className="muted ember-sprite-zoom__label">
-                    {cellScale}px
+                    {canvasNavigation.zoomPercent}%
                   </span>
                 </div>
+                {tool === "wand" ? (
+                  <div className="ember-wand-options ember-sprite-toolstrip__group" role="group" aria-label="Параметры волшебной палочки">
+                    <div className="ember-wand-options__modes" role="group" aria-label="Режим объединения выделения">
+                      {([
+                        ["replace", "Новое", "Заменить текущее выделение"],
+                        ["add", "+", "Добавить к выделению"],
+                        ["subtract", "−", "Вычесть из выделения"],
+                        ["intersect", "∩", "Пересечь с выделением"],
+                      ] as const).map(([mode, label, title]) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          className={`ghost ember-chip--sm ${wandCombineMode === mode ? "is-active" : ""}`}
+                          aria-pressed={wandCombineMode === mode}
+                          title={title}
+                          onClick={() => setWandCombineMode(mode)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <label className="ember-wand-options__tolerance">
+                      <span>Допуск</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={255}
+                        step={1}
+                        value={wandTolerance}
+                        onChange={(event) => setWandTolerance(Number(event.target.value))}
+                      />
+                      <output>{wandTolerance}</output>
+                    </label>
+                    <label className="ember-wand-options__check" title="Выбирать только связанную область">
+                      <input
+                        type="checkbox"
+                        checked={wandContiguous}
+                        onChange={(event) => setWandContiguous(event.target.checked)}
+                      />
+                      Смежные
+                    </label>
+                    <span className="muted">Shift добавить · Alt вычесть · Shift+Alt пересечь</span>
+                  </div>
+                ) : null}
+                {pixelShapeKind(tool) ? (
+                  <div className="ember-shape-options ember-sprite-toolstrip__group" role="group" aria-label="Параметры геометрической фигуры">
+                    <div className="ember-shape-options__channels" role="group" aria-label="Канал рисования">
+                      {([[
+                        "color",
+                        "Цвет",
+                      ], [
+                        "glow",
+                        "Свечение",
+                      ], [
+                        "shine",
+                        "Блеск",
+                      ]] as const).map(([channel, label]) => (
+                        <button
+                          key={channel}
+                          type="button"
+                          className={`ghost ember-chip--sm ${shapeChannel === channel ? "is-active" : ""}`}
+                          aria-pressed={shapeChannel === channel}
+                          onClick={() => setShapeChannel(channel)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <label className="ember-shape-options__check" title="Заполнить фигуру текущим цветом">
+                      <input
+                        type="checkbox"
+                        checked={shapeFilled}
+                        disabled={tool === "line"}
+                        onChange={(event) => setShapeFilled(event.target.checked)}
+                      />
+                      Заливка
+                    </label>
+                    <span className="muted">Толщина: {brushSize}px · Shift: 45° / квадрат / круг</span>
+                  </div>
+                ) : null}
+                {tool === "fill" ? (
+                  <div className="ember-fill-options ember-sprite-toolstrip__group" role="group" aria-label="Параметры заливки">
+                    <div className="ember-shape-options__channels" role="group" aria-label="Канал заливки">
+                      {([[
+                        "color",
+                        "Цвет",
+                      ], [
+                        "glow",
+                        "Свечение",
+                      ], [
+                        "shine",
+                        "Блеск",
+                      ]] as const).map(([channel, label]) => (
+                        <button
+                          key={channel}
+                          type="button"
+                          className={`ghost ember-chip--sm ${shapeChannel === channel ? "is-active" : ""}`}
+                          aria-pressed={shapeChannel === channel}
+                          onClick={() => setShapeChannel(channel)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <label className="ember-wand-options__tolerance">
+                      <span>Допуск</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={255}
+                        step={1}
+                        value={fillTolerance}
+                        onChange={(event) => setFillTolerance(Number(event.target.value))}
+                      />
+                      <output>{fillTolerance}</output>
+                    </label>
+                    <label className="ember-wand-options__check" title="Заливать только связанную область">
+                      <input
+                        type="checkbox"
+                        checked={fillContiguous}
+                        onChange={(event) => setFillContiguous(event.target.checked)}
+                      />
+                      Смежные
+                    </label>
+                    <span className="muted">X↔ / Y↕ отражают точку заливки</span>
+                  </div>
+                ) : null}
+                {tool === "paint" || tool === "glow" || tool === "shine" ? (
+                  <div className="ember-brush-options ember-sprite-toolstrip__group" role="group" aria-label="Параметры кисти">
+                    <div className="ember-brush-options__presets" role="group" aria-label="Пресеты кисти">
+                      <button type="button" className="ghost ember-chip--sm" onClick={() => { setBrushSize(1); setBrushOpacity(100); setBrushDither(100); setBrushSpacing(1); setBrushPixelPerfect(true); }}>Пиксель</button>
+                      <button type="button" className="ghost ember-chip--sm" onClick={() => { setBrushSize(2); setBrushOpacity(35); setBrushDither(100); setBrushSpacing(1); setBrushPixelPerfect(false); }}>Мягкая</button>
+                      <button type="button" className="ghost ember-chip--sm" onClick={() => { setBrushSize(1); setBrushOpacity(100); setBrushDither(50); setBrushSpacing(1); setBrushPixelPerfect(true); }}>Дизер</button>
+                      <button type="button" className="ghost ember-chip--sm" onClick={() => { setBrushSize(2); setBrushOpacity(100); setBrushDither(100); setBrushSpacing(4); setBrushPixelPerfect(false); }}>Штамп</button>
+                    </div>
+                    <label className="ember-brush-options__range">
+                      <span>Непрозр.</span>
+                      <input type="range" min={10} max={100} step={5} value={brushOpacity} onChange={(event) => setBrushOpacity(Number(event.target.value))} />
+                      <output>{brushOpacity}%</output>
+                    </label>
+                    <label className="ember-brush-options__select">
+                      <span>Дизер</span>
+                      <select value={brushDither} onChange={(event) => setBrushDither(Number(event.target.value) as PixelDitherCoverage)}>
+                        <option value={100}>off</option>
+                        <option value={75}>75%</option>
+                        <option value={50}>50%</option>
+                        <option value={25}>25%</option>
+                      </select>
+                    </label>
+                    <label className="ember-brush-options__range">
+                      <span>Интервал</span>
+                      <input type="range" min={1} max={8} step={1} value={brushSpacing} onChange={(event) => setBrushSpacing(Number(event.target.value))} />
+                      <output>{brushSpacing}px</output>
+                    </label>
+                    <label className="ember-brush-options__check" title="Убирать лишний угловой пиксель у кисти 1 px">
+                      <input type="checkbox" checked={brushPixelPerfect} onChange={(event) => setBrushPixelPerfect(event.target.checked)} />
+                      Чистый пиксель
+                    </label>
+                  </div>
+                ) : null}
               </div>
 
               <div className="ember-sprite-body">
@@ -2536,6 +4059,41 @@ export function SpriteEditorPanel({
                   </label>
                   <span className="muted">{width}×{canvasH}</span>
                 </div>
+                <p className="muted ember-sprite-inspector__label">
+                  Позиция в мире · воксели
+                </p>
+                <div
+                  className="ember-sprite-inspector__row ember-sprite-inspector__world-offset"
+                  title="Визуальный сдвиг относительно клетки. X/Y — плоскость карты, Z — вверх; коллизия остаётся на клетке."
+                >
+                  {(["x", "y", "z"] as const).map((axis) => (
+                    <label key={axis} className="ember-sprite-inspector__num">
+                      <span className="muted">{axis.toUpperCase()}</span>
+                      <input
+                        type="number"
+                        min={-128}
+                        max={128}
+                        step={0.25}
+                        value={worldOffsetVoxels[axis]}
+                        onChange={(event) => {
+                          const value = Number(event.target.value);
+                          setWorldOffsetVoxels((current) => ({
+                            ...current,
+                            [axis]: Number.isFinite(value) ? value : 0,
+                          }));
+                        }}
+                        onBlur={() => commitToPack(pixelsRef.current)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") event.currentTarget.blur();
+                        }}
+                        aria-label={`Сдвиг ${axis.toUpperCase()} в мире`}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <p className="muted ember-sprite-inspector__hint">
+                  X/Y — по карте · Z — вверх · 16 вокселей = 1 клетка
+                </p>
                 <label className="ember-sprite-inspector__field">
                   <span className="muted">Теги</span>
                   <input
@@ -2585,6 +4143,100 @@ export function SpriteEditorPanel({
                 </div>
                 <p className="muted ember-sprite-inspector__label">Слои</p>
                 <div className="ember-sprite-layers">
+                  <div className="ember-sprite-layers__toolbar" role="toolbar" aria-label="Операции со слоями">
+                    <button
+                      type="button"
+                      className="ghost ember-chip--sm"
+                      disabled={(artLayers?.length ?? 1) >= MAX_SPRITE_ART_LAYERS}
+                      onClick={addArtLayer}
+                      title="Новый пустой слой"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost ember-chip--sm"
+                      disabled={(artLayers?.length ?? 1) >= MAX_SPRITE_ART_LAYERS}
+                      onClick={() => duplicateArtLayer()}
+                      title="Дублировать активный слой"
+                    >
+                      ⧉
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost ember-chip--sm"
+                      disabled={!selectedArtLayer || artLayers?.at(-1)?.id === selectedArtLayer.id}
+                      onClick={() => selectedArtLayer && moveArtLayer(selectedArtLayer.id, 1)}
+                      title="Поднять слой"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost ember-chip--sm"
+                      disabled={!selectedArtLayer || artLayers?.[0]?.id === selectedArtLayer.id}
+                      onClick={() => selectedArtLayer && moveArtLayer(selectedArtLayer.id, -1)}
+                      title="Опустить слой"
+                    >
+                      ↓
+                    </button>
+                    <span className="ember-sprite-layers__toolbar-spacer" />
+                    <button
+                      type="button"
+                      className="ghost ember-chip--sm ember-danger"
+                      disabled={!selectedArtLayer}
+                      onClick={() => selectedArtLayer && removeArtLayer(selectedArtLayer.id)}
+                      title="Удалить активный слой"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  {selectedArtLayer ? (
+                    <div className="ember-sprite-layers__controls">
+                      <label title="Режим наложения активного слоя">
+                        <span>Режим</span>
+                        <select
+                          value={selectedArtLayer.blendMode ?? "normal"}
+                          onChange={(event) =>
+                            setArtLayerBlendMode(
+                              selectedArtLayer.id,
+                              event.target.value as EmberSpriteArtLayerBlendMode,
+                            )
+                          }
+                        >
+                          {SPRITE_ART_LAYER_BLEND_MODES.map((mode) => (
+                            <option key={mode} value={mode}>
+                              {mode === "normal"
+                                ? "Обычный"
+                                : mode === "multiply"
+                                  ? "Умножение"
+                                  : mode === "screen"
+                                    ? "Экран"
+                                    : "Добавление"}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="ember-sprite-layers__opacity" title="Непрозрачность активного слоя">
+                        <span>Непр.</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={Math.round((selectedArtLayer.opacity ?? 1) * 100)}
+                          onFocus={beginArtLayerOpacity}
+                          onPointerDown={beginArtLayerOpacity}
+                          onChange={(event) =>
+                            previewArtLayerOpacity(selectedArtLayer.id, Number(event.target.value))
+                          }
+                          onPointerUp={finishArtLayerOpacity}
+                          onPointerCancel={finishArtLayerOpacity}
+                          onBlur={finishArtLayerOpacity}
+                        />
+                        <output>{Math.round((selectedArtLayer.opacity ?? 1) * 100)}%</output>
+                      </label>
+                    </div>
+                  ) : null}
                   {(artLayers?.length
                     ? [...artLayers].reverse()
                     : [
@@ -2592,6 +4244,10 @@ export function SpriteEditorPanel({
                           id: "flat",
                           nameRu: "Слой 1",
                           visible: true as boolean | undefined,
+                          opacity: undefined,
+                          blendMode: undefined,
+                          locked: undefined,
+                          alphaLocked: undefined,
                         },
                       ]
                   ).map((layer) => {
@@ -2612,43 +4268,225 @@ export function SpriteEditorPanel({
                         >
                           {hidden ? "○" : "●"}
                         </button>
-                        <button
-                          type="button"
+                        <input
+                          key={`${layer.id}:${layer.nameRu ?? "Слой"}`}
                           className={`ember-sprite-layers__name ${active ? "is-active" : ""}`}
-                          onClick={() => {
+                          defaultValue={layer.nameRu ?? "Слой"}
+                          readOnly={isFlat}
+                          aria-label="Название слоя"
+                          onFocus={() => {
                             if (isFlat) return;
                             setActiveLayerId(layer.id);
                             activeLayerIdRef.current = layer.id;
                           }}
+                          onBlur={(event) => {
+                            if (!isFlat) renameArtLayer(layer.id, event.target.value);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") event.currentTarget.blur();
+                            if (event.key === "Escape") {
+                              event.currentTarget.value = layer.nameRu ?? "Слой";
+                              event.currentTarget.blur();
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className={`ghost ember-chip--sm ${layer.alphaLocked ? "is-active" : ""}`}
+                          title={layer.alphaLocked ? "Разблокировать прозрачность" : "Зафиксировать прозрачность"}
+                          disabled={isFlat}
+                          onClick={() => toggleArtLayerLock(layer.id, "alpha")}
                         >
-                          {layer.nameRu ?? "Слой"}
+                          α
                         </button>
                         <button
                           type="button"
-                          className="ghost ember-chip--sm ember-danger"
-                          title="Удалить слой"
+                          className={`ghost ember-chip--sm ${layer.locked ? "is-active" : ""}`}
+                          title={layer.locked ? "Разблокировать пиксели" : "Заблокировать пиксели"}
                           disabled={isFlat}
-                          onClick={() => removeArtLayer(layer.id)}
+                          onClick={() => toggleArtLayerLock(layer.id, "pixels")}
                         >
-                          ×
+                          {layer.locked ? "▣" : "□"}
                         </button>
                       </div>
                     );
                   })}
-                  <button
-                    type="button"
-                    className="ember-chip ember-chip--sm"
-                    disabled={(artLayers?.length ?? 1) >= MAX_SPRITE_ART_LAYERS}
-                    onClick={addArtLayer}
-                    title="Добавить слой"
-                  >
-                    + слой
-                  </button>
                 </div>
                 <p className="muted ember-sprite-inspector__label">Кадры</p>
                 <div className="ember-sprite-frames">
+                  <div className="ember-sprite-frames__toolbar" role="toolbar" aria-label="Операции с кадрами">
+                    <button
+                      type="button"
+                      className="ghost ember-chip--sm"
+                      disabled={(frames?.length ?? 1) >= MAX_SPRITE_ANIM_FRAMES}
+                      onClick={addBlankFrame}
+                      title="Новый пустой кадр после активного"
+                      aria-label="Новый пустой кадр"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost ember-chip--sm"
+                      disabled={(frames?.length ?? 1) >= MAX_SPRITE_ANIM_FRAMES}
+                      onClick={addFrame}
+                      title="Дублировать активный кадр"
+                      aria-label="Дублировать кадр"
+                    >
+                      ⧉
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost ember-chip--sm"
+                      disabled={!selectedFrame || selectedFrameIndex <= 0}
+                      onClick={() => selectedFrame && moveFrame(selectedFrame.id, -1)}
+                      title="Сдвинуть кадр влево"
+                      aria-label="Сдвинуть кадр влево"
+                    >
+                      ←
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost ember-chip--sm"
+                      disabled={!selectedFrame || selectedFrameIndex >= (frames?.length ?? 0) - 1}
+                      onClick={() => selectedFrame && moveFrame(selectedFrame.id, 1)}
+                      title="Сдвинуть кадр вправо"
+                      aria-label="Сдвинуть кадр вправо"
+                    >
+                      →
+                    </button>
+                    <span className="ember-sprite-frames__toolbar-spacer" />
+                    <button
+                      type="button"
+                      className="ghost ember-chip--sm ember-danger"
+                      disabled={!selectedFrame}
+                      onClick={() => selectedFrame && removeFrame(selectedFrame.id)}
+                      title="Удалить активный кадр"
+                      aria-label="Удалить кадр"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="ember-sprite-frames__playback" role="toolbar" aria-label="Предпросмотр кадров">
+                    <button
+                      type="button"
+                      className="ghost ember-chip--sm"
+                      disabled={(frames?.length ?? 0) < 2 || selectedFrameIndex <= 0}
+                      onClick={() => stepFrame(-1)}
+                      title="Предыдущий кадр"
+                    >
+                      ◀
+                    </button>
+                    <button
+                      type="button"
+                      className={`ember-chip ember-chip--sm ${previewPlaying ? "is-active" : ""}`}
+                      disabled={(frames?.length ?? 0) < 2}
+                      onClick={toggleFramePreview}
+                      title="Проиграть выбранный диапазон"
+                    >
+                      {previewPlaying ? "■" : "▶"}
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost ember-chip--sm"
+                      disabled={(frames?.length ?? 0) < 2 || selectedFrameIndex >= (frames?.length ?? 0) - 1}
+                      onClick={() => stepFrame(1)}
+                      title="Следующий кадр"
+                    >
+                      ▶|
+                    </button>
+                    <button
+                      type="button"
+                      className={`ghost ember-chip--sm ${previewLoop ? "is-active" : ""}`}
+                      aria-pressed={previewLoop}
+                      onClick={() => setPreviewLoop((value) => !value)}
+                      title="Зациклить предпросмотр"
+                    >
+                      ↻
+                    </button>
+                    <button
+                      type="button"
+                      className={`ghost ember-chip--sm ${onionSkin ? "is-active" : ""}`}
+                      disabled={(frames?.length ?? 0) < 2}
+                      aria-pressed={onionSkin}
+                      onClick={() => setOnionSkin((value) => !value)}
+                      title="Onion skin: предыдущий кадр красным, следующий зелёным"
+                    >
+                      ◉
+                    </button>
+                  </div>
+                  {(frames?.length ?? 0) >= 2 ? (
+                    <div className="ember-sprite-frames__range">
+                      <label title="Первый кадр предпросмотра">
+                        <span>От</span>
+                        <select
+                          value={Math.min(previewRangeStart, frames!.length - 1)}
+                          disabled={previewPlaying}
+                          onChange={(event) => {
+                            const value = Number(event.target.value);
+                            setPreviewRangeStart(value);
+                            setPreviewRangeEnd((end) => Math.max(end, value));
+                          }}
+                        >
+                          {frames!.map((frame, index) => (
+                            <option key={frame.id} value={index}>{index + 1}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label title="Последний кадр предпросмотра">
+                        <span>До</span>
+                        <select
+                          value={Math.max(
+                            Math.min(previewRangeStart, frames!.length - 1),
+                            Math.min(previewRangeEnd, frames!.length - 1),
+                          )}
+                          disabled={previewPlaying}
+                          onChange={(event) => setPreviewRangeEnd(Number(event.target.value))}
+                        >
+                          {frames!.map((frame, index) => (
+                            <option
+                              key={frame.id}
+                              value={index}
+                              disabled={index < Math.min(previewRangeStart, frames!.length - 1)}
+                            >
+                              {index + 1}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <span className="muted">
+                        {(frames!.reduce((sum, frame, index) =>
+                          index >= Math.min(previewRangeStart, frames!.length - 1) &&
+                          index <= Math.min(previewRangeEnd, frames!.length - 1)
+                            ? sum + frame.durationMs
+                            : sum, 0) / 1000).toFixed(2)} с
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="muted ember-sprite-frames__empty">
+                      Статичный кадр · + создаёт пустой, ⧉ дублирует текущий
+                    </p>
+                  )}
+                  {onionSkin && (frames?.length ?? 0) >= 2 ? (
+                    <label className="ember-sprite-frames__onion-opacity" title="Прозрачность соседних кадров">
+                      <span>Onion</span>
+                      <input
+                        type="range"
+                        min={10}
+                        max={60}
+                        step={2}
+                        value={onionSkinOpacity}
+                        onChange={(event) => setOnionSkinOpacity(Number(event.target.value))}
+                      />
+                      <output>{onionSkinOpacity}%</output>
+                    </label>
+                  ) : null}
+                  <div className="ember-sprite-frames__list">
                   {(frames ?? []).map((frame, index) => {
                     const active = frame.id === activeFrameId;
+                    const framePixels = cardView === "front"
+                      ? frame.front.pixels
+                      : frame.extras[cardView]?.pixels;
                     return (
                       <div
                         key={frame.id}
@@ -2658,8 +4496,10 @@ export function SpriteEditorPanel({
                           type="button"
                           className={`ember-sprite-frames__name ${active ? "is-active" : ""}`}
                           onClick={() => selectFrame(frame.id)}
+                          title={`Кадр ${index + 1}`}
                         >
-                          {index + 1}
+                          <SpriteFrameThumb pixels={framePixels} width={width} height={canvasH} />
+                          <span>{index + 1}</span>
                         </button>
                         <input
                           className="ember-sprite-frames__ms"
@@ -2669,40 +4509,19 @@ export function SpriteEditorPanel({
                           step={10}
                           value={frame.durationMs}
                           title="Длительность кадра, мс"
+                          aria-label={`Длительность кадра ${index + 1}`}
+                          onFocus={beginFrameDuration}
                           onChange={(e) =>
-                            setFrameDurationMs(frame.id, Number(e.target.value))
+                            previewFrameDurationMs(frame.id, Number(e.target.value))
                           }
+                          onBlur={finishFrameDuration}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") event.currentTarget.blur();
+                          }}
                         />
-                        <button
-                          type="button"
-                          className="ghost ember-chip--sm ember-danger"
-                          title="Удалить кадр"
-                          onClick={() => removeFrame(frame.id)}
-                        >
-                          ×
-                        </button>
                       </div>
                     );
                   })}
-                  <div className="ember-sprite-frames__toolbar">
-                    <button
-                      type="button"
-                      className="ember-chip ember-chip--sm"
-                      disabled={(frames?.length ?? 1) >= MAX_SPRITE_ANIM_FRAMES}
-                      onClick={addFrame}
-                      title="Добавить кадр"
-                    >
-                      + кадр
-                    </button>
-                    <button
-                      type="button"
-                      className={`ember-chip ember-chip--sm ${previewPlaying ? "is-active" : ""}`}
-                      disabled={(frames?.length ?? 0) < 2}
-                      onClick={() => setPreviewPlaying((on) => !on)}
-                      title="Проиграть цикл кадров"
-                    >
-                      {previewPlaying ? "Стоп" : "▶"}
-                    </button>
                   </div>
                 </div>
                 <label
@@ -3120,19 +4939,49 @@ export function SpriteEditorPanel({
 
               <div className="ember-sprite-draw">
               <div className="ember-sprite-stage">
-                <div className="ember-sprite-stage__scroll" ref={stageRef}>
+                <div
+                  className={`ember-sprite-stage__scroll ${canvasNavigation.handMode || canvasNavigation.spaceHeld ? "is-hand" : ""} ${canvasNavigation.dragging ? "is-panning" : ""}`}
+                  ref={stageRef}
+                  onMouseDown={canvasNavigation.beginPan}
+                >
                   <div className="ember-sprite-stage__center">
                     <div className="ember-sprite-artboard">
+                      <div className={`ember-pixel-canvas-pair ${canvasView.reference?.mode === "side" ? "is-side" : ""}`}>
+                      <div
+                        className="ember-pixel-canvas-wrap"
+                        style={{ backgroundSize: `${cellScale * 2}px ${cellScale * 2}px` }}
+                      >
+                      <PixelCanvasReferenceLayer
+                        reference={canvasView.reference}
+                        layer="under"
+                        cellScale={cellScale}
+                        width={width}
+                        height={canvasH}
+                      />
                       <canvas
                         ref={canvasRef}
                         className="ember-sprite-paint__canvas"
                         style={{
                           width: width * cellScale,
                           height: canvasH * cellScale,
-                          cursor: tool === "eyedrop" ? "crosshair" : "cell",
+                          cursor: canvasNavigation.dragging ? "grabbing" : canvasNavigation.handMode || canvasNavigation.spaceHeld ? "grab" : tool === "eyedrop" || tool === "fill" || tool === "select" || tool === "lasso" || tool === "wand" || pixelShapeKind(tool) ? "crosshair" : "cell",
                         }}
                       onContextMenu={(e) => e.preventDefault()}
                       onMouseDown={(e) => {
+                        if (canvasNavigation.shouldPan(e.button)) {
+                          canvasNavigation.beginPan(e);
+                          return;
+                        }
+                        if (toolRef.current === "wand" && e.button === 0) {
+                          const pos = pixelFromEvent(e.clientX, e.clientY);
+                          if (pos) selectWithMagicWand(pos, e.shiftKey, e.altKey);
+                          return;
+                        }
+                        if ((toolRef.current === "select" || toolRef.current === "lasso") && e.button === 0) {
+                          const pos = pixelFromEvent(e.clientX, e.clientY);
+                          if (pos) beginSelection(pos);
+                          return;
+                        }
                         if (
                           e.button === 2 ||
                           toolRef.current === "eyedrop" ||
@@ -3143,14 +4992,58 @@ export function SpriteEditorPanel({
                           return;
                         }
                         if (e.button !== 0) return;
-                        painting.current = true;
-                        strokeSaved.current = false;
-                        paintAt(e.clientX, e.clientY);
+                        if (toolRef.current === "fill") {
+                          const pos = pixelFromEvent(e.clientX, e.clientY);
+                          if (pos) fillAt(pos);
+                          return;
+                        }
+                        const shapeKind = pixelShapeKind(toolRef.current);
+                        if (shapeKind) {
+                          const pos = pixelFromEvent(e.clientX, e.clientY);
+                          if (pos) beginShapeDrag(pos, e.shiftKey);
+                          return;
+                        }
+                        if (isArtBrushTool(toolRef.current)) {
+                          painting.current = true;
+                          strokeSaved.current = false;
+                          paintAt(e.clientX, e.clientY);
+                        } else {
+                          const pos = pixelFromEvent(e.clientX, e.clientY);
+                          if (pos) beginBrushStroke(pos);
+                        }
                       }}
                       onMouseMove={(e) => {
+                        updateCursorStatus(e.clientX, e.clientY);
+                        if (toolRef.current === "select" || toolRef.current === "lasso") {
+                          const pos = pixelFromEvent(e.clientX, e.clientY);
+                          if (pos) updateSelectionDrag(pos);
+                          return;
+                        }
+                        if (shapeDragRef.current) {
+                          const pos = pixelFromEvent(e.clientX, e.clientY);
+                          if (pos) updateShapeDrag(pos, e.shiftKey);
+                          return;
+                        }
+                        if (brushStrokeRef.current) {
+                          const pos = pixelFromEvent(e.clientX, e.clientY);
+                          if (pos) updateBrushStroke(pos);
+                          return;
+                        }
                         if (painting.current) paintAt(e.clientX, e.clientY);
                       }}
                       onMouseUp={() => {
+                        if (toolRef.current === "select" || toolRef.current === "lasso") {
+                          finishSelectionDrag();
+                          return;
+                        }
+                        if (shapeDragRef.current) {
+                          finishShapeDrag();
+                          return;
+                        }
+                        if (brushStrokeRef.current) {
+                          finishBrushStroke();
+                          return;
+                        }
                         if (!painting.current) return;
                         painting.current = false;
                         strokeSaved.current = false;
@@ -3158,6 +5051,19 @@ export function SpriteEditorPanel({
                         commitToPack(pixelsRef.current);
                       }}
                       onMouseLeave={() => {
+                        if (cursorStatusRef.current) cursorStatusRef.current.textContent = "X —  Y —";
+                        if (toolRef.current === "select" || toolRef.current === "lasso") {
+                          finishSelectionDrag();
+                          return;
+                        }
+                        if (shapeDragRef.current) {
+                          finishShapeDrag();
+                          return;
+                        }
+                        if (brushStrokeRef.current) {
+                          finishBrushStroke();
+                          return;
+                        }
                         if (painting.current) {
                           painting.current = false;
                           strokeSaved.current = false;
@@ -3166,10 +5072,89 @@ export function SpriteEditorPanel({
                         }
                       }}
                     />
+                    <PixelCanvasReferenceLayer
+                      reference={canvasView.reference}
+                      layer="over"
+                      cellScale={cellScale}
+                      width={width}
+                      height={canvasH}
+                    />
+                    <PixelCanvasOverlays
+                      width={width}
+                      height={canvasH}
+                      cellScale={cellScale}
+                      gridVisible={canvasView.gridVisible}
+                      gridStep={canvasView.gridStep}
+                      gridOpacity={canvasView.gridOpacity}
+                      guidesVisible={canvasView.guidesVisible}
+                      guides={canvasView.guides}
+                      onMoveGuide={canvasView.moveGuide}
+                      onRemoveGuide={canvasView.removeGuide}
+                    />
+                    {selection ? (
+                      <div
+                        ref={selectionOverlayRef}
+                        className={`ember-pixel-selection ${selectionPaths ? "is-masked" : ""}`}
+                        style={{
+                          left: selection.x * cellScale,
+                          top: selection.y * cellScale,
+                          width: selection.w * cellScale,
+                          height: selection.h * cellScale,
+                        }}
+                        role="group"
+                        aria-label={`Выделение ${selection.w} на ${selection.h} пикселей`}
+                      >
+                        {selectionPaths ? (
+                          <svg
+                            className="ember-pixel-selection__mask"
+                            viewBox={`0 0 ${selection.w} ${selection.h}`}
+                            preserveAspectRatio="none"
+                            aria-hidden
+                          >
+                            <path className="ember-pixel-selection__mask-fill" d={selectionPaths.fill} />
+                            <path className="ember-pixel-selection__mask-outline" d={selectionPaths.outline} />
+                          </svg>
+                        ) : null}
+                        {(["nw", "ne", "se", "sw"] as const).map((handle) => (
+                          <button
+                            key={handle}
+                            type="button"
+                            className={`ember-pixel-selection__handle is-${handle}`}
+                            aria-label={`Масштабировать за угол ${handle.toUpperCase()}`}
+                            title="Тянуть для масштаба · Shift сохраняет пропорции"
+                            onPointerDown={(event) => beginSelectionScale(handle, event)}
+                            onPointerMove={updateSelectionScale}
+                            onPointerUp={finishSelectionScale}
+                            onPointerCancel={cancelSelectionScale}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                    </div>
+                    <PixelCanvasReferenceLayer
+                      reference={canvasView.reference}
+                      layer="side"
+                      cellScale={cellScale}
+                      width={width}
+                      height={canvasH}
+                    />
+                    </div>
                     </div>
                   </div>
                 </div>
 
+                <PixelCanvasNavigator
+                  stageRef={stageRef}
+                  sourceCanvasRef={canvasRef}
+                  width={width}
+                  height={canvasH}
+                  scale={cellScale}
+                  visible={canvasNavigation.navigatorVisible}
+                  onClose={() => canvasNavigation.setNavigatorVisible(false)}
+                  revisionA={pixels}
+                  revisionB={emissivePixels}
+                  revisionC={shinePixels}
+                />
                 <aside className="ember-sprite-hud" aria-label="Превью на тайле">
                   <div className="ember-sprite-hud__frame">
                     <canvas
@@ -3243,79 +5228,64 @@ export function SpriteEditorPanel({
                   Привязать
                 </button>
               </div>
+              <footer className="ember-studio-status" aria-label="Состояние холста">
+                <span className="ember-studio-status__primary">
+                  {tool === "select" ? "Выделение" : tool === "lasso" ? "Лассо" : tool === "wand" ? "Палочка" : tool === "fill" ? "Заливка" : tool === "line" ? "Линия" : tool === "rect" ? "Прямоугольник" : tool === "ellipse" ? "Эллипс" : tool === "paint" ? "Кисть" : tool === "eyedrop" ? "Пипетка" : tool === "glow" ? "Свечение" : tool === "shine" ? "Блеск" : ART_BRUSH_TOOLS.find((item) => item.id === tool)?.label ?? tool}
+                  <b>{selection && (tool === "select" || tool === "lasso" || tool === "wand") ? `${selection.w}×${selection.h}` : `${brushSize}px`}</b>
+                </span>
+                <span ref={cursorStatusRef}>X —  Y —</span>
+                <span>{width}×{canvasH} · {canvasNavigation.zoomPercent}%</span>
+                <span className="ember-studio-status__hint"><kbd>M</kbd> рамка <kbd>L</kbd> лассо <kbd>W</kbd> цвет <kbd>F</kbd> заливка <kbd>U</kbd> фигуры <kbd>B</kbd> кисть <kbd>I</kbd> пипетка</span>
+              </footer>
               </div>
               </div>
             </>
           )}
         </div>
 
-        <aside className="ember-sprite-palette">
-          <div className="ember-sprite-palette__head">
-            <h3 className="ember-sprite-palette__title">Цвет</h3>
-            <span
-              className="ember-sprite-palette__current"
-              style={{
-                background:
-                  color === "#00000000"
-                    ? "repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 50% / 8px 8px"
-                    : color,
-              }}
-              title={color}
+        <PixelPalettePanel
+          className="ember-sprite-palette"
+          foreground={color}
+          background={backgroundColor}
+          baseColors={BASE_PALETTE}
+          favorites={favorites}
+          recentColors={recentColors}
+          onForegroundChange={chooseForegroundColor}
+          onForegroundPreview={setColor}
+          onBackgroundChange={chooseBackgroundColor}
+          onFavoritesChange={setPaletteFavorites}
+          onSwap={swapPaletteColors}
+          onReset={resetPaletteColors}
+          onReplace={replacePaletteColor}
+          replaceDisabled={activeColorLayerLocked()}
+          onAdjust={adjustActiveColors}
+          onQuantize={quantizeActiveColors}
+          onOutline={outlineActiveColors}
+          outlineDisabled={activeArtLayer()?.alphaLocked === true}
+          canvasView={(
+            <PixelCanvasViewPanel
+              width={width}
+              height={canvasH}
+              gridVisible={canvasView.gridVisible}
+              gridStep={canvasView.gridStep}
+              gridOpacity={canvasView.gridOpacity}
+              guidesVisible={canvasView.guidesVisible}
+              guides={canvasView.guides}
+              reference={canvasView.reference}
+              onGridVisibleChange={canvasView.setGridVisible}
+              onGridStepChange={canvasView.setGridStep}
+              onGridOpacityChange={canvasView.setGridOpacity}
+              onGuidesVisibleChange={canvasView.setGuidesVisible}
+              onAddGuide={canvasView.addGuide}
+              onRemoveGuide={canvasView.removeGuide}
+              onClearGuides={() => canvasView.setGuides([])}
+              onReferenceFile={canvasView.setReferenceFile}
+              onRemoveReference={canvasView.removeReference}
+              onReferenceChange={canvasView.updateReference}
+              onReferenceModeChange={canvasView.setReferenceMode}
             />
-          </div>
-          <div className="ember-tile-palette-grid">
-            {palette.map((c) => (
-              <button
-                key={c}
-                type="button"
-                className={`ember-palette-swatch ${color === c ? "is-active" : ""}`}
-                style={{
-                  background:
-                    c === "#00000000"
-                      ? "repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 50% / 10px 10px"
-                      : c,
-                }}
-                title={
-                  c === "#00000000"
-                    ? "Прозрачный"
-                    : BASE_PALETTE.includes(c)
-                      ? c
-                      : `${c} · ПКМ убрать`
-                }
-                onClick={() => setColor(c)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  if (!BASE_PALETTE.includes(c)) removeFavorite(c);
-                }}
-              />
-            ))}
-            <label
-              className="ember-palette-swatch ember-palette-swatch--add"
-              title="Добавить цвет"
-            >
-              <span aria-hidden>+</span>
-              <input
-                type="color"
-                aria-label="Добавить цвет в палитру"
-                value={
-                  color.startsWith("#") && color.length === 7
-                    ? color
-                    : "#c45c26"
-                }
-                ref={(node) => {
-                  if (!node) return;
-                  // Native `change` fires when the picker closes.
-                  // React onChange is the `input` event and would save every drag step.
-                  node.onchange = () => {
-                    setColor(node.value);
-                    addFavorite(node.value);
-                  };
-                }}
-                onInput={(e) => setColor(e.currentTarget.value)}
-              />
-            </label>
-          </div>
-        </aside>
+          )}
+        />
       </div>
     </div>
   );

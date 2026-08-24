@@ -45,6 +45,7 @@ import {
   projectWorldPoint,
   randomWalkablePointInRegion,
   regionCenter,
+  regionVolumeElev,
   resolveMapLight,
   stepTeleport,
   tileSurfaceElev,
@@ -384,8 +385,7 @@ export class ArenaScene extends Phaser.Scene {
         h: 1,
       });
     const pos = regionCenter(this.map, start);
-    const startTile = worldToTile(this.map, pos.x, pos.y);
-    this.playerElev = tileSurfaceElev(this.map, startTile.tx, startTile.ty);
+    this.playerElev = regionVolumeElev(this.map, start);
     this.teleportOccupyId = findRegions(this.map, "teleport").find((r) =>
       pointInRegion(this.map, r, pos.x, pos.y, this.playerElev),
     )?.id ?? null;
@@ -926,6 +926,9 @@ export class ArenaScene extends Phaser.Scene {
       }
       const p = regionCenter(this.map, r);
       if (Phaser.Math.Distance.Between(pl.x, pl.y, p.x, p.y) > 14) continue;
+      if (!elevNearlyEqual(regionVolumeElev(this.map, r), this.playerElev)) {
+        continue;
+      }
       this.chestTaken.add(r.id);
       for (const child of this.children.list) {
         if (
@@ -1629,8 +1632,7 @@ export class ArenaScene extends Phaser.Scene {
       const hh = Math.max(1, spriteTotalHeight(n)) * 0.5;
       spr.setCircle(radius, hw - radius, hh - radius);
     }
-    const { tx, ty } = worldToTile(this.map, p.x, p.y);
-    spr.elev = tileSurfaceElev(this.map, tx, ty);
+    spr.elev = p.elev;
     this.place(spr, p.x, p.y, 14, spr.elev);
   }
 

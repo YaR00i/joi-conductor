@@ -3,6 +3,9 @@ import type { EmberMap, EmberMapRegion } from "../content/types";
 import {
   createEmptyMap,
   ensureMapLayers,
+  findRegions,
+  layerData,
+  pointInRegion,
   regionCenter,
   resolveTeleportTarget,
   stepTeleport,
@@ -123,5 +126,58 @@ describe("stepTeleport", () => {
     expect(stepTeleport(map, pos.x, pos.y, null, true, 2).warp?.fromId).toBe(
       "pad-loft",
     );
+  });
+
+  it("treats an unauthored zone elevation as its visible column surface", () => {
+    const raised = { ...padA };
+    const map = tpMap([raised, { ...padB, elev: 0 }]);
+    const height = layerData(map, "height")!;
+    height[raised.y * map.width + raised.x] = map.tileSize * 3;
+    const pos = regionCenter(map, raised);
+
+    expect(pointInRegion(map, raised, pos.x, pos.y, 0)).toBe(false);
+    expect(pointInRegion(map, raised, pos.x, pos.y, 3)).toBe(true);
+    expect(stepTeleport(map, pos.x, pos.y, null, true, 0).warp).toBeNull();
+    expect(stepTeleport(map, pos.x, pos.y, null, true, 3).warp?.fromId).toBe(
+      "pad-a",
+    );
+  });
+
+  it("allows a vertical teleport to the same XY on another floor", () => {
+    const vertical: EmberMapRegion = {
+      id: "vertical",
+      kind: "teleport",
+      x: 3,
+      y: 3,
+      w: 1,
+      h: 1,
+      elev: 3,
+      targetX: 3,
+      targetY: 3,
+      targetElevation: 0,
+    };
+    const map = tpMap([vertical]);
+    const pos = regionCenter(map, vertical);
+    expect(stepTeleport(map, pos.x, pos.y, null, true, 0).warp).toBeNull();
+    expect(stepTeleport(map, pos.x, pos.y, null, true, 3).warp).toMatchObject({
+      x: pos.x,
+      y: pos.y,
+      elev: 0,
+      fromId: "vertical",
+    });
+  });
+});
+
+describe("region groups", () => {
+  it("does not leak ungrouped spawns into a requested group", () => {
+    const map = tpMap([
+      { ...padA, kind: "spawn", id: "north", group: "north" },
+      { ...padB, kind: "spawn", id: "south", group: "south" },
+      { ...padA, kind: "spawn", id: "ungrouped" },
+    ]);
+    expect(findRegions(map, "spawn", "north").map((region) => region.id)).toEqual([
+      "north",
+    ]);
+    expect(findRegions(map, "spawn", "any")).toHaveLength(3);
   });
 });

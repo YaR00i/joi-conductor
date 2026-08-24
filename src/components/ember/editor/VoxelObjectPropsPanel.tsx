@@ -296,11 +296,16 @@ function PaletteGroupCard({
 }
 
 type Props = {
+  mode?: "sculpt" | "material" | "scene" | "animate";
+  selectionCount?: number;
   object: EmberVoxelSceneObject | null;
   model: EmberVoxelModel | null;
   canRemove: boolean;
   onRename: (nameRu: string) => void;
   onSetOffset: (offset: { x: number; y: number; z: number }) => void;
+  rotationQuarterTurns?: number;
+  canRotateSelection?: boolean;
+  onRotateSelection?: (quarterTurns: number) => void;
   onResizeBlocks: (axis: "x" | "z", blocks: number) => void;
   onResizeHeight: (voxels: number) => void;
   onSetMaterial: (material: EmberMaterialKind | undefined) => void;
@@ -320,11 +325,16 @@ type Props = {
 };
 
 export function VoxelObjectPropsPanel({
+  mode = "scene",
+  selectionCount = 1,
   object,
   model,
   canRemove,
   onRename,
   onSetOffset,
+  rotationQuarterTurns = 0,
+  canRotateSelection = false,
+  onRotateSelection,
   onResizeBlocks,
   onResizeHeight,
   onSetMaterial,
@@ -361,22 +371,46 @@ export function VoxelObjectPropsPanel({
   const activeLamp =
     lamps.find((lamp) => lamp.id === selectedLampId) ?? lamps[0] ?? null;
   const activeOrigin = activeLamp?.origin ?? origin;
+  const showTransform = mode === "scene" || mode === "animate";
+  const showModel = mode === "sculpt";
+  const showLight = mode === "material" || mode === "scene";
+  const showGroups = mode === "material";
 
   return (
     <div className="ember-voxel-objprops">
-      <p className="ember-voxel-sculpt__section">Параметры объекта</p>
+      <p className="ember-voxel-sculpt__section">
+        {showGroups
+          ? "Материал объекта"
+          : showModel
+            ? "Геометрия объекта"
+            : selectionCount > 1
+              ? `Параметры объектов · ${selectionCount}`
+              : "Параметры объекта"}
+      </p>
 
+      {showTransform ? (
+        <>
       <label className="ember-voxel-objprops__field">
         <span>Имя</span>
         <input
           type="text"
           value={object.nameRu ?? ""}
+          disabled={selectionCount > 1}
+          title={
+            selectionCount > 1
+              ? "Имя меняется только у одного выбранного объекта"
+              : undefined
+          }
           onChange={(e) => onRename(e.target.value)}
         />
       </label>
 
       <div className="ember-voxel-objprops__offset">
-        <span className="ember-voxel-objprops__sub">Позиция Δ</span>
+        <span className="ember-voxel-objprops__sub">
+          {selectionCount > 1
+            ? `Позиция группы · опорный объект «${object.nameRu?.trim() || object.modelId}»`
+            : "Позиция Δ"}
+        </span>
         {(["x", "y", "z"] as const).map((axis) => (
           <label key={axis}>
             <span>{axis.toUpperCase()}</span>
@@ -394,8 +428,42 @@ export function VoxelObjectPropsPanel({
           </label>
         ))}
       </div>
+      <div className="ember-voxel-objprops__rotation">
+        <span className="ember-voxel-objprops__sub">
+          {selectionCount > 1 ? "Поворот группы" : "Поворот Y"}
+        </span>
+        <button
+          type="button"
+          className="ghost"
+          disabled={!canRotateSelection || !onRotateSelection}
+          title={
+            canRotateSelection
+              ? "Повернуть на 90° против часовой стрелки"
+              : "Поворот объектов со скелетными связями заблокирован"
+          }
+          onClick={() => onRotateSelection?.(-1)}
+        >
+          ↺ 90°
+        </button>
+        <strong>{((rotationQuarterTurns % 4 + 4) % 4) * 90}°</strong>
+        <button
+          type="button"
+          className="ghost"
+          disabled={!canRotateSelection || !onRotateSelection}
+          title={
+            canRotateSelection
+              ? "Повернуть на 90° по часовой стрелке"
+              : "Поворот объектов со скелетными связями заблокирован"
+          }
+          onClick={() => onRotateSelection?.(1)}
+        >
+          ↻ 90°
+        </button>
+      </div>
+        </>
+      ) : null}
 
-      {model && grid ? (
+      {model && grid && showModel ? (
         <>
           <div className="ember-voxel-objprops__canvas">
             <span className="ember-voxel-objprops__sub">
@@ -473,6 +541,10 @@ export function VoxelObjectPropsPanel({
             Физичность
           </label>
 
+        </>
+      ) : null}
+
+      {model && showLight ? (
           <div className="ember-voxel-objprops__light">
             <p className="ember-voxel-sculpt__section">Свет (PointLight)</p>
             {!hasEmit ? (
@@ -869,10 +941,10 @@ export function VoxelObjectPropsPanel({
               </>
             )}
           </div>
-        </>
       ) : null}
 
-      <div className="ember-voxel-objprops__ops">
+      {showTransform ? (
+        <div className="ember-voxel-objprops__ops">
         {onDuplicate ? (
           <button
             type="button"
@@ -894,9 +966,10 @@ export function VoxelObjectPropsPanel({
             Убрать
           </button>
         ) : null}
-      </div>
+        </div>
+      ) : null}
 
-      {model ? (
+      {model && showGroups ? (
         <div className="ember-voxel-objprops__groups">
           <p className="ember-voxel-sculpt__section">Группы цветов</p>
           <p className="muted ember-hint">

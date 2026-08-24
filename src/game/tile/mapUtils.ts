@@ -22,6 +22,7 @@ import type {
 } from "../content/types";
 import { MAX_ELEVATION, MIN_ELEVATION, clampElevation } from "../content/types";
 import { voxelGridSize } from "../voxel/voxelModel";
+import { voxelPlacementSeamScale } from "../voxel/voxelPlacement";
 import {
   isVoxelModelPhysical,
   zoneRegionPhysicalVoxelPlacements,
@@ -1004,8 +1005,9 @@ function voxelPropFootprint(
   const vw = ts / VOXELS_PER_BLOCK;
   const rot = voxelPropRot(place.rot);
   const scale = resolveEmberTransformScale(place.scale);
-  const localW = sx * vw * scale.x;
-  const localD = sz * vw * scale.y;
+  const seam = voxelPlacementSeamScale(model);
+  const localW = sx * vw * scale.x * seam.x;
+  const localD = sz * vw * scale.y * seam.z;
   const fw = rot % 2 === 0 ? localW : localD;
   const fd = rot % 2 === 0 ? localD : localW;
   const cx = place.x * ts + (sx * vw) * 0.5;
@@ -1019,9 +1021,9 @@ function voxelPropFootprint(
     rot,
     sx,
     sz,
-    voxelWorldX: vw * scale.x,
-    voxelWorldZ: vw * scale.y,
-    verticalScale: scale.z,
+    voxelWorldX: vw * scale.x * seam.x,
+    voxelWorldZ: vw * scale.y * seam.z,
+    verticalScale: scale.z * seam.y,
     baseElev,
     topElev:
       baseElev + voxelsToElevStories(map, solidVoxH * scale.z),
@@ -1037,6 +1039,124 @@ export type PhysicalVoxelCollisionAabb = {
   maxY: number;
   maxZ: number;
 };
+
+export type PhysicalVoxelNavigationConnector = {
+  tx: number;
+  ty: number;
+  dx: number;
+  dy: number;
+  lowElev: number;
+  highElev: number;
+};
+
+type VoxelStairAxis = { axis: "x" | "z"; sign: -1 | 1 };
+
+/**
+ * Detect a sculpted voxel staircase from its column-top profile.
+ *
+ * This deliberately requires a monotone, mountable series of steps. Tables,
+ * crates and decorative roofs therefore remain ordinary solid props, while a
+ * 2/4-voxel staircase can become a connector in the shared crowd graph.
+ */
+function voxelModelStairAxis(
+  model: EmberVoxelModel,
+  verticalScale: number,
+): VoxelStairAxis | null {
+  const { sx, sz } = voxelGridSize(model);
+  const heights = voxelModelColumnHeights(model);
+  const profile = (axis: "x" | "z"): number[] => {
+    const primary = axis === "x" ? sx : sz;
+    const cross = axis === "x" ? sz : sx;
+    const out = new Array<number>(primary);
+    for (let p = 0; p < primary; p++) {
+      let walkableTop = Infinity;
+      for (let c = 0; c < cross; c++) {
+        const x = axis === "x" ? p : c;
+        const z = axis === "x" ? c : p;
+        const height = heights[x + z * sx] ?? 0;
+        if (height > 0) walkableTop = Math.min(walkableTop, height);
+      }
+      out[p] = Number.isFinite(walkableTop) ? walkableTop : 0;
+    }
+    return out;
+  };
+  const classify = (values: number[]): VoxelStairAxis["sign"] | null => {
+    if (values.length < 2 || values.some((value) => value <= 0)) return null;
+    const delta = values.at(-1)! - values[0]!;
+    if (Math.abs(delta) < 2) return null;
+    const sign: -1 | 1 = delta > 0 ? 1 : -1;
+    for (let i = 1; i < values.length; i++) {
+      const step = (values[i]! - values[i - 1]!) * sign;
+      if (step < 0 || step * verticalScale > MAX_AUTO_STEP_VOXELS + 0.05) {
+        return null;
+      }
+    }
+    const low = sign > 0 ? values[0]! : values.at(-1)!;
+    return low * verticalScale <= MAX_AUTO_STEP_VOXELS + 0.05 ? sign : null;
+  };
+  const xValues = profile("x");
+  const zValues = profile("z");
+  const xSign = classify(xValues);
+  const zSign = classify(zValues);
+  if (xSign == null && zSign == null) return null;
+  const xRange = Math.abs(xValues.at(-1)! - xValues[0]!);
+  const zRange = Math.abs(zValues.at(-1)! - zValues[0]!);
+  return xSign != null && (zSign == null || xRange >= zRange)
+    ? { axis: "x", sign: xSign }
+    : { axis: "z", sign: zSign! };
+}
+
+/**
+ * Walkable one-tile voxel stairs for the baked crowd navigation graph.
+ * Exact movement still resolves every individual voxel step.
+ */
+export function listPhysicalVoxelNavigationConnectors(
+  map: EmberMap,
+  voxelModels?: EmberVoxelModelLib,
+  voxelScenes?: EmberVoxelSceneLib,
+): PhysicalVoxelNavigationConnector[] {
+  if (!voxelModels) return [];
+  const out: PhysicalVoxelNavigationConnector[] = [];
+  for (const place of buildPhysicalVoxelPropPlacements(
+    map,
+    voxelModels,
+    voxelScenes,
+  )) {
+    const model = voxelModels[place.modelId];
+    if (!model) continue;
+    const fp = voxelPropFootprint(map, place, model);
+    if (!fp) continue;
+    // A single graph node can represent one tile with a continuous elevation
+    // band. Larger sculpted structures need authored tile connectors instead.
+    if (
+      fp.right - fp.left > map.tileSize + 0.05 ||
+      fp.bottom - fp.top > map.tileSize + 0.05
+    ) {
+      continue;
+    }
+    const stair = voxelModelStairAxis(model, fp.verticalScale);
+    if (!stair) continue;
+    const angle = fp.rot * (Math.PI / 2);
+    const cos = Math.round(Math.cos(angle));
+    const sin = Math.round(Math.sin(angle));
+    const localX = stair.axis === "x" ? stair.sign : 0;
+    const localZ = stair.axis === "z" ? stair.sign : 0;
+    const dx = localX * cos + localZ * sin;
+    const dy = -localX * sin + localZ * cos;
+    const tx = Math.floor(((fp.left + fp.right) * 0.5) / map.tileSize);
+    const ty = Math.floor(((fp.top + fp.bottom) * 0.5) / map.tileSize);
+    if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) continue;
+    out.push({
+      tx,
+      ty,
+      dx,
+      dy,
+      lowElev: fp.baseElev,
+      highElev: fp.topElev,
+    });
+  }
+  return out;
+}
 
 /** World-space AABBs of voxel props that actually block movement. */
 export function listPhysicalVoxelCollisionAabbs(
@@ -1143,13 +1263,6 @@ function voxelPropLocalAtWorld(
   return { x: localX, z: localZ };
 }
 
-function voxelPropContainsLocal(
-  fp: VoxelPropFootprint,
-  local: { x: number; z: number },
-): boolean {
-  return local.x >= 0 && local.z >= 0 && local.x < fp.sx && local.z < fp.sz;
-}
-
 function voxelPropColumnHeightAtWorld(
   model: EmberVoxelModel,
   fp: VoxelPropFootprint,
@@ -1157,9 +1270,20 @@ function voxelPropColumnHeightAtWorld(
   y: number,
 ): number {
   const local = voxelPropLocalAtWorld(fp, x, y);
-  if (!voxelPropContainsLocal(fp, local)) return 0;
-  const lx = Math.floor(local.x);
-  const lz = Math.floor(local.z);
+  // Two adjacent stair props share an exact floating-point boundary. Treat a
+  // center on that seam as belonging to both columns so support does not drop
+  // to the ground for one frame between consecutive stair stories.
+  const seamEpsilon = 1e-6;
+  if (
+    local.x < -seamEpsilon ||
+    local.z < -seamEpsilon ||
+    local.x > fp.sx + seamEpsilon ||
+    local.z > fp.sz + seamEpsilon
+  ) {
+    return 0;
+  }
+  const lx = Math.max(0, Math.min(fp.sx - 1, Math.floor(local.x)));
+  const lz = Math.max(0, Math.min(fp.sz - 1, Math.floor(local.z)));
   return voxelModelColumnHeights(model)[lx + lz * fp.sx] ?? 0;
 }
 
@@ -1222,12 +1346,69 @@ function autoStepSurfacesAt(
       if (!model) return;
       const fp = voxelPropFootprint(map, place, model);
       if (!fp || fp.solidVoxH <= 0) return;
-      if (!pointInFootprint(x, y, fp)) return;
       const surface = voxelPropColumnTopElev(map, model, fp, x, y);
       if (surface != null) out.push(surface);
     },
   );
   return out;
+}
+
+/**
+ * Authored walk surface at a world point for baked navigation.
+ *
+ * Unlike `snapElevAtWorld`, this does not start from an actor's current
+ * elevation. It resolves the actual top surface encoded by terrain, ramps,
+ * short walls and physical voxel columns. Runtime movement still goes through
+ * `tryMoveWithElevation`; this is only the shared source of truth used while
+ * baking its coarse height graph.
+ */
+export function navigationSurfaceElevAtWorld(
+  map: EmberMap,
+  tileset: EmberTileset,
+  x: number,
+  y: number,
+  voxelModels?: EmberVoxelModelLib,
+  voxelScenes?: EmberVoxelSceneLib,
+): number | null {
+  const { tx, ty } = worldToTile(map, x, y);
+  if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) return null;
+
+  const connector = connectorDirAt(map, tileset, tx, ty);
+  if (connector) {
+    const band = connectorElevBand(map, tileset, tx, ty);
+    if (band) {
+      const lx = (x - tx * map.tileSize) / map.tileSize;
+      const ly = (y - ty * map.tileSize) / map.tileSize;
+      const amount =
+        connector === "n"
+          ? 1 - ly
+          : connector === "s"
+            ? ly
+            : connector === "w"
+              ? 1 - lx
+              : lx;
+      return band.low + (band.high - band.low) * Math.max(0, Math.min(1, amount));
+    }
+  }
+
+  const surfaces = autoStepSurfacesAt(
+    map,
+    x,
+    y,
+    voxelModels,
+    voxelScenes,
+  );
+  surfaces.push(...tileSupportSurfacesAt(map, tileset, tx, ty));
+  if (surfaces.length === 0) {
+    const wallTop = shortWallTopElev(map, tx, ty);
+    if (wallTop != null) return wallTop;
+    return elevationAt(map, tx, ty);
+  }
+  let highest = -Infinity;
+  for (const surface of surfaces) {
+    if (Number.isFinite(surface) && surface > highest) highest = surface;
+  }
+  return Number.isFinite(highest) ? highest : null;
 }
 
 /** Pick stand elev with asymmetric movement: step up is limited, falling down is not. */
@@ -2581,8 +2762,12 @@ export function pointInRegion(
   const right = (region.x + region.w) * ts;
   const bottom = (region.y + region.h) * ts;
   if (!(x >= left && x < right && y >= top && y < bottom)) return false;
-  if (region.elev == null || elev == null) return true;
-  return clampElevation(region.elev) === clampElevation(elev);
+  // Callers that omit elevation intentionally ask for an XY-only query (NPC
+  // patrol and editor helpers). Runtime callers always provide player elev.
+  // An unauthored region elev is not a wildcard: editor/preview glue that zone
+  // to the local column surface, so hit testing must resolve the same Z.
+  if (elev == null) return true;
+  return clampElevation(regionVolumeElev(map, region)) === clampElevation(elev);
 }
 
 export function worldToTile(
@@ -2776,7 +2961,7 @@ export function randomWalkablePointInRegion(
   radius: number,
   rng: () => number = Math.random,
   sprites?: EmberSpriteLib,
-): { x: number; y: number } | null {
+): { x: number; y: number; elev: number } | null {
   const ts = map.tileSize;
   for (let attempt = 0; attempt < 48; attempt++) {
     const p = randomPointInRegion(map, region, rng);
@@ -2784,9 +2969,12 @@ export function randomWalkablePointInRegion(
     const cx = Math.floor(p.x / ts) * ts + ts / 2;
     const cy = Math.floor(p.y / ts) * ts + ts / 2;
     const { tx, ty } = worldToTile(map, cx, cy);
-    const elev = elevationAt(map, tx, ty);
+    const elev =
+      region.elev != null
+        ? regionVolumeElev(map, region)
+        : elevationAt(map, tx, ty);
     if (!circleHitsSolid(map, tileset, cx, cy, radius, elev, sprites)) {
-      return { x: cx, y: cy };
+      return { x: cx, y: cy, elev };
     }
   }
 
@@ -2794,15 +2982,18 @@ export function randomWalkablePointInRegion(
   const y0 = Math.max(0, Math.floor(region.y));
   const x1 = Math.min(map.width - 1, Math.ceil(region.x + region.w) - 1);
   const y1 = Math.min(map.height - 1, Math.ceil(region.y + region.h) - 1);
-  const candidates: Array<{ x: number; y: number }> = [];
+  const candidates: Array<{ x: number; y: number; elev: number }> = [];
   for (let ty = y0; ty <= y1; ty++) {
     for (let tx = x0; tx <= x1; tx++) {
       if (isSolidAt(map, tileset, tx, ty)) continue;
       const cx = tx * ts + ts / 2;
       const cy = ty * ts + ts / 2;
-      const elev = elevationAt(map, tx, ty);
+      const elev =
+        region.elev != null
+          ? regionVolumeElev(map, region)
+          : elevationAt(map, tx, ty);
       if (!circleHitsSolid(map, tileset, cx, cy, radius, elev, sprites)) {
-        candidates.push({ x: cx, y: cy });
+        candidates.push({ x: cx, y: cy, elev });
       }
     }
   }
@@ -2817,7 +3008,7 @@ export function findRegions(
 ): EmberMapRegion[] {
   return map.regions.filter((r) => {
     if (r.kind !== kind) return false;
-    if (group && group !== "any" && r.group && r.group !== group) return false;
+    if (group && group !== "any" && r.group !== group) return false;
     return true;
   });
 }

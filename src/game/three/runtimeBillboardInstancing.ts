@@ -3,6 +3,7 @@ import {
   EMBER_DYNAMIC_ACTOR_LAYER,
   setObjectRenderLayer,
 } from "./dynamicShadowPolicy";
+import { transferBillboardTextureLeases } from "./billboards";
 
 export type RuntimeBillboardInstance = {
   slot: number;
@@ -75,6 +76,7 @@ export class RuntimeBillboardBatches {
       mesh.receiveShadow = template.receiveShadow;
       mesh.customDepthMaterial = template.customDepthMaterial;
       mesh.customDistanceMaterial = template.customDistanceMaterial;
+      transferBillboardTextureLeases(template, mesh);
       // The batch spans the active arena. Per-instance frustum culling is not
       // available on InstancedMesh; one batched draw is cheaper than rebuilding
       // aggregate bounds for every moving enemy each frame.
@@ -170,6 +172,9 @@ export class RuntimeBillboardBatches {
       for (const material of materials) material.dispose();
       batch.mesh.customDepthMaterial?.dispose();
       batch.mesh.customDistanceMaterial?.dispose();
+      const releaseTrackedTextures = batch.mesh.userData
+        .emberReleaseTrackedTextures as (() => void) | undefined;
+      releaseTrackedTextures?.();
       batch.entries.length = 0;
     }
     this.batches.clear();

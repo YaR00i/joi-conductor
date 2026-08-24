@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Ember Engine Contract
 
-Перед изменениями прочитай `docs/EMBER_AI_HANDOFF.md`. Подробная продуктовая спецификация и roadmap находятся в `docs/EMBER_ANOMALY.md`.
+Перед изменениями прочитай корневой `AGENTS.md`, `docs/EMBER_AI_HANDOFF.md` и, для архитектурных работ, `docs/EMBER_RESTRUCTURE_PLAN.md`. Подробная продуктовая спецификация находится в `docs/EMBER_ANOMALY.md`.
 
 - Цель: единый Unity/Blender-подобный редактор кубичного/воксельного мира и надёжный Three.js runtime. Не создавай отдельную логику для тайлов, вокселей, света и регионов, если её можно выразить через общий WorldObject + Components + Modifiers.
 - Активный runtime — `src/game/three/EmberThreeWorld.ts`. `src/game/phaser/` считается legacy и не должен становиться второй реализацией новых систем.
@@ -18,6 +18,7 @@ alwaysApply: false
 - Локальные PointLight-тени запекаются только для статического слоя 0. Игроки и враги находятся на dynamic layer 1 и исключены. Не возвращай fake/projected actor shadows без прямого запроса.
 - Полный static shadow bake выполняется через `beginStaticPointShadowBake`; ручная команда редактора — `rebuildStaticShadows()`. После изменения статической геометрии или света обязательно инвалидируй bake.
 - Сохраняй оптимизации: terrain chunks/workers, instancing, pooling, spatial hash, fixed-step AI/physics и streaming light budgets. Не добавляй per-frame `scene.traverse`, массовые allocations или динамические PointLight cube maps.
+- Не создавай параллельные `V2/New`-системы и не добавляй новую самостоятельную подсистему в legacy-монолиты. Сначала найди существующий owner; новый предметный leaf-модуль должен уменьшать ответственность старого файла.
 - Сначала проверяй local overrides: браузерный override имеет приоритет над `content/ember`, **кроме** пустого/тонкого voxel override — он игнорируется. Пустой файл на диске не доказывает отсутствие данных; смотри `.bak`.
 - Воксельная библиотека — пара `content/ember/voxels/models/<id>.json` + `<id>.vox`. Сетка — MagicaVoxel `.vox` (`emberVoxCodec.ts`); JSON держит компоненты и extra channels. Сохранение только через `writeVoxelRegistry` с `dirtyIds`. Импорт/экспорт `.vox` в скульпторе не должен терять collider/light. Кнопка MagicaVoxel открывает sibling `.vox` через `shell.openPath` и следит за файлом; внешний save не должен затирать Ember JSON. Не дампить каталог в `registry.json`. Отсутствие модели в памяти не удаляет её с диска.
 - Рабочее дерево может быть сильно изменено пользователем. Не reset/checkout и не перезаписывай несвязанные файлы. Никогда не git reset Ember JSON.

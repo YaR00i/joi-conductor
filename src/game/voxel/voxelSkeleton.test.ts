@@ -102,6 +102,36 @@ describe("voxel skeleton FK", () => {
     expect(world.z).toBeCloseTo(10, 5);
   });
 
+  it("applies persisted root yaw in computed poses and Three hierarchy", () => {
+    const scene: EmberVoxelScene = {
+      id: "rotated",
+      objects: [
+        { id: "root", modelId: "m", offset: { x: 2, y: 0, z: 3 }, rot: 1 },
+      ],
+    };
+    const pose = computeSkeletonPoses(scene, () => 0).get("root")!;
+    const posedAxis = new THREE.Vector3(1, 0, 0).applyQuaternion(
+      pose.quaternion,
+    );
+    expect(posedAxis.x).toBeCloseTo(0, 5);
+    expect(posedAxis.z).toBeCloseTo(-1, 5);
+
+    const content = new THREE.Group();
+    const node = new THREE.Group();
+    attachSkeletonHierarchy(
+      content,
+      new Map([["root", node]]),
+      scene,
+      () => 0,
+      1,
+    );
+    const hierarchyAxis = new THREE.Vector3(1, 0, 0).applyQuaternion(
+      node.quaternion,
+    );
+    expect(hierarchyAxis.x).toBeCloseTo(0, 5);
+    expect(hierarchyAxis.z).toBeCloseTo(-1, 5);
+  });
+
   it("carries the chibi head and hair with the torso", () => {
     const { scene } = createChibi32Character("vox_chr_skel", "Скелет");
     const rest = computeSkeletonPoses(scene, () => 0, 1);

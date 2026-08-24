@@ -1,0 +1,19 @@
+---
+description: Не раздувать монолиты и не создавать параллельные системы
+alwaysApply: true
+---
+
+# Project Growth Contract
+
+- Сначала прочитай корневой `AGENTS.md`; для Ember — `docs/EMBER_AI_HANDOFF.md` и `docs/EMBER_RESTRUCTURE_PLAN.md`.
+- Перед новым helper/type/manager/renderer/collision/UI flow найди существующий контракт через `rg` и доработай его.
+- Новый leaf-модуль допустим только для отдельной ответственности; нельзя создавать параллельную V2-систему.
+- Не добавляй самостоятельные подсистемы в `MapEditorPanel`, `VoxelSculptPanel`, `SpriteEditorPanel`, `TileEditorPanel`, `mapUtils`, `EmberThreeWorld` или глобальный `styles.css`.
+- `mapUtils.ts` — compatibility barrel на время декомпозиции: новую логику размещай в предметных модулях и re-export только при необходимости.
+- Editor/preview/runtime используют общую математику. Новое поле проходит types → validation → editor → runtime → serialization → tests.
+- Один законченный input = один commit. Не сохраняй/remesh/rebuild на каждый pointermove.
+- Каждый listener/RAF/timer/observer/object URL/worker/GPU resource получает симметричный cleanup.
+- Не вводи special-case по map id/координате, если это можно выразить данными.
+- Сохраняй F3 profiler и crowd hot path; не добавляй allocations/event bus в fixed-step loop.
+- Не трогай попутно `ChatLlmSampling`, клипы крышек сундуков и намеренную дверь `(12,8)`.
+- После работы: targeted tests, `npm test`, `npx vite build`, визуальная проверка; обнови handoff/план при изменении контракта.

@@ -32,6 +32,7 @@ describe("explore NPCs", () => {
       kind: "npc_idle",
       x: 4,
       y: 4,
+      elev: 3,
       w: 2,
       h: 2,
       spriteId: "villager",
@@ -56,6 +57,7 @@ describe("explore NPCs", () => {
     const spawned = collectExploreNpcSpawns(map, sprites, EXPLORE_NPC_CAP);
     expect(spawned).toHaveLength(EXPLORE_NPC_CAP);
     expect(spawned[0]?.mode).toBe("idle");
+    expect(spawned[0]?.elev).toBe(3);
     expect(spawned[1]?.mode).toBe("wander");
     expect(spawned[1]?.wander).toEqual({
       x0: 8 * 16,

@@ -6,6 +6,7 @@ import {
   normalizeEmberLibraryTags,
 } from "../content/libraryTags";
 import {
+  buildLibraryReferenceCountIndex,
   countLibraryAssetReferences,
   filterLibraryAssets,
   findVoxelModelReferences,
@@ -91,6 +92,7 @@ describe("Find References", () => {
     const refs = findVoxelModelReferences(pack, "lamp");
     expect(refs).toHaveLength(3);
     expect(countLibraryAssetReferences(pack, "voxel", "lamp")).toBe(3);
+    expect(buildLibraryReferenceCountIndex(pack).voxel.get("lamp")).toBe(3);
     expect(uniqueLibraryTags(pack)).toEqual(["light"]);
     expect(
       filterLibraryAssets([model("lamp", ["light"])], "", "light"),

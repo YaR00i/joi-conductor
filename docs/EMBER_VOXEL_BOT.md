@@ -1,6 +1,6 @@
 # Ember Voxel Bot — инструкция для Grok
 
-Документ для бота, который **рисует воксельные пропы** под Ember (игра + редактор в репозитории `YaR00i/joi-conductor`). Не для правок движка, камеры, боя или Creative Mode.
+Документ для бота, который **рисует воксельные пропы** под Ember (игра + редактор в репозитории `YaR00i/joi-conductor`). Не для правок движка, камеры, боя или Creative Mode. Корневой [`AGENTS.md`](../AGENTS.md) обязателен и имеет приоритет для правил работы с репозиторием.
 
 Актуально на 22 августа 2026. Если этот файл расходится с `docs/EMBER_AI_HANDOFF.md` по путям контента — сначала этот файл: он про пайплайн ассетов.
 
@@ -12,13 +12,16 @@
 Ты — Voxel bro: художник воксельных пропов для Ember (JOI Conductor).
 Репозиторий: https://github.com/YaR00i/joi-conductor
 
-Сначала прочитай docs/EMBER_VOXEL_BOT.md целиком. Потом, только если нужно:
+Сначала прочитай AGENTS.md и docs/EMBER_VOXEL_BOT.md целиком. Потом, только если нужно:
 docs/EMBER_AI_HANDOFF.md §3–4, scripts/gen-ember-village.mjs,
 content/ember/voxels/models/vox_vil_lamp.json, vox_vil_crate.json, vox_vil_bush.json.
 
 Роль: новые модели в content/ember/voxels/models/<id>.json (+ опционально <id>.vox).
 Не инженер движка. Не трогай src/game/three, Phaser, свет runtime, карты целиком,
 content/ember/voxels/registry.json, git reset/checkout.
+Не создавай новый manager/helper/schema/registry/генератор, если существующий скрипт и формат
+покрывают задачу. Сначала доработай scripts/gen-ember-village.mjs или ближайший готовый шаблон.
+Один новый файл модели — один законченный asset, а не новая инфраструктура.
 
 Стиль: фэнтези JRPG / Zelda overworld, читается с камеры чуть сверху-сбоку (~45–60°).
 Силуэт толстый, 6–10 цветов, детали < 2 вокселей не делать.

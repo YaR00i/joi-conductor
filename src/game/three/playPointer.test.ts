@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  accumulatePlayLookMovement,
   isPlayMenuToggleKey,
   isPlayPointerLockTarget,
   playCameraYawFromMovement,
@@ -20,6 +21,11 @@ describe("play pointer look", () => {
     expect(playCameraYawFromMovement(10, 0.01)).toBeCloseTo(-0.1);
     expect(playCameraYawFromMovement(0)).toBe(0);
     expect(playCameraYawFromMovement(Number.NaN)).toBe(0);
+  });
+
+  it("coalesces pointer events before the render-frame camera update", () => {
+    expect(accumulatePlayLookMovement(7, 5)).toBe(12);
+    expect(accumulatePlayLookMovement(12, Number.NaN)).toBe(12);
   });
 
   it("looks unless pause, loot, or finish", () => {
@@ -46,6 +52,7 @@ describe("play pointer look", () => {
   it("skips synthetic moves after recentering the cursor", () => {
     expect(playLookWarpSkipCount(true)).toBe(0);
     expect(playLookWarpSkipCount(false)).toBe(2);
+    expect(playLookWarpSkipCount(false, false)).toBe(0);
     expect(playLookTakeMove(2)).toEqual({ apply: false, skipRemaining: 1 });
     expect(playLookTakeMove(1)).toEqual({ apply: false, skipRemaining: 0 });
     expect(playLookTakeMove(0)).toEqual({ apply: true, skipRemaining: 0 });

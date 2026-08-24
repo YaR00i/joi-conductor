@@ -12,6 +12,8 @@ export type PixelClipboard = {
   pixels: string[];
   emissivePixels?: string[];
   shinePixels?: string[];
+  /** Optional local selection mask; false cells must not overwrite the destination. */
+  mask?: boolean[];
   /** @deprecated legacy square field */
   size?: number;
 };
@@ -51,6 +53,15 @@ function optionalChannel(
   return [...raw];
 }
 
+function optionalMask(
+  raw: boolean[] | undefined,
+  width: number,
+  height: number,
+): boolean[] | undefined {
+  if (!Array.isArray(raw) || raw.length !== width * height) return undefined;
+  return raw.map(Boolean);
+}
+
 function normalizeClip(raw: PixelClipboard): PixelClipboard | null {
   if (!raw || !Array.isArray(raw.pixels)) return null;
   if (
@@ -68,6 +79,7 @@ function normalizeClip(raw: PixelClipboard): PixelClipboard | null {
         raw.height,
       ),
       shinePixels: optionalChannel(raw.shinePixels, raw.width, raw.height),
+      mask: optionalMask(raw.mask, raw.width, raw.height),
     };
   }
   // Legacy square clipboard
@@ -114,6 +126,7 @@ export function copyPixelArtChannels(
   width: number,
   height: number,
   channels: PixelArtChannels,
+  mask?: boolean[],
 ): void {
   persist({
     width,
@@ -121,6 +134,7 @@ export function copyPixelArtChannels(
     pixels: [...channels.pixels],
     emissivePixels: optionalChannel(channels.emissivePixels, width, height),
     shinePixels: optionalChannel(channels.shinePixels, width, height),
+    mask: optionalMask(mask, width, height),
     size: width === height ? width : undefined,
   });
 }

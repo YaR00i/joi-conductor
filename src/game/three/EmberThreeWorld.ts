@@ -13,6 +13,7 @@ import {
 import { rollLootOptions } from "../content/pools";
 import {
   normalizePixelSprite,
+  resolveSpriteWorldOffsetVoxels,
   spriteHasVisual,
 } from "../content/pixelSprite";
 import type {
@@ -81,6 +82,7 @@ import {
 } from "../content/interactivity";
 import {
   MAP_CHANGE_COOLDOWN,
+  mapChangeRegionAt,
   mapChangeRequestFromRegion,
   mapChangeRequestFromWouldFire,
   resolveMapChangeArrival,
@@ -101,6 +103,7 @@ import {
 } from "../content/playProfile";
 import {
   emissivePlacementSeed,
+  emissiveSmoothstep,
   hasEmissiveInk,
   resolveEmissiveGlowStrength,
 } from "../tile/emissivePaint";
@@ -112,6 +115,7 @@ import {
   pointInRegion,
   randomWalkablePointInRegion,
   regionCenter,
+  regionVolumeElev,
   resolveMapLight,
   stepTeleport,
   tileSurfaceElev,
@@ -138,6 +142,7 @@ import {
 } from "../voxel/voxelSceneMesh";
 import {
   applySpritePlacementScale,
+  applySpriteWorldPosition,
   createColorBillboard,
   createPixelBillboard,
   disposeYawBillboard,
@@ -146,6 +151,7 @@ import {
 } from "./billboards";
 import { addQuestMarkerOverlays } from "./questMarkerOverlay";
 import {
+  accumulatePlayLookMovement,
   PLAY_LOOK_LOCK_UI_SELECTOR,
   PLAY_POINTER_LOCK_RELOCK_MS,
   isPlayMenuToggleKey,
@@ -262,6 +268,7 @@ import {
   EMBER_DYNAMIC_ACTOR_LAYER,
   beginPointShadowBake,
   configureCachedSunShadow,
+  dynamicLocalShadowLimitForCrowd,
   mapWideDirectionalHalf,
   directionalShadowLightDistance,
   fitDirectionalShadowToFocus,
@@ -270,6 +277,19 @@ import {
   pointLightRequestsShadow,
   setObjectRenderLayer,
 } from "./dynamicShadowPolicy";
+import {
+  advanceRuntimeReflectionClock,
+  runtimeReflectionIntervalMs,
+  shouldRenderRuntimeReflection,
+} from "./runtimeReflectionPolicy";
+import {
+  normalizeRuntimeStressTarget,
+  runtimeAllowsEnemyDamage,
+  runtimeAllowsStageSpawns,
+  runtimeEnemySpawnLimit,
+  runtimeStressTargetForShortcut,
+  runtimeXpAfterPickup,
+} from "./runtimeStressPolicy";
 import {
   RuntimeBillboardBatches,
   type RuntimeBillboardInstance,
@@ -284,6 +304,7 @@ import {
 } from "./exploreNpcs";
 import {
   clampCoordToMap,
+  enemyExactCollisionBudget,
   enemySimLod,
   noteMovementCadence,
   runsOnStaggeredTick,
@@ -293,6 +314,21 @@ import {
   resolveCrowdSteering,
   type CrowdSeparationAccumulator,
 } from "./enemyCrowdAvoidance";
+import {
+  buildEnemyCrowdOpenField,
+  enemyCrowdMoveTouchesConnector,
+  enemyCrowdOpenFieldAllowsDirectPath,
+  enemyCrowdOpenFieldAllowsMove,
+  enemyCrowdTryConnectorMove,
+  type EnemyCrowdOpenField,
+} from "./enemyCrowdOpenField";
+import {
+  ENEMY_FLOW_GUIDED,
+  createEnemyCrowdFlowField,
+  enemyCrowdFlowDirection,
+  updateEnemyCrowdFlowField,
+  type EnemyCrowdFlowField,
+} from "./enemyCrowdFlowField";
 
 export type EmberThreeWorldOpts = {
   parent: HTMLElement;
@@ -318,6 +354,16 @@ type WeaponSlot = { def: EmberWeaponDef; level: number; cooldown: number };
 const CHEST_INTERACT_R = 14;
 const ENEMY_AI_STEP = 1 / 30;
 const ENEMY_AI_MAX_STEPS = 3;
+
+function countSetBits(value: number): number {
+  let bits = value >>> 0;
+  let count = 0;
+  while (bits !== 0) {
+    bits &= bits - 1;
+    count += 1;
+  }
+  return count;
+}
 
 type FrozenShadow = {
   shadow: THREE.LightShadow<THREE.Camera>;
@@ -389,6 +435,10 @@ type Actor = {
   npcWander?: ExploreNpcWanderBounds;
   npcDirX?: number;
   npcDirY?: number;
+  /** Cached visual-only sprite pivot in Three world units. */
+  spriteOffsetX?: number;
+  spriteOffsetY?: number;
+  spriteOffsetZ?: number;
 };
 
 type Orbital = {
@@ -410,6 +460,30 @@ export class EmberThreeWorld {
   private readonly post: EmberPostFx;
   private readonly renderBudget: EmberRenderBudget;
   private readonly profiler: EmberFrameProfiler;
+  private readonly profilerWork = {
+    worldMs: 0,
+    weaponsMs: 0,
+    bulletsMs: 0,
+    orbitalsMs: 0,
+    spawnsMs: 0,
+    aiMs: 0,
+    terrainMs: 0,
+    cameraMs: 0,
+    billboardsMs: 0,
+    environmentMs: 0,
+    shadowsMs: 0,
+    hudMs: 0,
+    reflectionMs: 0,
+    mainRenderMs: 0,
+    profilerMs: 0,
+  };
+  private profilerRenderableCache = {
+    updatedAt: -Infinity,
+    terrain: 0,
+    props: 0,
+    overlays: 0,
+    instances: 0,
+  };
   private readonly localShadowDebug: LocalShadowDebugOverlay;
   private readonly playProfileBudget: EmberPlayProfileBudget;
   private readonly autoAttackEnabled: boolean;
@@ -454,12 +528,18 @@ export class EmberThreeWorld {
   private waterMats: THREE.Material[] = [];
   /** Pixel planar reflection pass for water (scene mirror, not specular smear). */
   private waterReflect: WaterPlanarReflection | null = null;
+  /** Cadence clock may trail wall time slightly to avoid divisor aliasing. */
+  private lastWaterReflectionMs = -Infinity;
+  /** Actual presentation time used only for profiler age. */
+  private waterReflectionPresentedAtMs = -Infinity;
+  private waterReflectionUpdatedThisFrame = false;
+  private readonly lastWaterReflectionCameraPosition = new THREE.Vector3();
+  private readonly lastWaterReflectionCameraQuaternion = new THREE.Quaternion();
+  private hasWaterReflectionCameraPose = false;
   /** Weak PointLights from dense emissive ink. */
   private emissiveLights: THREE.PointLight[] = [];
   /** Lantern PointLights for global torch flicker. */
   private lanternLights: THREE.PointLight[] = [];
-  /** Moving/yawing runtime casters invalidate cached shadow depth this frame. */
-  private dynamicShadowDirty = true;
   /** Terrain/props/lights changed; cached point-light cube maps need one bake. */
   private staticShadowDirty = true;
   private sunShadowDirty = true;
@@ -498,14 +578,27 @@ export class EmberThreeWorld {
   private readonly projectiles: Actor[] = [];
   private readonly gems: Actor[] = [];
   private readonly enemySpatial: RuntimeActorSpatialIndex<Actor>;
+  private enemyCrowdOpenField: EnemyCrowdOpenField;
+  private enemyCrowdFlow: EnemyCrowdFlowField;
   private enemySpatialDirty = true;
   private enemyAiAccumulator = 0;
   private enemyAiStepsLastFrame = 0;
+  private bulletExactCollisionChecksLastFrame = 0;
+  private bulletOpenFieldMovesLastFrame = 0;
   private enemyAiTick = 0;
   private enemyPhysicsMovesLastFrame = 0;
+  private enemyOpenFieldMovesLastFrame = 0;
+  private enemyKinematicMovesLastFrame = 0;
+  private enemyDeferredCollisionMovesLastFrame = 0;
+  private enemyHeightTransitionMovesLastFrame = 0;
+  private enemyHeightTransitionDeferredLastFrame = 0;
   private enemyContactSkipsLastFrame = 0;
   private enemyAvoidanceActorsLastFrame = 0;
   private enemyAvoidanceNeighborsLastFrame = 0;
+  private enemyFlowGuidedLastFrame = 0;
+  private enemyFlowMissesLastFrame = 0;
+  private enemyFlowRebuildsLastFrame = 0;
+  private enemyFlowRouteMaskLastFrame = 0;
   private enemyCadenceLastFrame = { full: 0, half: 0, third: 0, quarter: 0 };
   private readonly crowdSeparation: CrowdSeparationAccumulator = {
     x: 0,
@@ -513,8 +606,15 @@ export class EmberThreeWorld {
     weight: 0,
   };
   private readonly crowdSteering = { x: 0, y: 0 };
-  private readonly emissiveEnemyTiles: Array<{ x: number; y: number }> = [];
+  private readonly crowdFlowDirection = {
+    x: 0,
+    y: 0,
+    heightTransition: false,
+    routeGroup: -1,
+  };
+  private readonly crowdConnectorMove = { x: 0, y: 0, elev: 0 };
   private stressEnemyTarget = 0;
+  private stressNoXp = false;
   private player!: Actor;
   /** Discrete support story used by horizontal Minecraft-style collision. */
   private playerElev = 0;
@@ -600,6 +700,8 @@ export class EmberThreeWorld {
   private exploreSpawnFromSave: EmberExploreSaveState | null = null;
   private pausedLogic = false;
   private lookWarpSkip = 0;
+  private pendingLookMovementX = 0;
+  private lookWarpPending = false;
   private finished = false;
   private followDist = 120;
   private readonly followTarget = new THREE.Vector3();
@@ -619,9 +721,14 @@ export class EmberThreeWorld {
   private uidSeq = 1;
 
   private readonly onKeyDown = (ev: KeyboardEvent) => {
-    if (ev.code === "F4" && !ev.repeat && import.meta.env.DEV) {
+    const stressTarget = import.meta.env.DEV
+      ? runtimeStressTargetForShortcut(ev.code, ev.shiftKey)
+      : null;
+    if (stressTarget != null && !ev.repeat) {
       ev.preventDefault();
-      this.spawnCrowdStress(ev.shiftKey ? 180 : 120);
+      this.stressNoXp = true;
+      this.xp = 0;
+      this.spawnCrowdStress(stressTarget);
       return;
     }
     if (isPlayMenuToggleKey(ev)) {
@@ -690,16 +797,17 @@ export class EmberThreeWorld {
     const taken = playLookTakeMove(this.lookWarpSkip);
     this.lookWarpSkip = taken.skipRemaining;
     if (!taken.apply) return;
-    const yaw = playCameraYawFromMovement(ev.movementX);
-    if (yaw === 0) return;
-    this.lookOffset.copy(this.camera.position).sub(this.controls.target);
-    this.lookOffset.applyAxisAngle(this.lookAxis, yaw);
-    this.camera.position.copy(this.controls.target).add(this.lookOffset);
     const locked = this.hasLookLock();
-    warpPlayCursorIfNeeded(true, locked);
-    this.lookWarpSkip = playLookWarpSkipCount(locked);
+    this.pendingLookMovementX = accumulatePlayLookMovement(
+      this.pendingLookMovementX,
+      ev.movementX,
+    );
+    if (!locked) this.lookWarpPending = true;
   };
   private readonly onPointerLockChange = () => {
+    this.pendingLookMovementX = 0;
+    this.lookWarpPending = false;
+    this.lookWarpSkip = 0;
     this.syncPointerLock();
   };
   private readonly onWindowBlur = () => {
@@ -772,6 +880,16 @@ export class EmberThreeWorld {
     const tileset = opts.pack.tilesets[this.map.tilesetId];
     if (!tileset) throw new Error(`tileset ${this.map.tilesetId}`);
     this.tileset = tileset;
+    this.enemyCrowdOpenField = buildEnemyCrowdOpenField(
+      this.map,
+      this.tileset,
+      this.pack.sprites,
+      this.pack.voxelModels,
+      this.pack.voxelScenes,
+    );
+    this.enemyCrowdFlow = createEnemyCrowdFlowField(
+      this.enemyCrowdOpenField,
+    );
     this.terrainStreaming = {
       enabled:
         opts.terrainStreaming?.enabled ??
@@ -1276,9 +1394,8 @@ export class EmberThreeWorld {
     const pos = saved
       ? exploreSaveWorldPos(saved, this.map.tileSize)
       : regionCenter(this.map, start);
-    const tile = worldToTile(this.map, pos.x, pos.y);
     this.playerElev =
-      saved?.elev ?? tileSurfaceElev(this.map, tile.tx, tile.ty);
+      saved?.elev ?? regionVolumeElev(this.map, start);
     this.playerFeetElev = this.playerElev;
     this.playerFallVelocity = 0;
     this.playerGrounded = true;
@@ -1428,7 +1545,10 @@ export class EmberThreeWorld {
         hexColorOr(def.color, "#c8a878"),
         this.map.tileSize * 0.95,
       );
-      mesh.position.set(
+      applySpriteWorldPosition(
+        mesh,
+        def,
+        this.map.tileSize,
         (p.x + 0.5) * this.map.tileSize,
         elev * blockStoryHeight(this.map.tileSize) +
           this.map.tileSize * 0.45,
@@ -1722,7 +1842,6 @@ export class EmberThreeWorld {
   private invalidateStaticShadows(): void {
     this.staticShadowDirty = true;
     this.sunShadowDirty = true;
-    this.dynamicShadowDirty = true;
     this.localShadowMapBank.markAllDirty();
     invalidatePointLightShadows(this.lightRoot);
   }
@@ -1830,7 +1949,6 @@ export class EmberThreeWorld {
     this.localShadowDebug.update(this.dynamicLocalLights);
     if (!this.staticShadowDirty) this.completeShadowWarmup();
     else this.emitLoadProgress();
-    if (rendered) this.dynamicShadowDirty = true;
     return rendered;
   }
 
@@ -1851,11 +1969,41 @@ export class EmberThreeWorld {
     this.shadowReadyResolve();
   }
 
+  private waterReflectionCameraMoved(): boolean {
+    if (!this.hasWaterReflectionCameraPose) return true;
+    if (
+      this.camera.position.distanceToSquared(
+        this.lastWaterReflectionCameraPosition,
+      ) > 1e-8
+    ) {
+      return true;
+    }
+    return (
+      1 -
+        Math.abs(
+          this.camera.quaternion.dot(
+            this.lastWaterReflectionCameraQuaternion,
+          ),
+        ) >
+      1e-10
+    );
+  }
+
+  private noteWaterReflectionCameraPose(): void {
+    this.lastWaterReflectionCameraPosition.copy(this.camera.position);
+    this.lastWaterReflectionCameraQuaternion.copy(this.camera.quaternion);
+    this.hasWaterReflectionCameraPose = true;
+  }
+
   private primePlayPresent(): void {
     this.camera.updateMatrixWorld(true);
     this.renderer.compile(this.scene, this.camera);
     if (this.waterReflect) {
       this.waterReflect.render(this.renderer, this.scene, this.camera);
+      this.lastWaterReflectionMs = this.nowMs;
+      this.waterReflectionPresentedAtMs = this.nowMs;
+      this.waterReflectionUpdatedThisFrame = true;
+      this.noteWaterReflectionCameraPose();
     }
     this.post.render();
   }
@@ -1900,10 +2048,13 @@ export class EmberThreeWorld {
       this.localShadowCandidates,
       this.player.mesh.position,
       {
-        maxLights: Math.min(
-          lightCfg.dynamicPointShadows,
-          this.localPointShadowLimit,
-          DYNAMIC_LOCAL_SHADOW_MAX_LIGHTS,
+        maxLights: dynamicLocalShadowLimitForCrowd(
+          Math.min(
+            lightCfg.dynamicPointShadows,
+            this.localPointShadowLimit,
+            DYNAMIC_LOCAL_SHADOW_MAX_LIGHTS,
+          ),
+          this.enemies.length,
         ),
         previous: this.dynamicLocalLights,
         enterScale: lightCfg.dynamicShadowEnterScale,
@@ -2010,7 +2161,6 @@ export class EmberThreeWorld {
       a.actorIndex = undefined;
     }
     if (pooledTransient) this.transientActors.release(a);
-    else this.dynamicShadowDirty = true;
   }
 
   private tickInteractiveOutlines(): void {
@@ -2023,7 +2173,16 @@ export class EmberThreeWorld {
         continue;
       }
       const dist = Math.hypot(a.lx - this.player.lx, a.ly - this.player.ly);
-      a.outline.setCanInteract(dist <= CHEST_INTERACT_R);
+      const region = a.regionId
+        ? this.map.regions.find((item) => item.id === a.regionId)
+        : undefined;
+      const interactionElev = region
+        ? regionVolumeElev(this.map, region)
+        : a.elev;
+      a.outline.setCanInteract(
+        dist <= CHEST_INTERACT_R &&
+          elevNearlyEqual(interactionElev, this.playerElev),
+      );
       a.outline.tick(t);
     }
   }
@@ -2045,14 +2204,18 @@ export class EmberThreeWorld {
           ? 0
           : 4;
     const p = logicToThree(lx, ly, feetElev, yLift, this.map.tileSize);
-    if (
-      !a.enemyBillboard &&
-      !a.effectBillboard &&
-      a.mesh.position.distanceToSquared(p) > 1e-10
-    ) {
+    const targetX = p.x + (a.spriteOffsetX ?? 0);
+    const targetY = p.y + (a.spriteOffsetY ?? 0);
+    const targetZ = p.z + (a.spriteOffsetZ ?? 0);
+    const moved =
+      Math.abs(a.mesh.position.x - targetX) > 1e-5 ||
+      Math.abs(a.mesh.position.y - targetY) > 1e-5 ||
+      Math.abs(a.mesh.position.z - targetZ) > 1e-5;
+    if (!moved) return;
+    if (!a.enemyBillboard && !a.effectBillboard) {
       this.localShadowActorsMoved = true;
     }
-    a.mesh.position.set(p.x, p.y, p.z);
+    a.mesh.position.set(targetX, targetY, targetZ);
     this.enemyBillboards.markDirty(a.enemyBillboard);
     this.effectBillboards.markDirty(a.effectBillboard);
   }
@@ -2177,13 +2340,39 @@ export class EmberThreeWorld {
     applyInteriorCutawayTagged(this.cutawayTagged, hide);
   }
 
+  /** Apply all raw pointer deltas once per render frame. */
+  private consumePendingLookInput(): void {
+    const movementX = this.pendingLookMovementX;
+    this.pendingLookMovementX = 0;
+    const yaw = playCameraYawFromMovement(movementX);
+    if (yaw !== 0) {
+      this.lookOffset.copy(this.camera.position).sub(this.controls.target);
+      this.lookOffset.applyAxisAngle(this.lookAxis, yaw);
+      this.camera.position.copy(this.controls.target).add(this.lookOffset);
+    }
+    if (!this.lookWarpPending) return;
+    this.lookWarpPending = false;
+    const locked = this.hasLookLock();
+    const warped = warpPlayCursorIfNeeded(true, locked);
+    this.lookWarpSkip = playLookWarpSkipCount(locked, warped);
+  }
+
   private tick(): void {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.tick);
     if (this.contextLost) return;
     this.profiler.beginFrame();
+    const profileWork = this.profiler.isVisible();
+    if (profileWork) {
+      for (const key of Object.keys(this.profilerWork) as Array<
+        keyof typeof this.profilerWork
+      >) {
+        this.profilerWork[key] = 0;
+      }
+    }
     const dt = Math.min(0.05, this.clock.getDelta());
     this.nowMs += dt * 1000;
+    let workStartedAt = profileWork ? performance.now() : 0;
     this.tickMapFade(dt);
 
     if (
@@ -2196,12 +2385,36 @@ export class EmberThreeWorld {
       this.tickTeleport(dt);
       this.tickMapChangeEnter(dt);
       this.tickTriggerRegions(dt);
+      if (profileWork) {
+        this.profilerWork.worldMs += performance.now() - workStartedAt;
+        workStartedAt = performance.now();
+      }
       this.tickWeapons(dt);
+      if (profileWork) {
+        this.profilerWork.weaponsMs = performance.now() - workStartedAt;
+        workStartedAt = performance.now();
+      }
       this.tickBullets(dt);
+      if (profileWork) {
+        this.profilerWork.bulletsMs = performance.now() - workStartedAt;
+        workStartedAt = performance.now();
+      }
       this.tickOrbitals();
+      if (profileWork) {
+        this.profilerWork.orbitalsMs = performance.now() - workStartedAt;
+        workStartedAt = performance.now();
+      }
       this.tickSpawns(dt);
+      if (profileWork) {
+        this.profilerWork.spawnsMs = performance.now() - workStartedAt;
+        workStartedAt = performance.now();
+      }
       this.tickEnemyAi(dt);
       this.tickNpcs(dt);
+      if (profileWork) {
+        this.profilerWork.aiMs += performance.now() - workStartedAt;
+        workStartedAt = performance.now();
+      }
       this.tickChestPickup();
       this.tickGems();
       this.tickTileSemantics();
@@ -2210,11 +2423,27 @@ export class EmberThreeWorld {
         this.finish("clear");
       }
     } else {
+      if (profileWork) {
+        this.profilerWork.worldMs += performance.now() - workStartedAt;
+        workStartedAt = performance.now();
+      }
       this.tickOrbitals();
+      if (profileWork) {
+        this.profilerWork.orbitalsMs = performance.now() - workStartedAt;
+        workStartedAt = performance.now();
+      }
     }
     // Keep lid anim running even while loot UI is up (rare) / between frames.
     this.tickChestOpens(dt);
+    if (profileWork) {
+      this.profilerWork.worldMs += performance.now() - workStartedAt;
+      workStartedAt = performance.now();
+    }
     this.updateTerrainStreaming();
+    if (profileWork) {
+      this.profilerWork.terrainMs = performance.now() - workStartedAt;
+      workStartedAt = performance.now();
+    }
 
     // Follow player: translate target + camera together so orbit radius stays put.
     const focus = logicToThree(
@@ -2225,6 +2454,8 @@ export class EmberThreeWorld {
       this.map.tileSize,
     );
     this.followTarget.set(focus.x, focus.y, focus.z);
+
+    this.consumePendingLookInput();
 
     if (this.keys.q || this.keys.e) {
       const sign = this.keys.q ? -1 : 1;
@@ -2244,46 +2475,102 @@ export class EmberThreeWorld {
     this.camera.position.z += this.controls.target.z - prevZ;
     this.controls.update();
     this.applyPlayInteriorCutaway();
+    if (profileWork) {
+      this.profilerWork.cameraMs = performance.now() - workStartedAt;
+    }
 
     // Sprites stay upright: yaw toward camera only (no pitch tip).
+    const billboardsStartedAt = profileWork ? performance.now() : 0;
     this.enemyBillboards.sync(this.camera);
     this.effectBillboards.sync(this.camera);
     updateYawBillboards(this.entityRoot, this.camera);
+    if (profileWork) {
+      this.profilerWork.billboardsMs =
+        performance.now() - billboardsStartedAt;
+    }
+    const environmentStartedAt = profileWork ? performance.now() : 0;
     this.atmosphere.tick(dt, this.nowMs / 1000, this.camera);
     this.tickEmissiveAnims(dt);
     this.tickTorchFlickerAnims();
     if (this.waterMats.length) tickWaterMaterials(this.waterMats, this.nowMs / 1000);
     this.tickInteractiveOutlines();
+    if (profileWork) {
+      this.profilerWork.environmentMs =
+        performance.now() - environmentStartedAt;
+    }
 
     // Cached sun bake + lamp cubes. Radius flicker only changes light cutoff.
+    const shadowsStartedAt = profileWork ? performance.now() : 0;
     const staticJustBaked = this.bakeStaticPointShadows();
     if (this.shadowWarmupComplete) {
       this.bakeDynamicLocalPointShadows(staticJustBaked);
     }
-
-    // Most lamps stay on the cached layer-0 cube. The nearest in-range lamp
-    // also captures layer-1 player/enemy silhouettes for this frame.
-    if (this.dynamicShadowDirty || this.chestOpens.length > 0) {
-      this.renderer.shadowMap.needsUpdate = true;
-      this.dynamicShadowDirty = false;
+    if (profileWork) {
+      this.profilerWork.shadowsMs = performance.now() - shadowsStartedAt;
     }
 
+    // Dynamic lamp cubes are rendered explicitly above. Only an authored
+    // opening chest still asks Three.js for the legacy full shadow refresh.
+    if (this.chestOpens.length > 0) {
+      this.renderer.shadowMap.needsUpdate = true;
+    }
+
+    const hudStartedAt = profileWork ? performance.now() : 0;
     this.hudAcc += dt * 1000;
     if (this.hudAcc > 100) {
       this.hudAcc = 0;
       this.emitHud();
     }
+    if (profileWork) {
+      this.profilerWork.hudMs = performance.now() - hudStartedAt;
+    }
 
     this.profiler.beginGpu();
-    if (this.waterReflect) {
-      this.camera.updateMatrixWorld(true);
-      this.waterReflect.render(this.renderer, this.scene, this.camera);
-    }
-    this.post.render();
-    this.profiler.endGpu();
-    this.profiler.endFrame(
-      this.profiler.isVisible() ? this.profilerExtras() : undefined,
+    this.waterReflectionUpdatedThisFrame = false;
+    const reflectionCameraMoved = this.waterReflectionCameraMoved();
+    const reflectionIntervalMs = runtimeReflectionIntervalMs(
+      this.enemies.length,
+      reflectionCameraMoved,
     );
+    if (
+      this.waterReflect &&
+      shouldRenderRuntimeReflection(
+        this.nowMs,
+        this.lastWaterReflectionMs,
+        this.enemies.length,
+        reflectionCameraMoved,
+      )
+    ) {
+      this.camera.updateMatrixWorld(true);
+      const reflectionStartedAt = profileWork ? performance.now() : 0;
+      this.waterReflect.render(this.renderer, this.scene, this.camera);
+      if (profileWork) {
+        this.profilerWork.reflectionMs =
+          performance.now() - reflectionStartedAt;
+      }
+      this.lastWaterReflectionMs = advanceRuntimeReflectionClock(
+        this.nowMs,
+        this.lastWaterReflectionMs,
+        reflectionIntervalMs,
+      );
+      this.waterReflectionPresentedAtMs = this.nowMs;
+      this.waterReflectionUpdatedThisFrame = true;
+      this.noteWaterReflectionCameraPose();
+    }
+    const mainRenderStartedAt = profileWork ? performance.now() : 0;
+    this.post.render();
+    if (profileWork) {
+      this.profilerWork.mainRenderMs =
+        performance.now() - mainRenderStartedAt;
+    }
+    this.profiler.endGpu();
+    let profilerExtras: EmberProfilerExtras | undefined;
+    if (profileWork) {
+      const profilerStartedAt = performance.now();
+      profilerExtras = this.profilerExtras();
+      this.profilerWork.profilerMs = performance.now() - profilerStartedAt;
+    }
+    this.profiler.endFrame(profilerExtras);
   }
 
   private profilerExtras(): EmberProfilerExtras {
@@ -2347,6 +2634,8 @@ export class EmberThreeWorld {
         npcs: this.npcs.length,
         batches: enemyBatchStats.batches,
         bullets: this.projectiles.length,
+        bulletCollisionExact: this.bulletExactCollisionChecksLastFrame,
+        bulletCollisionOpen: this.bulletOpenFieldMovesLastFrame,
         effects: this.gems.length + this.orbitals.length,
         logicHz: Math.round(1 / ENEMY_AI_STEP),
         logicSteps: this.enemyAiStepsLastFrame,
@@ -2356,7 +2645,14 @@ export class EmberThreeWorld {
         pooledTransient: transientPoolStats.available,
         createdTransient: transientPoolStats.created,
         stressTarget: this.stressEnemyTarget || undefined,
+        stressNoXp: this.stressNoXp || undefined,
         physicsMoves: this.enemyPhysicsMovesLastFrame,
+        openFieldMoves: this.enemyOpenFieldMovesLastFrame,
+        kinematicMoves: this.enemyKinematicMovesLastFrame,
+        deferredCollisionMoves: this.enemyDeferredCollisionMovesLastFrame,
+        heightTransitionMoves: this.enemyHeightTransitionMovesLastFrame,
+        heightTransitionDeferred:
+          this.enemyHeightTransitionDeferredLastFrame,
         contactSkips: this.enemyContactSkipsLastFrame,
         cadenceFull: this.enemyCadenceLastFrame.full,
         cadenceHalf: this.enemyCadenceLastFrame.half,
@@ -2364,8 +2660,31 @@ export class EmberThreeWorld {
         cadenceQuarter: this.enemyCadenceLastFrame.quarter,
         avoidanceActors: this.enemyAvoidanceActorsLastFrame,
         avoidanceNeighbors: this.enemyAvoidanceNeighborsLastFrame,
+        flowGuided: this.enemyFlowGuidedLastFrame,
+        flowMisses: this.enemyFlowMissesLastFrame,
+        flowReachableCells: this.enemyCrowdFlow.reachableCells,
+        flowRebuilds: this.enemyFlowRebuildsLastFrame,
+        flowRoutesUsed: countSetBits(this.enemyFlowRouteMaskLastFrame),
+        flowRoutesAvailable: this.enemyCrowdFlow.connectorGroupCount,
+        flowBakedCells: this.enemyCrowdOpenField.open.length,
+        flowBakedTransitions: this.enemyCrowdOpenField.transitionCount,
+        flowTargets: this.enemyCrowdFlow.targetCount,
+        flowComponents: this.enemyCrowdFlow.componentCount,
+        flowFallbackDistanceCells:
+          this.enemyCrowdFlow.targetFallbackDistanceCells,
       },
       renderables: this.profilerRenderableCounts(),
+      reflection: this.waterReflect
+        ? {
+            updated: this.waterReflectionUpdatedThisFrame,
+            ageMs: Math.max(
+              0,
+              this.nowMs - this.waterReflectionPresentedAtMs,
+            ),
+          }
+        : undefined,
+      work: this.profilerWork,
+      look: { locked: this.hasLookLock() },
     };
   }
 
@@ -2375,6 +2694,9 @@ export class EmberThreeWorld {
     overlays: number;
     instances: number;
   } {
+    if (this.nowMs - this.profilerRenderableCache.updatedAt < 500) {
+      return this.profilerRenderableCache;
+    }
     let terrain = 0;
     let props = 0;
     let instances = 0;
@@ -2388,12 +2710,14 @@ export class EmberThreeWorld {
       }
       if ((object as THREE.Mesh).isMesh) props += 1;
     });
-    return {
+    this.profilerRenderableCache = {
+      updatedAt: this.nowMs,
       terrain,
       props,
       overlays: this.cutawayTagged.length,
       instances,
     };
+    return this.profilerRenderableCache;
   }
 
   private tickTorchFlickerAnims(): void {
@@ -2412,13 +2736,12 @@ export class EmberThreeWorld {
     const playerTiles = [
       { x: this.player.lx / ts, y: this.player.ly / ts },
     ];
-    const enemyTiles = this.collectNearbyEnemyTiles(18);
     const light = resolveMapLight(this.map);
     const ctx = {
       timeSec: this.nowMs / 1000,
       dt,
       playerTiles,
-      enemyTiles,
+      enemyProximityAmount: this.emissiveEnemyProximityAmount,
       activeEventIds: this.activeEmissiveEvents,
       torchFlickerAmount: light.torchFlicker,
       torchFlickerSpeed: light.torchFlickerSpeed,
@@ -2429,31 +2752,34 @@ export class EmberThreeWorld {
     }
   }
 
-  private collectNearbyEnemyTiles(maxTiles: number): Array<{ x: number; y: number }> {
-    const out = this.emissiveEnemyTiles;
+  private readonly emissiveEnemyProximityAmount = (
+    tx: number,
+    ty: number,
+    radius: number,
+  ): number => {
     const ts = this.map.tileSize;
-    const maxDist = maxTiles * ts;
-    const maxDistSq = maxDist * maxDist;
-    const px = this.player.lx;
-    const py = this.player.ly;
-    let n = 0;
-    for (const a of this.enemies) {
-      if (a.dead) continue;
-      const dx = a.lx - px;
-      const dy = a.ly - py;
-      if (dx * dx + dy * dy > maxDistSq) continue;
-      let tile = out[n];
-      if (!tile) {
-        tile = { x: 0, y: 0 };
-        out[n] = tile;
-      }
-      tile.x = a.lx / ts;
-      tile.y = a.ly / ts;
-      n += 1;
-    }
-    out.length = n;
-    return out;
-  }
+    const cx = tx + 0.5;
+    const cy = ty + 0.5;
+    const radiusSq = radius * radius;
+    let best = 0;
+    this.enemySpatial.visitRadius(
+      cx * ts,
+      cy * ts,
+      radius * ts,
+      (enemy) => {
+        if (enemy.dead) return false;
+        const dx = enemy.lx / ts - cx;
+        const dy = enemy.ly / ts - cy;
+        const distanceSq = dx * dx + dy * dy;
+        if (distanceSq >= radiusSq) return false;
+        const linear = 1 - Math.sqrt(distanceSq) / radius;
+        const soft = emissiveSmoothstep(linear);
+        best = Math.max(best, soft * soft);
+        return best >= 1 - 1e-8;
+      },
+    );
+    return best;
+  };
 
   private currentGroundTile() {
     const { tx, ty } = worldToTile(this.map, this.player.lx, this.player.ly);
@@ -2575,12 +2901,14 @@ export class EmberThreeWorld {
     if (playMovementFrozen(this.overlayFlags())) {
       return;
     }
-    const region = findRegions(this.map, "trigger").find((item) =>
-      pointInRegion(this.map, item, this.player.lx, this.player.ly, this.playerElev),
+    const region = mapChangeRegionAt(
+      this.map,
+      this.player.lx,
+      this.player.ly,
+      this.playerElev,
     );
     if (!region) return;
     const request = mapChangeRequestFromRegion(region);
-    if (!request) return;
     this.applyPlayMapChange(request, region.id);
   }
 
@@ -2800,6 +3128,16 @@ export class EmberThreeWorld {
 
     this.map = ensureMapLayers(arrival.map);
     this.tileset = tileset;
+    this.enemyCrowdOpenField = buildEnemyCrowdOpenField(
+      this.map,
+      this.tileset,
+      this.pack.sprites,
+      this.pack.voxelModels,
+      this.pack.voxelScenes,
+    );
+    this.enemyCrowdFlow = createEnemyCrowdFlowField(
+      this.enemyCrowdOpenField,
+    );
     this.terrainDatasetKey = `runtime:${this.map.id}:${this.tileset.id}`;
     this.terrainFocusChunkKey = "";
     this.terrainLoadKeySig = "";
@@ -2850,7 +3188,7 @@ export class EmberThreeWorld {
 
   private tickTriggerRegions(dt: number): void {
     this.triggerCd = Math.max(0, this.triggerCd - dt);
-    if (this.triggerCd > 0) return;
+    if (this.triggerCd > 0 || mapFadeBusy(this.mapFade)) return;
     for (const r of findRegions(this.map, "trigger")) {
       if (!pointInRegion(this.map, r, this.player.lx, this.player.ly, this.playerElev)) continue;
       const event = Object.values(this.pack.events).find(
@@ -2980,6 +3318,8 @@ export class EmberThreeWorld {
   }
 
   private tickBullets(dt: number): void {
+    this.bulletExactCollisionChecksLastFrame = 0;
+    this.bulletOpenFieldMovesLastFrame = 0;
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const b = this.projectiles[i]!;
       if (b.dead) continue;
@@ -2991,18 +3331,33 @@ export class EmberThreeWorld {
       const nx = b.lx + (b.vx ?? 0) * dt;
       const ny = b.ly + (b.vy ?? 0) * dt;
       if (
-        hitsSolidVoxels(
-          this.map,
-          this.tileset,
+        enemyCrowdOpenFieldAllowsMove(
+          this.enemyCrowdOpenField,
+          b.lx,
+          b.ly,
           nx,
           ny,
           b.radius,
           b.elev,
-          this.pack.sprites,
         )
       ) {
-        this.removeActor(b);
-        continue;
+        this.bulletOpenFieldMovesLastFrame += 1;
+      } else {
+        this.bulletExactCollisionChecksLastFrame += 1;
+        if (
+          hitsSolidVoxels(
+            this.map,
+            this.tileset,
+            nx,
+            ny,
+            b.radius,
+            b.elev,
+            this.pack.sprites,
+          )
+        ) {
+          this.removeActor(b);
+          continue;
+        }
       }
       b.lx = nx;
       b.ly = ny;
@@ -3098,6 +3453,7 @@ export class EmberThreeWorld {
 
   private tickSpawns(dt: number): void {
     if (!this.playProfileBudget.allowHorde) return;
+    if (!runtimeAllowsStageSpawns(this.stressEnemyTarget)) return;
     const table = this.pack.spawns[this.stage.spawnTableId];
     if (!table) return;
     const bossAt = this.shortMode
@@ -3136,7 +3492,9 @@ export class EmberThreeWorld {
   private spawnEnemy(enemyId: string, group: string): void {
     const def = this.pack.enemies[enemyId];
     if (!def) return;
-    if (this.enemies.length >= 180) {
+    if (
+      this.enemies.length >= runtimeEnemySpawnLimit(this.stressEnemyTarget)
+    ) {
       return;
     }
     let regions = findRegions(this.map, "spawn", group);
@@ -3185,15 +3543,17 @@ export class EmberThreeWorld {
               def.boss ? "#ffdd88" : undefined,
             ),
     );
-    const { tx, ty } = worldToTile(this.map, p.x, p.y);
-    const elev = tileSurfaceElev(this.map, tx, ty);
     const uid = this.uidSeq++;
+    const spriteOffset = linked
+      ? resolveSpriteWorldOffsetVoxels(linked)
+      : { x: 0, y: 0, z: 0 };
+    const spriteVoxelWorld = this.map.tileSize / VOXELS_PER_BLOCK;
     const a: Actor = {
       mesh,
       enemyBillboard,
       lx: p.x,
       ly: p.y,
-      elev,
+      elev: p.elev,
       radius,
       kind: "enemy",
       hp: def.hp,
@@ -3202,6 +3562,9 @@ export class EmberThreeWorld {
       touchCd: 0,
       uid,
       aiPhase: uid,
+      spriteOffsetX: spriteOffset.x * spriteVoxelWorld,
+      spriteOffsetY: spriteOffset.z * spriteVoxelWorld,
+      spriteOffsetZ: spriteOffset.y * spriteVoxelWorld,
     };
     this.addActor(a);
     this.syncActor(a);
@@ -3236,21 +3599,24 @@ export class EmberThreeWorld {
           ? createPixelBillboard(def, color, size)
           : createColorBillboard(color, size),
     );
-    const { tx, ty } = worldToTile(this.map, spawn.x, spawn.y);
-    const elev = tileSurfaceElev(this.map, tx, ty);
     const angle = Math.random() * Math.PI * 2;
+    const spriteOffset = resolveSpriteWorldOffsetVoxels(def);
+    const spriteVoxelWorld = this.map.tileSize / VOXELS_PER_BLOCK;
     const a: Actor = {
       mesh,
       enemyBillboard,
       lx: spawn.x,
       ly: spawn.y,
-      elev,
+      elev: spawn.elev,
       radius: Math.max(4, this.map.tileSize * 0.3),
       kind: "npc",
       uid: this.uidSeq++,
       npcWander: spawn.wander,
       npcDirX: Math.cos(angle),
       npcDirY: Math.sin(angle),
+      spriteOffsetX: spriteOffset.x * spriteVoxelWorld,
+      spriteOffsetY: spriteOffset.z * spriteVoxelWorld,
+      spriteOffsetZ: spriteOffset.y * spriteVoxelWorld,
     };
     this.addActor(a);
     this.syncActor(a);
@@ -3269,10 +3635,12 @@ export class EmberThreeWorld {
       .filter((enemy) => !enemy.boss)
       .map((enemy) => enemy.id);
     if (ids.length === 0) return;
-    this.stressEnemyTarget = Math.max(
-      this.stressEnemyTarget,
-      Math.min(180, Math.round(target)),
-    );
+    this.stressEnemyTarget = normalizeRuntimeStressTarget(target);
+    while (this.enemies.length > this.stressEnemyTarget) {
+      const enemy = this.enemies[this.enemies.length - 1];
+      if (!enemy) break;
+      this.removeActor(enemy);
+    }
     let attempts = 0;
     let consecutiveFailures = 0;
     while (
@@ -3289,7 +3657,7 @@ export class EmberThreeWorld {
     this.enemySpatialDirty = true;
     this.onBridge({
       type: "toast",
-      textRu: `Stress: ${this.enemies.length}/${this.stressEnemyTarget} врагов · неуязвимость`,
+      textRu: `Stress: ${this.enemies.length}/${this.stressEnemyTarget} врагов · неуязвимость · без XP`,
     });
   }
 
@@ -3301,9 +3669,18 @@ export class EmberThreeWorld {
     let steps = 0;
     if (this.enemyAiAccumulator >= ENEMY_AI_STEP) {
       this.enemyPhysicsMovesLastFrame = 0;
+      this.enemyOpenFieldMovesLastFrame = 0;
+      this.enemyKinematicMovesLastFrame = 0;
+      this.enemyDeferredCollisionMovesLastFrame = 0;
+      this.enemyHeightTransitionMovesLastFrame = 0;
+      this.enemyHeightTransitionDeferredLastFrame = 0;
       this.enemyContactSkipsLastFrame = 0;
       this.enemyAvoidanceActorsLastFrame = 0;
       this.enemyAvoidanceNeighborsLastFrame = 0;
+      this.enemyFlowGuidedLastFrame = 0;
+      this.enemyFlowMissesLastFrame = 0;
+      this.enemyFlowRebuildsLastFrame = 0;
+      this.enemyFlowRouteMaskLastFrame = 0;
       this.enemyCadenceLastFrame.full = 0;
       this.enemyCadenceLastFrame.half = 0;
       this.enemyCadenceLastFrame.third = 0;
@@ -3452,7 +3829,28 @@ export class EmberThreeWorld {
   private tickEnemiesFixed(dt: number): void {
     const crowdSize = this.enemies.length;
     const tileSize = this.map.tileSize;
-    for (const e of this.enemies) {
+    const crowdFlowEnabled = crowdSize > 40;
+    if (
+      crowdFlowEnabled &&
+      updateEnemyCrowdFlowField(
+        this.enemyCrowdFlow,
+        this.player.lx,
+        this.player.ly,
+        this.playerElev,
+      )
+    ) {
+      this.enemyFlowRebuildsLastFrame += 1;
+    }
+    let exactCollisionBudget = enemyExactCollisionBudget(crowdSize);
+    let heightTransitionBudget = Math.min(
+      48,
+      Math.max(16, Math.ceil(crowdSize / 16)),
+    );
+    const enemyCount = this.enemies.length;
+    const iterationStart =
+      crowdSize > 40 && enemyCount > 0 ? this.enemyAiTick % enemyCount : 0;
+    for (let enemyOffset = 0; enemyOffset < enemyCount; enemyOffset++) {
+      const e = this.enemies[(iterationStart + enemyOffset) % enemyCount]!;
       if (e.dead || !e.def) continue;
       const def = e.def;
       const dist = Math.hypot(e.lx - this.player.lx, e.ly - this.player.ly);
@@ -3470,13 +3868,13 @@ export class EmberThreeWorld {
         e.moveAccum = Math.min(e.moveAccum, lod.cadence * dt);
         if ((e.touchCd ?? 0) <= 0) {
           e.touchCd = 1.6;
-          const angle = Math.atan2(this.player.ly - e.ly, this.player.lx - e.lx);
           const sp = def.projectileSpeed ?? 120;
+          const invDist = dist > 1e-6 ? 1 / dist : 0;
           this.spawnBullet(
             e.lx,
             e.ly,
-            Math.cos(angle) * sp,
-            Math.sin(angle) * sp,
+            (this.player.lx - e.lx) * invDist * sp,
+            (this.player.ly - e.ly) * invDist * sp,
             def.damage,
             2.5,
             e.elev,
@@ -3503,10 +3901,48 @@ export class EmberThreeWorld {
         e.simPrevElev = e.elev;
         e.simBlendElapsed = 0;
         e.simBlendDuration = moveDt;
-        const angle = Math.atan2(this.player.ly - e.ly, this.player.lx - e.lx);
-        const pursuitX = Math.cos(angle);
-        const pursuitY = Math.sin(angle);
-        if (lod.crowdSteer) {
+        const toPlayerX = this.player.lx - e.lx;
+        const toPlayerY = this.player.ly - e.ly;
+        const invDist = dist > 1e-6 ? 1 / dist : 0;
+        let pursuitX = toPlayerX * invDist;
+        let pursuitY = toPlayerY * invDist;
+        let flowHeightTransition = false;
+        const directPathOpen =
+          crowdFlowEnabled &&
+          sameElev &&
+          enemyCrowdOpenFieldAllowsDirectPath(
+            this.enemyCrowdOpenField,
+            e.lx,
+            e.ly,
+            this.player.lx,
+            this.player.ly,
+            e.radius,
+            e.elev,
+          );
+        if (crowdFlowEnabled && !directPathOpen) {
+          const flowResult = enemyCrowdFlowDirection(
+            this.enemyCrowdFlow,
+            e.lx,
+            e.ly,
+            e.elev,
+            this.crowdFlowDirection,
+            e.uid ?? e.aiPhase ?? 0,
+          );
+          if (flowResult === ENEMY_FLOW_GUIDED) {
+            pursuitX = this.crowdFlowDirection.x;
+            pursuitY = this.crowdFlowDirection.y;
+            flowHeightTransition =
+              this.crowdFlowDirection.heightTransition === true;
+            this.enemyFlowGuidedLastFrame += 1;
+            const routeGroup = this.crowdFlowDirection.routeGroup;
+            if (routeGroup >= 0 && routeGroup < 31) {
+              this.enemyFlowRouteMaskLastFrame |= 1 << routeGroup;
+            }
+          } else if (flowResult === 0) {
+            this.enemyFlowMissesLastFrame += 1;
+          }
+        }
+        if (lod.crowdSteer && !flowHeightTransition) {
           this.resolveEnemyCrowdSteering(e, pursuitX, pursuitY, lod.maxNeighbors);
         } else {
           this.crowdSteering.x = pursuitX;
@@ -3515,25 +3951,87 @@ export class EmberThreeWorld {
         const nextX = e.lx + this.crowdSteering.x * def.speed * moveDt;
         const nextY = e.ly + this.crowdSteering.y * def.speed * moveDt;
         if (lod.collideWorld) {
-          const pos = moveWithVoxels(
-            this.map,
-            this.tileset,
-            e.lx,
-            e.ly,
-            nextX,
-            nextY,
-            e.radius,
-            e.elev,
-            this.pack.sprites,
-          );
-          e.lx = pos.x;
-          e.ly = pos.y;
-          e.elev = pos.elev;
+          if (
+            enemyCrowdOpenFieldAllowsMove(
+              this.enemyCrowdOpenField,
+              e.lx,
+              e.ly,
+              nextX,
+              nextY,
+              e.radius,
+              e.elev,
+            )
+          ) {
+            e.lx = nextX;
+            e.ly = nextY;
+            this.enemyOpenFieldMovesLastFrame += 1;
+          } else {
+            const heightTransition = enemyCrowdMoveTouchesConnector(
+              this.enemyCrowdOpenField,
+              e.lx,
+              e.ly,
+              nextX,
+              nextY,
+              e.radius,
+            );
+            if (
+              heightTransition &&
+              enemyCrowdTryConnectorMove(
+                this.enemyCrowdOpenField,
+                e.lx,
+                e.ly,
+                nextX,
+                nextY,
+                e.radius,
+                e.elev,
+                this.crowdConnectorMove,
+              )
+            ) {
+              e.lx = this.crowdConnectorMove.x;
+              e.ly = this.crowdConnectorMove.y;
+              e.elev = this.crowdConnectorMove.elev;
+              this.enemyHeightTransitionMovesLastFrame += 1;
+              continue;
+            }
+            const hasCollisionBudget = heightTransition
+              ? heightTransitionBudget > 0
+              : exactCollisionBudget > 0;
+            if (!hasCollisionBudget) {
+              e.moveAccum = Math.min(0.15, moveDt);
+              this.enemyDeferredCollisionMovesLastFrame += 1;
+              if (heightTransition) {
+                this.enemyHeightTransitionDeferredLastFrame += 1;
+              }
+              continue;
+            }
+            if (heightTransition) heightTransitionBudget -= 1;
+            else exactCollisionBudget -= 1;
+            const pos = moveWithVoxels(
+              this.map,
+              this.tileset,
+              e.lx,
+              e.ly,
+              nextX,
+              nextY,
+              e.radius,
+              e.elev,
+              this.pack.sprites,
+              this.pack.voxelModels,
+              this.pack.voxelScenes,
+            );
+            e.lx = pos.x;
+            e.ly = pos.y;
+            e.elev = pos.elev;
+            this.enemyPhysicsMovesLastFrame += 1;
+            if (heightTransition) {
+              this.enemyHeightTransitionMovesLastFrame += 1;
+            }
+          }
         } else {
           e.lx = clampCoordToMap(nextX, e.radius, this.map.width, tileSize);
           e.ly = clampCoordToMap(nextY, e.radius, this.map.height, tileSize);
+          this.enemyKinematicMovesLastFrame += 1;
         }
-        this.enemyPhysicsMovesLastFrame += 1;
       }
 
       if (
@@ -3711,13 +4209,17 @@ export class EmberThreeWorld {
     for (const a of [...this.actors]) {
       if (a.kind !== "chest" || a.dead || !a.regionId) continue;
       if (this.openedChestKeys.has(chestKey(this.map.id, a.regionId))) continue;
+      const region = this.map.regions.find((r) => r.id === a.regionId);
+      const interactionElev = region
+        ? regionVolumeElev(this.map, region)
+        : a.elev;
+      if (!elevNearlyEqual(interactionElev, this.playerElev)) continue;
       if (
         Math.hypot(a.lx - this.player.lx, a.ly - this.player.ly) >
         CHEST_INTERACT_R
       ) {
         continue;
       }
-      const region = this.map.regions.find((r) => r.id === a.regionId);
       this.openedChestKeys.add(chestKey(this.map.id, a.regionId));
       if (!region) {
         this.removeActor(a);
@@ -3755,9 +4257,13 @@ export class EmberThreeWorld {
       if (Math.hypot(g.lx - this.player.lx, g.ly - this.player.ly) > 12) {
         continue;
       }
-      this.xp += g.xp ?? 1;
+      this.xp = runtimeXpAfterPickup(
+        this.xp,
+        g.xp ?? 1,
+        this.stressNoXp,
+      );
       this.removeActor(g);
-      while (this.xp >= this.xpToLevel) {
+      while (!this.stressNoXp && this.xp >= this.xpToLevel) {
         this.xp -= this.xpToLevel;
         this.level += 1;
         this.xpToLevel = Math.floor(this.stage.baseXpToLevel + this.level * 4);
@@ -3792,6 +4298,7 @@ export class EmberThreeWorld {
 
   private applyDamageToEnemy(enemy: Actor, dmg: number): void {
     if (enemy.dead || enemy.kind !== "enemy") return;
+    if (!runtimeAllowsEnemyDamage(this.stressEnemyTarget)) return;
     const profile = resolveMapPlayProfile(this.map);
     const dealt = outgoingPlayerDamage(profile, dmg, this.playerCombatStats());
     enemy.hp = (enemy.hp ?? 1) - dealt;
@@ -4515,6 +5022,11 @@ export class EmberThreeWorld {
     if (this.disposed) return;
     const canvas = this.renderer.domElement;
     const looking = playLookActive(this.lookState());
+    if (!looking) {
+      this.pendingLookMovementX = 0;
+      this.lookWarpPending = false;
+      this.lookWarpSkip = 0;
+    }
     canvas.style.cursor = playCanvasCursor(looking);
     this.parent.classList.toggle("is-looking", looking);
     this.parent.parentElement?.classList.toggle("is-looking", looking);

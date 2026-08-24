@@ -70,6 +70,32 @@ describe("exploreSim agent_sandbox", () => {
     expect(dump.nearby[0]?.id).toBe("start");
   });
 
+  it("respects player_start elevation and ignores a stacked ground teleporter", () => {
+    const world = loadSandbox();
+    const start = world.map.regions.find((region) => region.id === "start")!;
+    const elevatedMap = {
+      ...world.map,
+      regions: [
+        ...world.map.regions.map((region) =>
+          region.id === start.id ? { ...region, elev: 3 } : region,
+        ),
+        {
+          id: "under_start",
+          kind: "teleport" as const,
+          x: start.x,
+          y: start.y,
+          w: start.w,
+          h: start.h,
+          elev: 0,
+          targetX: 1,
+          targetY: 1,
+        },
+      ],
+    };
+    const sim = createExploreSim({ ...simOpts(world), map: elevatedMap });
+    expect(sim.dump()).toMatchObject({ elev: 3, occupyingId: null });
+  });
+
   it("walks to teleport_a and arrives at teleport_b with voxel collision loaded", () => {
     const world = loadSandbox();
     const sim = createExploreSim(simOpts(world));

@@ -57,6 +57,7 @@ import {
   setEmberVoxelAssetComponentPresence,
   setEmberWorldObjectComponentPresence,
   translateEmberWorldObjects,
+  translateEmberWorldSelection,
   translateEmberSceneGroupTransforms,
   type EditorDocumentChangeSource,
   type EditorPickCycleState,
@@ -72,6 +73,7 @@ import {
 } from "../../../game/editor";
 import type { EmberAssetReference } from "../../../game/editor/emberLibraryIndex";
 import { writeEmberJson } from "../../../game/content/io";
+import { resolveMapAutoAttack } from "../../../game/content/playProfile";
 import {
   packWithVoxels,
   writeVoxelRegistry,
@@ -158,6 +160,7 @@ import {
   lightsFileFromPresets,
 } from "../../../game/content/lightPresets";
 import { voxelPlacementModifiersFromModel } from "../../../game/voxel/voxelModelApply";
+import { clampVoxelDirectLightScale } from "../../../game/voxel/voxelMesher";
 import {
   BUILTIN_LIGHT_PRESET_IDS,
   MAP_LIB_MIME,
@@ -419,7 +422,7 @@ const TOOLS: Array<{
   {
     id: "select",
     labelRu: "Выбор",
-    hint: "Клик — объект / тайл · Shift+ЛКМ — рамка на Z · Ctrl+клик — мультивыбор · G/R/S",
+    hint: "Клик — объект / тайл · Shift+ЛКМ — объёмная рамка · Alt+Shift — один Z · Ctrl+клик — мультивыбор · G/R/S",
     glyph: "V",
   },
   {
@@ -825,7 +828,6 @@ function multiSelectionWorldObjects(
     selections.some(
       (selection) =>
         selection.kind === "group" ||
-        selection.kind === "tile" ||
         selection.kind === "lib" ||
         selection.kind === "globalLight",
     )
@@ -835,7 +837,7 @@ function multiSelectionWorldObjects(
   const byKey = new Map<string, EmberWorldObject>();
   for (const selection of selections) {
     const ref = mapSelectionToWorldObjectRef(selection);
-    if (!ref || ref.kind === "tile") continue;
+    if (!ref) continue;
     const object = getEmberWorldObject(map, ref);
     if (object) byKey.set(object.key, object);
   }
@@ -880,7 +882,9 @@ function multiSelectionTransformTarget(
     },
     scale: { x: 1, y: 1, z: 1 },
     allowRotate: false,
-    allowScale: true,
+    allowScale: objects.every(
+      (object) => object.kind !== "tile" && object.kind !== "light",
+    ),
   };
 }
 
@@ -917,9 +921,9 @@ function mapWithTransformPreview(
         preview.scale,
       );
     }
-    return translateEmberWorldObjects(
+    return translateEmberWorldSelection(
       map,
-      objects.map((object) => object.ref),
+      objects,
       Math.round(targetX - pivot.x),
       Math.round(targetY - pivot.y),
     );
@@ -1218,6 +1222,7 @@ export function MapEditorPanel({
   const canvasWrapRef = useRef<HTMLDivElement>(null);
   const threeHostRef = useRef<HTMLDivElement>(null);
   const threePreviewRef = useRef<EditorThreePreview | null>(null);
+  const syncViewportRef = useRef<() => void>(() => undefined);
   const transformCommitRef = useRef<(commit: EditorTransformCommit) => void>(
     () => undefined,
   );
@@ -1262,13 +1267,16 @@ export function MapEditorPanel({
   const dragEndRef = useRef<TilePos | null>(null);
   const marqueeing = useRef(false);
   const marqueeAddRef = useRef(false);
+  const marqueePlaneOnlyRef = useRef(false);
   const marqueeElevRef = useRef(0);
+  const marqueeEndElevRef = useRef(0);
   const marqueeStartRef = useRef<TilePos | null>(null);
   const marqueeEndRef = useRef<TilePos | null>(null);
   const toolRef = useRef<Tool>("select");
   const mapRef = useRef(map);
   const displayMapRef = useRef(map);
   const packRef = useRef(pack);
+  const tilesetRef = useRef<EmberTileset | undefined>(undefined);
   const onChangeRef = useRef(onChange);
   const editorCoreRef = useRef<
     EditorCore<EmberMap, MapSelection, Tool> | null
@@ -1593,6 +1601,9 @@ export function MapEditorPanel({
               mapRef.current,
             ),
             elev: marqueeSelRef.current.elev,
+            elevEnd: marqueeSelRef.current.planeOnly
+              ? marqueeSelRef.current.elev
+              : marqueeSelRef.current.endElev,
           }
         : null,
       libTile: lib ? { tx: lib.x, ty: lib.y } : null,
@@ -1817,6 +1828,7 @@ export function MapEditorPanel({
       if (marqueeing.current) {
         marqueeing.current = false;
         marqueeAddRef.current = false;
+        marqueePlaneOnlyRef.current = false;
         marqueeStartRef.current = null;
         marqueeEndRef.current = null;
         setMarqueeSel(null);
@@ -1913,6 +1925,8 @@ export function MapEditorPanel({
     start: TilePos;
     end: TilePos;
     elev: number;
+    endElev: number;
+    planeOnly: boolean;
     add: boolean;
   } | null>(null);
   const marqueeSelRef = useRef(marqueeSel);
@@ -1984,14 +1998,29 @@ export function MapEditorPanel({
             return emberSceneGroupObjectKeys(map.sceneHierarchy, item.id);
           }
           const ref = mapSelectionToWorldObjectRef(item);
-          return ref && ref.kind !== "tile" ? [emberWorldObjectRefKey(ref)] : [];
+          return ref ? [emberWorldObjectRefKey(ref)] : [];
         }),
       ),
     [map.sceneHierarchy, selectionState.items],
   );
   const selectedSceneObjects = useMemo(
-    () => sceneObjects.filter((object) => selectedObjectKeys.has(object.key)),
-    [sceneObjects, selectedObjectKeys],
+    () => {
+      const objects = new Map<string, EmberWorldObject>();
+      for (const object of sceneObjects) {
+        if (selectedObjectKeys.has(object.key)) objects.set(object.key, object);
+      }
+      // Tiles are intentionally queried lazily and therefore absent from the
+      // Outliner list. Resolve selected tile stories explicitly so Inspector
+      // batch edits and the shared transform gizmo see the complete selection.
+      for (const item of selectionState.items) {
+        const ref = mapSelectionToWorldObjectRef(item);
+        if (!ref || ref.kind !== "tile") continue;
+        const object = getEmberWorldObject(map, ref, { pack, tileset });
+        if (object) objects.set(object.key, object);
+      }
+      return [...objects.values()];
+    },
+    [map, pack, sceneObjects, selectedObjectKeys, selectionState.items, tileset],
   );
   const selectedSceneGroup =
     selection?.kind === "group"
@@ -2040,6 +2069,7 @@ export function MapEditorPanel({
 
   mapRef.current = map;
   packRef.current = pack;
+  tilesetRef.current = tileset;
   onChangeRef.current = onChange;
 
   useEffect(() => {
@@ -2245,13 +2275,15 @@ export function MapEditorPanel({
           }
           transformMapPreviewRafRef.current = requestAnimationFrame(() => {
             transformMapPreviewRafRef.current = 0;
+            const currentTileset = tilesetRef.current;
+            if (!currentTileset) return;
             setTransformMapPreview(
               mapWithTransformPreview(
                 mapRef.current,
                 preview,
                 selectionItemsRef.current,
-                tileset,
-                pack.sprites,
+                currentTileset,
+                packRef.current.sprites,
               ),
             );
           });
@@ -2317,10 +2349,8 @@ export function MapEditorPanel({
       syncThreeOverlays();
     };
 
+    syncViewportRef.current = syncViewport;
     syncViewport();
-    const ro = new ResizeObserver(() => syncViewport());
-    ro.observe(wrap);
-    return () => ro.disconnect();
   }, [
     viewMode,
     tileset,
@@ -2330,6 +2360,14 @@ export function MapEditorPanel({
     blitBaseAndOverlay,
     syncThreeOverlays,
   ]);
+
+  useEffect(() => {
+    const wrap = canvasWrapRef.current;
+    if (!wrap) return;
+    const ro = new ResizeObserver(() => syncViewportRef.current());
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     threePreviewRef.current?.setViewPreset(viewMode);
@@ -2468,12 +2506,7 @@ export function MapEditorPanel({
       const current = mapRef.current;
       pushHistory(current, `Переместить ${editable.length} объектов`);
       publishMap(
-        translateEmberWorldObjects(
-          current,
-          editable.map((object) => object.ref),
-          dx,
-          dy,
-        ),
+        translateEmberWorldSelection(current, editable, dx, dy),
       );
       if (editable.length !== objects.length) {
         onSaved(`Перемещено ${editable.length}; заблокированные пропущены.`);
@@ -2484,7 +2517,9 @@ export function MapEditorPanel({
 
   const deleteWorldSelection = useCallback(
     (objects: readonly EmberWorldObject[]) => {
-      const editable = objects.filter((object) => !sceneState.isLocked(object.key));
+      const editable = objects.filter(
+        (object) => object.kind !== "tile" && !sceneState.isLocked(object.key),
+      );
       const tileItems = selectionService
         .getState()
         .items.filter(
@@ -2626,11 +2661,13 @@ export function MapEditorPanel({
     (elevation: number | "floor") => {
       const editable = selectedSceneObjects.filter(
         (object) =>
-          (object.kind === "voxel" || object.kind === "sprite") &&
+          (object.kind === "voxel" ||
+            object.kind === "sprite" ||
+            object.kind === "region") &&
           !sceneState.isLocked(object.key),
       );
       if (editable.length === 0) {
-        onSaved("В выборе нет доступных вокселей или спрайтов с Transform Z.");
+        onSaved("В выборе нет доступных объектов с общим Transform Z.");
         return;
       }
       const current = mapRef.current;
@@ -2663,10 +2700,77 @@ export function MapEditorPanel({
     [onSaved, publishMap, pushHistory, sceneState, selectedSceneObjects],
   );
 
+  const setWorldSelectionWallHeight = useCallback(
+    (heightVoxels: number) => {
+      const cells = new Map<string, { tx: number; ty: number }>();
+      for (const object of selectedSceneObjects) {
+        if (object.source.kind !== "tile") continue;
+        const { tx, ty } = object.source.value;
+        cells.set(`${tx}:${ty}`, { tx, ty });
+      }
+      if (cells.size === 0) return;
+      const current = mapRef.current;
+      const value = Math.max(0, Math.min(64, Math.round(heightVoxels)));
+      const changed = [...cells.values()].some(
+        ({ tx, ty }) => heightVoxelsAt(current, tx, ty) !== value,
+      );
+      if (!changed) return;
+      pushHistory(current, `Высота стены · ${cells.size} клеток`);
+      const next = ensureMapLayers(cloneMap(current));
+      for (const { tx, ty } of cells.values()) {
+        setWallHeightVoxels(next, ty * next.width + tx, value);
+      }
+      publishMap(next);
+      onSaved(`Высота стены ${value} vx · ${cells.size} клеток`);
+    },
+    [onSaved, publishMap, pushHistory, selectedSceneObjects],
+  );
+
+  const patchWorldSelectionVoxels = useCallback(
+    (patch: { rot?: number; directLightScale?: number }) => {
+      const ids = new Set(
+        selectedSceneObjects.flatMap((object) =>
+          object.source.kind === "voxel" ? [object.source.value.id] : [],
+        ),
+      );
+      if (ids.size === 0) return;
+      const current = mapRef.current;
+      const rot =
+        patch.rot == null
+          ? undefined
+          : ((Math.round(patch.rot) % 4) + 4) % 4;
+      const direct =
+        patch.directLightScale == null
+          ? undefined
+          : clampVoxelDirectLightScale(patch.directLightScale);
+      let changed = false;
+      const voxelProps = (current.voxelProps ?? []).map((item) => {
+        if (!ids.has(item.id)) return item;
+        const next = { ...item };
+        if (rot != null && (item.rot ?? 0) !== rot) {
+          next.rot = rot;
+          changed = true;
+        }
+        if (direct != null && item.directLightScale !== direct) {
+          next.directLightScale = direct;
+          changed = true;
+        }
+        return next;
+      });
+      if (!changed) return;
+      pushHistory(current, `Общие параметры · ${ids.size} вокселей`);
+      publishMap({ ...current, voxelProps });
+      onSaved(`Обновлено вокселей: ${ids.size}`);
+    },
+    [onSaved, publishMap, pushHistory, selectedSceneObjects],
+  );
+
   const setWorldSelectionLocked = useCallback(
     (locked: boolean) => {
       sceneState.setLockedMany(
-        selectedSceneObjects.map((object) => object.key),
+        selectedSceneObjects
+          .filter((object) => object.kind !== "tile")
+          .map((object) => object.key),
         locked,
       );
       if (locked) setObjectGrab(null);
@@ -2677,7 +2781,9 @@ export function MapEditorPanel({
   const setWorldSelectionHidden = useCallback(
     (hidden: boolean) => {
       sceneState.setHiddenMany(
-        selectedSceneObjects.map((object) => object.key),
+        selectedSceneObjects
+          .filter((object) => object.kind !== "tile")
+          .map((object) => object.key),
         hidden,
       );
       if (hidden) setObjectGrab(null);
@@ -2842,6 +2948,49 @@ export function MapEditorPanel({
       publishMap(next);
     },
     [onSaved, publishMap, pushHistory, sceneState],
+  );
+
+  const editWorldSelectionField = useCallback(
+    (edit: EmberInspectorFieldEdit) => {
+      const primaryRef = mapSelectionToWorldObjectRef(selectionRef.current);
+      const primary = selectedSceneObjects.find(
+        (object) => primaryRef && emberWorldObjectRefKey(primaryRef) === object.key,
+      );
+      const compatible = primary
+        ? selectedSceneObjects.filter(
+            (object) =>
+              object.kind === primary.kind &&
+              (object.kind === "tile" || !sceneState.isLocked(object.key)),
+          )
+        : [];
+      // Absolute Transform X/Y from a single-object schema would collapse a
+      // group. Shared Transform uses the pivot gizmo and dedicated Z control.
+      if (compatible.length < 2 || edit.componentType === "transform") {
+        editSelectedWorldObjectField(edit);
+        return;
+      }
+      const current = mapRef.current;
+      let next = current;
+      for (const object of compatible) {
+        next = applyEmberInspectorFieldEdit(next, object.ref, edit);
+      }
+      if (next === current) return;
+      const schema = getEmberInspectorComponentSchema(edit.componentType);
+      pushHistory(
+        current,
+        `Изменить ${schema?.label ?? edit.componentType} · ${compatible.length}`,
+      );
+      publishMap(next);
+      onSaved(`Общее поле применено к ${compatible.length} объектам`);
+    },
+    [
+      editSelectedWorldObjectField,
+      onSaved,
+      publishMap,
+      pushHistory,
+      sceneState,
+      selectedSceneObjects,
+    ],
   );
 
   const setSelectedWorldObjectComponent = useCallback(
@@ -3591,6 +3740,44 @@ export function MapEditorPanel({
     if (selectedLightId && isSceneObjectLocked("light", selectedLightId)) return;
     pushHistory(mapRef.current, "Изменить источник света");
   }, [isSceneObjectLocked, selectedLightId]);
+
+  const commitGlobalLight = useCallback(
+    (light: EmberMapLight) => {
+      const current = mapRef.current;
+      if (JSON.stringify(current.light ?? null) === JSON.stringify(light)) return;
+      pushHistory(current, "Изменить глобальный свет");
+      const next = cloneMap(current);
+      next.light = light;
+      publishMap(next);
+    },
+    [publishMap, pushHistory],
+  );
+
+  const commitPlayProfile = useCallback(
+    (profile: EmberMap["playProfile"]) => {
+      const current = mapRef.current;
+      if (
+        JSON.stringify(current.playProfile ?? null) === JSON.stringify(profile ?? null)
+      ) return;
+      pushHistory(current, "Изменить профиль запуска");
+      const next = cloneMap(current);
+      next.playProfile = profile;
+      publishMap(next);
+    },
+    [publishMap, pushHistory],
+  );
+
+  const commitAutoAttack = useCallback(
+    (enabled: boolean) => {
+      const current = mapRef.current;
+      if (resolveMapAutoAttack(current) === enabled) return;
+      pushHistory(current, "Изменить автоатаку");
+      const next = cloneMap(current);
+      next.autoAttack = enabled;
+      publishMap(next);
+    },
+    [publishMap, pushHistory],
+  );
 
   const commitLightSource = useCallback(
     (source: EmberLightSource, opts?: { history?: boolean }) => {
@@ -4431,12 +4618,7 @@ export function MapEditorPanel({
       if (!dx && !dy) return;
       pushHistory(m, `Переместить ${objects.length} объектов`);
       publishMap(
-        translateEmberWorldObjects(
-          m,
-          objects.map((object) => object.ref),
-          dx,
-          dy,
-        ),
+        translateEmberWorldSelection(m, objects, dx, dy),
       );
       return;
     }
@@ -4912,6 +5094,7 @@ export function MapEditorPanel({
         e.stopPropagation();
         marqueeing.current = false;
         marqueeAddRef.current = false;
+        marqueePlaneOnlyRef.current = false;
         marqueeStartRef.current = null;
         marqueeEndRef.current = null;
         setMarqueeSel(null);
@@ -5403,6 +5586,7 @@ export function MapEditorPanel({
   const cancelMarquee = () => {
     marqueeing.current = false;
     marqueeAddRef.current = false;
+    marqueePlaneOnlyRef.current = false;
     marqueeStartRef.current = null;
     marqueeEndRef.current = null;
     setMarqueeSel(null);
@@ -5413,6 +5597,8 @@ export function MapEditorPanel({
     const start = marqueeStartRef.current;
     const end = marqueeEndRef.current ?? start;
     const elev = marqueeElevRef.current;
+    const endElev = marqueeEndElevRef.current;
+    const planeOnly = marqueePlaneOnlyRef.current;
     const add = marqueeAddRef.current;
     cancelMarquee();
     if (!start || !end) return;
@@ -5422,7 +5608,10 @@ export function MapEditorPanel({
       map: mapNow,
       start,
       end,
-      elev,
+      elev: planeOnly ? elev : undefined,
+      elevRange: planeOnly
+        ? undefined
+        : { min: Math.min(elev, endElev), max: Math.max(elev, endElev) },
       filter: selectionFilterRef.current,
       voxelModels: packNow.voxelModels,
       tileset: packNow.tilesets[mapNow.tilesetId],
@@ -5486,14 +5675,26 @@ export function MapEditorPanel({
         return;
       }
       if (marqueeing.current && marqueeStartRef.current) {
-        const place = clientToPlaceTarget(e.clientX, e.clientY);
-        if (!place) return;
-        const tile = { x: place.tx, y: place.ty };
-        marqueeEndRef.current = tile;
+        // Both ends come from the nearest visible world surface. The old
+        // work-plane endpoint could jump behind a wall and expand X/Y by
+        // several isometric rows.
+        const surface = clientToBreakTarget(e.clientX, e.clientY);
+        const fallbackTile = surface
+          ? null
+          : clientToTile(e.clientX, e.clientY);
+        if (!surface && !fallbackTile) return;
+        const end = surface
+          ? { x: surface.tx, y: surface.ty }
+          : fallbackTile!;
+        const endElev = surface?.elev ?? marqueeElevRef.current;
+        marqueeEndRef.current = end;
+        marqueeEndElevRef.current = endElev;
         setMarqueeSel({
           start: marqueeStartRef.current,
-          end: tile,
+          end,
           elev: marqueeElevRef.current,
+          endElev,
+          planeOnly: marqueePlaneOnlyRef.current,
           add: marqueeAddRef.current,
         });
         return;
@@ -5710,7 +5911,7 @@ export function MapEditorPanel({
       setIsPanning(true);
       return true;
     }
-    if (e.button === 2 || (e.button === 0 && e.altKey)) {
+    if (e.button === 2 || (e.button === 0 && e.altKey && !e.shiftKey)) {
       e.preventDefault();
       // RMB on map clears library place-tool selection (Старт / Спавн / …).
       if (e.button === 2 && libSelectedRef.current) {
@@ -5771,17 +5972,15 @@ export function MapEditorPanel({
 
   // Debounced autosave after map edits.
   useEffect(() => {
-    const json = JSON.stringify(ensureMapLayers(map));
     if (!lastSavedJsonRef.current) {
-      lastSavedJsonRef.current = json;
+      lastSavedJsonRef.current = JSON.stringify(ensureMapLayers(map));
       dirtyRef.current = false;
       documentStore.markSaved();
       setSaveState("saved");
       return;
     }
-    if (json === lastSavedJsonRef.current) {
+    if (!documentStore.getState().dirty) {
       dirtyRef.current = false;
-      documentStore.markSaved();
       setSaveState((s) => (s === "saving" || s === "error" ? s : "saved"));
       return;
     }
@@ -6803,22 +7002,10 @@ export function MapEditorPanel({
                     onPackChange={onPackChange}
                     onSaved={onSaved}
                     playProfile={map.playProfile}
-                    onCommitPlayProfile={(profile) => {
-                      const next = cloneMap(mapRef.current);
-                      next.playProfile = profile;
-                      publishMap(next);
-                    }}
+                    onCommitPlayProfile={commitPlayProfile}
                     autoAttack={map.autoAttack}
-                    onCommitAutoAttack={(enabled) => {
-                      const next = cloneMap(mapRef.current);
-                      next.autoAttack = enabled;
-                      publishMap(next);
-                    }}
-                    onCommitGlobal={(light: EmberMapLight) => {
-                      const next = cloneMap(mapRef.current);
-                      next.light = light;
-                      publishMap(next);
-                    }}
+                    onCommitAutoAttack={commitAutoAttack}
+                    onCommitGlobal={commitGlobalLight}
                     onResetGlobal={() => {
                       pushHistory(mapRef.current);
                       const next = cloneMap(mapRef.current);
@@ -6839,11 +7026,7 @@ export function MapEditorPanel({
                     pickModeActive={tool === "lightpick"}
                     onActivatePickMode={() => selectTool("lightpick")}
                     onSelectSource={setSelectedLightId}
-                    onCommitGlobal={(light: EmberMapLight) => {
-                      const next = cloneMap(mapRef.current);
-                      next.light = light;
-                      publishMap(next);
-                    }}
+                    onCommitGlobal={commitGlobalLight}
                     onResetGlobal={() => {
                       pushHistory(mapRef.current);
                       const next = cloneMap(mapRef.current);
@@ -7111,22 +7294,36 @@ export function MapEditorPanel({
                 if (toolRef.current === "select") {
                   e.preventDefault();
                   if (e.shiftKey) {
-                    const place = clientToPlaceTarget(e.clientX, e.clientY);
-                    const tile = place
-                      ? { x: place.tx, y: place.ty }
-                      : clientToTile(e.clientX, e.clientY);
-                    if (!tile) return;
-                    const elev = brushElevRef.current;
+                    const hitStory = pointerStack.find(
+                      (candidate): candidate is Extract<MapSelection, { kind: "tile" }> =>
+                        candidate.kind === "tile" && candidate.elev != null,
+                    );
+                    const surface = clientToBreakTarget(e.clientX, e.clientY);
+                    const fallbackTile = surface
+                      ? null
+                      : hitStory
+                        ? { x: hitStory.tx, y: hitStory.ty }
+                        : clientToTile(e.clientX, e.clientY);
+                    if (!surface && !fallbackTile) return;
+                    const elev =
+                      surface?.elev ?? hitStory?.elev ?? brushElevRef.current;
+                    const start = surface
+                      ? { x: surface.tx, y: surface.ty }
+                      : fallbackTile!;
                     marqueeing.current = true;
                     marqueeAddRef.current = e.ctrlKey || e.metaKey;
-                    marqueeStartRef.current = tile;
-                    marqueeEndRef.current = tile;
+                    marqueePlaneOnlyRef.current = e.altKey;
+                    marqueeStartRef.current = start;
+                    marqueeEndRef.current = start;
                     marqueeElevRef.current = elev;
+                    marqueeEndElevRef.current = elev;
                     hoverPickRef.current = null;
                     setMarqueeSel({
-                      start: tile,
-                      end: tile,
+                      start,
+                      end: start,
                       elev,
+                      endElev: elev,
+                      planeOnly: marqueePlaneOnlyRef.current,
                       add: marqueeAddRef.current,
                     });
                     return;
@@ -7320,7 +7517,15 @@ export function MapEditorPanel({
                   );
                   const w = r.x1 - r.x0 + 1;
                   const h = r.y1 - r.y0 + 1;
-                  return `${w}×${h} · плоскость Z${marqueeSel.elev} · отпусти — ${marqueeSel.add ? "добавить в выбор" : "выделить"} · Esc — отмена`;
+                  const z0 = marqueeSel.elev;
+                  const z1 = marqueeSel.planeOnly
+                    ? marqueeSel.elev
+                    : marqueeSel.endElev;
+                  const zLabel =
+                    z0 === z1
+                      ? `Z${z0}`
+                      : `Z${Math.min(z0, z1)}–Z${Math.max(z0, z1)}`;
+                  return `${w}×${h} · ${zLabel} · координатная область по видимой поверхности · отпусти — ${marqueeSel.add ? "добавить в выбор" : "выделить"} · Esc — отмена`;
                 })()}
               </div>
             ) : dragSel ? (
@@ -7355,7 +7560,7 @@ export function MapEditorPanel({
                       .slice(0, 4)
                       .map(mapSelectionShortLabel)
                       .join(" → ")}${hoverSelectionStack.length > 4 ? ` · ещё ${hoverSelectionStack.length - 4}` : ""}. Повторный клик — следующий · Ctrl+клик — добавить/убрать.`
-                  : "Выбор (V): клик — объект или тайл · Shift+ЛКМ — рамка на Z · Ctrl+клик — мультивыбор · G — перенос · R — поворот · Esc — снять"}
+                  : "Выбор (V): клик — объект или тайл · Shift+ЛКМ — объёмная рамка всех Z · Alt+Shift — один Z · Ctrl+клик — мультивыбор · G — перенос · R — поворот · Esc — снять"}
               </p>
             ) : showEditorHints && tool === "lightpick" ? (
               <p className="muted ember-hint ember-ed-map__drag-hint">
@@ -7395,7 +7600,9 @@ export function MapEditorPanel({
                   <dt>Del</dt>
                   <dd>удалить</dd>
                   <dt>Shift+ЛКМ</dt>
-                  <dd>рамка на плоскости Z</dd>
+                  <dd>объёмная рамка всех Z</dd>
+                  <dt>Alt+Shift+ЛКМ</dt>
+                  <dd>рамка только на Z под курсором</dd>
                   <dt>Shift+стрелки</dt>
                   <dd>сдвиг на клетку</dd>
                   <dt>. · Ctrl+G</dt>
@@ -7573,7 +7780,7 @@ export function MapEditorPanel({
                     </div>
                     {showEditorHints ? (
                       <p className="muted ember-ed-map__tool-hud-hint">
-                        Повторный клик — следующий · Shift+ЛКМ — рамка на Z ·
+                        Повторный клик — следующий · Shift+ЛКМ — рамка всех Z ·
                         Ctrl — добавить · Del — удалить всё в выборе
                       </p>
                     ) : null}
@@ -7772,6 +7979,8 @@ export function MapEditorPanel({
               onSetMultiElevation={(elevation) =>
                 setWorldSelectionElevation(elevation)
               }
+              onSetMultiWallHeight={setWorldSelectionWallHeight}
+              onPatchMultiVoxels={patchWorldSelectionVoxels}
               onDropMultiToFloor={() => setWorldSelectionElevation("floor")}
               onSetMultiLocked={setWorldSelectionLocked}
               onSetMultiHidden={setWorldSelectionHidden}
@@ -7824,7 +8033,7 @@ export function MapEditorPanel({
               onSetWorldObjectParent={(objectKey, parentGroupId) =>
                 reparentSceneObjects([objectKey], parentGroupId)
               }
-              onWorldObjectFieldEdit={editSelectedWorldObjectField}
+              onWorldObjectFieldEdit={editWorldSelectionField}
               onWorldObjectTransformPatch={editSelectedWorldObjectTransform}
               onApplyWorldObjectComponentToAsset={
                 applySelectedWorldObjectComponentToAsset
@@ -7856,16 +8065,8 @@ export function MapEditorPanel({
               onClose={() => setSelection(null)}
               onActivatePickMode={() => selectTool("lightpick")}
               onSelectLight={setSelectedLightId}
-              onCommitGlobal={(light) => {
-                const next = cloneMap(mapRef.current);
-                next.light = light;
-                publishMap(next);
-              }}
-              onCommitPlayProfile={(profile) => {
-                const next = cloneMap(mapRef.current);
-                next.playProfile = profile;
-                publishMap(next);
-              }}
+              onCommitGlobal={commitGlobalLight}
+              onCommitPlayProfile={commitPlayProfile}
               onResetGlobal={() => {
                 pushHistory(mapRef.current);
                 const next = cloneMap(mapRef.current);

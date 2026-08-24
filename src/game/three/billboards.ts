@@ -7,6 +7,7 @@ import {
   composeSpriteForFrame,
   composeSpriteForView,
   normalizePixelSprite,
+  resolveSpriteWorldOffsetVoxels,
   spriteHasAnimFrames,
   spriteHasExtraCardViews,
   spriteHasVisual,
@@ -22,6 +23,7 @@ import type {
   EmberTransformScale,
 } from "../content/types";
 import { EMBER_CHARACTER_CARD_VIEWS } from "../content/types";
+import { VOXELS_PER_BLOCK } from "../voxel/constants";
 import {
   characterCardViewSticky,
   lookYawToward,
@@ -35,8 +37,74 @@ import {
 import { parseHexRgb } from "../tile/mapUtils";
 import { resolveEmberTransformScale } from "../world/worldTransform";
 
-const texCache = new Map<string, THREE.CanvasTexture>();
+type CachedBillboardTexture = {
+  key: string;
+  texture: THREE.CanvasTexture;
+  refs: number;
+};
+
+type BillboardTextureLease = {
+  texture: THREE.Texture;
+  release: () => void;
+};
+
+const texCache = new Map<string, CachedBillboardTexture>();
+const texCacheByTexture = new WeakMap<THREE.Texture, CachedBillboardTexture>();
 const _faceDir = new THREE.Vector3();
+
+/**
+ * Tie a cached texture to the lifetime of one billboard mesh. A texture is
+ * retained once per mesh even when main/depth/distance materials share it.
+ */
+export function trackBillboardTexture(
+  mesh: THREE.Mesh,
+  texture: THREE.Texture,
+  release: () => void,
+): boolean {
+  const leases = (mesh.userData.emberTextureLeases ??= []) as BillboardTextureLease[];
+  if (leases.some((lease) => lease.texture === texture)) return false;
+  leases.push({ texture, release });
+  mesh.userData.emberReleaseTrackedTextures = () => releaseBillboardTextures(mesh);
+  return true;
+}
+
+/** Move cache ownership when a template mesh becomes an InstancedMesh. */
+export function transferBillboardTextureLeases(
+  from: THREE.Mesh,
+  to: THREE.Mesh,
+): void {
+  const leases = from.userData.emberTextureLeases as
+    | BillboardTextureLease[]
+    | undefined;
+  if (!leases?.length) return;
+  from.userData.emberTextureLeases = undefined;
+  from.userData.emberReleaseTrackedTextures = undefined;
+  to.userData.emberTextureLeases = leases;
+  to.userData.emberReleaseTrackedTextures = () => releaseBillboardTextures(to);
+}
+
+function retainCachedTexture(mesh: THREE.Mesh, texture: THREE.Texture): void {
+  const entry = texCacheByTexture.get(texture);
+  if (!entry) return;
+  const tracked = trackBillboardTexture(mesh, texture, () => {
+    entry.refs = Math.max(0, entry.refs - 1);
+    if (entry.refs > 0 || texCache.get(entry.key) !== entry) return;
+    texCache.delete(entry.key);
+    texCacheByTexture.delete(entry.texture);
+    entry.texture.dispose();
+  });
+  if (tracked) entry.refs += 1;
+}
+
+function releaseBillboardTextures(mesh: THREE.Mesh): void {
+  const leases = mesh.userData.emberTextureLeases as
+    | BillboardTextureLease[]
+    | undefined;
+  if (!leases) return;
+  mesh.userData.emberTextureLeases = undefined;
+  mesh.userData.emberReleaseTrackedTextures = undefined;
+  for (const lease of leases) lease.release();
+}
 
 function makeCircleTexture(
   color: string,
@@ -45,7 +113,7 @@ function makeCircleTexture(
 ): THREE.CanvasTexture {
   const key = `c:${color}:${outline ?? ""}:${size}`;
   const hit = texCache.get(key);
-  if (hit) return hit;
+  if (hit) return hit.texture;
   const c = document.createElement("canvas");
   c.width = size;
   c.height = size;
@@ -63,21 +131,28 @@ function makeCircleTexture(
   const tex = new THREE.CanvasTexture(c);
   tex.magFilter = THREE.NearestFilter;
   tex.minFilter = THREE.NearestFilter;
-  texCache.set(key, tex);
+  const entry = { key, texture: tex, refs: 0 } satisfies CachedBillboardTexture;
+  texCache.set(key, entry);
+  texCacheByTexture.set(tex, entry);
   return tex;
 }
 
-function channelFingerprint(pixels: string[] | undefined): string {
+export function billboardChannelFingerprint(
+  pixels: string[] | undefined,
+): string {
   if (!pixels?.length) return "0";
   let n = 0;
-  let acc = 0;
+  let acc = 0x811c9dc5;
   for (let i = 0; i < pixels.length; i++) {
     const c = pixels[i];
     if (!c || c === "#00000000") continue;
     n++;
-    acc = (acc * 33 + c.charCodeAt(1)! + i) | 0;
+    acc = Math.imul(acc ^ i, 0x01000193);
+    for (let j = 0; j < c.length; j++) {
+      acc = Math.imul(acc ^ c.charCodeAt(j), 0x01000193);
+    }
   }
-  return `${n}:${acc}`;
+  return `${n}:${acc >>> 0}`;
 }
 
 function makePixelSpriteTexture(spr: EmberPixelSprite): THREE.CanvasTexture | null {
@@ -93,9 +168,9 @@ function makePixelSpriteTexture(spr: EmberPixelSprite): THREE.CanvasTexture | nu
   const bloomKey = bloomRgb
     ? `b${bloomRgb.r.toString(16)}${bloomRgb.g.toString(16)}${bloomRgb.b.toString(16)}`
     : "0";
-  const key = `px:${n.id}:${n.width}x${h}:p${channelFingerprint(n.pixels)}:em${hasEm ? `${emStr.toFixed(2)}:${channelFingerprint(em)}:${bloomKey}` : "0"}`;
+  const key = `px:${n.id}:${n.width}x${h}:p${billboardChannelFingerprint(n.pixels)}:em${hasEm ? `${emStr.toFixed(2)}:${billboardChannelFingerprint(em)}:${bloomKey}` : "0"}`;
   const hit = texCache.get(key);
-  if (hit) return hit;
+  if (hit) return hit.texture;
   const c = document.createElement("canvas");
   c.width = n.width;
   c.height = h;
@@ -165,7 +240,9 @@ function makePixelSpriteTexture(spr: EmberPixelSprite): THREE.CanvasTexture | nu
   tex.magFilter = THREE.NearestFilter;
   tex.minFilter = THREE.NearestFilter;
   tex.colorSpace = THREE.SRGBColorSpace;
-  texCache.set(key, tex);
+  const entry = { key, texture: tex, refs: 0 } satisfies CachedBillboardTexture;
+  texCache.set(key, entry);
+  texCacheByTexture.set(tex, entry);
   return tex;
 }
 
@@ -186,6 +263,7 @@ function makeYawBillboard(
     side: THREE.DoubleSide,
   });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+  retainCachedTexture(mesh, map);
   mesh.scale.set(worldW, worldH, 1);
   mesh.userData.yawBillboard = true;
   mesh.castShadow = true;
@@ -216,6 +294,7 @@ export function disposeYawBillboard(mesh: THREE.Mesh): void {
   mesh.customDistanceMaterial?.dispose();
   mesh.customDepthMaterial = undefined;
   mesh.customDistanceMaterial = undefined;
+  releaseBillboardTextures(mesh);
 }
 
 export function createColorBillboard(
@@ -278,14 +357,20 @@ function attachSpriteCardMaps(
     if (reuseFront) maps.front = reuseFront;
     else {
       const tex = makePixelSpriteTexture(cel);
-      if (tex) maps.front = tex;
+      if (tex) {
+        maps.front = tex;
+        retainCachedTexture(mesh, tex);
+      }
     }
     for (const view of EMBER_CHARACTER_CARD_VIEWS) {
       if (view === "front") continue;
       const composed = composeSpriteForView(cel, view);
       if (composed === cel) continue;
       const tex = makePixelSpriteTexture(composed);
-      if (tex) maps[view] = tex;
+      if (tex) {
+        maps[view] = tex;
+        retainCachedTexture(mesh, tex);
+      }
     }
     return maps;
   };
@@ -383,6 +468,24 @@ export function applySpritePlacementScale(
   if (!stored) obj.userData.emberBillboardBaseScale = { ...base };
   const scale = resolveEmberTransformScale(authoredScale);
   obj.scale.set(base.x * scale.x, base.y * scale.z, base.z * scale.y);
+}
+
+/** Apply an asset's visual pivot without moving its map cell or collider. */
+export function applySpriteWorldPosition(
+  obj: THREE.Object3D,
+  sprite: Pick<EmberPixelSprite, "worldOffsetVoxels">,
+  tileSize: number,
+  worldX: number,
+  worldY: number,
+  worldZ: number,
+): void {
+  const offset = resolveSpriteWorldOffsetVoxels(sprite);
+  const voxelWorld = tileSize / VOXELS_PER_BLOCK;
+  obj.position.set(
+    worldX + offset.x * voxelWorld,
+    worldY + offset.z * voxelWorld,
+    worldZ + offset.y * voxelWorld,
+  );
 }
 
 /** Keep upright: only yaw toward camera on the horizontal plane. */

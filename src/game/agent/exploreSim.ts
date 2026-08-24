@@ -24,6 +24,7 @@ import {
 } from "../content/emberScript";
 import {
   MAP_CHANGE_COOLDOWN,
+  mapChangeRegionAt,
   mapChangeRequestFromRegion,
   mapChangeRequestFromWouldFire,
   resolveMapChangeArrival,
@@ -70,6 +71,7 @@ import {
   findRegions,
   pointInRegion,
   regionCenter,
+  regionVolumeElev,
   resolveTeleportTarget,
   stepTeleport,
   tileSurfaceElev,
@@ -375,22 +377,18 @@ export function createExploreSim(opts: {
     throw new Error(`exploreSim: no player_start on map ${map.id}`);
   }
   const spawn = regionCenter(map, start);
-  const spawnTile = worldToTile(map, spawn.x, spawn.y);
 
   let x = spawn.x;
   let y = spawn.y;
-  let elev = tileSurfaceElev(map, spawnTile.tx, spawnTile.ty);
+  let elev = regionVolumeElev(map, start);
   let occupyingId: string | null =
-    findRegions(map, "teleport").find((region) => {
-      const c = regionCenter(map, region);
-      return (
-        worldToTile(map, c.x, c.y).tx === spawnTile.tx &&
-        worldToTile(map, c.x, c.y).ty === spawnTile.ty
-      );
-    })?.id ?? null;
+    findRegions(map, "teleport").find((region) =>
+      pointInRegion(map, region, x, y, elev),
+    )?.id ?? null;
   let teleportCd = 0;
   let mapChangeCd = 0;
-  let mapChangeOccupyId: string | null = null;
+  let mapChangeOccupyId: string | null =
+    mapChangeRegionAt(map, x, y, elev)?.id ?? null;
   let lastWarp: ExploreWarpDump | null = null;
   let lastMapChange: ExploreMapChangeDump | null = null;
   let facingMx = 0;
@@ -584,7 +582,7 @@ export function createExploreSim(opts: {
         pointInRegion(map, region, x, y, elev),
       )?.id ??
       null;
-    mapChangeOccupyId = occupyingId;
+    mapChangeOccupyId = mapChangeRegionAt(map, x, y, elev)?.id ?? null;
     mapChangeCd = MAP_CHANGE_COOLDOWN;
     teleportCd = MAP_CHANGE_COOLDOWN;
     return true;
@@ -640,7 +638,7 @@ export function createExploreSim(opts: {
     y = arrival.y;
     elev = arrival.elev;
     occupyingId = arrival.occupyId;
-    mapChangeOccupyId = arrival.occupyId;
+    mapChangeOccupyId = mapChangeRegionAt(map, x, y, elev)?.id ?? null;
     mapChangeCd = MAP_CHANGE_COOLDOWN;
     teleportCd = MAP_CHANGE_COOLDOWN;
     lastWarp = null;
@@ -681,12 +679,9 @@ export function createExploreSim(opts: {
       }
     }
     if (mapChangeCd > 0 || mapChangeOccupyId) return;
-    const region = findRegions(map, "trigger").find((item) =>
-      pointInRegion(map, item, x, y, elev),
-    );
+    const region = mapChangeRegionAt(map, x, y, elev);
     if (!region) return;
     const request = mapChangeRequestFromRegion(region);
-    if (!request) return;
     tryChangeMap(request, region.id);
   };
 

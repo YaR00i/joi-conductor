@@ -468,6 +468,11 @@ export type EmberPixelSprite = {
   nameRu?: string;
   /** Author tags for library search (`village`, `street`). Inferred prefixes stay search-only. */
   tags?: string[];
+  /**
+   * Visual pivot correction in Ember voxels. X/Y move along the map plane,
+   * Z moves vertically. It does not move the collider or authored map cell.
+   */
+  worldOffsetVoxels?: { x: number; y: number; z: number };
   /** Explicit optional components on this reusable library asset. */
   componentStates?: Partial<Record<"collider", boolean>>;
   /** Width of all bands (px), 4…64. */
@@ -909,9 +914,21 @@ export type EmberSpriteArtLayer = {
   visible?: boolean;
   /** 0..1, default 1. */
   opacity?: number;
+  /** Photoshop-like color compositing. Default `normal`. */
+  blendMode?: EmberSpriteArtLayerBlendMode;
+  /** Prevent pixel edits while still allowing layer properties to change. */
+  locked?: boolean;
+  /** Preserve the current per-pixel alpha while painting. */
+  alphaLocked?: boolean;
   /** Same W×H as the sprite canvas. */
   pixels: string[];
 };
+
+export type EmberSpriteArtLayerBlendMode =
+  | "normal"
+  | "multiply"
+  | "screen"
+  | "add";
 
 /** Extra drawing for one sprite card face. Same W×H as `pixels`. */
 export type EmberSpriteCardFace = {

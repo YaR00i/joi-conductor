@@ -52,6 +52,22 @@ export function mapChangeRequestFromRegion(
   };
 }
 
+/** First entered trigger that can actually change maps at this elevation. */
+export function mapChangeRegionAt(
+  map: EmberMap,
+  x: number,
+  y: number,
+  elev?: number,
+): EmberMapRegion | null {
+  return (
+    findRegions(map, "trigger").find(
+      (region) =>
+        mapChangeRequestFromRegion(region) != null &&
+        pointInRegion(map, region, x, y, elev),
+    ) ?? null
+  );
+}
+
 export function mapChangeRequestFromWouldFire(
   wouldFire: InteractivityWouldFire,
   source?: EmberMapRegion | null,

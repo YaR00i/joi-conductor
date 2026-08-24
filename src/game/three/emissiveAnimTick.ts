@@ -70,6 +70,11 @@ export type EmissiveTickContext = {
    */
   playerTiles?: Array<{ x: number; y: number }>;
   enemyTiles?: Array<{ x: number; y: number }>;
+  /**
+   * Runtime fast path backed by the actor spatial index. When present,
+   * enemy/either triggers avoid scanning the entire crowd per emissive cell.
+   */
+  enemyProximityAmount?: (tx: number, ty: number, radius: number) => number;
   /** Event ids considered "active" for trigger_event. */
   activeEventIds?: ReadonlySet<string> | string[];
   /**
@@ -231,13 +236,16 @@ function triggerAmountFor(
   const tx = meta.tx ?? 0;
   const ty = meta.ty ?? 0;
   const radius = resolveEmissiveTriggerRadius(meta.triggerRadius);
-  const playerAmount = emissiveProximityAmount(
-    tx,
-    ty,
-    radius,
-    ctx.playerTiles,
-  );
-  const enemyAmount = emissiveProximityAmount(tx, ty, radius, ctx.enemyTiles);
+  const playerAmount =
+    when === "enemy"
+      ? 0
+      : emissiveProximityAmount(tx, ty, radius, ctx.playerTiles);
+  if (when === "player" || (when === "either" && playerAmount >= 1)) {
+    return playerAmount;
+  }
+  const enemyAmount = ctx.enemyProximityAmount
+    ? ctx.enemyProximityAmount(tx, ty, radius)
+    : emissiveProximityAmount(tx, ty, radius, ctx.enemyTiles);
   return emissiveTriggerAmount(when, {
     playerAmount,
     enemyAmount,

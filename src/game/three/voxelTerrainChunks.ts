@@ -183,11 +183,14 @@ export function createChunkedVoxelTerrain(
     deferInitial?: boolean;
     /** Editor preview does not evaluate player-proximity tile triggers. */
     perCellEmissiveMaterials?: boolean;
+    /** Keep cell-level roof/wall meshes only where runtime cutaway needs them. */
+    cutawayMeshes?: boolean;
   } = {},
 ): ChunkedVoxelTerrain {
   const chunkSize = options.chunkSize ?? DEFAULT_TERRAIN_CHUNK_SIZE;
   const perCellEmissiveMaterials =
     options.perCellEmissiveMaterials !== false;
+  const cutawayMeshes = options.cutawayMeshes !== false;
   const root = new THREE.Group();
   root.name = "voxelMapChunks";
   const center = new THREE.Vector3();
@@ -262,6 +265,7 @@ export function createChunkedVoxelTerrain(
       if (!forceAll && current?.signature === signature) continue;
       const built = buildVoxelMesh(map, tileset, descriptor, {
         perCellEmissiveMaterials,
+        cutawayMeshes,
       });
       built.group.name = `terrainChunk:${descriptor.key}`;
       if (current) {
@@ -365,12 +369,16 @@ export function createChunkedVoxelTerrain(
       changed.map(({ descriptor, signature }) => () => {
         const built = buildVoxelMesh(map, tileset, descriptor, {
           perCellEmissiveMaterials,
+          cutawayMeshes,
         });
         built.group.name = `terrainChunk:${descriptor.key}`;
         replaceChunk(descriptor.key, signature, built.group);
       });
 
-    if (!worker.available || mapNeedsInteriorCutawayMeshes(map)) {
+    if (
+      !worker.available ||
+      (cutawayMeshes && mapNeedsInteriorCutawayMeshes(map))
+    ) {
       enqueue(syncJobs());
     } else {
       // Brush drags may publish many maps per second. Coalesce them before
@@ -407,6 +415,7 @@ export function createChunkedVoxelTerrain(
                 }
                 const built = buildVoxelMesh(map, tileset, descriptor, {
                   perCellEmissiveMaterials,
+                  cutawayMeshes,
                 });
                 built.group.name = `terrainChunk:${descriptor.key}`;
                 replaceChunk(descriptor.key, signature, built.group);

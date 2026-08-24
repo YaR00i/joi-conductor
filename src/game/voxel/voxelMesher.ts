@@ -495,6 +495,10 @@ export function disposeVoxelModelMesh(group: THREE.Object3D): void {
       o.customDistanceMaterial?.dispose();
       o.customDepthMaterial = undefined;
       o.customDistanceMaterial = undefined;
+      const releaseTrackedTextures = o.userData.emberReleaseTrackedTextures as
+        | (() => void)
+        | undefined;
+      releaseTrackedTextures?.();
     }
   });
 }

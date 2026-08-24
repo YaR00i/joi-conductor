@@ -13,7 +13,11 @@ import {
   spriteHasExtraCardViews,
   spriteTotalHeight,
 } from "./pixelSprite";
-import { spriteFrameIndexAt } from "./spriteAnimFrames";
+import {
+  nextSpritePreviewIndex,
+  normalizeSpriteFrameRange,
+  spriteFrameIndexAt,
+} from "./spriteAnimFrames";
 import type { EmberPixelSprite } from "./types";
 
 function paintAt(
@@ -256,6 +260,36 @@ describe("pixelSprite canvas", () => {
 });
 
 describe("pixelSprite frames", () => {
+  it("clamps preview ranges and stops or loops at their end", () => {
+    expect(normalizeSpriteFrameRange(5, -3, 99)).toEqual({ start: 0, end: 4 });
+    expect(normalizeSpriteFrameRange(5, 3, 1)).toEqual({ start: 3, end: 3 });
+    expect(nextSpritePreviewIndex(5, 1, 1, 3, true)).toBe(2);
+    expect(nextSpritePreviewIndex(5, 3, 1, 3, true)).toBe(1);
+    expect(nextSpritePreviewIndex(5, 3, 1, 3, false)).toBe(-1);
+    expect(nextSpritePreviewIndex(5, 4, 1, 3, true)).toBe(1);
+  });
+
+  it("normalizes and round-trips the visual world offset", () => {
+    const sprite = baseSprite({
+      width: 8,
+      topHeight: 8,
+      wallHeights: [],
+      pixels: emptySpritePixels(8, 8),
+      worldOffsetVoxels: { x: 1.257, y: -2.5, z: 4 },
+    });
+    const saved = serializePixelSprite(sprite);
+    expect(saved.worldOffsetVoxels).toEqual({ x: 1.26, y: -2.5, z: 4 });
+    expect(normalizePixelSprite(saved).worldOffsetVoxels).toEqual({
+      x: 1.26,
+      y: -2.5,
+      z: 4,
+    });
+    expect(normalizePixelSprite({
+      ...sprite,
+      worldOffsetVoxels: { x: 0, y: 0, z: 0 },
+    }).worldOffsetVoxels).toBeUndefined();
+  });
+
   it("wraps spriteFrameIndexAt around the cycle", () => {
     expect(spriteFrameIndexAt([100, 50], 0)).toBe(0);
     expect(spriteFrameIndexAt([100, 50], 99)).toBe(0);

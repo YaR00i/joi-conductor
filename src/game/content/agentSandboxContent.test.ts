@@ -52,6 +52,7 @@ describe("agent_sandbox content", () => {
       y: 3,
       w: 2,
       h: 2,
+      elev: 0,
       scriptId: "sandbox_cabin_enter",
       targetMapId: "agent_sandbox_interior",
       targetRegionId: "start",

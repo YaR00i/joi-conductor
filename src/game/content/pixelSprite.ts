@@ -908,6 +908,34 @@ export function spriteHasVisual(sprite: EmberPixelSprite): boolean {
   return spriteFaceHasInk(sprite.pixels);
 }
 
+const SPRITE_WORLD_OFFSET_LIMIT = 128;
+
+/** Normalize the asset visual pivot without changing its map cell/collider. */
+export function normalizeSpriteWorldOffsetVoxels(
+  raw: EmberPixelSprite["worldOffsetVoxels"],
+): EmberPixelSprite["worldOffsetVoxels"] {
+  if (!raw) return undefined;
+  const clean = (value: unknown) => {
+    if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+    return Math.max(
+      -SPRITE_WORLD_OFFSET_LIMIT,
+      Math.min(SPRITE_WORLD_OFFSET_LIMIT, Math.round(value * 100) / 100),
+    );
+  };
+  const next = { x: clean(raw.x), y: clean(raw.y), z: clean(raw.z) };
+  return next.x || next.y || next.z ? next : undefined;
+}
+
+export function resolveSpriteWorldOffsetVoxels(
+  sprite: Pick<EmberPixelSprite, "worldOffsetVoxels">,
+): { x: number; y: number; z: number } {
+  return normalizeSpriteWorldOffsetVoxels(sprite.worldOffsetVoxels) ?? {
+    x: 0,
+    y: 0,
+    z: 0,
+  };
+}
+
 /** Strip deprecated fields for save. */
 export function serializePixelSprite(sprite: EmberPixelSprite): EmberPixelSprite {
   const n = normalizePixelSprite(sprite);
@@ -915,6 +943,9 @@ export function serializePixelSprite(sprite: EmberPixelSprite): EmberPixelSprite
     id: n.id,
     nameRu: n.nameRu,
     tags: n.tags,
+    worldOffsetVoxels: n.worldOffsetVoxels
+      ? { ...n.worldOffsetVoxels }
+      : undefined,
     componentStates: n.componentStates
       ? { ...n.componentStates }
       : undefined,
@@ -962,6 +993,9 @@ export function normalizePixelSprite(raw: LegacySprite): EmberPixelSprite {
   const roles = raw.roles?.length ? [...raw.roles] : undefined;
   const nameRu = raw.nameRu;
   const tags = normalizeEmberLibraryTags(raw.tags);
+  const worldOffsetVoxels = normalizeSpriteWorldOffsetVoxels(
+    raw.worldOffsetVoxels,
+  );
   const componentStates = raw.componentStates
     ? { ...raw.componentStates }
     : undefined;
@@ -1053,6 +1087,7 @@ export function normalizePixelSprite(raw: LegacySprite): EmberPixelSprite {
       id,
       nameRu,
       tags,
+      worldOffsetVoxels,
       componentStates,
       width,
       topHeight,
@@ -1104,6 +1139,7 @@ export function normalizePixelSprite(raw: LegacySprite): EmberPixelSprite {
       id,
       nameRu,
       tags,
+      worldOffsetVoxels,
       componentStates,
       width: size,
       topHeight: size,
@@ -1150,6 +1186,7 @@ export function normalizePixelSprite(raw: LegacySprite): EmberPixelSprite {
     id,
     nameRu,
     tags,
+    worldOffsetVoxels,
     componentStates,
     width: size,
     topHeight: size,

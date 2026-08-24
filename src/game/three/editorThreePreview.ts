@@ -7,6 +7,7 @@ import * as THREE from "three";
 import type {
   EmberMap,
   EmberPack,
+  EmberPixelSprite,
   EmberTileset,
   EmberVoxelModel,
 } from "../content/types";
@@ -37,6 +38,7 @@ import { applyVoxelPlacementTransform } from "../voxel/voxelPlacement";
 import { addQuestMarkerOverlays } from "./questMarkerOverlay";
 import {
   applySpritePlacementScale,
+  applySpriteWorldPosition,
   createPixelBillboard,
   disposeYawBillboard,
   hexColorOr,
@@ -378,7 +380,63 @@ function clearLightRoot(root: THREE.Object3D): void {
   }
 }
 
-/** Cheap fingerprint of pack assets referenced by map props / lamps. */
+const voxelAssetSignatureCache = new WeakMap<EmberVoxelModel, string>();
+const spriteAssetSignatureCache = new WeakMap<EmberPixelSprite, string>();
+
+function mixSignatureHash(hash: number, value: number): number {
+  return Math.imul(hash ^ value, 16777619) >>> 0;
+}
+
+function hashNumberArray(values: readonly number[] | undefined): string {
+  if (!values?.length) return "0:0";
+  let hash = 2166136261;
+  for (const value of values) hash = mixSignatureHash(hash, value | 0);
+  return `${values.length}:${hash.toString(36)}`;
+}
+
+function hashText(value: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = mixSignatureHash(hash, value.charCodeAt(i));
+  }
+  return `${value.length}:${hash.toString(36)}`;
+}
+
+function voxelAssetSignature(model: EmberVoxelModel): string {
+  const cached = voxelAssetSignatureCache.get(model);
+  if (cached) return cached;
+  const {
+    voxels,
+    emissive,
+    shine,
+    transparency,
+    transmittance,
+    ...settings
+  } = model;
+  const signature = [
+    hashNumberArray(voxels),
+    hashNumberArray(emissive),
+    hashNumberArray(shine),
+    hashNumberArray(transparency),
+    hashNumberArray(transmittance),
+    hashText(JSON.stringify(settings)),
+  ].join(":");
+  voxelAssetSignatureCache.set(model, signature);
+  return signature;
+}
+
+function spriteAssetSignature(sprite: EmberPixelSprite): string {
+  const cached = spriteAssetSignatureCache.get(sprite);
+  if (cached) return cached;
+  // Sprite views, cels and art layers also affect the billboard. Hashing the
+  // complete immutable asset keeps preview geometry, materials and local
+  // emissive lights on the same invalidation contract.
+  const signature = hashText(JSON.stringify(sprite));
+  spriteAssetSignatureCache.set(sprite, signature);
+  return signature;
+}
+
+/** Fingerprint of pack assets referenced by map props / lamps. */
 export function packAssetsSignature(
   m: EmberMap,
   pack: EmberPack | undefined,
@@ -396,16 +454,6 @@ export function packAssetsSignature(
   const spriteIds = new Set<string>();
   for (const p of m.sprites ?? []) spriteIds.add(p.spriteId);
 
-  const hashArr = (arr: number[] | undefined, len: number): number => {
-    if (!arr?.length) return 0;
-    let h = len;
-    const step = Math.max(1, Math.floor(len / 48));
-    for (let i = 0; i < len; i += step) {
-      h = (Math.imul(h, 33) + (arr[i] ?? 0)) | 0;
-    }
-    return h;
-  };
-
   const modelParts: string[] = [];
   for (const id of [...modelIds].sort()) {
     const model = pack.voxelModels?.[id];
@@ -413,38 +461,7 @@ export function packAssetsSignature(
       modelParts.push(`${id}:0`);
       continue;
     }
-    const n = model.voxels?.length ?? 0;
-    const h =
-      hashArr(model.voxels, n) ^
-      hashArr(model.emissive, n) ^
-      hashArr(model.shine, n) ^
-      hashArr(model.transparency, n) ^
-      hashArr(model.transmittance, n);
-    const settings = JSON.stringify({
-      sizeBlocks: model.sizeBlocks,
-      heightVoxels: model.heightVoxels,
-      palette: model.palette,
-      material: model.material,
-      directLightScale: model.directLightScale,
-      componentStates: model.componentStates,
-      emissiveCastsLight: model.emissiveCastsLight,
-      emissiveLightRange: model.emissiveLightRange,
-      emissiveLightShadows: model.emissiveLightShadows,
-      emissiveLightSoftRings: model.emissiveLightSoftRings,
-      emissiveLightSoftShadows: model.emissiveLightSoftShadows,
-      emissiveLightOrigin: model.emissiveLightOrigin,
-      emissiveLightOffset: model.emissiveLightOffset,
-      emissiveLights: model.emissiveLights,
-      emissiveStrength: model.emissiveStrength,
-      emissiveTorchFlicker: model.emissiveTorchFlicker,
-      emissiveLanternFlicker: model.emissiveLanternFlicker,
-      emissiveSuppressHostShadow: model.emissiveSuppressHostShadow,
-      physical: model.physical,
-      collider: model.collider,
-    });
-    modelParts.push(
-      `${id}:${n}:${h}:${settings}`,
-    );
+    modelParts.push(`${id}:${voxelAssetSignature(model)}`);
   }
   const spriteParts: string[] = [];
   for (const id of [...spriteIds].sort()) {
@@ -453,9 +470,7 @@ export function packAssetsSignature(
       spriteParts.push(`${id}:0`);
       continue;
     }
-    spriteParts.push(
-      `${id}:${spr.emissiveCastsLight ? 1 : 0}:${spr.emissiveStrength ?? ""}:${(spr.pixels?.length ?? 0) | 0}`,
-    );
+    spriteParts.push(`${id}:${spriteAssetSignature(spr)}`);
   }
   return `${modelParts.join("|")}#${spriteParts.join("|")}`;
 }
@@ -594,7 +609,10 @@ export function createEditorThreePreview(
   let emissiveMats: THREE.Material[] = [];
   let waterMats: THREE.Material[] = [];
   let waterReflect: WaterPlanarReflection | null = null;
-  const reflectionScheduler = createEditorReflectionScheduler(100);
+  // Authoring preview does not need torch/water reflections at gameplay rate.
+  // A 2 Hz animation refresh keeps the look readable without injecting a
+  // multi-thousand-draw mirror pass into editor p95 every few frames.
+  const reflectionScheduler = createEditorReflectionScheduler(500);
   let modelOutlines: InteractiveOutlineHandle[] = [];
   let voxelInstanceBatches: EditorVoxelInstanceBatch[] = [];
   let emissiveLights: THREE.PointLight[] = [];
@@ -739,11 +757,17 @@ export function createEditorThreePreview(
       }
     } else if (preview.kind === "sprite") {
       const ghost = placementGhostRoot.children[0];
-      ghost?.position.set(
-        (preview.tx + 0.5) * map.tileSize,
-        preview.elev * storyH + map.tileSize * 0.45,
-        (preview.ty + 0.5) * map.tileSize,
-      );
+      const sprite = lastPack.sprites?.[preview.assetId];
+      if (ghost && sprite) {
+        applySpriteWorldPosition(
+          ghost,
+          sprite,
+          map.tileSize,
+          (preview.tx + 0.5) * map.tileSize,
+          preview.elev * storyH + map.tileSize * 0.45,
+          (preview.ty + 0.5) * map.tileSize,
+        );
+      }
     } else if (preview.kind === "light") {
       const cx = (preview.tx + 0.5) * map.tileSize;
       const cz = (preview.ty + 0.5) * map.tileSize;
@@ -759,15 +783,15 @@ export function createEditorThreePreview(
     }
   };
 
-  const terrainSignature = (m: EmberMap, tilesetId: string) =>
-    JSON.stringify({
-      tilesetId,
-      id: m.id,
-      w: m.width,
-      h: m.height,
-      ts: m.tileSize,
-      layers: m.layers,
-    });
+  const terrainLayersSignatureCache = new WeakMap<object, string>();
+  const terrainSignature = (m: EmberMap, tilesetId: string) => {
+    let layers = terrainLayersSignatureCache.get(m.layers);
+    if (layers == null) {
+      layers = JSON.stringify(m.layers);
+      terrainLayersSignatureCache.set(m.layers, layers);
+    }
+    return `${tilesetId}:${m.id}:${m.width}x${m.height}:${m.tileSize}:${layers}`;
+  };
 
   const propsStructureSignature = (m: EmberMap) => {
     const vx = (m.voxelProps ?? [])
@@ -833,8 +857,13 @@ export function createEditorThreePreview(
     for (const p of m.sprites ?? []) {
       const obj = byPick.get(`sprite:${p.id}`);
       if (!obj) continue;
+      const def = lastPack?.sprites?.[p.spriteId];
+      if (!def) continue;
       const elev = p.elev ?? tileSurfaceElev(m, p.x, p.y);
-      obj.position.set(
+      applySpriteWorldPosition(
+        obj,
+        def,
+        m.tileSize,
         (p.x + 0.5) * m.tileSize,
         elev * blockStoryHeight(m.tileSize) + m.tileSize * 0.45,
         (p.y + 0.5) * m.tileSize,
@@ -1111,37 +1140,59 @@ export function createEditorThreePreview(
     }
   };
 
+  let profilerSceneStats = {
+    updatedAt: -Infinity,
+    activeLights: 0,
+    shadowLights: 0,
+    terrain: 0,
+    props: 0,
+    overlays: 0,
+    instances: 0,
+  };
+
   const profilerExtras = (): EmberProfilerExtras => {
     const terrain = terrainChunks?.getStreamingStats();
-    let activeLights = 0;
-    let shadowLights = 0;
-    lightRoot.traverse((object) => {
-      const light = object as THREE.Light;
-      if (!light.isLight || !light.visible) return;
-      activeLights += 1;
-      if (light.castShadow) shadowLights += 1;
-    });
-    const renderableCount = (root: THREE.Object3D | null): number => {
-      let count = 0;
-      root?.traverse((object) => {
-        if (
-          object.visible &&
-          (object instanceof THREE.Mesh ||
+    const now = performance.now();
+    if (now - profilerSceneStats.updatedAt >= 500) {
+      let activeLights = 0;
+      let shadowLights = 0;
+      lightRoot.traverseVisible((object) => {
+        const light = object as THREE.Light;
+        if (!light.isLight) return;
+        activeLights += 1;
+        if (light.castShadow) shadowLights += 1;
+      });
+      const renderableCount = (root: THREE.Object3D | null): number => {
+        let count = 0;
+        root?.traverseVisible((object) => {
+          if (
+            object instanceof THREE.Mesh ||
             object instanceof THREE.Line ||
-            object instanceof THREE.Sprite)
-        ) {
-          count += 1;
+            object instanceof THREE.Sprite
+          ) {
+            count += 1;
+          }
+        });
+        return count;
+      };
+      let instanceCount = 0;
+      propRoot.traverseVisible((object) => {
+        if (object instanceof THREE.InstancedMesh) {
+          instanceCount += object.count;
         }
       });
-      return count;
-    };
-    let instanceCount = 0;
-    propRoot.traverse((object) => {
-      if (object instanceof THREE.InstancedMesh) {
-        instanceCount += object.count;
-      }
-    });
-    const reflection = reflectionScheduler.snapshot(performance.now());
+      profilerSceneStats = {
+        updatedAt: now,
+        activeLights,
+        shadowLights,
+        terrain: renderableCount(mapGroup),
+        props: renderableCount(propRoot),
+        overlays:
+          renderableCount(outlineRoot) + renderableCount(debugRoot),
+        instances: instanceCount,
+      };
+    }
+    const reflection = reflectionScheduler.snapshot(now);
     return {
       chunks: terrain
         ? {
@@ -1154,13 +1205,15 @@ export function createEditorThreePreview(
       workers: terrain
         ? { active: terrain.workerCount, jobs: terrain.workerJobs }
         : undefined,
-      lights: { active: activeLights, shadows: shadowLights },
+      lights: {
+        active: profilerSceneStats.activeLights,
+        shadows: profilerSceneStats.shadowLights,
+      },
       renderables: {
-        terrain: renderableCount(mapGroup),
-        props: renderableCount(propRoot),
-        overlays:
-          renderableCount(outlineRoot) + renderableCount(debugRoot),
-        instances: instanceCount,
+        terrain: profilerSceneStats.terrain,
+        props: profilerSceneStats.props,
+        overlays: profilerSceneStats.overlays,
+        instances: profilerSceneStats.instances,
       },
       reflection: {
         updated: reflection.updatedThisFrame,
@@ -1486,7 +1539,10 @@ export function createEditorThreePreview(
       hexColorOr(def.color, "#c8a878"),
       m.tileSize * 0.95,
     );
-    bill.position.set(
+    applySpriteWorldPosition(
+      bill,
+      def,
+      m.tileSize,
       (p.x + 0.5) * m.tileSize,
       elev * blockStoryHeight(m.tileSize) + m.tileSize * 0.45,
       (p.y + 0.5) * m.tileSize,
@@ -2062,6 +2118,9 @@ export function createEditorThreePreview(
             // Trigger/flicker tiles have no player state in the map editor.
             // Sharing their materials collapses thousands of per-cell meshes.
             perCellEmissiveMaterials: false,
+            // The editor never applies player-proximity roof cutaway. Merging
+            // those cells per material removes thousands of terrain draws.
+            cutawayMeshes: false,
           });
           mapGroup = terrainChunks.group;
           scene.add(mapGroup);

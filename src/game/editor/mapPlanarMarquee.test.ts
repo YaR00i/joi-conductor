@@ -22,6 +22,7 @@ function marqueeMap(): EmberMap {
   ];
   setElevTileId(map, 2, 2, 0, 7);
   setElevTileId(map, 2, 3, 2, 7);
+  setElevTileId(map, 3, 3, 1, 7);
   return map;
 }
 
@@ -47,7 +48,6 @@ describe("collectPlanarMarqueeHits", () => {
       { kind: "voxel", id: "bench" },
       { kind: "sprite", id: "sign-1" },
       { kind: "light", id: "lamp-1" },
-      { kind: "region", id: "exit-1" },
     ]);
   });
 
@@ -96,6 +96,72 @@ describe("collectPlanarMarqueeHits", () => {
       voxelModels: { wide: wideModel },
     });
     expect(hits).toEqual([{ kind: "voxel", id: "bench" }]);
+  });
+
+  it("selects a vertical volume across every occupied story when elev is omitted", () => {
+    const map = marqueeMap();
+    const hits = collectPlanarMarqueeHits({
+      map,
+      start: { x: 1, y: 1 },
+      end: { x: 3, y: 3 },
+      filter: { ...DEFAULT_EDITOR_SELECTION_FILTER, tile: false },
+      voxelModels: { wide: wideModel },
+    });
+    expect(hits).toEqual([
+      { kind: "voxel", id: "crate-high" },
+      { kind: "sprite", id: "sign-1" },
+      { kind: "region", id: "exit-1" },
+    ]);
+  });
+
+  it("selects every occupied tile story in a vertical column", () => {
+    const map = marqueeMap();
+    const hits = collectPlanarMarqueeHits({
+      map,
+      start: { x: 2, y: 3 },
+      end: { x: 2, y: 3 },
+      filter: {
+        ...DEFAULT_EDITOR_SELECTION_FILTER,
+        voxel: false,
+        sprite: false,
+        light: false,
+        region: false,
+      },
+    });
+    expect(hits).toEqual([
+      { kind: "tile", tx: 2, ty: 3, elev: 0 },
+      { kind: "tile", tx: 2, ty: 3, elev: 2 },
+    ]);
+  });
+
+  it("limits a coordinate volume to the visible endpoint Z range", () => {
+    const map = marqueeMap();
+    const hits = collectPlanarMarqueeHits({
+      map,
+      start: { x: 1, y: 1 },
+      end: { x: 3, y: 3 },
+      elevRange: { min: 1, max: 2 },
+      filter: { ...DEFAULT_EDITOR_SELECTION_FILTER, region: false },
+      voxelModels: { wide: wideModel },
+    });
+    expect(hits).toEqual([
+      { kind: "voxel", id: "crate-high" },
+      { kind: "tile", tx: 2, ty: 3, elev: 2 },
+      { kind: "tile", tx: 3, ty: 3, elev: 1 },
+    ]);
+  });
+
+  it("does not include the story below a same-height wall drag", () => {
+    const map = marqueeMap();
+    const hits = collectPlanarMarqueeHits({
+      map,
+      start: { x: 1, y: 1 },
+      end: { x: 3, y: 3 },
+      elevRange: { min: 1, max: 1 },
+      filter: { ...DEFAULT_EDITOR_SELECTION_FILTER, region: false },
+      voxelModels: { wide: wideModel },
+    });
+    expect(hits).toEqual([{ kind: "tile", tx: 3, ty: 3, elev: 1 }]);
   });
 
   it("respects the viewport filter and skips hidden or locked objects", () => {

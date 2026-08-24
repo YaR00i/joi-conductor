@@ -16,10 +16,17 @@ import type {
 } from "../content/types";
 import { tileSurfaceElev } from "../tile/mapUtils";
 import { VOXELS_PER_BLOCK } from "../voxel/constants";
-import { createColorBillboard } from "./billboards";
+import { createColorBillboard, trackBillboardTexture } from "./billboards";
 import { logicToThree } from "./voxelCollision";
 
-const iconTexCache = new Map<string, THREE.CanvasTexture>();
+type CachedQuestIconTexture = {
+  key: string;
+  texture: THREE.CanvasTexture;
+  refs: number;
+};
+
+const iconTexCache = new Map<string, CachedQuestIconTexture>();
+const iconTexCacheByTexture = new WeakMap<THREE.Texture, CachedQuestIconTexture>();
 
 const FALLBACK_BY_STATUS = {
   available: { fill: "#ffd45a", outline: "#3a2208" },
@@ -30,7 +37,7 @@ const FALLBACK_BY_STATUS = {
 function itemIconTexture(icon: EmberItemIcon): THREE.CanvasTexture {
   const key = `qi:${icon.id}:${icon.size}:${icon.pixels.join("")}`;
   const hit = iconTexCache.get(key);
-  if (hit) return hit;
+  if (hit) return hit.texture;
   const size = icon.size;
   const c = document.createElement("canvas");
   c.width = size;
@@ -52,8 +59,23 @@ function itemIconTexture(icon: EmberItemIcon): THREE.CanvasTexture {
   tex.magFilter = THREE.NearestFilter;
   tex.minFilter = THREE.NearestFilter;
   tex.colorSpace = THREE.SRGBColorSpace;
-  iconTexCache.set(key, tex);
+  const entry = { key, texture: tex, refs: 0 } satisfies CachedQuestIconTexture;
+  iconTexCache.set(key, entry);
+  iconTexCacheByTexture.set(tex, entry);
   return tex;
+}
+
+function retainQuestIconTexture(mesh: THREE.Mesh, texture: THREE.Texture): void {
+  const entry = iconTexCacheByTexture.get(texture);
+  if (!entry) return;
+  const tracked = trackBillboardTexture(mesh, texture, () => {
+    entry.refs = Math.max(0, entry.refs - 1);
+    if (entry.refs > 0 || iconTexCache.get(entry.key) !== entry) return;
+    iconTexCache.delete(entry.key);
+    iconTexCacheByTexture.delete(entry.texture);
+    entry.texture.dispose();
+  });
+  if (tracked) entry.refs += 1;
 }
 
 function createQuestIconBillboard(
@@ -70,6 +92,7 @@ function createQuestIconBillboard(
       side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+    retainQuestIconTexture(mesh, tex);
     mesh.scale.set(10, 10, 1);
     mesh.userData.yawBillboard = true;
     mesh.castShadow = false;

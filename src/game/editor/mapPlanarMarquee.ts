@@ -5,8 +5,13 @@ import type {
   EmberVoxelModel,
   EmberVoxelPlacement,
 } from "../content/types";
+import { elevationSteps } from "../content/types";
 import { elevTileIdAt } from "../tile/elevGroundLayers";
-import { listLanternSources, tileSurfaceElev } from "../tile/mapUtils";
+import {
+  listLanternSources,
+  regionVolumeElev,
+  tileSurfaceElev,
+} from "../tile/mapUtils";
 import { footprintTilesFromVoxelModel } from "../voxel/voxelModelApply";
 import type { EditorSelectionFilter } from "./EditorSelectionFilter";
 import { includeRegionInViewportPick } from "./EditorSelectionFilter";
@@ -30,6 +35,7 @@ export type PlanarMarqueeSelection =
 export type PlanarMarqueeMark = PlanarMarqueeRect &
   Readonly<{
     elev: number;
+    elevEnd?: number;
   }>;
 
 type SpriteLib = Readonly<Record<string, EmberPixelSprite>>;
@@ -87,14 +93,19 @@ function voxelPlacementTileRect(
 }
 
 /**
- * Everything whose tile footprint intersects the dragged rect on one Z plane.
- * Hidden / locked viewport objects are skipped, matching click-select.
+ * Everything whose tile footprint intersects the dragged rect.
+ *
+ * `elev` forces one story. `elevRange` creates the editor's normal coordinate
+ * volume between the two visible drag surfaces. Omitting both is retained for
+ * callers that intentionally need every story under X/Y. Hidden / locked
+ * viewport objects are skipped, matching click-select.
  */
 export function collectPlanarMarqueeHits(input: {
   map: EmberMap;
   start: PlanarMarqueeTilePos;
   end: PlanarMarqueeTilePos;
-  elev: number;
+  elev?: number;
+  elevRange?: Readonly<{ min: number; max: number }>;
   filter: Readonly<EditorSelectionFilter>;
   voxelModels?: Readonly<Record<string, EmberVoxelModel>> | null;
   tileset?: EmberTileset | null;
@@ -104,9 +115,22 @@ export function collectPlanarMarqueeHits(input: {
 }): PlanarMarqueeSelection[] {
   const rect = normalizePlanarMarqueeRect(input.start, input.end, input.map);
   const elev = input.elev;
+  const elevRange = input.elevRange
+    ? {
+        min: Math.min(input.elevRange.min, input.elevRange.max),
+        max: Math.max(input.elevRange.min, input.elevRange.max),
+      }
+    : null;
   const hidden = input.isHidden ?? (() => false);
   const locked = input.isLocked ?? (() => false);
   const hits: PlanarMarqueeSelection[] = [];
+
+  const storyAllowed = (resolvedZ: number) => {
+    if (elev != null) return storyMatchesPlane(resolvedZ, elev);
+    if (!elevRange) return true;
+    const story = Math.floor(resolvedZ + 1e-6);
+    return story >= elevRange.min && story <= elevRange.max;
+  };
 
   const skip = (kind: PlanarMarqueeSelection["kind"], id?: string) => {
     if (!input.filter[kind === "tile" ? "tile" : kind]) return true;
@@ -119,7 +143,7 @@ export function collectPlanarMarqueeHits(input: {
     for (const place of input.map.voxelProps ?? []) {
       if (skip("voxel", place.id)) continue;
       const resolvedZ = place.elev ?? tileSurfaceElev(input.map, place.x, place.y);
-      if (!storyMatchesPlane(resolvedZ, elev)) continue;
+      if (!storyAllowed(resolvedZ)) continue;
       const model = input.voxelModels?.[place.modelId];
       if (!tileRectsOverlap(rect, voxelPlacementTileRect(place, model))) {
         continue;
@@ -132,7 +156,7 @@ export function collectPlanarMarqueeHits(input: {
     for (const place of input.map.sprites ?? []) {
       if (skip("sprite", place.id)) continue;
       const resolvedZ = place.elev ?? tileSurfaceElev(input.map, place.x, place.y);
-      if (!storyMatchesPlane(resolvedZ, elev)) continue;
+      if (!storyAllowed(resolvedZ)) continue;
       if (
         !tileRectsOverlap(rect, {
           x0: place.x,
@@ -166,7 +190,7 @@ export function collectPlanarMarqueeHits(input: {
       if (skip("light", lamp.id)) continue;
       const resolvedZ =
         lamp.elev ?? tileSurfaceElev(input.map, lamp.x, lamp.y);
-      if (!storyMatchesPlane(resolvedZ, elev)) continue;
+      if (!storyAllowed(resolvedZ)) continue;
       if (
         !tileRectsOverlap(rect, {
           x0: lamp.x,
@@ -185,6 +209,7 @@ export function collectPlanarMarqueeHits(input: {
     for (const region of input.map.regions) {
       if (!includeRegionInViewportPick(region.kind)) continue;
       if (skip("region", region.id)) continue;
+      if (!storyAllowed(regionVolumeElev(input.map, region))) continue;
       const w = Math.max(1, region.w);
       const h = Math.max(1, region.h);
       if (
@@ -202,10 +227,20 @@ export function collectPlanarMarqueeHits(input: {
   }
 
   if (input.filter.tile) {
+    const elevations =
+      elev != null
+        ? [elev]
+        : elevRange
+          ? elevationSteps().filter(
+              (story) => story >= elevRange.min && story <= elevRange.max,
+            )
+          : elevationSteps();
     for (let ty = rect.y0; ty <= rect.y1; ty++) {
       for (let tx = rect.x0; tx <= rect.x1; tx++) {
-        if (!elevTileIdAt(input.map, tx, ty, elev)) continue;
-        hits.push({ kind: "tile", tx, ty, elev });
+        for (const story of elevations) {
+          if (!elevTileIdAt(input.map, tx, ty, story)) continue;
+          hits.push({ kind: "tile", tx, ty, elev: story });
+        }
       }
     }
   }

@@ -37,7 +37,7 @@ describe("editor voxel instancing", () => {
     const matrixBefore = new THREE.Matrix4();
     mesh.getMatrixAt(1, matrixBefore);
     const before = new THREE.Vector3().setFromMatrixPosition(matrixBefore);
-    expect(before.x).toBeCloseTo(32);
+    expect(before.x).toBeCloseTo(31.95);
 
     const moved = { ...b, x: 3 };
     expect(
@@ -58,5 +58,33 @@ describe("editor voxel instancing", () => {
         new THREE.Vector3(),
       ).x,
     ).toBeGreaterThan(48);
+  });
+
+  it("slightly overlaps adjacent full-block meshes so no raster seam opens", () => {
+    const full: EmberVoxelModel = {
+      ...model,
+      id: "full-block",
+      voxels: Array(16 * 16 * 16).fill(1),
+    };
+    const a: EmberVoxelPlacement = {
+      id: "left",
+      modelId: full.id,
+      x: 0,
+      y: 0,
+      elev: 0,
+    };
+    const b: EmberVoxelPlacement = { ...a, id: "right", x: 1 };
+    const batch = createEditorVoxelInstanceBatch(full, 16, [
+      { placement: a, elev: 0 },
+      { placement: b, elev: 0 },
+    ]);
+    const bounds = batch!.root.userData.editorInstanceBoundsById as Map<
+      string,
+      THREE.Box3
+    >;
+
+    expect(bounds.get("left")!.max.x - bounds.get("right")!.min.x).toBeCloseTo(
+      0.1,
+    );
   });
 });

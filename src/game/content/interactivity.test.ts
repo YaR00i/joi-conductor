@@ -5,6 +5,7 @@ import {
   isEmberInteractivityKind,
   isQuestMarkerKind,
   parseInteractivity,
+  pickInteractHit,
   wouldFireForInteractivity,
   wouldFireForTriggerRegion,
 } from "./interactivity";
@@ -149,5 +150,43 @@ describe("interactivity modifier", () => {
       "sign-1",
     );
     expect(findInteractivePropAt(map, 2 * 16 + 4, 4 * 16 + 4)).toBeNull();
+  });
+
+  it("does not interact with stacked regions or props from another floor", () => {
+    const map = mapWith({
+      regions: [
+        {
+          id: "loft-chest",
+          kind: "chest",
+          x: 3,
+          y: 4,
+          w: 1,
+          h: 1,
+          elev: 3,
+        },
+      ],
+      voxelProps: [
+        {
+          id: "loft-shop",
+          modelId: "shop",
+          x: 5,
+          y: 4,
+          elev: 3,
+          interactivity: { kind: "shop", shopId: "loft" },
+        },
+      ],
+    });
+    const chestX = 3 * 16 + 8;
+    const chestY = 4 * 16 + 8;
+    const shopX = 5 * 16 + 8;
+
+    expect(pickInteractHit(map, chestX, chestY, 1, 0, undefined, 0)).toBeNull();
+    expect(
+      pickInteractHit(map, chestX, chestY, 1, 0, undefined, 3),
+    ).toMatchObject({ kind: "region", region: { id: "loft-chest" } });
+    expect(findInteractivePropAt(map, shopX, chestY, undefined, 0)).toBeNull();
+    expect(
+      findInteractivePropAt(map, shopX, chestY, undefined, 3)?.id,
+    ).toBe("loft-shop");
   });
 });

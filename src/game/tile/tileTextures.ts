@@ -1,5 +1,6 @@
 import {
   normalizePixelSprite,
+  resolveSpriteWorldOffsetVoxels,
   sliceSpriteTop,
   sliceSpriteWall,
   spriteFaceHasInk,
@@ -1312,12 +1313,15 @@ export function paintSpriteDecorOnFloor(
   const floor = Math.max(1, Math.round(floorSize));
   const wallH = Math.round(spriteWallHeight(s) * sc);
   const topH = Math.max(1, Math.round(s.topHeight * sc));
-  const cx = floorX + floor / 2;
+  const offset = resolveSpriteWorldOffsetVoxels(s);
+  const voxelPx = floor / 16;
+  const cx = floorX + floor / 2 + offset.x * voxelPx;
   const cy =
     wallH > 0
       ? floorY + floor - wallH - topH / 2
       : floorY + floor / 2;
-  paintSpriteDecor(ctx, s, cx, cy, sc);
+  const offsetScreenY = (offset.y - offset.z) * voxelPx;
+  paintSpriteDecor(ctx, s, cx, cy + offsetScreenY, sc);
 }
 
 /** Front-face strip texture for extruded walls / cliffs (width × faceH). */

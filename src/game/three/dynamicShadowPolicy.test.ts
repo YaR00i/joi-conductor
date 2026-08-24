@@ -9,6 +9,7 @@ import {
   DIR_SHADOW_DEPTH_BIAS,
   DIR_SHADOW_NORMAL_BIAS,
   DIR_SHADOW_SNAP_MIN,
+  dynamicLocalShadowLimitForCrowd,
   directionalShadowHalfExtent,
   directionalShadowLightDistance,
   fitDirectionalShadowToFocus,
@@ -24,6 +25,12 @@ import {
 } from "./dynamicShadowPolicy";
 
 describe("dynamic shadow policy", () => {
+  it("drops six-face dynamic point cubes for extreme crowds", () => {
+    expect(dynamicLocalShadowLimitForCrowd(1, 159)).toBe(1);
+    expect(dynamicLocalShadowLimitForCrowd(1, 160)).toBe(0);
+    expect(dynamicLocalShadowLimitForCrowd(2, 12)).toBe(1);
+  });
+
   it("puts an actor hierarchy on the dynamic render layer", () => {
     const root = new THREE.Group();
     const child = new THREE.Mesh(new THREE.PlaneGeometry(1, 1));

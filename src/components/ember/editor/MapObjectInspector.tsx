@@ -121,6 +121,11 @@ export type MapObjectInspectorProps = {
   multiAllLocked?: boolean;
   multiAllHidden?: boolean;
   onSetMultiElevation?: (elevation: number) => void;
+  onSetMultiWallHeight?: (heightVoxels: number) => void;
+  onPatchMultiVoxels?: (patch: {
+    rot?: number;
+    directLightScale?: number;
+  }) => void;
   onDropMultiToFloor?: () => void;
   onSetMultiLocked?: (locked: boolean) => void;
   onSetMultiHidden?: (hidden: boolean) => void;
@@ -1579,8 +1584,63 @@ function GroupBody({
 export function MapObjectInspector(props: MapObjectInspectorProps) {
   const { selection, map, pack, tileset, globalLight, lanternSources } = props;
   const multiTransformObjects = (props.multiWorldObjects ?? []).filter(
-    (object) => object.kind === "voxel" || object.kind === "sprite",
+    (object) =>
+      object.kind === "voxel" ||
+      object.kind === "sprite" ||
+      object.kind === "region",
   );
+  const multiTileObjects = (props.multiWorldObjects ?? []).filter(
+    (object) => object.source.kind === "tile",
+  );
+  const multiVoxelObjects = (props.multiWorldObjects ?? []).filter(
+    (object) => object.source.kind === "voxel",
+  );
+  const onlyTiles =
+    multiTileObjects.length > 0 &&
+    multiTileObjects.length === (props.multiWorldObjects?.length ?? 0);
+  const onlyVoxels =
+    multiVoxelObjects.length > 0 &&
+    multiVoxelObjects.length === (props.multiWorldObjects?.length ?? 0);
+  const multiSameKind =
+    (props.multiWorldObjects?.length ?? 0) > 1 &&
+    props.multiWorldObjects!.every(
+      (object) => object.kind === props.multiWorldObjects![0]?.kind,
+    );
+  const multiSceneObjects = (props.multiWorldObjects ?? []).filter(
+    (object) => object.kind !== "tile",
+  );
+  const commonNumber = (
+    objects: readonly EmberWorldObject[],
+    read: (object: EmberWorldObject) => number,
+  ): number | null => {
+    const first = objects[0] ? read(objects[0]) : null;
+    if (first == null) return null;
+    return objects.every((object) => Math.abs(read(object) - first) < 0.001)
+      ? first
+      : null;
+  };
+  const multiWallHeight = onlyTiles
+    ? commonNumber(multiTileObjects, (object) => {
+        const block = object.components.find((component) => component.type === "block");
+        return block?.type === "block" ? block.heightVoxels : 0;
+      })
+    : null;
+  const multiVoxelRotation = onlyVoxels
+    ? commonNumber(
+        multiVoxelObjects,
+        (object) => object.transform.rotationQuarterTurns,
+      )
+    : null;
+  const multiVoxelDirectLight = onlyVoxels
+    ? commonNumber(multiVoxelObjects, (object) => {
+        const renderer = object.components.find(
+          (component) => component.type === "voxel-renderer",
+        );
+        return renderer?.type === "voxel-renderer"
+          ? renderer.directLightScale
+          : DEFAULT_VOXEL_DIRECT_LIGHT_SCALE;
+      })
+    : null;
   const multiElevation = (() => {
     const first = multiTransformObjects[0]?.transform.resolvedZ;
     if (first == null) return null;
@@ -1886,11 +1946,14 @@ export function MapObjectInspector(props: MapObjectInspectorProps) {
             })}
           </div>
           <small>
-            Inspector редактирует основной объект, gizmo — совместимые объекты
-            набора.
+            Общие поля применяются ко всему набору; mixed означает разные
+            значения. Gizmo двигает выбор от общего pivot.
+            {multiSameKind
+              ? " Поля компонентов ниже также применяются ко всем объектам этого типа."
+              : " Для общего редактирования компонентов оставь в выборе один тип."}
           </small>
           <div className="ember-map-inspector__multi-tools">
-            <label title="Установить одинаковый authored Z вокселям и спрайтам">
+            <label title="Установить одинаковый authored Z вокселям, спрайтам и зонам">
               <span>Z</span>
               <input
                 key={`multi-z-${multiElevation ?? "mixed"}`}
@@ -1912,6 +1975,71 @@ export function MapObjectInspector(props: MapObjectInspectorProps) {
                 }}
               />
             </label>
+            {onlyTiles ? (
+              <label title="Одинаковая высота стены для всех выбранных клеток">
+                <span>Стена, vx</span>
+                <input
+                  key={`multi-wall-${multiWallHeight ?? "mixed"}`}
+                  type="number"
+                  min="0"
+                  max="64"
+                  step="1"
+                  defaultValue={multiWallHeight ?? ""}
+                  placeholder="mixed"
+                  onBlur={(event) => {
+                    const value = Number(event.currentTarget.value);
+                    if (Number.isFinite(value) && event.currentTarget.value.trim()) {
+                      props.onSetMultiWallHeight?.(Math.round(value));
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") event.currentTarget.blur();
+                  }}
+                />
+              </label>
+            ) : null}
+            {onlyVoxels ? (
+              <>
+                <label title="Общий поворот вокруг вертикальной оси">
+                  <span>Поворот</span>
+                  <select
+                    key={`multi-rot-${multiVoxelRotation ?? "mixed"}`}
+                    defaultValue={multiVoxelRotation ?? ""}
+                    onChange={(event) => {
+                      const value = Number(event.currentTarget.value);
+                      if (Number.isFinite(value)) props.onPatchMultiVoxels?.({ rot: value });
+                    }}
+                  >
+                    {multiVoxelRotation == null ? <option value="">mixed</option> : null}
+                    <option value="0">0°</option>
+                    <option value="1">90°</option>
+                    <option value="2">180°</option>
+                    <option value="3">270°</option>
+                  </select>
+                </label>
+                <label title="Общий множитель прямого света экземпляров">
+                  <span>Direct light</span>
+                  <input
+                    key={`multi-direct-${multiVoxelDirectLight ?? "mixed"}`}
+                    type="number"
+                    min="0.05"
+                    max="1.5"
+                    step="0.05"
+                    defaultValue={multiVoxelDirectLight ?? ""}
+                    placeholder="mixed"
+                    onBlur={(event) => {
+                      const value = Number(event.currentTarget.value);
+                      if (Number.isFinite(value) && event.currentTarget.value.trim()) {
+                        props.onPatchMultiVoxels?.({ directLightScale: value });
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") event.currentTarget.blur();
+                    }}
+                  />
+                </label>
+              </>
+            ) : null}
             <button
               type="button"
               disabled={multiTransformObjects.length === 0}
@@ -1921,14 +2049,14 @@ export function MapObjectInspector(props: MapObjectInspectorProps) {
             </button>
             <button
               type="button"
-              disabled={(props.multiWorldObjects?.length ?? 0) === 0}
+              disabled={multiSceneObjects.length === 0}
               onClick={() => props.onSetMultiLocked?.(!props.multiAllLocked)}
             >
               {props.multiAllLocked ? "Unlock All" : "Lock All"}
             </button>
             <button
               type="button"
-              disabled={(props.multiWorldObjects?.length ?? 0) === 0}
+              disabled={multiSceneObjects.length === 0}
               onClick={() => props.onSetMultiHidden?.(!props.multiAllHidden)}
             >
               {props.multiAllHidden ? "Show All" : "Hide All"}

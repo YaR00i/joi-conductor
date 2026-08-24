@@ -163,6 +163,54 @@ describe("voxel model physicality", () => {
     ).toBe(true);
   });
 
+  it("uses vertical Transform scale for collision height and debug bounds", () => {
+    const model = solidCube("tall-crate");
+    const map = openYard();
+    map.voxelProps = [
+      {
+        id: "p",
+        modelId: model.id,
+        x: 4,
+        y: 4,
+        elev: 0,
+        scale: { x: 1, y: 1, z: 2 },
+      },
+    ];
+    const models = { [model.id]: model };
+    const ts = map.tileSize;
+    const x = 4 * ts + ts / 2;
+    const y = 4 * ts + ts / 2;
+
+    expect(
+      circleHitsSolid(map, tileset, x, y, R, 1, undefined, "top", models),
+    ).toBe(true);
+    const [box] = listPhysicalVoxelCollisionAabbs(map, models);
+    expect(box!.maxY - box!.minY).toBeCloseTo(2 * ts);
+  });
+
+  it("separates stacked voxel props by their authored Z", () => {
+    const model = solidCube("stacked-crate");
+    const map = openYard();
+    map.voxelProps = [
+      { id: "low", modelId: model.id, x: 4, y: 4, elev: 0 },
+      { id: "high", modelId: model.id, x: 4, y: 4, elev: 3 },
+    ];
+    const models = { [model.id]: model };
+    const ts = map.tileSize;
+    const x = 4 * ts + ts / 2;
+    const y = 4 * ts + ts / 2;
+
+    expect(
+      circleHitsSolid(map, tileset, x, y, R, 0, undefined, "top", models),
+    ).toBe(true);
+    expect(
+      circleHitsSolid(map, tileset, x, y, R, 2, undefined, "top", models),
+    ).toBe(false);
+    expect(
+      circleHitsSolid(map, tileset, x, y, R, 3, undefined, "top", models),
+    ).toBe(true);
+  });
+
   it("zone chest with non-physical model stays walk-through", () => {
     const model = solidCube("chest", false);
     const map = openYard();
@@ -392,8 +440,8 @@ describe("sprite and tile instance collider overrides", () => {
     });
     expect(boxes).toHaveLength(1);
     const box = boxes[0]!;
-    expect(box.maxX - box.minX).toBeCloseTo(map.tileSize);
-    expect(box.maxZ - box.minZ).toBeCloseTo(map.tileSize);
+    expect(box.maxX - box.minX).toBeCloseTo(map.tileSize + 0.1);
+    expect(box.maxZ - box.minZ).toBeCloseTo(map.tileSize + 0.1);
     expect(box.maxY - box.minY).toBeCloseTo(map.tileSize);
   });
 });

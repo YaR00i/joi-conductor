@@ -1,5 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { writeEmberJson } from "../../../game/content/io";
+import { prunePaletteFavorites } from "../../../game/content/pixelSprite";
 import type {
   EmberEmissiveAnim,
   EmberEmissiveTriggerWhen,
@@ -51,15 +59,74 @@ import {
 } from "../../../game/three/waterMaterial";
 import { EmberThumbGrid } from "./EmberThumbGrid";
 import {
-  copyPixelArt,
+  PixelCanvasOverlays,
+  PixelCanvasReferenceLayer,
+} from "./PixelCanvasOverlays";
+import { PixelCanvasNavigator } from "./PixelCanvasNavigator";
+import { PixelCanvasViewPanel } from "./PixelCanvasViewPanel";
+import { PixelPalettePanel } from "./PixelPalettePanel";
+import { PixelToolIcon } from "./PixelToolIcon";
+import {
+  copyPixelArtChannels,
   hasPixelClipboard,
+  peekPixelClipboard,
   pastePixelArt,
 } from "./pixelClipboard";
+import {
+  clearPixelSelection,
+  combinePixelSelections,
+  duplicatePixelSelection,
+  extractPixelSelection,
+  invertPixelSelection,
+  magicWandSelection,
+  movePixelSelection,
+  pastePixelSelection,
+  pixelMaskSvgPaths,
+  pixelRectFromPoints,
+  pixelRectFromScaleHandle,
+  pixelSelectionContains,
+  pixelSelectionFromPolygon,
+  resizePixelMask,
+  resizePixelSelection,
+  transformPixelSelection,
+  type PixelPoint,
+  type PixelRect,
+  type PixelScaleHandle,
+  type PixelSelectionCombineMode,
+  type PixelTransform,
+} from "./pixelSelection";
+import {
+  constrainPixelShapeEnd,
+  paintPixelShape,
+  type PixelShapeKind,
+} from "./pixelShape";
+import {
+  extendPixelStroke,
+  paintPixelBrushStroke,
+  paintPixelFill,
+  type PixelDitherCoverage,
+  type PixelStrokePath,
+} from "./pixelPaint";
+import type { PixelSymmetry } from "./pixelSymmetry";
+import {
+  pushRecentPixelColor,
+  replacePixelPaletteColor,
+} from "./pixelPalette";
+import {
+  adjustPixelColors,
+  outlinePixelColors,
+  quantizePixelColors,
+  type PixelColorAdjustments,
+  type PixelColorDitherMode,
+  type PixelColorOperationResult,
+} from "./pixelColorOperations";
 import {
   getLastOpenedId,
   hasOpenedEditor,
   markEditorOpened,
 } from "./editorOpenSession";
+import { usePixelCanvasView } from "./usePixelCanvasView";
+import { usePixelCanvasNavigation } from "./usePixelCanvasNavigation";
 import {
   appendBlankTile,
   appendClonedTile,
@@ -77,7 +144,12 @@ type Props = {
   initialTileId?: number | null;
 };
 
-type DrawTool = "paint" | "eyedrop" | "glow" | "shine";
+type DrawTool = "paint" | "eyedrop" | "glow" | "shine" | "fill" | "select" | "lasso" | "wand" | PixelShapeKind;
+type ShapeChannel = "color" | "glow" | "shine";
+
+function pixelShapeKind(tool: DrawTool): PixelShapeKind | null {
+  return tool === "line" || tool === "rect" || tool === "ellipse" ? tool : null;
+}
 type EditFace = "top" | "wall";
 
 const EMISSIVE_ANIM_OPTS: Array<{ id: EmberEmissiveAnim; label: string }> = [
@@ -240,7 +312,11 @@ export function TileEditorPanel({
   onSaved,
   initialTileId = null,
 }: Props) {
+  const canvasView = usePixelCanvasView();
   const size = tileset.tileSize;
+  useEffect(() => {
+    canvasView.clampGuides(size, size);
+  }, [canvasView.clampGuides, size]);
   const [showOpenPicker, setShowOpenPicker] = useState(() => {
     if (initialTileId != null) return false;
     return !hasOpenedEditor("tile");
@@ -334,8 +410,37 @@ export function TileEditorPanel({
       selectTile(initialTileId);
     }
   }, [initialTileId, tileset.id, tileset.tiles, selectTile]);
+  const [tileQuery, setTileQuery] = useState("");
   const [color, setColor] = useState("#2f4a30");
+  const [backgroundColor, setBackgroundColor] = useState("#1a120e");
+  const [recentColors, setRecentColors] = useState<string[]>([]);
+  const colorRef = useRef(color);
+  const backgroundColorRef = useRef(backgroundColor);
+  colorRef.current = color;
+  backgroundColorRef.current = backgroundColor;
   const [tool, setTool] = useState<DrawTool>("paint");
+  const [selection, setSelection] = useState<PixelRect | null>(null);
+  const [selectionMask, setSelectionMask] = useState<boolean[] | null>(null);
+  const [wandTolerance, setWandTolerance] = useState(0);
+  const [wandContiguous, setWandContiguous] = useState(true);
+  const [wandCombineMode, setWandCombineMode] = useState<PixelSelectionCombineMode>("replace");
+  const [shapeChannel, setShapeChannel] = useState<ShapeChannel>("color");
+  const [shapeFilled, setShapeFilled] = useState(false);
+  const [fillTolerance, setFillTolerance] = useState(0);
+  const [fillContiguous, setFillContiguous] = useState(true);
+  const [symmetryHorizontal, setSymmetryHorizontal] = useState(false);
+  const [symmetryVertical, setSymmetryVertical] = useState(false);
+  const [brushOpacity, setBrushOpacity] = useState(100);
+  const [brushDither, setBrushDither] = useState<PixelDitherCoverage>(100);
+  const [brushSpacing, setBrushSpacing] = useState(1);
+  const [brushPixelPerfect, setBrushPixelPerfect] = useState(true);
+  const selectionPaths = useMemo(
+    () =>
+      selection
+        ? pixelMaskSvgPaths(selectionMask ?? undefined, selection.w, selection.h)
+        : null,
+    [selection, selectionMask],
+  );
   const [brushSize, setBrushSize] = useState(1);
   const [editFace, setEditFace] = useState<EditFace>("top");
   const [pixels, setPixels] = useState<string[]>(() => emptyPixels(size));
@@ -430,14 +535,38 @@ export function TileEditorPanel({
   waterGlintBrightRef.current = waterGlintBright;
   waterWarpStrengthRef.current = waterWarpStrength;
   waterWarpSpeedRef.current = waterWarpSpeed;
-  const painting = useRef(false);
-  const strokeSaved = useRef(false);
   const toolRef = useRef(tool);
   const brushSizeRef = useRef(brushSize);
+  const symmetryRef = useRef<PixelSymmetry>({ horizontal: false, vertical: false });
   const editFaceRef = useRef<EditFace>(editFace);
   toolRef.current = tool;
   brushSizeRef.current = brushSize;
+  symmetryRef.current = {
+    horizontal: symmetryHorizontal,
+    vertical: symmetryVertical,
+  };
   editFaceRef.current = editFace;
+
+  const chooseForegroundColor = (next: string) => {
+    setColor(next);
+    setRecentColors((recent) => pushRecentPixelColor(recent, next));
+  };
+
+  const chooseBackgroundColor = (next: string) => {
+    setBackgroundColor(next);
+    setRecentColors((recent) => pushRecentPixelColor(recent, next));
+  };
+
+  const swapPaletteColors = () => {
+    const foreground = colorRef.current;
+    setColor(backgroundColorRef.current);
+    setBackgroundColor(foreground);
+  };
+
+  const resetPaletteColors = () => {
+    setColor("#1a120e");
+    setBackgroundColor("#f2e6d8");
+  };
   type PaintSnapshot = {
     pixels: string[];
     emissive: string[];
@@ -445,13 +574,79 @@ export function TileEditorPanel({
   };
   const undoRef = useRef<PaintSnapshot[]>([]);
   const redoRef = useRef<PaintSnapshot[]>([]);
+  const shapeDragRef = useRef<{
+    start: PixelPoint;
+    snapshot: PaintSnapshot;
+    base: string[];
+    kind: PixelShapeKind;
+    channel: ShapeChannel;
+    color: string;
+    thickness: number;
+    filled: boolean;
+    symmetry: PixelSymmetry;
+    changed: boolean;
+  } | null>(null);
+  const brushStrokeRef = useRef<{
+    snapshot: PaintSnapshot;
+    base: string[];
+    channel: ShapeChannel;
+    color: string;
+    size: number;
+    symmetry: PixelSymmetry;
+    opacity: number;
+    dither: PixelDitherCoverage;
+    spacing: number;
+    pixelPerfect: boolean;
+    path: PixelStrokePath;
+    changed: boolean;
+  } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const cursorStatusRef = useRef<HTMLSpanElement>(null);
+  const selectionOverlayRef = useRef<HTMLDivElement>(null);
+  const selectionRef = useRef<PixelRect | null>(selection);
+  const selectionMaskRef = useRef<boolean[] | null>(selectionMask);
+  const selectionAnchorRef = useRef<PixelPoint | null>(null);
+  const lassoPointsRef = useRef<PixelPoint[] | null>(null);
+  const selectionMoveRef = useRef<{
+    start: PixelPoint;
+    rect: PixelRect;
+    dx: number;
+    dy: number;
+  } | null>(null);
+  const selectionScaleRef = useRef<{
+    handle: PixelScaleHandle;
+    source: PixelRect;
+    target: PixelRect;
+    mask?: boolean[];
+  } | null>(null);
+  selectionRef.current = selection;
+  selectionMaskRef.current = selectionMask;
+  useEffect(() => {
+    setSelection(null);
+    setSelectionMask(null);
+    selectionAnchorRef.current = null;
+    lassoPointsRef.current = null;
+    selectionMoveRef.current = null;
+    selectionScaleRef.current = null;
+    shapeDragRef.current = null;
+    brushStrokeRef.current = null;
+  }, [tileId, editFace]);
   const tilesetRef = useRef(tileset);
   const tileIdRef = useRef(tileId);
   const onChangeRef = useRef(onChange);
   const [scale, setScale] = useState(16);
+  const canvasNavigation = usePixelCanvasNavigation({
+    stageRef,
+    canvasRef,
+    scale,
+    setScale,
+    width: size,
+    height: size,
+    fitPaddingX: 150,
+    fitPaddingY: 40,
+  });
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
   const [historyLen, setHistoryLen] = useState(0);
@@ -468,21 +663,9 @@ export function TileEditorPanel({
   onChangeRef.current = onChange;
 
   useEffect(() => {
-    const el = stageRef.current;
-    if (!el) return;
-    const fit = () => {
-      const rect = el.getBoundingClientRect();
-      const pad = 56;
-      const s = Math.floor(
-        Math.min(rect.width - pad, rect.height - pad) / Math.max(1, size),
-      );
-      setScale(Math.max(10, Math.min(36, s || 10)));
-    };
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [size, tileId]);
+    const frame = requestAnimationFrame(canvasNavigation.fit);
+    return () => cancelAnimationFrame(frame);
+  }, [canvasNavigation.fit, size, tileId]);
 
   const tile = useMemo(
     () => tileset.tiles.find((t) => t.id === tileId),
@@ -518,22 +701,26 @@ export function TileEditorPanel({
     [],
   );
 
-  const pushHistory = useCallback(() => {
+  const pushPaintSnapshot = useCallback((snapshot: PaintSnapshot) => {
     undoRef.current = [
       ...undoRef.current.slice(-40),
-      capturePaintSnapshot(),
+      snapshot,
     ];
     redoRef.current = [];
     setHistoryLen(undoRef.current.length);
     setRedoLen(0);
-  }, [capturePaintSnapshot]);
+  }, []);
+
+  const pushHistory = useCallback(() => {
+    pushPaintSnapshot(capturePaintSnapshot());
+  }, [capturePaintSnapshot, pushPaintSnapshot]);
 
   // Load top + wall pixels when switching tile / tileset
   useEffect(() => {
     const t = tileset.tiles.find((x) => x.id === tileId);
     if (!t) return;
     clearHistory();
-    strokeSaved.current = false;
+    brushStrokeRef.current = null;
     setEditFace("top");
     editFaceRef.current = "top";
     const top =
@@ -654,10 +841,7 @@ export function TileEditorPanel({
         const c = pixels[y * size + x];
         const px = x * scale;
         const py = y * scale;
-        if (!c) {
-          ctx.fillStyle = (x + y) % 2 === 0 ? "#1a1512" : "#221c18";
-          ctx.fillRect(px, py, scale, scale);
-        } else {
+        if (c && c !== "#00000000") {
           ctx.fillStyle = c;
           ctx.fillRect(px, py, scale, scale);
         }
@@ -682,15 +866,6 @@ export function TileEditorPanel({
           ctx.strokeRect(px + 0.5, py + 0.5, scale - 1, scale - 1);
         }
       }
-    }
-    ctx.strokeStyle = "rgba(255,255,255,0.08)";
-    for (let i = 0; i <= size; i++) {
-      ctx.beginPath();
-      ctx.moveTo(i * scale, 0);
-      ctx.lineTo(i * scale, size * scale);
-      ctx.moveTo(0, i * scale);
-      ctx.lineTo(size * scale, i * scale);
-      ctx.stroke();
     }
   }, [pixels, emissivePixels, shinePixels, emissiveEnabled, size, scale]);
 
@@ -959,7 +1134,7 @@ export function TileEditorPanel({
       shinePixelsRef.current,
     );
     clearHistory();
-    strokeSaved.current = false;
+    brushStrokeRef.current = null;
     setEditFace(face);
     editFaceRef.current = face;
     setPixels(
@@ -1019,55 +1194,431 @@ export function TileEditorPanel({
     return { x, y, idx: y * size + x };
   };
 
+  const updateCursorStatus = (clientX: number, clientY: number) => {
+    const pos = pixelFromEvent(clientX, clientY);
+    if (cursorStatusRef.current) {
+      cursorStatusRef.current.textContent = pos ? `X ${pos.x}  Y ${pos.y}` : "X —  Y —";
+    }
+  };
+
+  const currentPaintChannels = () => ({
+    pixels: pixelsRef.current,
+    emissivePixels: emissivePixelsRef.current,
+    shinePixels: shinePixelsRef.current,
+  });
+
+  const applyPaintChannels = (channels: {
+    pixels: string[];
+    emissivePixels?: string[];
+    shinePixels?: string[];
+  }) => {
+    const px = channels.pixels;
+    const em = channels.emissivePixels ?? emissivePixelsRef.current;
+    const sh = channels.shinePixels ?? shinePixelsRef.current;
+    pixelsRef.current = px;
+    emissivePixelsRef.current = em;
+    shinePixelsRef.current = sh;
+    setPixels(px);
+    setEmissivePixels(em);
+    setShinePixels(sh);
+    applyToTileset(px, em, sh);
+  };
+
+  const resetSelectionDrag = () => {
+    selectionAnchorRef.current = null;
+    lassoPointsRef.current = null;
+    selectionMoveRef.current = null;
+    if (selectionOverlayRef.current) selectionOverlayRef.current.style.transform = "";
+  };
+
+  const selectWithMagicWand = (point: PixelPoint, shiftKey: boolean, altKey: boolean) => {
+    const sampled = magicWandSelection(
+      pixelsRef.current,
+      size,
+      size,
+      point,
+      wandTolerance,
+      wandContiguous,
+    );
+    const current = selectionRef.current
+      ? { rect: selectionRef.current, mask: selectionMaskRef.current ?? undefined }
+      : null;
+    const mode = shiftKey && altKey
+      ? "intersect"
+      : altKey
+        ? "subtract"
+        : shiftKey
+          ? "add"
+          : wandCombineMode;
+    const combined = combinePixelSelections(current, sampled, mode, size, size);
+    setSelection(combined?.rect ?? null);
+    setSelectionMask(combined?.mask ?? null);
+  };
+
+  const beginSelection = (point: PixelPoint) => {
+    const active = selectionRef.current;
+    if (active && pixelSelectionContains(active, selectionMaskRef.current ?? undefined, point)) {
+      selectionMoveRef.current = { start: point, rect: active, dx: 0, dy: 0 };
+      return;
+    }
+    if (toolRef.current === "lasso") {
+      lassoPointsRef.current = [point];
+      selectionAnchorRef.current = null;
+      setSelection({ x: point.x, y: point.y, w: 1, h: 1 });
+      setSelectionMask([true]);
+      return;
+    }
+    selectionAnchorRef.current = point;
+    setSelectionMask(null);
+    setSelection({ x: point.x, y: point.y, w: 1, h: 1 });
+  };
+
+  const updateSelectionDrag = (point: PixelPoint) => {
+    const moving = selectionMoveRef.current;
+    if (moving) {
+      moving.dx = Math.max(
+        -moving.rect.x,
+        Math.min(size - moving.rect.x - moving.rect.w, point.x - moving.start.x),
+      );
+      moving.dy = Math.max(
+        -moving.rect.y,
+        Math.min(size - moving.rect.y - moving.rect.h, point.y - moving.start.y),
+      );
+      if (selectionOverlayRef.current) {
+        selectionOverlayRef.current.style.transform = `translate(${moving.dx * scaleRef.current}px, ${moving.dy * scaleRef.current}px)`;
+      }
+      return;
+    }
+    const lassoPoints = lassoPointsRef.current;
+    if (lassoPoints) {
+      const previous = lassoPoints[lassoPoints.length - 1];
+      if (!previous || previous.x !== point.x || previous.y !== point.y) lassoPoints.push(point);
+      const shape = pixelSelectionFromPolygon(lassoPoints, size, size);
+      if (shape) {
+        setSelection(shape.rect);
+        setSelectionMask(shape.mask ?? null);
+      }
+      return;
+    }
+    const anchor = selectionAnchorRef.current;
+    if (anchor) setSelection(pixelRectFromPoints(anchor, point, size, size));
+  };
+
+  const finishSelectionDrag = () => {
+    const moving = selectionMoveRef.current;
+    if (moving && (moving.dx !== 0 || moving.dy !== 0)) {
+      pushHistory();
+      const moved = movePixelSelection(
+        currentPaintChannels(),
+        size,
+        size,
+        moving.rect,
+        moving.dx,
+        moving.dy,
+        selectionMaskRef.current ?? undefined,
+      );
+      applyPaintChannels(moved.channels);
+      setSelection(moved.rect);
+      setSelectionMask(moved.mask ?? null);
+    }
+    resetSelectionDrag();
+  };
+
+  const beginSelectionScale = (
+    handle: PixelScaleHandle,
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) => {
+    const active = selectionRef.current;
+    if (!active) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    selectionScaleRef.current = {
+      handle,
+      source: active,
+      target: active,
+      mask: selectionMaskRef.current ? [...selectionMaskRef.current] : undefined,
+    };
+  };
+
+  const updateSelectionScale = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const sizing = selectionScaleRef.current;
+    if (!sizing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = pixelFromEvent(event.clientX, event.clientY);
+    if (!point) return;
+    const target = pixelRectFromScaleHandle(
+      sizing.source,
+      sizing.handle,
+      point,
+      size,
+      size,
+      event.shiftKey,
+    );
+    sizing.target = target;
+    setSelection(target);
+    setSelectionMask(
+      resizePixelMask(sizing.mask, sizing.source.w, sizing.source.h, target.w, target.h) ?? null,
+    );
+  };
+
+  const finishSelectionScale = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const sizing = selectionScaleRef.current;
+    if (!sizing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    selectionScaleRef.current = null;
+    const { source, target } = sizing;
+    if (
+      source.x === target.x &&
+      source.y === target.y &&
+      source.w === target.w &&
+      source.h === target.h
+    ) return;
+    pushHistory();
+    const resized = resizePixelSelection(
+      currentPaintChannels(),
+      size,
+      size,
+      source,
+      target,
+      sizing.mask,
+    );
+    applyPaintChannels(resized.channels);
+    setSelection(resized.rect);
+    setSelectionMask(resized.mask ?? null);
+  };
+
+  const cancelSelectionScale = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const sizing = selectionScaleRef.current;
+    if (!sizing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    selectionScaleRef.current = null;
+    setSelection(sizing.source);
+    setSelectionMask(sizing.mask ?? null);
+  };
+
+  const transformSelection = (transform: PixelTransform) => {
+    const active = selectionRef.current;
+    if (!active) return;
+    pushHistory();
+    const next = transformPixelSelection(
+      currentPaintChannels(),
+      size,
+      size,
+      active,
+      transform,
+      selectionMaskRef.current ?? undefined,
+    );
+    applyPaintChannels(next.channels);
+    setSelection(next.rect);
+    setSelectionMask(next.mask ?? null);
+  };
+
+  const deleteSelection = () => {
+    const active = selectionRef.current;
+    if (!active) return;
+    pushHistory();
+    applyPaintChannels(
+      clearPixelSelection(
+        currentPaintChannels(),
+        size,
+        size,
+        active,
+        selectionMaskRef.current ?? undefined,
+      ),
+    );
+  };
+
   const pickColorAt = (clientX: number, clientY: number) => {
     const pos = pixelFromEvent(clientX, clientY);
     if (!pos) return;
     const c = pixelsRef.current[pos.idx] ?? "";
-    setColor(c === "" ? "#00000000" : c);
+    chooseForegroundColor(c === "" ? "#00000000" : c);
     setTool("paint");
   };
 
-  const paintAt = (clientX: number, clientY: number) => {
-    const pos = pixelFromEvent(clientX, clientY);
-    if (!pos) return;
-    const paintColor = color === "#00000000" ? "" : color;
-    const glowMode = toolRef.current === "glow";
-    const shineMode = toolRef.current === "shine";
-    const prev = glowMode
-      ? emissivePixelsRef.current
-      : shineMode
-        ? shinePixelsRef.current
-        : pixelsRef.current;
-    const b = Math.max(1, Math.min(4, brushSizeRef.current));
-    const origin = Math.floor((b - 1) / 2);
-    let changed = false;
-    const next = [...prev];
-    for (let dy = 0; dy < b; dy++) {
-      for (let dx = 0; dx < b; dx++) {
-        const x = pos.x - origin + dx;
-        const y = pos.y - origin + dy;
-        if (x < 0 || y < 0 || x >= size || y >= size) continue;
-        const idx = y * size + x;
-        if (next[idx] === paintColor) continue;
-        next[idx] = paintColor;
-        changed = true;
-      }
-    }
-    if (!changed) return;
-    if (!strokeSaved.current) {
-      pushHistory();
-      strokeSaved.current = true;
-    }
-    if (glowMode) {
+  const applyShapeTarget = (channel: ShapeChannel, next: string[]) => {
+    if (channel === "glow") {
       emissivePixelsRef.current = next;
       setEmissivePixels(next);
-    } else if (shineMode) {
+    } else if (channel === "shine") {
       shinePixelsRef.current = next;
       setShinePixels(next);
     } else {
       pixelsRef.current = next;
       setPixels(next);
     }
+  };
+
+  const updateBrushStroke = (point: PixelPoint) => {
+    const stroke = brushStrokeRef.current;
+    if (!stroke) return;
+    stroke.path = extendPixelStroke(
+      stroke.path,
+      point,
+      stroke.spacing,
+      stroke.pixelPerfect && stroke.size === 1,
+    );
+    const preview = paintPixelBrushStroke(
+      stroke.base,
+      size,
+      size,
+      stroke.path.points,
+      stroke.color,
+      stroke.size,
+      stroke.symmetry,
+      {
+        opacity: stroke.opacity,
+        ditherCoverage: stroke.dither,
+      },
+    );
+    stroke.changed = preview.changed;
+    applyShapeTarget(stroke.channel, preview.pixels);
+  };
+
+  const beginBrushStroke = (point: PixelPoint) => {
+    const channel: ShapeChannel = toolRef.current === "glow"
+      ? "glow"
+      : toolRef.current === "shine"
+        ? "shine"
+        : "color";
+    const base = channel === "glow"
+      ? emissivePixelsRef.current
+      : channel === "shine"
+        ? shinePixelsRef.current
+        : pixelsRef.current;
+    brushStrokeRef.current = {
+      snapshot: capturePaintSnapshot(),
+      base: [...base],
+      channel,
+      color: color === "#00000000" ? "" : color,
+      size: brushSizeRef.current,
+      symmetry: { ...symmetryRef.current },
+      opacity: brushOpacity / 100,
+      dither: brushDither,
+      spacing: brushSpacing,
+      pixelPerfect: brushPixelPerfect,
+      path: { points: [], last: null, distance: 0 },
+      changed: false,
+    };
+    updateBrushStroke(point);
+  };
+
+  const finishBrushStroke = () => {
+    const stroke = brushStrokeRef.current;
+    if (!stroke) return;
+    brushStrokeRef.current = null;
+    if (!stroke.changed) return;
+    pushPaintSnapshot(stroke.snapshot);
+    applyToTileset(
+      pixelsRef.current,
+      emissivePixelsRef.current,
+      shinePixelsRef.current,
+    );
+  };
+
+  const cancelBrushStroke = () => {
+    const stroke = brushStrokeRef.current;
+    if (!stroke) return;
+    brushStrokeRef.current = null;
+    restorePaintSnapshot(stroke.snapshot);
+  };
+
+  const fillAt = (point: PixelPoint) => {
+    const channel = shapeChannel;
+    const base = channel === "glow"
+      ? emissivePixelsRef.current
+      : channel === "shine"
+        ? shinePixelsRef.current
+        : pixelsRef.current;
+    const filled = paintPixelFill(
+      base,
+      size,
+      size,
+      point,
+      color === "#00000000" ? "" : color,
+      fillTolerance,
+      fillContiguous,
+      symmetryRef.current,
+    );
+    if (!filled.changed) return;
+    pushHistory();
+    applyShapeTarget(channel, filled.pixels);
+    applyToTileset(
+      pixelsRef.current,
+      emissivePixelsRef.current,
+      shinePixelsRef.current,
+    );
+  };
+
+  const updateShapeDrag = (point: PixelPoint, constrained: boolean) => {
+    const drag = shapeDragRef.current;
+    if (!drag) return;
+    const rawEnd = constrainPixelShapeEnd(drag.kind, drag.start, point, constrained);
+    const end = {
+      x: Math.max(0, Math.min(size - 1, rawEnd.x)),
+      y: Math.max(0, Math.min(size - 1, rawEnd.y)),
+    };
+    const preview = paintPixelShape(
+      drag.base,
+      size,
+      size,
+      drag.kind,
+      drag.start,
+      end,
+      drag.color,
+      drag.thickness,
+      drag.filled,
+      drag.symmetry,
+    );
+    drag.changed = preview.changed;
+    applyShapeTarget(drag.channel, preview.pixels);
+  };
+
+  const beginShapeDrag = (point: PixelPoint, constrained: boolean) => {
+    const kind = pixelShapeKind(toolRef.current);
+    if (!kind) return;
+    const base = shapeChannel === "glow"
+      ? emissivePixelsRef.current
+      : shapeChannel === "shine"
+        ? shinePixelsRef.current
+        : pixelsRef.current;
+    shapeDragRef.current = {
+      start: point,
+      snapshot: capturePaintSnapshot(),
+      base: [...base],
+      kind,
+      channel: shapeChannel,
+      color: color === "#00000000" ? "" : color,
+      thickness: brushSizeRef.current,
+      filled: shapeFilled && kind !== "line",
+      symmetry: { ...symmetryRef.current },
+      changed: false,
+    };
+    updateShapeDrag(point, constrained);
+  };
+
+  const finishShapeDrag = () => {
+    const drag = shapeDragRef.current;
+    if (!drag) return;
+    shapeDragRef.current = null;
+    if (!drag.changed) return;
+    pushPaintSnapshot(drag.snapshot);
+    applyToTileset(
+      pixelsRef.current,
+      emissivePixelsRef.current,
+      shinePixelsRef.current,
+    );
+  };
+
+  const cancelShapeDrag = () => {
+    const drag = shapeDragRef.current;
+    if (!drag) return;
+    shapeDragRef.current = null;
+    restorePaintSnapshot(drag.snapshot);
   };
 
   const commitPixels = (next: string[]) => {
@@ -1078,39 +1629,296 @@ export function TileEditorPanel({
   };
 
   const copyPixels = useCallback(() => {
-    copyPixelArt(pixelsRef.current, size);
+    const active = selectionRef.current;
+    const clip = active
+      ? extractPixelSelection(
+          currentPaintChannels(),
+          size,
+          size,
+          active,
+          selectionMaskRef.current ?? undefined,
+        )
+      : null;
+    copyPixelArtChannels(
+      clip?.width ?? size,
+      clip?.height ?? size,
+      clip ?? currentPaintChannels(),
+      clip?.mask,
+    );
     setClipReady(true);
   }, [size]);
 
+  const selectAllPixels = () => {
+    setSelection({ x: 0, y: 0, w: size, h: size });
+    setSelectionMask(null);
+    setTool("select");
+  };
+
+  const invertSelection = () => {
+    const current = selectionRef.current
+      ? { rect: selectionRef.current, mask: selectionMaskRef.current ?? undefined }
+      : null;
+    const inverted = invertPixelSelection(current, size, size);
+    setSelection(inverted?.rect ?? null);
+    setSelectionMask(inverted?.mask ?? null);
+  };
+
+  const cutSelection = () => {
+    const active = selectionRef.current;
+    if (!active) return;
+    copyPixels();
+    pushHistory();
+    applyPaintChannels(
+      clearPixelSelection(
+        currentPaintChannels(),
+        size,
+        size,
+        active,
+        selectionMaskRef.current ?? undefined,
+      ),
+    );
+  };
+
+  const duplicateSelection = () => {
+    const active = selectionRef.current;
+    if (!active) return;
+    const dx = active.x + active.w < size ? 1 : active.x > 0 ? -1 : 0;
+    const dy = active.y + active.h < size ? 1 : active.y > 0 ? -1 : 0;
+    if (dx === 0 && dy === 0) return;
+    pushHistory();
+    const duplicated = duplicatePixelSelection(
+      currentPaintChannels(),
+      size,
+      size,
+      active,
+      dx,
+      dy,
+      selectionMaskRef.current ?? undefined,
+    );
+    applyPaintChannels(duplicated.channels);
+    setSelection(duplicated.rect);
+    setSelectionMask(duplicated.mask ?? null);
+    setTool("select");
+  };
+
   const pastePixels = useCallback(() => {
+    const active = selectionRef.current;
+    const clip = peekPixelClipboard();
+    if (
+      (active || toolRef.current === "select" || toolRef.current === "lasso" || toolRef.current === "wand") &&
+      clip
+    ) {
+      pushHistory();
+      const pasted = pastePixelSelection(
+        currentPaintChannels(),
+        size,
+        size,
+        clip,
+        active?.x ?? 0,
+        active?.y ?? 0,
+      );
+      applyPaintChannels(pasted.channels);
+      setSelection(pasted.rect);
+      setSelectionMask(pasted.mask ?? null);
+      setTool("select");
+      return;
+    }
     const next = pastePixelArt(size);
     if (!next) return;
     pushHistory();
     pixelsRef.current = next;
     setPixels(next);
     applyToTileset(next, emissivePixelsRef.current, shinePixelsRef.current);
-  }, [pushHistory]);
+  }, [pushHistory, size]);
+
+  const replacePaletteColor = (tolerance: number) => {
+    const replaced = replacePixelPaletteColor(
+      pixelsRef.current,
+      size,
+      size,
+      backgroundColorRef.current,
+      colorRef.current,
+      tolerance,
+      selectionRef.current
+        ? {
+            rect: selectionRef.current,
+            mask: selectionMaskRef.current ?? undefined,
+          }
+        : undefined,
+    );
+    if (!replaced.changed) return;
+    pushHistory();
+    pixelsRef.current = replaced.pixels;
+    setPixels(replaced.pixels);
+    applyToTileset(
+      replaced.pixels,
+      emissivePixelsRef.current,
+      shinePixelsRef.current,
+    );
+  };
+
+  const currentColorSelection = () => selectionRef.current
+    ? {
+        rect: selectionRef.current,
+        mask: selectionMaskRef.current ?? undefined,
+      }
+    : undefined;
+
+  const commitColorOperation = (result: PixelColorOperationResult) => {
+    if (!result.changed) return;
+    pushHistory();
+    pixelsRef.current = result.pixels;
+    setPixels(result.pixels);
+    applyToTileset(
+      result.pixels,
+      emissivePixelsRef.current,
+      shinePixelsRef.current,
+    );
+  };
+
+  const adjustActiveColors = (adjustments: PixelColorAdjustments) => {
+    commitColorOperation(adjustPixelColors(
+      pixelsRef.current,
+      size,
+      size,
+      adjustments,
+      currentColorSelection(),
+    ));
+  };
+
+  const quantizeActiveColors = (
+    colors: number,
+    dither: PixelColorDitherMode,
+    strength: number,
+  ) => {
+    commitColorOperation(quantizePixelColors(
+      pixelsRef.current,
+      size,
+      size,
+      colors,
+      dither,
+      strength,
+      currentColorSelection(),
+    ));
+  };
+
+  const outlineActiveColors = (thickness: number, diagonal: boolean) => {
+    commitColorOperation(outlinePixelColors(
+      pixelsRef.current,
+      size,
+      size,
+      colorRef.current,
+      thickness,
+      diagonal,
+      currentColorSelection(),
+    ));
+  };
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
       if (isTypingTarget(e.target)) return;
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.code === "Digit0") {
+        e.preventDefault();
+        canvasNavigation.fit();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.code === "Digit1") {
+        e.preventDefault();
+        canvasNavigation.zoom100();
+        return;
+      }
+      if (!(e.ctrlKey || e.metaKey) && !e.altKey) {
+        if (e.code === "Escape") {
+          cancelShapeDrag();
+          cancelBrushStroke();
+          setSelection(null);
+          setSelectionMask(null);
+          resetSelectionDrag();
+          selectionScaleRef.current = null;
+        } else if (e.code === "KeyM") setTool("select");
+        else if (e.code === "KeyL") setTool("lasso");
+        else if (e.code === "KeyW") setTool("wand");
+        else if (e.code === "KeyF") setTool("fill");
+        else if (e.code === "KeyU") {
+          setTool((current) => current === "line" ? "rect" : current === "rect" ? "ellipse" : "line");
+        }
+        else if ((e.code === "Delete" || e.code === "Backspace") && selectionRef.current) {
+          deleteSelection();
+        } else if (e.code.startsWith("Arrow") && selectionRef.current) {
+          const dx = e.code === "ArrowLeft" ? -1 : e.code === "ArrowRight" ? 1 : 0;
+          const dy = e.code === "ArrowUp" ? -1 : e.code === "ArrowDown" ? 1 : 0;
+          pushHistory();
+          const moved = movePixelSelection(
+            currentPaintChannels(),
+            size,
+            size,
+            selectionRef.current,
+            dx,
+            dy,
+            selectionMaskRef.current ?? undefined,
+          );
+          applyPaintChannels(moved.channels);
+          setSelection(moved.rect);
+          setSelectionMask(moved.mask ?? null);
+        } else if (e.code === "KeyB") setTool("paint");
+        else if (e.code === "KeyI") setTool("eyedrop");
+        else if (e.code === "KeyG") setTool("glow");
+        else if (e.code === "KeyH") setTool("shine");
+        else if (e.code === "KeyX") swapPaletteColors();
+        else if (e.code === "KeyD") resetPaletteColors();
+        else if (/^Digit[1-4]$/.test(e.code)) {
+          setBrushSize(Number(e.code.slice(-1)));
+        } else if (e.code === "BracketLeft" || e.code === "BracketRight") {
+          setBrushSize((value) =>
+            Math.max(1, Math.min(4, value + (e.code === "BracketRight" ? 1 : -1))),
+          );
+        } else {
+          return;
+        }
+        e.preventDefault();
+        return;
+      }
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
       const isUndo = e.code === "KeyZ" && !e.shiftKey;
       const isRedo =
         e.code === "KeyY" || (e.code === "KeyZ" && e.shiftKey);
       const isCopy = e.code === "KeyC";
       const isPaste = e.code === "KeyV";
-      if (!isUndo && !isRedo && !isCopy && !isPaste) return;
+      const isSelectAll = e.code === "KeyA" && !e.shiftKey;
+      const isInvert = e.code === "KeyI" && e.shiftKey;
+      const isCut = e.code === "KeyX";
+      const isDuplicate = e.code === "KeyJ";
+      if (
+        !isUndo &&
+        !isRedo &&
+        !isCopy &&
+        !isPaste &&
+        !isSelectAll &&
+        !isInvert &&
+        !isCut &&
+        !isDuplicate
+      ) return;
       e.preventDefault();
       e.stopPropagation();
       if (isUndo) undo();
       else if (isRedo) redo();
+      else if (isSelectAll) selectAllPixels();
+      else if (isInvert) invertSelection();
+      else if (isCut) cutSelection();
+      else if (isDuplicate) duplicateSelection();
       else if (isCopy) copyPixels();
       else pastePixels();
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [undo, redo, copyPixels, pastePixels]);
+  }, [
+    undo,
+    redo,
+    copyPixels,
+    pastePixels,
+    canvasNavigation.fit,
+    canvasNavigation.zoom100,
+  ]);
 
   const patchCurrentTile = (patch: Partial<EmberTilesetTile>) => {
     const ts = tilesetRef.current;
@@ -1182,7 +1990,7 @@ export function TileEditorPanel({
     if (editFaceRef.current !== face) {
       applyToTileset(pixelsRef.current);
       clearHistory();
-      strokeSaved.current = false;
+      brushStrokeRef.current = null;
       setEditFace(face);
       editFaceRef.current = face;
     }
@@ -1418,9 +2226,24 @@ export function TileEditorPanel({
                 </p>
               </div>
             </header>
+            <label className="ember-studio-search">
+              <span aria-hidden>⌕</span>
+              <input
+                type="search"
+                value={tileQuery}
+                onChange={(e) => setTileQuery(e.target.value)}
+                placeholder="Имя или ID тайла"
+                aria-label="Поиск тайлов"
+              />
+            </label>
             <div className="ember-ed-open-picker__scroll">
               <div className="ember-ed-open-picker__grid" role="listbox">
-                {tileset.tiles.map((t) => {
+                {tileset.tiles
+                  .filter((t) => {
+                    const q = tileQuery.trim().toLocaleLowerCase("ru");
+                    return !q || `${t.id} ${t.name}`.toLocaleLowerCase("ru").includes(q);
+                  })
+                  .map((t) => {
                   const topPx =
                     t.pixels && t.pixels.length === size * size
                       ? t.pixels
@@ -1457,7 +2280,7 @@ export function TileEditorPanel({
       <div className="ember-tile-editor">
         <aside className="ember-tile-list">
           <div className="ember-tile-list__head">
-            <h3 className="ember-tile-list__title">Тайлы</h3>
+            <h3 className="ember-tile-list__title">Навигатор тайлов</h3>
             <div className="ember-chip-row" role="group" aria-label="Создать">
               <button
                 type="button"
@@ -1465,7 +2288,7 @@ export function TileEditorPanel({
                 title="Пустой тайл с новым id"
                 onClick={createBlankTile}
               >
-                + Новый
+                +
               </button>
               <button
                 type="button"
@@ -1473,7 +2296,7 @@ export function TileEditorPanel({
                 title="Клон текущего тайла"
                 onClick={cloneCurrentTile}
               >
-                Клон
+                ⧉
               </button>
               <button
                 type="button"
@@ -1481,16 +2304,31 @@ export function TileEditorPanel({
                 title="Удалить тайл из тайлсета (не клетку на карте)"
                 onClick={deleteCurrentTile}
               >
-                Удалить
+                ×
               </button>
             </div>
           </div>
+          <label className="ember-studio-search ember-studio-search--dock">
+            <span aria-hidden>⌕</span>
+            <input
+              type="search"
+              value={tileQuery}
+              onChange={(e) => setTileQuery(e.target.value)}
+              placeholder="Фильтр…"
+              aria-label="Фильтр тайлов"
+            />
+          </label>
           <div
             className="ember-tile-pick"
             role="listbox"
             aria-label="Тайлы"
           >
-            {tileset.tiles.map((t) => {
+            {tileset.tiles
+              .filter((t) => {
+                const q = tileQuery.trim().toLocaleLowerCase("ru");
+                return !q || `${t.id} ${t.name}`.toLocaleLowerCase("ru").includes(q);
+              })
+              .map((t) => {
               const topPx =
                 t.pixels && t.pixels.length === size * size
                   ? t.pixels
@@ -1897,11 +2735,67 @@ export function TileEditorPanel({
               <div className="ember-chip-row">
                 <button
                   type="button"
+                  className={`ember-chip ember-chip--sm ${tool === "select" ? "is-active" : ""}`}
+                  onClick={() => setTool("select")}
+                  title="Прямоугольное выделение и перемещение · M"
+                >
+                  <PixelToolIcon name="marquee" /> Рамка
+                </button>
+                <button
+                  type="button"
+                  className={`ember-chip ember-chip--sm ${tool === "lasso" ? "is-active" : ""}`}
+                  onClick={() => setTool("lasso")}
+                  title="Свободное выделение лассо · L"
+                >
+                  <PixelToolIcon name="lasso" /> Лассо
+                </button>
+                <button
+                  type="button"
+                  className={`ember-chip ember-chip--sm ${tool === "wand" ? "is-active" : ""}`}
+                  onClick={() => setTool("wand")}
+                  title="Выделение похожих цветов · W"
+                >
+                  <PixelToolIcon name="wand" /> Палочка
+                </button>
+                <button
+                  type="button"
+                  className={`ember-chip ember-chip--sm ${tool === "line" ? "is-active" : ""}`}
+                  onClick={() => setTool("line")}
+                  title="Линия · U · Shift фиксирует 45°"
+                >
+                  <PixelToolIcon name="line" /> Линия
+                </button>
+                <button
+                  type="button"
+                  className={`ember-chip ember-chip--sm ${tool === "rect" ? "is-active" : ""}`}
+                  onClick={() => setTool("rect")}
+                  title="Прямоугольник · U · Shift рисует квадрат"
+                >
+                  <PixelToolIcon name="rect" /> Прямоуг.
+                </button>
+                <button
+                  type="button"
+                  className={`ember-chip ember-chip--sm ${tool === "ellipse" ? "is-active" : ""}`}
+                  onClick={() => setTool("ellipse")}
+                  title="Эллипс · U · Shift рисует круг"
+                >
+                  <PixelToolIcon name="ellipse" /> Эллипс
+                </button>
+                <button
+                  type="button"
+                  className={`ember-chip ember-chip--sm ${tool === "fill" ? "is-active" : ""}`}
+                  onClick={() => setTool("fill")}
+                  title="Локальная заливка · F"
+                >
+                  <PixelToolIcon name="fill" /> Заливка
+                </button>
+                <button
+                  type="button"
                   className={`ember-chip ember-chip--sm ${tool === "paint" ? "is-active" : ""}`}
                   onClick={() => setTool("paint")}
                   title="Обычные пиксели · B / ЛКМ"
                 >
-                  Кисть
+                  <PixelToolIcon name="brush" /> Кисть
                 </button>
                 <button
                   type="button"
@@ -1909,7 +2803,7 @@ export function TileEditorPanel({
                   onClick={() => setTool("glow")}
                   title="Светящиеся пиксели · ✦"
                 >
-                  Свечение
+                  <PixelToolIcon name="glow" /> Свечение
                 </button>
                 <button
                   type="button"
@@ -1917,7 +2811,7 @@ export function TileEditorPanel({
                   onClick={() => setTool("shine")}
                   title="Блеск · wet / metal · яркий = зеркало на полу"
                 >
-                  Блеск
+                  <PixelToolIcon name="shine" /> Блеск
                 </button>
                 <button
                   type="button"
@@ -1925,7 +2819,7 @@ export function TileEditorPanel({
                   onClick={() => setTool("eyedrop")}
                   title="Пипетка · I / ПКМ"
                 >
-                  Пипетка
+                  <PixelToolIcon name="eyedropper" /> Пипетка
                 </button>
               </div>
               <div className="ember-chip-row ember-tile-toolstrip__sizes">
@@ -1936,13 +2830,58 @@ export function TileEditorPanel({
                     className={`ember-chip ember-chip--sm ${brushSize === n ? "is-active" : ""}`}
                     onClick={() => {
                       setBrushSize(n);
-                      setTool("paint");
+                      if (!pixelShapeKind(tool)) setTool("paint");
                     }}
                     title={`Размер ${n}`}
                   >
                     {n}
                   </button>
                 ))}
+              </div>
+              <div className="ember-chip-row ember-pixel-symmetry" role="group" aria-label="Симметрия рисования">
+                <button
+                  type="button"
+                  className={`ghost ember-chip--sm ${symmetryHorizontal ? "is-active" : ""}`}
+                  aria-pressed={symmetryHorizontal}
+                  onClick={() => setSymmetryHorizontal((value) => !value)}
+                  title="Зеркально рисовать слева и справа"
+                >
+                  X↔
+                </button>
+                <button
+                  type="button"
+                  className={`ghost ember-chip--sm ${symmetryVertical ? "is-active" : ""}`}
+                  aria-pressed={symmetryVertical}
+                  onClick={() => setSymmetryVertical((value) => !value)}
+                  title="Зеркально рисовать сверху и снизу"
+                >
+                  Y↕
+                </button>
+              </div>
+              <div className="ember-chip-row ember-pixel-navigation-controls" role="group" aria-label="Навигация холста">
+                <button
+                  type="button"
+                  className={`ghost ember-chip--sm ${canvasNavigation.handMode ? "is-active" : ""}`}
+                  aria-pressed={canvasNavigation.handMode}
+                  onClick={() => canvasNavigation.setHandMode((value) => !value)}
+                  title="Рука · удерживать Space или среднюю кнопку мыши"
+                >
+                  <PixelToolIcon name="hand" /> Рука
+                </button>
+                <button type="button" className="ghost ember-chip--sm" onClick={canvasNavigation.zoomOut} title="Отдалить">−</button>
+                <button type="button" className="ghost ember-chip--sm" onClick={canvasNavigation.fit} title="Вписать в окно · Ctrl+0"><PixelToolIcon name="fit" /> Вписать</button>
+                <button type="button" className="ghost ember-chip--sm" onClick={canvasNavigation.zoom100} title="Масштаб 100% · Ctrl+1">100%</button>
+                <button type="button" className="ghost ember-chip--sm" onClick={canvasNavigation.zoomIn} title="Приблизить">+</button>
+                <button
+                  type="button"
+                  className={`ghost ember-chip--sm ${canvasNavigation.navigatorVisible ? "is-active" : ""}`}
+                  aria-pressed={canvasNavigation.navigatorVisible}
+                  onClick={() => canvasNavigation.setNavigatorVisible((value) => !value)}
+                  title="Показать или скрыть навигатор"
+                >
+                  <PixelToolIcon name="navigator" /> Навигатор
+                </button>
+                <span className="muted ember-pixel-navigation-controls__zoom">{canvasNavigation.zoomPercent}%</span>
               </div>
               <div className="ember-chip-row ember-tile-toolstrip__edits">
                 <button
@@ -1952,7 +2891,7 @@ export function TileEditorPanel({
                   disabled={historyLen === 0}
                   title="Undo"
                 >
-                  ↶
+                  <PixelToolIcon name="undo" /> Отмена
                 </button>
                 <button
                   type="button"
@@ -1961,7 +2900,7 @@ export function TileEditorPanel({
                   disabled={redoLen === 0}
                   title="Redo"
                 >
-                  ↷
+                  <PixelToolIcon name="redo" /> Повтор
                 </button>
                 <button
                   type="button"
@@ -1969,7 +2908,7 @@ export function TileEditorPanel({
                   onClick={copyPixels}
                   title="Копировать"
                 >
-                  Copy
+                  <PixelToolIcon name="copy" /> Копия
                 </button>
                 <button
                   type="button"
@@ -1978,7 +2917,7 @@ export function TileEditorPanel({
                   disabled={!clipReady}
                   title="Вставить"
                 >
-                  Paste
+                  <PixelToolIcon name="paste" /> Вставить
                 </button>
                 <button
                   type="button"
@@ -1993,19 +2932,19 @@ export function TileEditorPanel({
                     );
                   }}
                 >
-                  Gen
+                  Создать
                 </button>
                 <button
                   type="button"
                   className="ghost ember-chip--sm"
-                  title="Залить"
+                  title="Залить весь цветовой слой"
                   onClick={() =>
                     commitPixels(
                       emptyPixels(size, color === "#00000000" ? "" : color),
                     )
                   }
                 >
-                  Fill
+                  <PixelToolIcon name="fill" /> Залить всё
                 </button>
                 <button
                   type="button"
@@ -2013,10 +2952,185 @@ export function TileEditorPanel({
                   title="Очистить"
                   onClick={() => commitPixels(emptyPixels(size))}
                 >
-                  Clear
+                  <PixelToolIcon name="clear" /> Очистить
                 </button>
               </div>
+              <div className="ember-chip-row ember-pixel-selection-actions" aria-label="Трансформация выделения">
+                <button type="button" className="ghost ember-chip--sm" disabled={!selection} onClick={() => transformSelection("flip_x")} title="Отразить выделение по горизонтали"><PixelToolIcon name="flipX" /> По X</button>
+                <button type="button" className="ghost ember-chip--sm" disabled={!selection} onClick={() => transformSelection("flip_y")} title="Отразить выделение по вертикали"><PixelToolIcon name="flipY" /> По Y</button>
+                <button type="button" className="ghost ember-chip--sm" disabled={!selection} onClick={() => transformSelection("rotate_cw")} title="Повернуть выделение на 90°"><PixelToolIcon name="rotate" /> 90°</button>
+                <button type="button" className="ghost ember-chip--sm ember-danger" disabled={!selection} onClick={deleteSelection} title="Очистить выделенную область · Delete"><PixelToolIcon name="clear" /> Удалить</button>
+                <button type="button" className="ghost ember-chip--sm" disabled={!selection} onClick={cutSelection} title="Вырезать выделение · Ctrl+X"><PixelToolIcon name="cut" /> Вырезать</button>
+                <button type="button" className="ghost ember-chip--sm" disabled={!selection} onClick={duplicateSelection} title="Дублировать со сдвигом 1 px · Ctrl+J"><PixelToolIcon name="duplicate" /> Дубль</button>
+                <button type="button" className="ghost ember-chip--sm" onClick={selectAllPixels} title="Выделить всё · Ctrl+A"><PixelToolIcon name="selectAll" /> Всё</button>
+                <button type="button" className="ghost ember-chip--sm" onClick={invertSelection} title="Инвертировать выделение · Ctrl+Shift+I"><PixelToolIcon name="invert" /> Инверт.</button>
+                <button type="button" className="ghost ember-chip--sm" disabled={!selection} onClick={() => { setSelection(null); setSelectionMask(null); }} title="Снять выделение · Esc">×</button>
+              </div>
             </div>
+
+            {tool === "wand" ? (
+              <div className="ember-wand-options" role="group" aria-label="Параметры волшебной палочки">
+                <div className="ember-wand-options__modes" role="group" aria-label="Режим объединения выделения">
+                  {([
+                    ["replace", "Новое", "Заменить текущее выделение"],
+                    ["add", "+", "Добавить к выделению"],
+                    ["subtract", "−", "Вычесть из выделения"],
+                    ["intersect", "∩", "Пересечь с выделением"],
+                  ] as const).map(([mode, label, title]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={`ghost ember-chip--sm ${wandCombineMode === mode ? "is-active" : ""}`}
+                      aria-pressed={wandCombineMode === mode}
+                      title={title}
+                      onClick={() => setWandCombineMode(mode)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <label className="ember-wand-options__tolerance">
+                  <span>Допуск</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={255}
+                    step={1}
+                    value={wandTolerance}
+                    onChange={(event) => setWandTolerance(Number(event.target.value))}
+                  />
+                  <output>{wandTolerance}</output>
+                </label>
+                <label className="ember-wand-options__check" title="Выбирать только связанную область">
+                  <input
+                    type="checkbox"
+                    checked={wandContiguous}
+                    onChange={(event) => setWandContiguous(event.target.checked)}
+                  />
+                  Смежные
+                </label>
+                <span className="muted">Shift добавить · Alt вычесть · Shift+Alt пересечь</span>
+              </div>
+            ) : null}
+
+            {pixelShapeKind(tool) ? (
+              <div className="ember-shape-options" role="group" aria-label="Параметры геометрической фигуры">
+                <div className="ember-shape-options__channels" role="group" aria-label="Канал рисования">
+                  {([[
+                    "color",
+                    "Цвет",
+                  ], [
+                    "glow",
+                    "Свечение",
+                  ], [
+                    "shine",
+                    "Блеск",
+                  ]] as const).map(([channel, label]) => (
+                    <button
+                      key={channel}
+                      type="button"
+                      className={`ghost ember-chip--sm ${shapeChannel === channel ? "is-active" : ""}`}
+                      aria-pressed={shapeChannel === channel}
+                      onClick={() => setShapeChannel(channel)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <label className="ember-shape-options__check" title="Заполнить фигуру текущим цветом">
+                  <input
+                    type="checkbox"
+                    checked={shapeFilled}
+                    disabled={tool === "line"}
+                    onChange={(event) => setShapeFilled(event.target.checked)}
+                  />
+                  Заливка
+                </label>
+                <span className="muted">Толщина: {brushSize}px · Shift: 45° / квадрат / круг</span>
+              </div>
+            ) : null}
+
+            {tool === "fill" ? (
+              <div className="ember-fill-options" role="group" aria-label="Параметры заливки">
+                <div className="ember-shape-options__channels" role="group" aria-label="Канал заливки">
+                  {([[
+                    "color",
+                    "Цвет",
+                  ], [
+                    "glow",
+                    "Свечение",
+                  ], [
+                    "shine",
+                    "Блеск",
+                  ]] as const).map(([channel, label]) => (
+                    <button
+                      key={channel}
+                      type="button"
+                      className={`ghost ember-chip--sm ${shapeChannel === channel ? "is-active" : ""}`}
+                      aria-pressed={shapeChannel === channel}
+                      onClick={() => setShapeChannel(channel)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <label className="ember-wand-options__tolerance">
+                  <span>Допуск</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={255}
+                    step={1}
+                    value={fillTolerance}
+                    onChange={(event) => setFillTolerance(Number(event.target.value))}
+                  />
+                  <output>{fillTolerance}</output>
+                </label>
+                <label className="ember-wand-options__check" title="Заливать только связанную область">
+                  <input
+                    type="checkbox"
+                    checked={fillContiguous}
+                    onChange={(event) => setFillContiguous(event.target.checked)}
+                  />
+                  Смежные
+                </label>
+                <span className="muted">X↔ / Y↕ отражают точку заливки</span>
+              </div>
+            ) : null}
+
+            {tool === "paint" || tool === "glow" || tool === "shine" ? (
+              <div className="ember-brush-options" role="group" aria-label="Параметры кисти">
+                <div className="ember-brush-options__presets" role="group" aria-label="Пресеты кисти">
+                  <button type="button" className="ghost ember-chip--sm" onClick={() => { setBrushSize(1); setBrushOpacity(100); setBrushDither(100); setBrushSpacing(1); setBrushPixelPerfect(true); }}>Пиксель</button>
+                  <button type="button" className="ghost ember-chip--sm" onClick={() => { setBrushSize(2); setBrushOpacity(35); setBrushDither(100); setBrushSpacing(1); setBrushPixelPerfect(false); }}>Мягкая</button>
+                  <button type="button" className="ghost ember-chip--sm" onClick={() => { setBrushSize(1); setBrushOpacity(100); setBrushDither(50); setBrushSpacing(1); setBrushPixelPerfect(true); }}>Дизер</button>
+                  <button type="button" className="ghost ember-chip--sm" onClick={() => { setBrushSize(2); setBrushOpacity(100); setBrushDither(100); setBrushSpacing(4); setBrushPixelPerfect(false); }}>Штамп</button>
+                </div>
+                <label className="ember-brush-options__range">
+                  <span>Непрозр.</span>
+                  <input type="range" min={10} max={100} step={5} value={brushOpacity} onChange={(event) => setBrushOpacity(Number(event.target.value))} />
+                  <output>{brushOpacity}%</output>
+                </label>
+                <label className="ember-brush-options__select">
+                  <span>Дизер</span>
+                  <select value={brushDither} onChange={(event) => setBrushDither(Number(event.target.value) as PixelDitherCoverage)}>
+                    <option value={100}>off</option>
+                    <option value={75}>75%</option>
+                    <option value={50}>50%</option>
+                    <option value={25}>25%</option>
+                  </select>
+                </label>
+                <label className="ember-brush-options__range">
+                  <span>Интервал</span>
+                  <input type="range" min={1} max={8} step={1} value={brushSpacing} onChange={(event) => setBrushSpacing(Number(event.target.value))} />
+                  <output>{brushSpacing}px</output>
+                </label>
+                <label className="ember-brush-options__check" title="Убирать лишний угловой пиксель у кисти 1 px">
+                  <input type="checkbox" checked={brushPixelPerfect} onChange={(event) => setBrushPixelPerfect(event.target.checked)} />
+                  Чистый пиксель
+                </label>
+              </div>
+            ) : null}
 
             {showEmissivePanel ? (
               <div
@@ -2413,11 +3527,13 @@ export function TileEditorPanel({
             ) : null}
           </div>
 
-          <div
-            ref={stageRef}
-            className={`ember-tile-stage ${editFace === "wall" ? "is-wall" : "is-top"}`}
-          >
-            <div className="ember-tile-stage__center">
+          <div className={`ember-tile-stage ${editFace === "wall" ? "is-wall" : "is-top"}`}>
+            <div
+              ref={stageRef}
+              className={`ember-tile-stage__scroll ${canvasNavigation.handMode || canvasNavigation.spaceHeld ? "is-hand" : ""} ${canvasNavigation.dragging ? "is-panning" : ""}`}
+              onMouseDown={canvasNavigation.beginPan}
+            >
+              <div className="ember-tile-stage__center">
               <div className="ember-tile-artboard">
                 <div className="ember-tile-bands" aria-hidden>
                   <div className="ember-tile-bands__band">
@@ -2427,16 +3543,42 @@ export function TileEditorPanel({
                     </span>
                   </div>
                 </div>
+                <div className={`ember-pixel-canvas-pair ${canvasView.reference?.mode === "side" ? "is-side" : ""}`}>
+                <div
+                  className="ember-pixel-canvas-wrap"
+                  style={{ backgroundSize: `${scale * 2}px ${scale * 2}px` }}
+                >
+                <PixelCanvasReferenceLayer
+                  reference={canvasView.reference}
+                  layer="under"
+                  cellScale={scale}
+                  width={size}
+                  height={size}
+                />
                 <canvas
                   ref={canvasRef}
                   className="ember-tile-paint__canvas"
                   style={{
                     width: size * scale,
                     height: size * scale,
-                    cursor: tool === "eyedrop" ? "crosshair" : "cell",
+                    cursor: canvasNavigation.dragging ? "grabbing" : canvasNavigation.handMode || canvasNavigation.spaceHeld ? "grab" : tool === "eyedrop" || tool === "fill" || tool === "select" || tool === "lasso" || tool === "wand" || pixelShapeKind(tool) ? "crosshair" : "cell",
                   }}
                   onContextMenu={(e) => e.preventDefault()}
                   onMouseDown={(e) => {
+                    if (canvasNavigation.shouldPan(e.button)) {
+                      canvasNavigation.beginPan(e);
+                      return;
+                    }
+                    if (toolRef.current === "wand" && e.button === 0) {
+                      const pos = pixelFromEvent(e.clientX, e.clientY);
+                      if (pos) selectWithMagicWand(pos, e.shiftKey, e.altKey);
+                      return;
+                    }
+                    if ((toolRef.current === "select" || toolRef.current === "lasso") && e.button === 0) {
+                      const pos = pixelFromEvent(e.clientX, e.clientY);
+                      if (pos) beginSelection(pos);
+                      return;
+                    }
                     if (
                       e.button === 2 ||
                       toolRef.current === "eyedrop" ||
@@ -2447,38 +3589,144 @@ export function TileEditorPanel({
                       return;
                     }
                     if (e.button !== 0) return;
-                    painting.current = true;
-                    strokeSaved.current = false;
-                    paintAt(e.clientX, e.clientY);
+                    if (toolRef.current === "fill") {
+                      const pos = pixelFromEvent(e.clientX, e.clientY);
+                      if (pos) fillAt(pos);
+                      return;
+                    }
+                    const shapeKind = pixelShapeKind(toolRef.current);
+                    if (shapeKind) {
+                      const pos = pixelFromEvent(e.clientX, e.clientY);
+                      if (pos) beginShapeDrag(pos, e.shiftKey);
+                      return;
+                    }
+                    const pos = pixelFromEvent(e.clientX, e.clientY);
+                    if (pos) beginBrushStroke(pos);
                   }}
                   onMouseMove={(e) => {
-                    if (painting.current) paintAt(e.clientX, e.clientY);
-                  }}
-                  onMouseUp={() => {
-                    if (!painting.current) return;
-                    painting.current = false;
-                    strokeSaved.current = false;
-                    applyToTileset(
-                      pixelsRef.current,
-                      emissivePixelsRef.current,
-                      shinePixelsRef.current,
-                    );
-                  }}
-                  onMouseLeave={() => {
-                    if (painting.current) {
-                      painting.current = false;
-                      strokeSaved.current = false;
-                      applyToTileset(
-                        pixelsRef.current,
-                        emissivePixelsRef.current,
-                        shinePixelsRef.current,
-                      );
+                    updateCursorStatus(e.clientX, e.clientY);
+                    if (toolRef.current === "select" || toolRef.current === "lasso") {
+                      const pos = pixelFromEvent(e.clientX, e.clientY);
+                      if (pos) updateSelectionDrag(pos);
+                      return;
+                    }
+                    if (shapeDragRef.current) {
+                      const pos = pixelFromEvent(e.clientX, e.clientY);
+                      if (pos) updateShapeDrag(pos, e.shiftKey);
+                      return;
+                    }
+                    if (brushStrokeRef.current) {
+                      const pos = pixelFromEvent(e.clientX, e.clientY);
+                      if (pos) updateBrushStroke(pos);
                     }
                   }}
+                  onMouseUp={() => {
+                    if (toolRef.current === "select" || toolRef.current === "lasso") {
+                      finishSelectionDrag();
+                      return;
+                    }
+                    if (shapeDragRef.current) {
+                      finishShapeDrag();
+                      return;
+                    }
+                    finishBrushStroke();
+                  }}
+                  onMouseLeave={() => {
+                    if (cursorStatusRef.current) cursorStatusRef.current.textContent = "X —  Y —";
+                    if (toolRef.current === "select" || toolRef.current === "lasso") {
+                      finishSelectionDrag();
+                      return;
+                    }
+                    if (shapeDragRef.current) {
+                      finishShapeDrag();
+                      return;
+                    }
+                    finishBrushStroke();
+                  }}
                 />
+                <PixelCanvasReferenceLayer
+                  reference={canvasView.reference}
+                  layer="over"
+                  cellScale={scale}
+                  width={size}
+                  height={size}
+                />
+                <PixelCanvasOverlays
+                  width={size}
+                  height={size}
+                  cellScale={scale}
+                  gridVisible={canvasView.gridVisible}
+                  gridStep={canvasView.gridStep}
+                  gridOpacity={canvasView.gridOpacity}
+                  guidesVisible={canvasView.guidesVisible}
+                  guides={canvasView.guides}
+                  onMoveGuide={canvasView.moveGuide}
+                  onRemoveGuide={canvasView.removeGuide}
+                />
+                {selection ? (
+                  <div
+                    ref={selectionOverlayRef}
+                    className={`ember-pixel-selection ${selectionPaths ? "is-masked" : ""}`}
+                    style={{
+                      left: selection.x * scale,
+                      top: selection.y * scale,
+                      width: selection.w * scale,
+                      height: selection.h * scale,
+                    }}
+                    role="group"
+                    aria-label={`Выделение ${selection.w} на ${selection.h} пикселей`}
+                  >
+                    {selectionPaths ? (
+                      <svg
+                        className="ember-pixel-selection__mask"
+                        viewBox={`0 0 ${selection.w} ${selection.h}`}
+                        preserveAspectRatio="none"
+                        aria-hidden
+                      >
+                        <path className="ember-pixel-selection__mask-fill" d={selectionPaths.fill} />
+                        <path className="ember-pixel-selection__mask-outline" d={selectionPaths.outline} />
+                      </svg>
+                    ) : null}
+                    {(["nw", "ne", "se", "sw"] as const).map((handle) => (
+                      <button
+                        key={handle}
+                        type="button"
+                        className={`ember-pixel-selection__handle is-${handle}`}
+                        aria-label={`Масштабировать за угол ${handle.toUpperCase()}`}
+                        title="Тянуть для масштаба · Shift сохраняет пропорции"
+                        onPointerDown={(event) => beginSelectionScale(handle, event)}
+                        onPointerMove={updateSelectionScale}
+                        onPointerUp={finishSelectionScale}
+                        onPointerCancel={cancelSelectionScale}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                </div>
+                <PixelCanvasReferenceLayer
+                  reference={canvasView.reference}
+                  layer="side"
+                  cellScale={scale}
+                  width={size}
+                  height={size}
+                />
+                </div>
               </div>
             </div>
+            </div>
 
+            <PixelCanvasNavigator
+              stageRef={stageRef}
+              sourceCanvasRef={canvasRef}
+              width={size}
+              height={size}
+              scale={scale}
+              visible={canvasNavigation.navigatorVisible}
+              onClose={() => canvasNavigation.setNavigatorVisible(false)}
+              revisionA={pixels}
+              revisionB={emissivePixels}
+              revisionC={shinePixels}
+            />
             <aside className="ember-tile-hud" aria-label="Превью тайла">
               <div className="ember-tile-hud__frame">
                 <canvas
@@ -2490,90 +3738,60 @@ export function TileEditorPanel({
               <span className="ember-tile-hud__caption muted">На карте</span>
             </aside>
           </div>
+          <footer className="ember-studio-status" aria-label="Состояние холста">
+            <span className="ember-studio-status__primary">
+              {tool === "select" ? "Выделение" : tool === "lasso" ? "Лассо" : tool === "wand" ? "Палочка" : tool === "fill" ? "Заливка" : tool === "line" ? "Линия" : tool === "rect" ? "Прямоугольник" : tool === "ellipse" ? "Эллипс" : tool === "paint" ? "Кисть" : tool === "eyedrop" ? "Пипетка" : tool === "glow" ? "Свечение" : "Блеск"}
+              <b>{selection && (tool === "select" || tool === "lasso" || tool === "wand") ? `${selection.w}×${selection.h}` : `${brushSize}px`}</b>
+            </span>
+            <span ref={cursorStatusRef}>X —  Y —</span>
+            <span>{editFace === "top" ? "Верх" : "Стена"} · {size}×{size} · {canvasNavigation.zoomPercent}%</span>
+            <span className="ember-studio-status__hint"><kbd>M</kbd> рамка <kbd>L</kbd> лассо <kbd>W</kbd> цвет <kbd>F</kbd> заливка <kbd>U</kbd> фигуры <kbd>B</kbd> кисть <kbd>I</kbd> пипетка</span>
+          </footer>
         </div>
 
-        <aside className="ember-tile-palette">
-          <div className="ember-tile-palette__head">
-            <h3 className="ember-tile-palette__title">Цвет</h3>
-            <span
-              className="ember-tile-palette__current"
-              style={{
-                background:
-                  color === "#00000000"
-                    ? "repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 50% / 8px 8px"
-                    : color,
-              }}
-              title={color}
+        <PixelPalettePanel
+          className="ember-tile-palette"
+          foreground={color}
+          background={backgroundColor}
+          baseColors={PALETTE}
+          favorites={favorites}
+          recentColors={recentColors}
+          onForegroundChange={chooseForegroundColor}
+          onForegroundPreview={setColor}
+          onBackgroundChange={chooseBackgroundColor}
+          onFavoritesChange={(colors) =>
+            onFavoritesChange?.(prunePaletteFavorites(colors))
+          }
+          onSwap={swapPaletteColors}
+          onReset={resetPaletteColors}
+          onReplace={replacePaletteColor}
+          onAdjust={adjustActiveColors}
+          onQuantize={quantizeActiveColors}
+          onOutline={outlineActiveColors}
+          canvasView={(
+            <PixelCanvasViewPanel
+              width={size}
+              height={size}
+              gridVisible={canvasView.gridVisible}
+              gridStep={canvasView.gridStep}
+              gridOpacity={canvasView.gridOpacity}
+              guidesVisible={canvasView.guidesVisible}
+              guides={canvasView.guides}
+              reference={canvasView.reference}
+              onGridVisibleChange={canvasView.setGridVisible}
+              onGridStepChange={canvasView.setGridStep}
+              onGridOpacityChange={canvasView.setGridOpacity}
+              onGuidesVisibleChange={canvasView.setGuidesVisible}
+              onAddGuide={canvasView.addGuide}
+              onRemoveGuide={canvasView.removeGuide}
+              onClearGuides={() => canvasView.setGuides([])}
+              onReferenceFile={canvasView.setReferenceFile}
+              onRemoveReference={canvasView.removeReference}
+              onReferenceChange={canvasView.updateReference}
+              onReferenceModeChange={canvasView.setReferenceMode}
             />
-          </div>
-          {favorites.length > 0 ? (
-            <div className="ember-tile-palette-grid ember-tile-palette-grid--fav">
-              {favorites.map((c) => (
-                <button
-                  key={`fav-${c}`}
-                  type="button"
-                  className={`ember-palette-swatch ${color === c ? "is-active" : ""}`}
-                  style={{ background: c }}
-                  title={`${c} · ПКМ убрать`}
-                  onClick={() => setColor(c)}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    onFavoritesChange?.(favorites.filter((x) => x !== c));
-                  }}
-                />
-              ))}
-            </div>
-          ) : null}
-          <div className="ember-tile-palette-grid">
-            {[
-              ...PALETTE,
-              ...favorites.filter((c) => !PALETTE.includes(c)),
-            ].map((c) => (
-              <button
-                key={c}
-                type="button"
-                className={`ember-palette-swatch ${color === c ? "is-active" : ""}`}
-                style={{
-                  background:
-                    c === "#00000000"
-                      ? "repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 50% / 10px 10px"
-                      : c,
-                }}
-                title={c === "#00000000" ? "Прозрачный" : c}
-                onClick={() => setColor(c)}
-              />
-            ))}
-          </div>
-          <div className="ember-tile-palette__extras">
-            <input
-              type="color"
-              value={
-                color.startsWith("#") && color.length === 7
-                  ? color
-                  : "#2f4a30"
-              }
-              onChange={(e) => setColor(e.target.value)}
-              title="Свой цвет"
-            />
-            <button
-              type="button"
-              className="ghost ember-chip--sm"
-              title="В избранное"
-              onClick={() => {
-                if (
-                  color.startsWith("#") &&
-                  color.length === 7 &&
-                  !favorites.includes(color) &&
-                  !PALETTE.includes(color)
-                ) {
-                  onFavoritesChange?.([...favorites, color]);
-                }
-              }}
-            >
-              ★
-            </button>
-          </div>
-        </aside>
+          )}
+        />
       </div>
     </div>
   );

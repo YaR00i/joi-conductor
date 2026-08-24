@@ -1,4 +1,7 @@
-import type { EmberSpriteArtLayer } from "./types";
+import type {
+  EmberSpriteArtLayer,
+  EmberSpriteArtLayerBlendMode,
+} from "./types";
 
 export const MAX_SPRITE_ART_LAYERS = 8;
 
@@ -29,37 +32,87 @@ function copyPixelRect(
 }
 
 export function pixelHasInk(hex: string | undefined): boolean {
-  return !!hex && hex !== "#00000000";
+  return !!hex && !/^#[0-9a-f]{6}00$/i.test(hex);
 }
 
-function parseHexRgb(
-  hex: string,
-): { r: number; g: number; b: number } | null {
-  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+export const SPRITE_ART_LAYER_BLEND_MODES = [
+  "normal",
+  "multiply",
+  "screen",
+  "add",
+] as const satisfies readonly EmberSpriteArtLayerBlendMode[];
+
+type Rgba = { r: number; g: number; b: number; a: number };
+
+function parseHexRgba(hex: string): Rgba | null {
+  const m = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(hex.trim());
   if (!m) return null;
   const n = Number.parseInt(m[1]!, 16);
-  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  return {
+    r: (n >> 16) & 255,
+    g: (n >> 8) & 255,
+    b: n & 255,
+    a: m[2] ? Number.parseInt(m[2], 16) : 255,
+  };
 }
 
-function rgbToHex(r: number, g: number, b: number): string {
+function rgbaToHex(r: number, g: number, b: number, a: number): string {
   const h = (v: number) =>
     Math.max(0, Math.min(255, Math.round(v)))
       .toString(16)
       .padStart(2, "0");
-  return `#${h(r)}${h(g)}${h(b)}`;
+  const alpha = Math.max(0, Math.min(255, Math.round(a)));
+  if (alpha <= 0) return "";
+  const rgb = `#${h(r)}${h(g)}${h(b)}`;
+  return alpha >= 255 ? rgb : `${rgb}${h(alpha)}`;
 }
 
-function blendOver(dst: string, src: string, opacity: number): string {
-  const s = parseHexRgb(src);
-  if (!s || opacity <= 0) return dst;
-  const t = Math.max(0, Math.min(1, opacity));
-  const d = parseHexRgb(dst);
-  if (!d) return t >= 0.97 ? src.toLowerCase() : rgbToHex(s.r * t, s.g * t, s.b * t);
-  return rgbToHex(
-    d.r + (s.r - d.r) * t,
-    d.g + (s.g - d.g) * t,
-    d.b + (s.b - d.b) * t,
+function blendChannel(
+  backdrop: number,
+  source: number,
+  mode: EmberSpriteArtLayerBlendMode,
+): number {
+  if (mode === "multiply") return (backdrop * source) / 255;
+  if (mode === "screen") return 255 - ((255 - backdrop) * (255 - source)) / 255;
+  if (mode === "add") return Math.min(255, backdrop + source);
+  return source;
+}
+
+function blendOver(
+  dst: string,
+  src: string,
+  opacity: number,
+  mode: EmberSpriteArtLayerBlendMode,
+): string {
+  const s = parseHexRgba(src);
+  if (!s || s.a <= 0 || opacity <= 0) return dst;
+  const d = parseHexRgba(dst) ?? { r: 0, g: 0, b: 0, a: 0 };
+  const sa = (s.a / 255) * Math.max(0, Math.min(1, opacity));
+  const da = d.a / 255;
+  const outA = sa + da * (1 - sa);
+  if (outA <= 0) return "";
+  const channel = (backdrop: number, source: number) => {
+    const mixed = blendChannel(backdrop, source, mode);
+    return (
+      (1 - sa) * da * backdrop +
+      (1 - da) * sa * source +
+      da * sa * mixed
+    ) / outA;
+  };
+  return rgbaToHex(
+    channel(d.r, s.r),
+    channel(d.g, s.g),
+    channel(d.b, s.b),
+    outA * 255,
   );
+}
+
+function parseBlendMode(raw: unknown): EmberSpriteArtLayerBlendMode | undefined {
+  return typeof raw === "string" &&
+    SPRITE_ART_LAYER_BLEND_MODES.includes(raw as EmberSpriteArtLayerBlendMode) &&
+    raw !== "normal"
+    ? (raw as EmberSpriteArtLayerBlendMode)
+    : undefined;
 }
 
 export function parseArtLayers(
@@ -94,6 +147,9 @@ export function parseArtLayers(
           : undefined,
       visible: rec.visible === false ? false : undefined,
       opacity: opacity === undefined || opacity >= 0.999 ? undefined : opacity,
+      blendMode: parseBlendMode(rec.blendMode),
+      locked: rec.locked === true ? true : undefined,
+      alphaLocked: rec.alphaLocked === true ? true : undefined,
       pixels,
     });
   }
@@ -139,7 +195,15 @@ export function compositeArtLayers(
     for (let i = 0; i < need; i++) {
       const src = px[i] ?? "";
       if (!pixelHasInk(src)) continue;
-      out[i] = blendOver(out[i] ?? "", src, opacity);
+      if (
+        opacity >= 0.999 &&
+        (layer.blendMode === undefined || layer.blendMode === "normal") &&
+        /^#[0-9a-f]{6}$/i.test(src)
+      ) {
+        out[i] = src.toLowerCase();
+        continue;
+      }
+      out[i] = blendOver(out[i] ?? "", src, opacity, layer.blendMode ?? "normal");
     }
   }
   return out;
@@ -150,7 +214,16 @@ export function packArtLayers(
 ): EmberSpriteArtLayer[] | undefined {
   if (!layers?.length) return undefined;
   const packed = layers
-    .filter((layer) => layer.pixels.some((c) => pixelHasInk(c)) || layers.length > 1)
+    .filter(
+      (layer) =>
+        layer.pixels.some((c) => pixelHasInk(c)) ||
+        layers.length > 1 ||
+        layer.visible === false ||
+        (layer.opacity ?? 1) < 0.999 ||
+        !!layer.blendMode ||
+        !!layer.locked ||
+        !!layer.alphaLocked,
+    )
     .map((layer) => ({
       id: layer.id,
       nameRu: layer.nameRu,
@@ -159,13 +232,22 @@ export function packArtLayers(
         layer.opacity !== undefined && layer.opacity < 0.999
           ? layer.opacity
           : undefined,
+      blendMode:
+        layer.blendMode && layer.blendMode !== "normal"
+          ? layer.blendMode
+          : undefined,
+      locked: layer.locked === true ? true : undefined,
+      alphaLocked: layer.alphaLocked === true ? true : undefined,
       pixels: [...layer.pixels],
     }));
   if (!packed.length) return undefined;
   if (
     packed.length === 1 &&
     packed[0]!.visible !== false &&
-    (packed[0]!.opacity === undefined || packed[0]!.opacity >= 0.999)
+    (packed[0]!.opacity === undefined || packed[0]!.opacity >= 0.999) &&
+    !packed[0]!.blendMode &&
+    !packed[0]!.locked &&
+    !packed[0]!.alphaLocked
   ) {
     return undefined;
   }
@@ -198,4 +280,24 @@ export function makeEmptyArtLayer(
     nameRu: `Слой ${index}`,
     pixels: emptyPixels(width, height),
   };
+}
+
+/** Applies the active layer edit locks without mutating either input buffer. */
+export function constrainArtLayerPixels(
+  layer: EmberSpriteArtLayer,
+  candidate: string[],
+): string[] {
+  if (layer.locked) return layer.pixels;
+  if (!layer.alphaLocked) return candidate;
+  let changed = false;
+  const next = layer.pixels.map((previous, index) => {
+    const before = parseHexRgba(previous);
+    if (!before || before.a <= 0) return previous;
+    const after = parseHexRgba(candidate[index] ?? "");
+    if (!after || after.a <= 0) return previous;
+    const value = rgbaToHex(after.r, after.g, after.b, before.a);
+    if (value !== previous) changed = true;
+    return value;
+  });
+  return changed ? next : layer.pixels;
 }

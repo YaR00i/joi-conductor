@@ -4,7 +4,12 @@ import type {
   EmberPixelSprite,
   EmberSpritePlacement,
 } from "../content/types";
-import { pointInRegion, regionCenter } from "../tile/mapUtils";
+import {
+  pointInRegion,
+  regionCenter,
+  regionVolumeElev,
+  tileSurfaceElev,
+} from "../tile/mapUtils";
 import { clampCoordToMap } from "./enemyAiLod";
 import { EXPLORE_NPC_CAP } from "./renderBudget";
 
@@ -21,6 +26,7 @@ export type ExploreNpcSpawn = {
   spriteId: string;
   x: number;
   y: number;
+  elev: number;
   mode: ExploreNpcMode;
   wander?: ExploreNpcWanderBounds;
   placementId?: string;
@@ -95,6 +101,7 @@ export function collectExploreNpcSpawns(
         spriteId,
         x: pos.x,
         y: pos.y,
+        elev: regionVolumeElev(map, region),
         mode,
         wander: mode === "wander" ? resolveWanderBounds(map, region) : undefined,
       })
@@ -109,15 +116,19 @@ export function collectExploreNpcSpawns(
     if (!def) continue;
     const x = (placement.x + 0.5) * map.tileSize;
     const y = (placement.y + 0.5) * map.tileSize;
+    const elev =
+      placement.elev ?? tileSurfaceElev(map, placement.x, placement.y);
     const wanderHost = map.regions.find(
       (region) =>
-        region.kind === "npc_wander" && pointInRegion(map, region, x, y),
+        region.kind === "npc_wander" &&
+        pointInRegion(map, region, x, y, elev),
     );
     if (
       !push({
         spriteId: placement.spriteId,
         x,
         y,
+        elev,
         mode: wanderHost ? "wander" : "idle",
         wander: wanderHost ? resolveWanderBounds(map, wanderHost) : undefined,
         placementId: placement.id,

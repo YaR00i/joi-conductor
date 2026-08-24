@@ -16,6 +16,34 @@ export function clampSpriteFrameDuration(raw: unknown): number {
   );
 }
 
+export type SpriteFrameRange = { start: number; end: number };
+
+export function normalizeSpriteFrameRange(
+  length: number,
+  startRaw: number,
+  endRaw: number,
+): SpriteFrameRange {
+  const last = Math.max(0, Math.floor(length) - 1);
+  const start = Math.max(0, Math.min(last, Math.floor(startRaw) || 0));
+  const end = Math.max(start, Math.min(last, Math.floor(endRaw) || 0));
+  return { start, end };
+}
+
+/** Returns the next preview index, or -1 when a non-looping range is done. */
+export function nextSpritePreviewIndex(
+  length: number,
+  current: number,
+  startRaw: number,
+  endRaw: number,
+  loop: boolean,
+): number {
+  if (length <= 0) return -1;
+  const { start, end } = normalizeSpriteFrameRange(length, startRaw, endRaw);
+  if (current < start || current > end) return start;
+  if (current < end) return current + 1;
+  return loop ? start : -1;
+}
+
 /** Looping index into a duration list. Empty list → 0. */
 export function spriteFrameIndexAt(
   durationsMs: readonly number[],

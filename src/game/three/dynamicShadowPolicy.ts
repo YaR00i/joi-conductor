@@ -48,6 +48,19 @@ export const DIR_SHADOW_DEPTH_BIAS = -0.0008;
 export const DIR_SHADOW_NORMAL_BIAS = 0.1;
 /** Extra PointLight cube updates per frame (6 faces each). Keep this at 1. */
 export const DYNAMIC_LOCAL_SHADOW_MAX_LIGHTS = 1;
+/** Above this crowd size, actor-aware point cubes cost more than they add. */
+export const DYNAMIC_LOCAL_SHADOW_CROWD_CUTOFF = 160;
+
+export function dynamicLocalShadowLimitForCrowd(
+  requested: number,
+  crowdSize: number,
+): number {
+  if (crowdSize >= DYNAMIC_LOCAL_SHADOW_CROWD_CUTOFF) return 0;
+  return Math.max(
+    0,
+    Math.min(DYNAMIC_LOCAL_SHADOW_MAX_LIGHTS, Math.floor(requested)),
+  );
+}
 
 const _lightX = new THREE.Vector3();
 const _lightY = new THREE.Vector3();

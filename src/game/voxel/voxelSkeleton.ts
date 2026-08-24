@@ -11,6 +11,7 @@ import type {
   EmberVoxelSceneObject,
 } from "../content/types";
 import { normalizeVoxelOffset, sampleJointAngleDeg } from "./voxelScene";
+import { normalizeVoxelRot } from "./voxelPlacement";
 
 export type JointAngleFn = (jointId: string) => number;
 
@@ -21,7 +22,7 @@ export type SkeletonNodePose = {
   origin: Vec3;
   /** World position of the incoming hinge (mesh origin if the object is a root). */
   hinge: Vec3;
-  /** World rotation of the hinged wrapper (identity for roots). */
+  /** World rotation of the hinged wrapper (persisted yaw for roots). */
   quaternion: THREE.Quaternion;
   /** Local inner offset: -childPivot, or 0 for roots. */
   inner: Vec3;
@@ -115,7 +116,7 @@ function rootPose(obj: EmberVoxelSceneObject, unit: number): SkeletonNodePose {
   return {
     origin,
     hinge: { ...origin },
-    quaternion: IDENTITY.clone(),
+    quaternion: jointRotationQuaternion("y", normalizeVoxelRot(obj.rot) * 90),
     inner: { x: 0, y: 0, z: 0 },
   };
 }
@@ -274,7 +275,9 @@ export function attachSkeletonHierarchy(
       obj.offset.y * unit,
       obj.offset.z * unit,
     );
-    node.quaternion.identity();
+    node.quaternion.copy(
+      jointRotationQuaternion("y", normalizeVoxelRot(obj.rot) * 90),
+    );
     content.add(node);
     attached.add(id);
   };

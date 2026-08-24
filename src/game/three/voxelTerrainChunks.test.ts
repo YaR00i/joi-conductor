@@ -9,6 +9,7 @@ import {
   terrainChunkWindow,
 } from "./voxelTerrainChunks";
 import { buildSolidTerrainGeometry } from "./solidTerrainGeometry";
+import { terrainCellCutawayRole } from "./voxelMesh";
 
 function testMap(): EmberMap {
   return ensureMapLayers({
@@ -162,6 +163,58 @@ describe("voxel terrain chunk invalidation", () => {
     expect(runtime.batches.length).toBeGreaterThan(editor.batches.length);
     expect(editor.batches).toHaveLength(2);
     expect(editor.batches.every((batch) => batch.tx == null)).toBe(true);
+  });
+
+  it("batches elevated roof and wall cells when editor cutaway is disabled", () => {
+    const map = testMap();
+    for (let y = 2; y < 6; y++) {
+      for (let x = 2; x < 6; x++) setElevTileId(map, x, y, 2, 2);
+    }
+    const tileset = {
+      id: "tiles",
+      name: "Tiles",
+      tileSize: 16,
+      tiles: [
+        { id: 0, name: "empty", color: "#00000000" },
+        { id: 1, name: "grass", color: "#557755" },
+        { id: 2, name: "крыша", color: "#663333", solid: true },
+      ],
+    } as never;
+    const region = { x0: 0, y0: 0, x1: 8, y1: 8 };
+    const editor = buildSolidTerrainGeometry(
+      map,
+      tileset,
+      region,
+      "editor-elevated",
+      false,
+    );
+
+    expect(editor.requiresSync).toBe(false);
+    expect(editor.batches).toHaveLength(4);
+    expect(
+      terrainCellCutawayRole(
+        { name: "крыша", solid: true },
+        2,
+        "wall",
+        false,
+      ),
+    ).toBe("floor");
+    expect(
+      terrainCellCutawayRole(
+        { name: "grass", solid: false },
+        0,
+        "wall",
+        true,
+      ),
+    ).toBe("floor");
+    expect(
+      terrainCellCutawayRole(
+        { name: "stone wall", solid: true },
+        0,
+        "wall",
+        true,
+      ),
+    ).toBe("wall");
   });
 
   it("routes water chunks to the feature-complete synchronous fallback", () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createEmptyMap, ensureMapLayers, regionCenter } from "../tile/mapUtils";
 import type { EmberMap } from "./types";
 import {
+  mapChangeRegionAt,
   mapChangeRequestFromRegion,
   resolveMapChangeArrival,
 } from "./mapChange";
@@ -135,5 +136,32 @@ describe("resolveMapChangeArrival", () => {
         scriptId: "hi",
       }),
     ).toBeNull();
+  });
+
+  it("does not let an overlapping script-only trigger mask a map exit", () => {
+    const map = tinyMap("outside", [
+      {
+        id: "notice",
+        kind: "trigger",
+        x: 2,
+        y: 2,
+        w: 1,
+        h: 1,
+        scriptId: "hello",
+      },
+      {
+        id: "exit",
+        kind: "trigger",
+        x: 2,
+        y: 2,
+        w: 1,
+        h: 1,
+        targetMapId: "inside",
+        targetRegionId: "start",
+      },
+    ]);
+    expect(mapChangeRegionAt(map, 2 * 16 + 8, 2 * 16 + 8, 0)?.id).toBe(
+      "exit",
+    );
   });
 });

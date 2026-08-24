@@ -65,6 +65,18 @@ export function enemyCrowdNeighborLimit(crowdSize: number): number {
   return 4;
 }
 
+/**
+ * Exact multi-layer voxel movement performs several swept collision probes.
+ * Time-slice it for hordes; deferred actors retain their accumulated travel
+ * time and get another chance from a rotated iteration start on later ticks.
+ */
+export function enemyExactCollisionBudget(crowdSize: number): number {
+  if (crowdSize <= 40) return Number.MAX_SAFE_INTEGER;
+  if (crowdSize <= 96) return 16;
+  if (crowdSize <= 160) return 8;
+  return 6;
+}
+
 export function enemySimLod(
   distanceWorld: number,
   tileSize: number,

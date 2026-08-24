@@ -8,6 +8,16 @@ export function playCameraYawFromMovement(
   return -movementX * sensitivity;
 }
 
+/** Coalesce irregular pointer events into one camera update per render frame. */
+export function accumulatePlayLookMovement(
+  pendingMovementX: number,
+  movementX: number,
+): number {
+  return Number.isFinite(movementX)
+    ? pendingMovementX + movementX
+    : pendingMovementX;
+}
+
 export function isPlayMenuToggleKey(ev: {
   code: string;
   key: string;
@@ -84,10 +94,13 @@ export function syncPlayCursorClip(
 export function warpPlayCursorIfNeeded(
   looking: boolean,
   pointerLocked: boolean,
-): void {
-  if (!looking || pointerLocked) return;
-  if (typeof window === "undefined") return;
-  window.joiDesktop?.cursor?.warpCenter?.();
+): boolean {
+  if (!looking || pointerLocked) return false;
+  if (typeof window === "undefined") return false;
+  const warpCenter = window.joiDesktop?.cursor?.warpCenter;
+  if (!warpCenter) return false;
+  warpCenter();
+  return true;
 }
 
 export function playLookTakeMove(skipRemaining: number): {
@@ -100,8 +113,11 @@ export function playLookTakeMove(skipRemaining: number): {
   return { apply: true, skipRemaining: 0 };
 }
 
-export function playLookWarpSkipCount(pointerLocked: boolean): number {
-  return pointerLocked ? 0 : 2;
+export function playLookWarpSkipCount(
+  pointerLocked: boolean,
+  cursorWarped = !pointerLocked,
+): number {
+  return pointerLocked || !cursorWarped ? 0 : 2;
 }
 
 export function releasePlayCursorClip(): void {

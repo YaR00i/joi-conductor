@@ -1,4 +1,12 @@
-import type { EmberMap, EmberPack, ValidationIssue } from "./types";
+import {
+  MAX_ELEVATION,
+  MIN_ELEVATION,
+  clampElevation,
+  type EmberMap,
+  type EmberPack,
+  type ValidationIssue,
+} from "./types";
+import { regionVolumeElev, tileSurfaceElev } from "../tile/mapUtils";
 import {
   isEmberDialogueUse,
   isEmberQuestMarkerStatus,
@@ -451,7 +459,70 @@ export function validatePack(pack: EmberPack): ValidationIssue[] {
         message: "Нет region player_start",
       });
     }
+    const regionIds = new Set<string>();
     for (const r of map.regions) {
+      const regionBase = `${mapBase}.regions.${r.id || "<empty>"}`;
+      if (!r.id?.trim()) {
+        pushError(issues, `${regionBase}.id`, "У зоны нет id");
+      } else if (regionIds.has(r.id)) {
+        pushError(issues, `${regionBase}.id`, `Повторяющийся id зоны «${r.id}»`);
+      } else {
+        regionIds.add(r.id);
+      }
+      for (const [field, value] of Object.entries({
+        x: r.x,
+        y: r.y,
+        w: r.w,
+        h: r.h,
+      })) {
+        if (!Number.isFinite(value) || !Number.isInteger(value)) {
+          pushError(issues, `${regionBase}.${field}`, "Ожидалось целое число");
+        }
+      }
+      if (r.w <= 0 || r.h <= 0) {
+        pushError(issues, regionBase, "Размер зоны должен быть не меньше 1×1");
+      } else if (
+        r.x < 0 ||
+        r.y < 0 ||
+        r.x + r.w > map.width ||
+        r.y + r.h > map.height
+      ) {
+        pushError(issues, regionBase, "Зона выходит за границы карты");
+      }
+      validateOptionalNumber(issues, `${regionBase}.elev`, r.elev, {
+        min: MIN_ELEVATION,
+        max: MAX_ELEVATION,
+      });
+      validateOptionalNumber(
+        issues,
+        `${regionBase}.targetElevation`,
+        r.targetElevation,
+        { min: MIN_ELEVATION, max: MAX_ELEVATION },
+      );
+      const hasTargetX = r.targetX != null;
+      const hasTargetY = r.targetY != null;
+      if (hasTargetX !== hasTargetY) {
+        pushError(
+          issues,
+          regionBase,
+          "Координаты цели должны содержать одновременно targetX и targetY",
+        );
+      } else if (hasTargetX && hasTargetY) {
+        const targetMap = r.targetMapId ? pack.maps[r.targetMapId] : map;
+        if (
+          targetMap &&
+          (r.targetX! < 0 ||
+            r.targetY! < 0 ||
+            r.targetX! >= targetMap.width ||
+            r.targetY! >= targetMap.height)
+        ) {
+          pushError(
+            issues,
+            regionBase,
+            `Координаты цели выходят за границы карты «${targetMap.id}»`,
+          );
+        }
+      }
       if (r.kind === "chest") {
         if (r.lootIds != null) {
           issues.push(
@@ -584,6 +655,10 @@ export function validatePack(pack: EmberPack): ValidationIssue[] {
       if (r.kind !== "teleport") continue;
       const hasCoords = r.targetX != null && r.targetY != null;
       const hasRegion = Boolean(r.targetRegionId);
+      const sourceElev = regionVolumeElev(map, r);
+      const targetElev = hasCoords
+        ? (r.targetElevation ?? tileSurfaceElev(map, r.targetX!, r.targetY!))
+        : sourceElev;
       if (!hasCoords && !hasRegion) {
         issues.push({
           level: "warn",
@@ -597,7 +672,8 @@ export function validatePack(pack: EmberPack): ValidationIssue[] {
         r.targetX! >= r.x &&
         r.targetX! < r.x + r.w &&
         r.targetY! >= r.y &&
-        r.targetY! < r.y + r.h
+        r.targetY! < r.y + r.h &&
+        clampElevation(targetElev) === clampElevation(sourceElev)
       ) {
         issues.push({
           level: "warn",
@@ -606,7 +682,12 @@ export function validatePack(pack: EmberPack): ValidationIssue[] {
             "Цель телепорта совпадает с этой зоной — в игре ничего не произойдёт",
         });
       }
-      if (hasRegion && r.targetRegionId === r.id) {
+      if (
+        hasRegion &&
+        r.targetRegionId === r.id &&
+        clampElevation(r.targetElevation ?? sourceElev) ===
+          clampElevation(sourceElev)
+      ) {
         issues.push({
           level: "warn",
           path: `maps/${map.id}.regions.${r.id}.targetRegionId`,

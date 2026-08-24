@@ -4,6 +4,7 @@ import {
   copyPixelArtChannels,
   pastePixelArt,
   pastePixelArtChannels,
+  peekPixelClipboard,
 } from "./pixelClipboard";
 
 describe("pixelClipboard channels", () => {
@@ -32,5 +33,15 @@ describe("pixelClipboard channels", () => {
     expect(ch!.shinePixels?.[1]).toBe("#88ccff");
     expect(ch!.emissivePixels).toHaveLength(12);
     expect(ch!.shinePixels).toHaveLength(12);
+  });
+
+  it("keeps a lasso mask with the copied channels", () => {
+    copyPixelArtChannels(
+      2,
+      2,
+      { pixels: ["a", "", "", "d"] },
+      [true, false, false, true],
+    );
+    expect(peekPixelClipboard()?.mask).toEqual([true, false, false, true]);
   });
 });

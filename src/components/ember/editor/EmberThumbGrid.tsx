@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   normalizePixelSprite,
   spriteTotalHeight,
@@ -206,6 +206,29 @@ function collectSceneCells(
   return cells;
 }
 
+function useLazyCanvasVisible(ref: { current: HTMLCanvasElement | null }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || visible) return;
+    if (!("IntersectionObserver" in window)) {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setVisible(true);
+        observer.disconnect();
+      },
+      { rootMargin: "160px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [ref, visible]);
+  return visible;
+}
+
 type Props = {
   items: EmberThumbItem[];
   selectedId?: string | null;
@@ -286,9 +309,10 @@ export function EmberSpriteThumb({
   size?: number;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const visible = useLazyCanvasVisible(ref);
   useEffect(() => {
     const canvas = ref.current;
-    if (!canvas) return;
+    if (!canvas || !visible) return;
     const s = normalizePixelSprite(sprite);
     const totalH = Math.max(1, spriteTotalHeight(s));
     canvas.width = size;
@@ -307,7 +331,7 @@ export function EmberSpriteThumb({
     if (spriteHasVisual(s)) {
       paintPixelGrid(ctx, s.pixels, s.width, totalH, ox, oy, dw, dh);
     }
-  }, [sprite, size]);
+  }, [sprite, size, visible]);
   return (
     <canvas
       ref={ref}
@@ -329,9 +353,10 @@ export function EmberVoxelThumb({
   size?: number;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const visible = useLazyCanvasVisible(ref);
   useEffect(() => {
     const canvas = ref.current;
-    if (!canvas) return;
+    if (!canvas || !visible) return;
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext("2d");
@@ -339,7 +364,7 @@ export function EmberVoxelThumb({
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, size, size);
     paintVoxelIsoCells(ctx, collectModelCells(model), size);
-  }, [model, size]);
+  }, [model, size, visible]);
 
   return (
     <canvas
@@ -365,9 +390,10 @@ export function EmberVoxelSceneThumb({
   size?: number;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const visible = useLazyCanvasVisible(ref);
   useEffect(() => {
     const canvas = ref.current;
-    if (!canvas) return;
+    if (!canvas || !visible) return;
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext("2d");
@@ -383,7 +409,7 @@ export function EmberVoxelSceneThumb({
       }
     }
     paintVoxelIsoCells(ctx, cells, size);
-  }, [scene, models, size]);
+  }, [scene, models, size, visible]);
 
   return (
     <canvas

@@ -288,6 +288,8 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
   const [createMapProfile, setCreateMapProfile] =
     useState<EmberMapPlayProfile>("explore");
   const menubarRef = useRef<HTMLElement>(null);
+  const validationTimerRef = useRef<number | null>(null);
+  const pendingValidationPackRef = useRef<EmberPack | null>(null);
   const saveBackend = useMemo(() => createLocalStorageSaveBackend(), []);
   const prevToastFlagsRef = useRef({ bak: false, vox: 0, ov: 0 });
 
@@ -323,6 +325,30 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
         window.clearTimeout(timer);
       }
       toastTimersRef.current.clear();
+    },
+    [],
+  );
+
+  const scheduleValidation = useCallback((next: EmberPack) => {
+    pendingValidationPackRef.current = next;
+    if (validationTimerRef.current !== null) {
+      window.clearTimeout(validationTimerRef.current);
+    }
+    validationTimerRef.current = window.setTimeout(() => {
+      validationTimerRef.current = null;
+      const pending = pendingValidationPackRef.current;
+      pendingValidationPackRef.current = null;
+      if (pending) setIssues(validatePack(pending));
+    }, 160);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (validationTimerRef.current !== null) {
+        window.clearTimeout(validationTimerRef.current);
+      }
+      validationTimerRef.current = null;
+      pendingValidationPackRef.current = null;
     },
     [],
   );
@@ -373,7 +399,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
     let next = upsertScene(pack, scene);
     next = upsertEvent(next, event);
     setPack(next);
-    setIssues(validatePack(next));
+    scheduleValidation(next);
     setSceneId(scene.id);
     const sceneRes = await writeEmberJson(`scenes/${scene.id}.json`, scene);
     const evRes = await writeEmberJson(`events/${event.id}.json`, event);
@@ -446,7 +472,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
       /* pack without stages — map still playable once a stage exists */
     }
     setPack(next);
-    setIssues(validatePack(next));
+    scheduleValidation(next);
     setActiveMapId(map.id);
     setActiveTilesetId(tileset.id);
     setTab("maps");
@@ -499,7 +525,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
     }
     const { pack: next, removedStageIds } = removeMapFromPack(pack, id);
     setPack(next);
-    setIssues(validatePack(next));
+    scheduleValidation(next);
     setActiveMapId(Object.keys(next.maps)[0] ?? null);
     const mapRes = await deleteEmberFile(`maps/${id}.json`);
     const stageErrors: string[] = [];
@@ -526,7 +552,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
       const synced = syncEventStageLinks(next, event);
       next = synced.pack;
       setPack(next);
-      setIssues(validatePack(next));
+      scheduleValidation(next);
       const evRes = await writeEmberJson(`events/${event.id}.json`, event);
       for (const st of synced.stagesChanged) {
         await writeEmberJson(`stages/${st.id}.json`, st);
@@ -570,6 +596,16 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
     (activeTilesetId && pack?.tilesets[activeTilesetId]
       ? activeTilesetId
       : null) ?? (pack ? Object.keys(pack.tilesets)[0] : null);
+  const mapEditorPack = useMemo(
+    () =>
+      pack
+        ? {
+            ...pack,
+            voxelModels: pack.voxelModels ?? {},
+          }
+        : null,
+    [pack],
+  );
   const errorCount = issues.filter((i) => i.level === "error").length;
   const warningCount = issues.filter((i) => i.level === "warn").length;
   const issueCount = errorCount + warningCount;
@@ -588,7 +624,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
         stages: { ...pack.stages, [stage.id]: stage },
       };
       setPack(next);
-      setIssues(validatePack(next));
+      scheduleValidation(next);
     },
     [pack],
   );
@@ -601,7 +637,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
         spawns: { ...pack.spawns, [spawn.id]: spawn },
       };
       setPack(next);
-      setIssues(validatePack(next));
+      scheduleValidation(next);
     },
     [pack],
   );
@@ -965,10 +1001,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
               {tab === "maps" && mapId && pack.maps[mapId] ? (
                 <LazyMapEditorPanel
                   key={mapId}
-                  pack={{
-                    ...pack,
-                    voxelModels: pack.voxelModels ?? {},
-                  }}
+                  pack={mapEditorPack ?? pack}
                   map={pack.maps[mapId]}
                   onChange={(map) => {
                     const next = {
@@ -976,11 +1009,11 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
                       maps: { ...pack.maps, [map.id]: map },
                     };
                     setPack(next);
-                    setIssues(validatePack(next));
+                    scheduleValidation(next);
                   }}
                   onPackChange={(next) => {
                     setPack(next);
-                    setIssues(validatePack(next));
+                    scheduleValidation(next);
                   }}
                   onStageChange={applyStageChange}
                   onSpawnChange={applySpawnChange}
@@ -1032,7 +1065,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
                       tilesets: { ...pack.tilesets, [tileset.id]: tileset },
                     };
                     setPack(next);
-                    setIssues(validatePack(next));
+                    scheduleValidation(next);
                   }}
                   onSaved={(msg) => {
                     setStatus(msg);
@@ -1047,7 +1080,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
                   initialSpriteId={spriteFocusId}
                   onChangePack={(next) => {
                     setPack(next);
-                    setIssues(validatePack(next));
+                    scheduleValidation(next);
                   }}
                   onSaved={(msg) => {
                     setStatus(msg);
@@ -1068,7 +1101,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
                   onActiveModelChange={setVoxelFocusId}
                   onPackChange={(next) => {
                     setPack(next);
-                    setIssues(validatePack(next));
+                    scheduleValidation(next);
                     // Keep current focus; only fall back if the focused model was deleted.
                     setVoxelFocusId((prev) => {
                       if (prev && next.voxelModels[prev]) return prev;
@@ -1099,14 +1132,14 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
                         scenes: { ...pack.scenes, [scene.id]: scene },
                       };
                       setPack(next);
-                      setIssues(validatePack(next));
+                      scheduleValidation(next);
                     }}
                     onArtsChange={(arts: EmberArt[]) => {
                       const map: Record<string, EmberArt> = {};
                       for (const a of arts) map[a.id] = a;
                       const next = { ...pack, arts: map };
                       setPack(next);
-                      setIssues(validatePack(next));
+                      scheduleValidation(next);
                     }}
                     onEventChange={(event) => void applyEventChange(event)}
                     onEnsureEvent={() => {
@@ -1144,7 +1177,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
                     for (const a of arts) map[a.id] = a;
                     const next = { ...pack, arts: map };
                     setPack(next);
-                    setIssues(validatePack(next));
+                    scheduleValidation(next);
                   }}
                   onSaved={(msg) => {
                     setStatus(msg);
@@ -1158,7 +1191,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
                   pack={pack}
                   onChangePack={(next) => {
                     setPack(next);
-                    setIssues(validatePack(next));
+                    scheduleValidation(next);
                   }}
                   onSaved={(msg) => {
                     setStatus(msg);
@@ -1172,7 +1205,7 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
                   pack={pack}
                   onChangePack={(next) => {
                     setPack(next);
-                    setIssues(validatePack(next));
+                    scheduleValidation(next);
                   }}
                   onSaved={(msg) => {
                     setStatus(msg);

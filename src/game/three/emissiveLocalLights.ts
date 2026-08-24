@@ -10,7 +10,10 @@ import type {
   EmberVoxelPlacement,
   EmberVoxelScene,
 } from "../content/types";
-import { spriteTotalHeight } from "../content/pixelSprite";
+import {
+  resolveSpriteWorldOffsetVoxels,
+  spriteTotalHeight,
+} from "../content/pixelSprite";
 import {
   emissiveCellSeed,
   emissiveInkDenseEnough,
@@ -372,21 +375,27 @@ export function listEmissiveLocalLights(
       const rangeTiles = resolveEmissiveLightRange(spr.emissiveLightRange);
       const dens = densityGain(sum);
       const intensity = peakIntensity(strength, dens);
-      const elev = tileSurfaceElev(map, place.x, place.y);
+      const elev = place.elev ?? tileSurfaceElev(map, place.x, place.y);
+      const scale = resolveEmberTransformScale(place.scale);
+      const visualOffset = resolveSpriteWorldOffsetVoxels(spr);
+      const voxelWorld = ts / VOXELS_PER_BLOCK;
       // Place light near the lit band centroid along the stack height.
       const cyNorm =
         sum.cy >= 0 ? 1 - (sum.cy + 0.5) / Math.max(1, sum.height) : 0.45;
-      const stackH = (totalH / Math.max(1, spr.width)) * ts;
+      const stackH =
+        (totalH / Math.max(1, spr.width)) * ts * scale.z;
       const heightAboveFloor =
-        elev * storyH + Math.max(0.15 * ts, cyNorm * stackH);
+        elev * storyH +
+        Math.max(0.15 * ts, cyNorm * stackH) +
+        visualOffset.z * voxelWorld;
 
       const castShadows = spr.emissiveLightShadows === true;
       out.push({
         id: `emspr:${place.id}`,
         x: place.x,
         y: place.y,
-        localX: ts * 0.5,
-        localZ: ts * 0.5,
+        localX: ts * 0.5 + visualOffset.x * voxelWorld,
+        localZ: ts * 0.5 + visualOffset.y * voxelWorld,
         heightAboveFloor,
         color: new THREE.Color(sum.r, sum.g, sum.b),
         intensity,

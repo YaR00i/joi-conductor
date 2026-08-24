@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   clampCoordToMap,
   enemyCrowdNeighborLimit,
+  enemyExactCollisionBudget,
   enemyCrowdSteerEnabled,
   enemyMovementCadence,
   enemySimLod,
@@ -57,6 +58,13 @@ describe("enemy AI movement LOD", () => {
     expect(enemyCrowdNeighborLimit(32)).toBe(8);
     expect(enemyCrowdNeighborLimit(64)).toBe(6);
     expect(enemyCrowdNeighborLimit(180)).toBe(4);
+  });
+
+  it("caps exact voxel collision work per fixed step", () => {
+    expect(enemyExactCollisionBudget(32)).toBe(Number.MAX_SAFE_INTEGER);
+    expect(enemyExactCollisionBudget(64)).toBe(16);
+    expect(enemyExactCollisionBudget(120)).toBe(8);
+    expect(enemyExactCollisionBudget(180)).toBe(6);
   });
 
   it("packs cadence, collision and steering into one sim LOD", () => {

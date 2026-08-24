@@ -29,6 +29,13 @@ describe("applyVoxelPlacementTransform", () => {
     );
     expect(group.scale.toArray()).toEqual([2, 1.5, 0.5]);
     expect(group.rotation.y).toBeCloseTo(Math.PI / 2);
+    const inner = group.children[0] as THREE.Group;
+    expect(inner.scale.x).toBeGreaterThan(1);
+    expect(inner.scale.y).toBe(1);
+    expect(inner.scale.z).toBeGreaterThan(1);
+    // Geometry grows around the same tile centre; authored anchor does not move.
+    expect(group.position.x).toBe(40);
+    expect(group.position.z).toBe(56);
 
     applyVoxelPlacementTransform(
       group,

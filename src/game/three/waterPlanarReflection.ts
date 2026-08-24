@@ -150,6 +150,43 @@ export function createWaterPlanarReflection(
   const reflectSize = new THREE.Vector2(rtW, rtH);
 
   let renderTarget = makeRT(rtW, rtH);
+  let cachedScene: THREE.Scene | null = null;
+  const cachedWaterMeshes: THREE.Mesh[] = [];
+  const cachedSkipFx: THREE.Object3D[] = [];
+  const cachedAmbientLights: THREE.AmbientLight[] = [];
+  const cachedHemisphereLights: THREE.HemisphereLight[] = [];
+  const cachedLocalLights: THREE.Light[] = [];
+  const prevWaterVisible: boolean[] = [];
+  const prevSkipFxVisible: boolean[] = [];
+  const prevAmbientIntensity: number[] = [];
+  const prevHemisphereIntensity: number[] = [];
+  const prevLocalIntensity: number[] = [];
+
+  function refreshSceneCache(scene: THREE.Scene): void {
+    if (cachedScene === scene) return;
+    cachedScene = scene;
+    cachedWaterMeshes.length = 0;
+    cachedSkipFx.length = 0;
+    cachedAmbientLights.length = 0;
+    cachedHemisphereLights.length = 0;
+    cachedLocalLights.length = 0;
+    scene.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        if (mats.some((mat) => materialHasPlanarReflect(mat))) {
+          cachedWaterMeshes.push(obj);
+        }
+      }
+      if (obj.userData?.emberSkipWaterReflect) cachedSkipFx.push(obj);
+      if (obj instanceof THREE.AmbientLight) {
+        cachedAmbientLights.push(obj);
+      } else if (obj instanceof THREE.HemisphereLight) {
+        cachedHemisphereLights.push(obj);
+      } else if (obj instanceof THREE.Light && !(obj instanceof THREE.DirectionalLight)) {
+        cachedLocalLights.push(obj);
+      }
+    });
+  }
 
   function makeRT(w: number, h: number): THREE.WebGLRenderTarget {
     const rt = new THREE.WebGLRenderTarget(w, h, {
@@ -191,6 +228,9 @@ export function createWaterPlanarReflection(
   }
 
   function bindMaterials(mats: readonly THREE.Material[]): void {
+    // World/editor rebuilds call bind again; refresh the matching scene lists on
+    // the next reflection instead of traversing the scene every mirror frame.
+    cachedScene = null;
     boundMats.length = 0;
     for (const mat of mats) {
       const u = reflectUniformsOf(mat);
@@ -211,6 +251,7 @@ export function createWaterPlanarReflection(
     camera: THREE.PerspectiveCamera,
   ): void {
     if (boundMats.length === 0) return;
+    refreshSceneCache(scene);
 
     _reflectorPos.set(0, planeY, 0);
     _cameraPos.setFromMatrixPosition(camera.matrixWorld);
@@ -299,47 +340,38 @@ export function createWaterPlanarReflection(
       proj.elements[14] = _clipPlane.w;
     }
 
-    const waterMeshes = collectWaterMeshes(scene);
-    const prevWaterVisible: boolean[] = [];
-    for (let i = 0; i < waterMeshes.length; i++) {
-      prevWaterVisible[i] = waterMeshes[i]!.visible;
-      waterMeshes[i]!.visible = false;
+    for (let i = 0; i < cachedWaterMeshes.length; i++) {
+      prevWaterVisible[i] = cachedWaterMeshes[i]!.visible;
+      cachedWaterMeshes[i]!.visible = false;
     }
 
     // Soft atmosphere FX (sun glare disc, cloud multiply plane) become a pale
     // moon-blob in the mirror — hide for the planar pass only.
-    const skipFx: Array<{ obj: THREE.Object3D; visible: boolean }> = [];
-    scene.traverse((obj) => {
-      if (!obj.userData?.emberSkipWaterReflect) return;
-      skipFx.push({ obj, visible: obj.visible });
-      obj.visible = false;
-    });
+    for (let i = 0; i < cachedSkipFx.length; i++) {
+      prevSkipFxVisible[i] = cachedSkipFx[i]!.visible;
+      cachedSkipFx[i]!.visible = false;
+    }
 
     // Soft teal blobs were PointLight / SpotLight pools mirrored into the RT.
     // Keep Ambient + Hemisphere + Directional so ordinary voxels still read;
     // only kill local omni lights. Mutate intensity (not .visible) so a failed
     // restore can never leave the main scene permanently unlit / black.
     // Keep lamp-core meshes — MeshBasic boxes read as hard mirrors.
-    type LightIntensityState = { light: THREE.Light; intensity: number };
-    const lightIntensities: LightIntensityState[] = [];
-    const fillBoosts: LightIntensityState[] = [];
-    scene.traverse((obj) => {
-      if (!(obj instanceof THREE.Light)) return;
-      if (obj instanceof THREE.AmbientLight) {
-        // Night fill is dim — lift it so non-emissive voxels survive the mirror.
-        fillBoosts.push({ light: obj, intensity: obj.intensity });
-        obj.intensity = Math.max(obj.intensity * 3, 0.5);
-        return;
-      }
-      if (obj instanceof THREE.HemisphereLight) {
-        fillBoosts.push({ light: obj, intensity: obj.intensity });
-        obj.intensity = Math.max(obj.intensity * 3, 0.2);
-        return;
-      }
-      if (obj instanceof THREE.DirectionalLight) return;
-      lightIntensities.push({ light: obj, intensity: obj.intensity });
-      obj.intensity = 0;
-    });
+    for (let i = 0; i < cachedAmbientLights.length; i++) {
+      const light = cachedAmbientLights[i]!;
+      prevAmbientIntensity[i] = light.intensity;
+      light.intensity = Math.max(light.intensity * 3, 0.5);
+    }
+    for (let i = 0; i < cachedHemisphereLights.length; i++) {
+      const light = cachedHemisphereLights[i]!;
+      prevHemisphereIntensity[i] = light.intensity;
+      light.intensity = Math.max(light.intensity * 3, 0.2);
+    }
+    for (let i = 0; i < cachedLocalLights.length; i++) {
+      const light = cachedLocalLights[i]!;
+      prevLocalIntensity[i] = light.intensity;
+      light.intensity = 0;
+    }
 
     const prevTarget = renderer.getRenderTarget();
     const prevXr = renderer.xr.enabled;
@@ -382,11 +414,20 @@ export function createWaterPlanarReflection(
       renderer.autoClear = prevAutoClear;
       renderer.setRenderTarget(prevTarget);
 
-      for (const s of lightIntensities) s.light.intensity = s.intensity;
-      for (const s of fillBoosts) s.light.intensity = s.intensity;
-      for (const s of skipFx) s.obj.visible = s.visible;
-      for (let i = 0; i < waterMeshes.length; i++) {
-        waterMeshes[i]!.visible = prevWaterVisible[i]!;
+      for (let i = 0; i < cachedLocalLights.length; i++) {
+        cachedLocalLights[i]!.intensity = prevLocalIntensity[i]!;
+      }
+      for (let i = 0; i < cachedAmbientLights.length; i++) {
+        cachedAmbientLights[i]!.intensity = prevAmbientIntensity[i]!;
+      }
+      for (let i = 0; i < cachedHemisphereLights.length; i++) {
+        cachedHemisphereLights[i]!.intensity = prevHemisphereIntensity[i]!;
+      }
+      for (let i = 0; i < cachedSkipFx.length; i++) {
+        cachedSkipFx[i]!.visible = prevSkipFxVisible[i]!;
+      }
+      for (let i = 0; i < cachedWaterMeshes.length; i++) {
+        cachedWaterMeshes[i]!.visible = prevWaterVisible[i]!;
       }
     }
 
@@ -402,6 +443,12 @@ export function createWaterPlanarReflection(
     },
     dispose: () => {
       boundMats.length = 0;
+      cachedScene = null;
+      cachedWaterMeshes.length = 0;
+      cachedSkipFx.length = 0;
+      cachedAmbientLights.length = 0;
+      cachedHemisphereLights.length = 0;
+      cachedLocalLights.length = 0;
       renderTarget.dispose();
     },
   };
