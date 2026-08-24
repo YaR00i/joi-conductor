@@ -1811,6 +1811,27 @@
       "elev": 0
     },
     {
+      "id": "inn_scales",
+      "modelId": "vox_fan_scales",
+      "x": 5,
+      "y": 2,
+      "elev": 0
+    },
+    {
+      "id": "inn_rings",
+      "modelId": "vox_fan_ring_box",
+      "x": 9,
+      "y": 2,
+      "elev": 0
+    },
+    {
+      "id": "inn_coins",
+      "modelId": "vox_fan_coin_pouch",
+      "x": 4,
+      "y": 3,
+      "elev": 0
+    },
+    {
       "id": "inn_bottles",
       "modelId": "vox_fan_bottles",
       "x": 1,

@@ -256,7 +256,7 @@ Ember — кубичный/воксельный мир внутри Electron-п�
 `vox_fan_chimney`, `vox_fan_porch`, `vox_fan_mail_box`, `vox_fan_banner` (`physical: false`).
 Теги: `fantasy`, `outdoor`, `town`, `building`. Дверь — только меш; `kind:door` вешается на карте.
 
-**Карты `fan_town*`.** JRPG-городок `content/ember/maps/fan_town.json` + интерьеры `fan_town_inn` / `fan_town_smith` / `fan_town_mage` / `fan_town_house`. Входы: `vox_fan_door` + `vox_fan_porch` (регионы `*_enter` на крыльце). Не править `hu_tao_*`.
+**Карты `fan_town*`.** JRPG-городок `content/ember/maps/fan_town.json` + интерьеры `fan_town_inn` / `fan_town_smith` / `fan_town_mage` / `fan_town_house`. Входы: `vox_fan_door` + `vox_fan_porch` (регионы `*_enter` на крыльце). Kit2 display goods на `fan_town_smith` / `fan_town_inn` (не дублируют `weapon_rack` / `armor_stand`). Не править `hu_tao_*`.
 
 **Крупные вещи** (мельница, лодка, мост) — несколько пропов или voxel scene, не один гигантский массив.
 

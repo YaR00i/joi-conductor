@@ -1606,6 +1606,42 @@
       "elev": 0
     },
     {
+      "id": "sm_shield",
+      "modelId": "vox_fan_shield_wall",
+      "x": 7,
+      "y": 1,
+      "elev": 1,
+      "rot": 2
+    },
+    {
+      "id": "sm_helm",
+      "modelId": "vox_fan_helm_barrel",
+      "x": 7,
+      "y": 2,
+      "elev": 0
+    },
+    {
+      "id": "sm_bow",
+      "modelId": "vox_fan_bow_stand",
+      "x": 6,
+      "y": 2,
+      "elev": 0
+    },
+    {
+      "id": "sm_quiver",
+      "modelId": "vox_fan_quiver",
+      "x": 8,
+      "y": 3,
+      "elev": 0
+    },
+    {
+      "id": "sm_daggers",
+      "modelId": "vox_fan_daggers",
+      "x": 2,
+      "y": 8,
+      "elev": 1
+    },
+    {
       "id": "sm_horseshoe",
       "modelId": "vox_fan_horseshoe",
       "x": 8,
