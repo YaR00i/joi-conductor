@@ -23,7 +23,7 @@ Ember сейчас функционально стабилен, но неско�
 
 - `npm test`: 165 файлов, 949 тестов проходят;
 - `npx vite build`: production bundle собирается;
-- `npm run build`: останавливается только на известных `ChatLlmSampling` ошибках, которые пользователь просил пока не трогать;
+- `npm run build` (`tsc --noEmit` + vite) проходит; прежние ошибки `ChatLlmSampling` в `createOllamaSoulClient` закрыты.
 - initial JS: около 2.01 MB minified / 498 KB gzip;
 - глобальный CSS: около 569 KB minified / 95.8 KB gzip;
 - Ember editor tabs уже lazy-loaded;

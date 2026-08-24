@@ -6,21 +6,15 @@ alwaysApply: false
 
 # Ember Engine Contract
 
-Перед изменениями прочитай корневой `AGENTS.md`, `docs/EMBER_AI_HANDOFF.md` и, для архитектурных работ, `docs/EMBER_RESTRUCTURE_PLAN.md`. Подробная продуктовая спецификация находится в `docs/EMBER_ANOMALY.md`.
+Перед изменениями прочитай корневой `AGENTS.md`, `docs/EMBER_AI_HANDOFF.md` и, для архитектурных работ, `docs/EMBER_RESTRUCTURE_PLAN.md`. Продуктовая спецификация — `docs/EMBER_ANOMALY.md`. Воксельный контент-бот — `docs/EMBER_VOXEL_BOT.md`, он не даёт права менять движок.
 
-- Цель: единый Unity/Blender-подобный редактор кубичного/воксельного мира и надёжный Three.js runtime. Не создавай отдельную логику для тайлов, вокселей, света и регионов, если её можно выразить через общий WorldObject + Components + Modifiers.
-- Активный runtime — `src/game/three/EmberThreeWorld.ts`. `src/game/phaser/` считается legacy и не должен становиться второй реализацией новых систем.
-- Координаты данных: X/Y — плоскость карты, Z — высота. В Three.js это X/Z — земля, Y — вверх. Используй существующие функции преобразования, не переставляй оси вручную.
-- `position.z: null` означает наследование высоты поверхности. Scale X/Y/Z обязан одинаково учитываться renderer, collider, outline, light pivot и placement preview.
-- Коллизии объёмные по вертикали: блок мешает только при пересечении вертикальных spans тела и collider. Игрок должен проходить под достаточно высоким блоком.
-- Инспектор строится из компонентных схем и различает asset default, instance override и removed component. Изменения редактора должны поддерживать preview, undo/redo и сохранение одним контрактом.
-- Библиотека и viewport используют один placement/selection/inspector pipeline; не добавляй обходные UI-only записи в JSON.
-- Локальные PointLight-тени запекаются только для статического слоя 0. Игроки и враги находятся на dynamic layer 1 и исключены. Не возвращай fake/projected actor shadows без прямого запроса.
-- Полный static shadow bake выполняется через `beginStaticPointShadowBake`; ручная команда редактора — `rebuildStaticShadows()`. После изменения статической геометрии или света обязательно инвалидируй bake.
-- Сохраняй оптимизации: terrain chunks/workers, instancing, pooling, spatial hash, fixed-step AI/physics и streaming light budgets. Не добавляй per-frame `scene.traverse`, массовые allocations или динамические PointLight cube maps.
-- Не создавай параллельные `V2/New`-системы и не добавляй новую самостоятельную подсистему в legacy-монолиты. Сначала найди существующий owner; новый предметный leaf-модуль должен уменьшать ответственность старого файла.
-- Сначала проверяй local overrides: браузерный override имеет приоритет над `content/ember`, **кроме** пустого/тонкого voxel override — он игнорируется. Пустой файл на диске не доказывает отсутствие данных; смотри `.bak`.
-- Воксельная библиотека — пара `content/ember/voxels/models/<id>.json` + `<id>.vox`. Сетка — MagicaVoxel `.vox` (`emberVoxCodec.ts`); JSON держит компоненты и extra channels. Сохранение только через `writeVoxelRegistry` с `dirtyIds`. Импорт/экспорт `.vox` в скульпторе не должен терять collider/light. Кнопка MagicaVoxel открывает sibling `.vox` через `shell.openPath` и следит за файлом; внешний save не должен затирать Ember JSON. Не дампить каталог в `registry.json`. Отсутствие модели в памяти не удаляет её с диска.
-- Рабочее дерево может быть сильно изменено пользователем. Не reset/checkout и не перезаписывай несвязанные файлы. Никогда не git reset Ember JSON.
-- После изменений: targeted tests → `npm test` → `npm run build`; визуальные задачи проверяй в редакторе и игре, производительность — через F3, crowd stress — F4/Shift+F4.
-- Обновляй `docs/EMBER_AI_HANDOFF.md`, если меняется архитектурный контракт или ближайший план.
+- Цель: единый Unity/Blender-подобный редактор кубичного мира и один Three.js runtime (`EmberThreeWorld.ts`). Phaser — legacy, не вторая реализация. Creative Mode отложен.
+- Координаты данных: X/Y — карта, Z — высота. Three.js: X/Z — земля, Y — вверх. Используй готовые преобразования. `position.z: null` наследует поверхность. Scale учитывается renderer, collider, outline, light pivot и preview одинаково.
+- Коллизии объёмные: блок мешает только при пересечении вертикальных spans. Игрок и AI опираются на одну поверхность (`navigationSurfaceElevAtWorld`).
+- Crowd: baked height-surface grid 2×2 ячейки на тайл, ребро только если каждый подъём ≤ `MAX_AUTO_STEP_VOXELS = 4`. Не сериализовать flow, не возвращать connector-chain / route hashing / admin corridor, не ставить локальный `scale: 1.04`. Общий seam bleed `0.05` в `voxelPlacement.ts`.
+- Инспектор строится из компонентных схем (asset default / instance override / tombstone). Viewport, Outliner и Library ведут к одной `EmberWorldObjectRef`. Preview = commit; тяжёлый input — на pointer-up/Enter.
+- Скульптор: режимы Модель / Материал / Сцена / Анимация — представление над тем же JSON, не новый формат. Не возвращать глобальные хоткеи, где одна клавиша меняет инструменты двух режимов.
+- PointLight-тени пекутся только для static layer 0; актёры на layer 1. Не возвращать fake actor shadows и не подключать `three/addons/csm/CSM`. После правки статики — `invalidatePointLightShadows`.
+- Сначала проверяй local overrides: браузерный override старше диска, **кроме** пустого/тонкого voxel override. Пустой файл на диске не доказывает отсутствие данных; смотри `.bak`.
+- Воксели — пара `voxels/models/<id>.json` + `<id>.vox`. Писать только через `writeVoxelRegistry` с `dirtyIds`. Импорт/watch MagicaVoxel не затирает Ember JSON. Не дампить `registry.json`. Отсутствие в памяти ≠ удаление с диска.
+- Не reset/checkout рабочее дерево и Ember JSON. После изменений: targeted tests → `npm test` → `npm run build`; свет — дождаться flicker; crowd — F3 + F4/Shift+F4/F6, XP = 0. Обновляй handoff при смене контракта.

@@ -1,6 +1,6 @@
 # JOI Conductor — правила для AI-агентов
 
-Этот файл обязателен для Codex, Cursor, Grok и любых других агентов, меняющих проект. Для Ember дополнительно читать `docs/EMBER_AI_HANDOFF.md`; текущая декомпозиция описана в `docs/EMBER_RESTRUCTURE_PLAN.md`.
+Этот файл обязателен для Codex, Cursor, Grok и любых других агентов, меняющих проект. Для Ember дополнительно читать `docs/EMBER_AI_HANDOFF.md`; текущая декомпозиция описана в `docs/EMBER_RESTRUCTURE_PLAN.md`. Старая пометка «Ember не трогаем» в `docs/IMPROVEMENTS.md` снята: Ember активно разрабатывается, handoff имеет приоритет.
 
 ## Главный принцип
 
@@ -22,6 +22,20 @@ Legacy-монолиты: `styles.css`, `VoxelSculptPanel.tsx`, `MapEditorPanel.t
 - В `mapUtils.ts` не добавляй новый домен: создавай leaf-модуль и временно re-export через compatibility barrel согласно плану.
 - В `EmberThreeWorld` оставляй orchestration; новые gameplay/render подсистемы должны иметь явный lifecycle и `dispose/destroy`.
 
+## Тесты механик Ember
+
+Механики (телепорт, зоны, ходьба, камера, тайлы, интерьеры, interact/shop/смена карты) проверять на стадии `agent_sandbox` / «Песочница агента». Не использовать арену `hu_tao_p1` и двор `hu_tao_yard` — там волны бьют по HP. Деревню `hu_tao_village` не водить в браузере для проверки движка.
+
+Для AI-агента — только headless: `src/game/agent/exploreSim.ts`, `npm run ember-agent`, MCP `ember-agent`. Не водить WASD в Chromium / Browser MCP / Playwright. Default stage пака — арена, его не менять.
+
+## Crowd-навигация
+
+Источник правды — baked height-surface grid (`enemyCrowdOpenField.ts`, `navigationSurfaceElevAtWorld`), а не плоские этажи и не спецмаршруты для отдельных лестниц. Подъём не выше `MAX_AUTO_STEP_VOXELS = 4`; игрок и враг видят одну физическую поверхность. Не сериализовать flow в JSON карты, не восстанавливать connector-chain / route hashing / «администраторский» коридор, не ставить локальный `scale: 1.04` вместо общего seam bleed `0.05`.
+
+## Реструктуризация
+
+Порядок обязателен: guard/smoke (волна 0) → декомпозиция `mapUtils` → CSS ownership → controllers редакторов → façade `EmberThreeWorld` последним. Crowd/flow не выносить до отдельного benchmark. Не начинать большой rewrite и не заводить вторую систему рядом со старой.
+
 ## Вертикальный контракт Ember
 
 Изменение данных считается законченным только по цепочке: schema/types → normalization/validation → editor → preview → runtime → serialization → targeted tests → документация.
@@ -31,6 +45,7 @@ Legacy-монолиты: `styles.css`, `VoxelSculptPanel.tsx`, `MapEditorPanel.t
 - Preview обязан совпадать с commit; тяжёлая операция фиксируется один раз на pointer-up/Enter, не на каждом move/input.
 - Не меняй JSON-схему ради временного UI-состояния. Производные cache/flow/grid не сериализуются без versioning-решения.
 - Не создавать третий renderer, отдельный Creative runtime или вторую реализацию в legacy Phaser.
+- Воксельная библиотека — пара `content/ember/voxels/models/<id>.json` + `<id>.vox`. Сохранение только через `writeVoxelRegistry` с `dirtyIds`. Не дампить каталог в `registry.json`.
 
 ## Производительность и lifecycle
 
@@ -44,13 +59,12 @@ Legacy-монолиты: `styles.css`, `VoxelSculptPanel.tsx`, `MapEditorPanel.t
 1. Прочитать релевантные документы и `git status --short`; не перезаписывать чужие незавершённые изменения.
 2. Найти существующий контракт, его потребителей и тесты. Объяснить, почему нужен новый модуль/поле.
 3. Делать один ограниченный вертикальный срез. Не совмещать рефакторинг с новой механикой без необходимости.
-4. Сначала targeted tests, затем `npm test`, `npx vite build`; `npm run build` также запускать и отдельно указывать известные внешние ошибки.
+4. Сначала targeted tests, затем `npm test`, `npx tsc --noEmit`, `npx vite build` / `npm run build`. Ошибка `tsc` — регрессия.
 5. Визуальные изменения проверять в реальном editor/play. Для lifecycle — несколько mount/unmount или Reload.
 6. Обновлять `docs/EMBER_AI_HANDOFF.md` при изменении контракта и `docs/EMBER_RESTRUCTURE_PLAN.md` при завершении волны.
 
 ## Защищённые текущие работы
 
-- Не исправлять `ChatLlmSampling` попутно без отдельного запроса пользователя.
 - Не менять клипы/геометрию крышки сундуков: они переделываются пользователем.
 - Дверь в `(12,8)`, ранее отмеченная пользователем, расположена намеренно.
 - Не применять `git reset`, `checkout --`, массовое удаление или форматирование всего репозитория.
