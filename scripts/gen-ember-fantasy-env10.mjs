@@ -130,46 +130,54 @@ function magicLight(range, strength) {
 }
 
 /** Fat round potion flask: bulb body, short neck, cork. Not a wine bottle. */
-function flask(g, cx, y0, cz, body, glass, cork) {
-  for (let y = y0; y < y0 + 5; y++) {
-    const t = (y - y0) / 4;
-    const r = 1.85 + Math.sin(t * Math.PI) * 0.85;
-    for (let z = cz - 4; z <= cz + 4; z++) {
-      for (let x = cx - 4; x <= cx + 4; x++) {
+function flask(g, cx, y0, cz, body, glass, cork, bodyH = 5) {
+  for (let y = y0; y < y0 + bodyH; y++) {
+    const t = (y - y0) / Math.max(1, bodyH - 1);
+    const r = 1.95 + Math.sin(t * Math.PI) * 0.9;
+    for (let z = Math.floor(cz) - 4; z <= Math.ceil(cz) + 4; z++) {
+      for (let x = Math.floor(cx) - 4; x <= Math.ceil(cx) + 4; x++) {
         if (!inDisk(x, z, cx, cz, r)) continue;
-        const inner = y > y0 && y < y0 + 4 && inDisk(x, z, cx, cz, Math.max(0.9, r - 1.15));
+        const inner =
+          y > y0 &&
+          y < y0 + bodyH - 1 &&
+          inDisk(x, z, cx, cz, Math.max(0.95, r - 1.1));
         setV(g, x, y, z, inner ? glass : body);
       }
     }
   }
-  box(g, cx - 1, y0 + 5, cz - 1, cx + 1, y0 + 7, cz + 1, body);
-  box(g, cx - 1, y0 + 7, cz - 1, cx + 1, y0 + 8, cz + 1, cork);
+  const neck0 = y0 + bodyH;
+  box(g, Math.floor(cx) - 1, neck0, Math.floor(cz) - 1, Math.floor(cx) + 1, neck0 + 2, Math.floor(cz) + 1, body);
+  box(g, Math.floor(cx) - 1, neck0 + 2, Math.floor(cz) - 1, Math.floor(cx) + 1, neck0 + 3, Math.floor(cz) + 1, cork);
 }
 
-/** Tall wooden rack of fat colored potion flasks. Under a 32 vx crown. */
+/** Tall open wooden rack of fat colored potion flasks. Under a 32 vx crown. */
 function modelPotionRack() {
-  const h = 26;
+  const h = 27;
   const g = emptyGrid(V, h, V);
   box(g, 1, 0, 3, 15, 2, 14, 1);
-  post(g, 1, 2, 3, 4, 24, 7, 2, 1);
-  post(g, 12, 2, 3, 15, 24, 7, 2, 1);
-  box(g, 1, 2, 3, 15, 24, 6, 2);
-  box(g, 1, 24, 3, 15, 26, 14, 3);
+  post(g, 1, 2, 3, 4, 26, 6, 2, 1);
+  post(g, 12, 2, 3, 15, 26, 6, 2, 1);
+  post(g, 1, 2, 11, 4, 8, 14, 2, 1);
+  post(g, 12, 2, 11, 15, 8, 14, 2, 1);
+  box(g, 1, 2, 3, 15, 26, 5, 2);
+  box(g, 1, 25, 3, 15, 27, 8, 3);
 
-  box(g, 2, 2, 6, 14, 4, 14, 3);
-  box(g, 2, 10, 6, 14, 12, 14, 3);
-  box(g, 2, 18, 6, 14, 20, 14, 3);
-  box(g, 2, 2, 6, 14, 3, 14, 1);
-  box(g, 2, 10, 6, 14, 11, 14, 1);
-  box(g, 2, 18, 6, 14, 19, 14, 1);
+  function shelf(y0) {
+    box(g, 2, y0, 5, 14, y0 + 2, 13, 3);
+    box(g, 2, y0, 5, 14, y0 + 1, 13, 1);
+    box(g, 2, y0, 12, 14, y0 + 2, 13, 1);
+  }
+  shelf(2);
+  shelf(11);
+  shelf(19);
 
-  flask(g, 4.5, 4, 10, 4, 4, 8);
-  flask(g, 8, 4, 11, 5, 5, 8);
-  flask(g, 11.5, 4, 9.5, 6, 6, 8);
-  flask(g, 5, 12, 10.5, 7, 7, 8);
-  flask(g, 10.5, 12, 10, 4, 4, 8);
-  flask(g, 4.5, 20, 10, 5, 5, 8);
-  flask(g, 11, 20, 10.5, 6, 6, 8);
+  flask(g, 4, 4, 10.5, 4, 4, 8, 5);
+  flask(g, 8, 4, 11, 5, 5, 8, 5);
+  flask(g, 12, 4, 10.5, 6, 6, 8, 5);
+  flask(g, 5, 13, 11, 7, 7, 8, 5);
+  flask(g, 11, 13, 11, 4, 4, 8, 5);
+  flask(g, 4, 20, 11, 5, 5, 8, 4);
+  flask(g, 12, 20, 11, 6, 6, 8, 4);
 
   return finishModel(g, {
     id: "vox_fan_potion_rack",
@@ -252,20 +260,20 @@ function modelGrimoire() {
   post(g, 5, 3, 5, 11, 12, 11, 2, 1);
   box(g, 6, 4, 10, 10, 11, 12, 3);
 
-  box(g, 2, 11, 3, 14, 14, 8, 2);
-  box(g, 2, 13, 7, 14, 16, 13, 3);
-  box(g, 2, 12, 5, 14, 15, 10, 2);
-  box(g, 2, 15, 10, 14, 17, 14, 1);
+  box(g, 2, 11, 3, 14, 13, 7, 2);
+  box(g, 2, 12, 6, 14, 15, 10, 2);
+  box(g, 2, 14, 9, 14, 16, 13, 3);
+  box(g, 2, 15, 11, 14, 17, 14, 1);
 
-  box(g, 1, 13, 4, 8, 16, 12, 5);
-  box(g, 8, 13, 4, 15, 16, 12, 5);
-  box(g, 7, 13, 4, 9, 17, 12, 4);
-  box(g, 2, 15, 5, 7, 16, 11, 8);
-  box(g, 9, 15, 5, 14, 16, 11, 8);
-  box(g, 3, 14, 11, 6, 16, 13, 6);
-  box(g, 10, 14, 11, 13, 16, 13, 6);
-  box(g, 4, 14, 10, 5, 15, 12, 7);
-  box(g, 11, 14, 10, 12, 15, 12, 7);
+  box(g, 1, 12, 4, 7, 15, 10, 5);
+  box(g, 9, 13, 5, 15, 16, 12, 5);
+  box(g, 2, 13, 6, 7, 16, 11, 8);
+  box(g, 9, 14, 7, 14, 17, 12, 8);
+  box(g, 6, 14, 6, 10, 18, 12, 4);
+  box(g, 3, 13, 9, 6, 15, 12, 6);
+  box(g, 10, 14, 10, 13, 16, 13, 6);
+  box(g, 4, 13, 10, 5, 14, 12, 7);
+  box(g, 11, 14, 11, 12, 15, 13, 7);
 
   return finishModel(g, {
     id: "vox_fan_grimoire",
@@ -314,9 +322,10 @@ function modelMortar() {
     }
   }
 
-  box(g, 9, 2, 4, 12, 4, 7, 5);
-  box(g, 10, 3, 3, 13, 7, 6, 5);
-  box(g, 11, 6, 3, 14, 8, 6, 4);
+  box(g, 7, 3, 5, 10, 4, 8, 5);
+  box(g, 9, 3, 4, 12, 5, 7, 5);
+  box(g, 10, 4, 3, 13, 7, 6, 5);
+  box(g, 12, 6, 3, 14, 8, 5, 4);
 
   box(g, 11, 2, 9, 14, 4, 12, 6);
   box(g, 12, 3, 10, 14, 5, 12, 6);
@@ -490,9 +499,12 @@ function modelScryBowl() {
       }
     }
   }
-  box(g, 3, 4, 3, 6, 6, 6, 3);
-  box(g, 10, 4, 3, 13, 6, 6, 3);
-  box(g, 3, 4, 10, 6, 5, 13, 3);
+  for (let z = 2; z < 14; z++) {
+    for (let x = 2; x < 14; x++) {
+      if (!inDisk(x, z, 8, 8, 5.5) || inDisk(x, z, 8, 8, 4.1)) continue;
+      setV(g, x, 4, z, 3);
+    }
+  }
   box(g, 7, 3, 7, 9, 4, 9, 6, 255);
 
   return finishModel(g, {
@@ -530,20 +542,25 @@ function modelMageSign() {
   box(g, 2, 4, 6, 14, 5, 7, 7);
   box(g, 2, 11, 6, 14, 12, 7, 7);
 
-  for (let y = 5; y < 11; y++) {
-    for (let x = 3; x < 10; x++) {
-      const moon = inDisk(x, y, 6.2, 8, 2.55) && !inDisk(x, y, 7.6, 8.6, 1.85);
-      if (moon) {
-        box(g, x, y, 10, x + 1, y + 1, 13, 5);
-      }
+  for (let y = 4; y < 12; y++) {
+    for (let x = 2; x < 10; x++) {
+      const moon = inDisk(x, y, 5.8, 8, 3.15) && !inDisk(x, y, 7.5, 8.7, 2.25);
+      if (moon) box(g, x, y, 10, x + 1, y + 1, 13, 5);
     }
   }
-  box(g, 10, 8, 10, 13, 11, 13, 6);
-  setV(g, 11, 9, 12, 5);
-  setV(g, 11, 10, 12, 5);
-  setV(g, 12, 9, 12, 5);
-  box(g, 9, 6, 11, 11, 8, 13, 6);
-  setV(g, 10, 7, 12, 4);
+  const star = [
+    [11, 9],
+    [10, 9],
+    [12, 9],
+    [11, 8],
+    [11, 10],
+    [10, 8],
+    [12, 10],
+    [10, 10],
+    [12, 8],
+  ];
+  for (const [x, y] of star) box(g, x, y, 10, x + 1, y + 1, 13, 6);
+  setV(g, 11, 9, 12, 4);
 
   return finishModel(g, {
     id: "vox_fan_mage_sign",
