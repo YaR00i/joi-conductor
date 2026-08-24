@@ -10333,52 +10333,52 @@
       "id": "inn_enter",
       "kind": "trigger",
       "x": 9,
-      "y": 11,
+      "y": 12,
       "w": 2,
       "h": 1,
       "targetMapId": "fan_town_inn",
       "targetRegionId": "start",
       "boundObjectId": "ft_inn_door",
-      "note": "Дверь таверны → fan_town_inn",
+      "note": "Дверь таверны → fan_town_inn (крыльцо vox_fan_porch)",
       "elev": 0
     },
     {
       "id": "mage_enter",
       "kind": "trigger",
       "x": 21,
-      "y": 11,
+      "y": 12,
       "w": 2,
       "h": 1,
       "targetMapId": "fan_town_mage",
       "targetRegionId": "start",
       "boundObjectId": "ft_mage_door",
-      "note": "Дверь лавки мага → fan_town_mage",
+      "note": "Дверь лавки мага → fan_town_mage (крыльцо vox_fan_porch)",
       "elev": 0
     },
     {
       "id": "smith_enter",
       "kind": "trigger",
       "x": 9,
-      "y": 25,
+      "y": 26,
       "w": 2,
       "h": 1,
       "targetMapId": "fan_town_smith",
       "targetRegionId": "start",
       "boundObjectId": "ft_smith_door",
-      "note": "Дверь кузницы → fan_town_smith",
+      "note": "Дверь кузницы → fan_town_smith (крыльцо vox_fan_porch)",
       "elev": 0
     },
     {
       "id": "house_enter",
       "kind": "trigger",
       "x": 21,
-      "y": 25,
+      "y": 26,
       "w": 2,
       "h": 1,
       "targetMapId": "fan_town_house",
       "targetRegionId": "start",
       "boundObjectId": "ft_house_door",
-      "note": "Дверь дома → fan_town_house",
+      "note": "Дверь дома → fan_town_house (крыльцо vox_fan_porch)",
       "elev": 0
     }
   ],
@@ -10387,7 +10387,7 @@
   "voxelProps": [
     {
       "id": "ft_inn_door",
-      "modelId": "vox_vil_door",
+      "modelId": "vox_fan_door",
       "x": 9,
       "y": 11,
       "elev": 0,
@@ -10398,7 +10398,7 @@
     },
     {
       "id": "ft_mage_door",
-      "modelId": "vox_vil_door",
+      "modelId": "vox_fan_door",
       "x": 21,
       "y": 11,
       "elev": 0,
@@ -10409,7 +10409,7 @@
     },
     {
       "id": "ft_smith_door",
-      "modelId": "vox_vil_door",
+      "modelId": "vox_fan_door",
       "x": 9,
       "y": 25,
       "elev": 0,
@@ -10420,7 +10420,7 @@
     },
     {
       "id": "ft_house_door",
-      "modelId": "vox_vil_door",
+      "modelId": "vox_fan_door",
       "x": 21,
       "y": 25,
       "elev": 0,
@@ -11382,6 +11382,254 @@
       "y": 29,
       "elev": 0,
       "rot": 1
+    },
+    {
+      "id": "ft_inn_porch_l",
+      "modelId": "vox_fan_porch",
+      "x": 9,
+      "y": 12,
+      "elev": 0
+    },
+    {
+      "id": "ft_inn_porch_r",
+      "modelId": "vox_fan_porch",
+      "x": 10,
+      "y": 12,
+      "elev": 0
+    },
+    {
+      "id": "ft_inn_front",
+      "modelId": "vox_fan_shop_front",
+      "x": 11,
+      "y": 11,
+      "elev": 0
+    },
+    {
+      "id": "ft_inn_awning",
+      "modelId": "vox_fan_awning_stripe",
+      "x": 11,
+      "y": 11,
+      "elev": 0
+    },
+    {
+      "id": "ft_inn_win_0",
+      "modelId": "vox_fan_window",
+      "x": 7,
+      "y": 11,
+      "elev": 1
+    },
+    {
+      "id": "ft_inn_win_1",
+      "modelId": "vox_fan_window",
+      "x": 6,
+      "y": 8,
+      "elev": 1,
+      "rot": 3
+    },
+    {
+      "id": "ft_inn_win_2",
+      "modelId": "vox_fan_window",
+      "x": 13,
+      "y": 7,
+      "elev": 1,
+      "rot": 1
+    },
+    {
+      "id": "ft_inn_chimney",
+      "modelId": "vox_fan_chimney",
+      "x": 8,
+      "y": 7,
+      "elev": 2
+    },
+    {
+      "id": "ft_inn_banner",
+      "modelId": "vox_fan_banner",
+      "x": 6,
+      "y": 6,
+      "elev": 1,
+      "rot": 3
+    },
+    {
+      "id": "ft_inn_mail",
+      "modelId": "vox_fan_mail_box",
+      "x": 7,
+      "y": 12,
+      "elev": 0
+    },
+    {
+      "id": "ft_mage_porch_l",
+      "modelId": "vox_fan_porch",
+      "x": 21,
+      "y": 12,
+      "elev": 0
+    },
+    {
+      "id": "ft_mage_porch_r",
+      "modelId": "vox_fan_porch",
+      "x": 22,
+      "y": 12,
+      "elev": 0
+    },
+    {
+      "id": "ft_mage_front",
+      "modelId": "vox_fan_shop_front",
+      "x": 23,
+      "y": 11,
+      "elev": 0
+    },
+    {
+      "id": "ft_mage_awning",
+      "modelId": "vox_fan_awning_stripe",
+      "x": 23,
+      "y": 11,
+      "elev": 0
+    },
+    {
+      "id": "ft_mage_win_0",
+      "modelId": "vox_fan_window",
+      "x": 19,
+      "y": 11,
+      "elev": 1
+    },
+    {
+      "id": "ft_mage_win_1",
+      "modelId": "vox_fan_window",
+      "x": 18,
+      "y": 8,
+      "elev": 1,
+      "rot": 3
+    },
+    {
+      "id": "ft_mage_win_2",
+      "modelId": "vox_fan_window",
+      "x": 25,
+      "y": 7,
+      "elev": 1,
+      "rot": 1
+    },
+    {
+      "id": "ft_mage_chimney",
+      "modelId": "vox_fan_chimney",
+      "x": 20,
+      "y": 7,
+      "elev": 2
+    },
+    {
+      "id": "ft_mage_banner",
+      "modelId": "vox_fan_banner",
+      "x": 25,
+      "y": 6,
+      "elev": 1,
+      "rot": 1
+    },
+    {
+      "id": "ft_smith_porch_l",
+      "modelId": "vox_fan_porch",
+      "x": 9,
+      "y": 26,
+      "elev": 0
+    },
+    {
+      "id": "ft_smith_porch_r",
+      "modelId": "vox_fan_porch",
+      "x": 10,
+      "y": 26,
+      "elev": 0
+    },
+    {
+      "id": "ft_smith_win_0",
+      "modelId": "vox_fan_window",
+      "x": 7,
+      "y": 25,
+      "elev": 1
+    },
+    {
+      "id": "ft_smith_win_1",
+      "modelId": "vox_fan_window",
+      "x": 12,
+      "y": 25,
+      "elev": 1
+    },
+    {
+      "id": "ft_smith_win_2",
+      "modelId": "vox_fan_window",
+      "x": 6,
+      "y": 22,
+      "elev": 1,
+      "rot": 3
+    },
+    {
+      "id": "ft_smith_chimney",
+      "modelId": "vox_fan_chimney",
+      "x": 8,
+      "y": 21,
+      "elev": 2
+    },
+    {
+      "id": "ft_smith_banner",
+      "modelId": "vox_fan_banner",
+      "x": 13,
+      "y": 22,
+      "elev": 1,
+      "rot": 1
+    },
+    {
+      "id": "ft_house_porch_l",
+      "modelId": "vox_fan_porch",
+      "x": 21,
+      "y": 26,
+      "elev": 0
+    },
+    {
+      "id": "ft_house_porch_r",
+      "modelId": "vox_fan_porch",
+      "x": 22,
+      "y": 26,
+      "elev": 0
+    },
+    {
+      "id": "ft_house_win_0",
+      "modelId": "vox_fan_window",
+      "x": 19,
+      "y": 25,
+      "elev": 1
+    },
+    {
+      "id": "ft_house_win_1",
+      "modelId": "vox_fan_window",
+      "x": 24,
+      "y": 25,
+      "elev": 1
+    },
+    {
+      "id": "ft_house_win_2",
+      "modelId": "vox_fan_window",
+      "x": 18,
+      "y": 22,
+      "elev": 1,
+      "rot": 3
+    },
+    {
+      "id": "ft_house_chimney",
+      "modelId": "vox_fan_chimney",
+      "x": 20,
+      "y": 21,
+      "elev": 2
+    },
+    {
+      "id": "ft_house_banner",
+      "modelId": "vox_fan_banner",
+      "x": 25,
+      "y": 22,
+      "elev": 1,
+      "rot": 1
+    },
+    {
+      "id": "ft_house_mail",
+      "modelId": "vox_fan_mail_box",
+      "x": 24,
+      "y": 26,
+      "elev": 0
     }
   ],
   "light": {

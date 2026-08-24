@@ -1787,7 +1787,7 @@
   "voxelProps": [
     {
       "id": "ft_inn_exit_door",
-      "modelId": "vox_vil_door",
+      "modelId": "vox_fan_door",
       "x": 6,
       "y": 10,
       "elev": 0,
@@ -1935,6 +1935,14 @@
       "x": 11,
       "y": 2,
       "elev": 1
+    },
+    {
+      "id": "fan_town_inn_window",
+      "modelId": "vox_fan_window",
+      "x": 2,
+      "y": 1,
+      "elev": 1,
+      "rot": 2
     }
   ],
   "light": {
