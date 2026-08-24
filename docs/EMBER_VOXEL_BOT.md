@@ -242,6 +242,13 @@ Ember — кубичный/воксельный мир внутри Electron-п�
 
 **Расстановка на `hu_tao_village`** — отдельная задача после env3.
 
+**Env11 — рынок / площадь (сделано).** `scripts/gen-ember-fantasy-env11.mjs`
+
+`vox_fan_stall` (2×1, striped awning), `vox_fan_produce`, `vox_fan_fountain` (tag `water`),
+`vox_fan_statue`, `vox_fan_hitch`, `vox_fan_laundry` (`physical: false`),
+`vox_fan_crate_stack`, `vox_fan_flowerbox` (`physical: false`).
+Теги: `fantasy`, `outdoor`, `town`, `market`.
+
 **Крупные вещи** (мельница, лодка, мост) — несколько пропов или voxel scene, не один гигантский массив.
 
 ---
