@@ -3,7 +3,7 @@ import type { SoulChatTurn } from "./prompts";
 import {
   buildChatCompletionBody,
   chatCompletionHeaders,
-  harvestChatCompletion,
+  DEFAULT_CHAT_SAMPLING,
   splitThinkFromCompletion,
   type ResolvedChatLlm,
 } from "./llmSettings";
@@ -77,15 +77,8 @@ export function createOllamaSoulClient(opts: {
     endpoint: opts.endpoint,
     apiKey: "",
     sampling: {
-      temperature: 0.8,
-      top_p: 0.7,
-      min_p: 0.07,
-      top_k: 40,
-      maxTokens: 1000,
-      frequencyPenalty: 0.4,
-      presencePenalty: 0.3,
-      repeatPenalty: 1.1,
-      timeoutMs: opts.timeoutMs ?? 90000,
+      ...DEFAULT_CHAT_SAMPLING,
+      timeoutMs: opts.timeoutMs ?? DEFAULT_CHAT_SAMPLING.timeoutMs,
     },
   });
 }

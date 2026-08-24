@@ -1,0 +1,20 @@
+---
+description: Где и как агенту проверять механики Ember
+alwaysApply: true
+---
+
+# Ember Agent Sandbox
+
+Механики Ember (телепорт, зоны, ходьба, камера, тайлы, интерьеры, interact / shop / смена карты / fade) проверять только на стадии `agent_sandbox` / «Песочница агента». Не ходить на арену `hu_tao_p1` и двор `hu_tao_yard` — волны бьют по HP. Деревню `hu_tao_village` не водить в Chromium для проверки движка; контент-тест — `villageExploreContent.test.ts`. Default stage пака (`hu_tao_p1`) не менять.
+
+Для AI — только headless, не WASD в браузере:
+
+| Как | Команда |
+| --- | --- |
+| Состояние | `npm run ember-agent -- state` |
+| Шаг | `npm run ember-agent -- step --dir east` |
+| До региона | `npm run ember-agent -- walk-toward --to teleport_a` |
+| Interact | `npm run ember-agent -- interact` |
+| MCP | `get_state`, `step`, `walk_toward`, `interact`, `buy`, `sell`, `save`, `load`, `reset_save` |
+
+Оси CLI/MCP — оси карты (north = −Y, east = +X), не yaw камеры. Коллизия — тот же `moveWithVoxels`, что в play. Карта по умолчанию `agent_sandbox`. Подробности: `docs/EMBER_AI_HANDOFF.md` §2.1.

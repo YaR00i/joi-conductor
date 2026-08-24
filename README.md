@@ -3,6 +3,8 @@
 Личный дирижёр JOI-сессий: функции × BPM-паттерны × finish/cumplay.  
 Голос Ху Тао (templates / local LLM). 3D-аватар — Phase 3.
 
+**Ember** — встроенная воксельная игра и редактор: арены в духе Vampire Survivors, JRPG-хаб и Unity-подобный пайплайн контента на Three.js.
+
 ## Docs
 
 - [Правила для AI-агентов](AGENTS.md)
