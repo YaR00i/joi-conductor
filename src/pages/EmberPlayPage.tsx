@@ -55,7 +55,20 @@ type ResultState = {
 function fmtTime(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function toggleEmberPlayFullscreen(): void {
+  const desktop = window.joiDesktop;
+  if (desktop?.toggleFullScreen) {
+    void desktop.toggleFullScreen();
+    return;
+  }
+  if (!document.fullscreenElement) {
+    void document.documentElement.requestFullscreen?.();
+    return;
+  }
+  void document.exitFullscreen?.();
 }
 
 export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
@@ -453,6 +466,14 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
           <button type="button" className="ghost" onClick={() => void reload()}>
             Reload
           </button>
+          <button
+            type="button"
+            className="ghost"
+            title="На весь экран (F11)"
+            onClick={() => toggleEmberPlayFullscreen()}
+          >
+            F11
+          </button>
         </div>
       </nav>
 
@@ -581,6 +602,7 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
                     <li>Карта: {selectedMap?.nameRu ?? selectedStage?.mapId}</li>
                     <li>Редактор → Карты → «Деревня Ху Тао»</li>
                     <li>WASD — движение · мышь — камера · Esc — меню</li>
+                    <li>F11 — игра на весь экран</li>
                     <li>F у прилавка — магазин · F у сундука — лут</li>
                     <li>I — инвентарь и экипировка (пока открыт магазин — нет)</li>
                     <li>Фонари и окна — локальный свет с гибридными тенями</li>
@@ -588,6 +610,7 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
                 ) : (
                   <>
                     <li>Мышь — камера · Esc — меню</li>
+                    <li>F11 — игра на весь экран</li>
                     <li>Слизь замедляет</li>
                     <li>Урон оголяет (strip)</li>
                     <li>Контент — в Редакторе</li>
@@ -646,6 +669,7 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
               <button type="button" className="ghost" onClick={quitToEditor}>
                 Редактор
               </button>
+              <p className="muted ember-play__menu-hint">F11 — на весь экран</p>
             </div>
           </div>
         ) : null}
@@ -727,86 +751,86 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
             />
           </div>
         ) : null}
-      </div>
 
-      {toast ? <div className="ember-toast">{toast}</div> : null}
+        {toast ? <div className="ember-toast">{toast}</div> : null}
 
-      {loot ? (
-        <EmberLootRoulette
-          titleRu={loot.kind === "chest" ? "Сундук" : "Level Up"}
-          options={loot.options}
-          targetId={loot.targetId}
-          onDone={takeLoot}
-        />
-      ) : null}
+        {loot ? (
+          <EmberLootRoulette
+            titleRu={loot.kind === "chest" ? "Сундук" : "Level Up"}
+            options={loot.options}
+            targetId={loot.targetId}
+            onDone={takeLoot}
+          />
+        ) : null}
 
-      {shop && pack ? (
-        <EmberShopPanel
-          shop={shop}
-          items={pack.items}
-          itemIcons={pack.itemIcons}
-          onBuy={(itemId) => apiRef.current?.buyShopItem(itemId)}
-          onSell={(itemId) => apiRef.current?.sellShopItem(itemId)}
-          onClose={() => apiRef.current?.closeShop()}
-        />
-      ) : null}
+        {shop && pack ? (
+          <EmberShopPanel
+            shop={shop}
+            items={pack.items}
+            itemIcons={pack.itemIcons}
+            onBuy={(itemId) => apiRef.current?.buyShopItem(itemId)}
+            onSell={(itemId) => apiRef.current?.sellShopItem(itemId)}
+            onClose={() => apiRef.current?.closeShop()}
+          />
+        ) : null}
 
-      {inventory && pack && !shop ? (
-        <EmberInventoryPanel
-          inventory={inventory}
-          items={pack.items}
-          itemIcons={pack.itemIcons}
-          onEquip={(itemId) => apiRef.current?.equipItem(itemId)}
-          onUnequip={(slot) => apiRef.current?.unequipSlot(slot)}
-          onUse={(itemId) => apiRef.current?.useItem(itemId)}
-          onClose={() => apiRef.current?.closeInventory()}
-        />
-      ) : null}
+        {inventory && pack && !shop ? (
+          <EmberInventoryPanel
+            inventory={inventory}
+            items={pack.items}
+            itemIcons={pack.itemIcons}
+            onEquip={(itemId) => apiRef.current?.equipItem(itemId)}
+            onUnequip={(slot) => apiRef.current?.unequipSlot(slot)}
+            onUse={(itemId) => apiRef.current?.useItem(itemId)}
+            onClose={() => apiRef.current?.closeInventory()}
+          />
+        ) : null}
 
-      {result ? (
-        <div className="ember-result" role="dialog">
-          <div className="ember-result__card">
-            <h2>{result.outcome === "clear" ? "Победа" : "Поражение"}</h2>
-            <p className="muted">
-              {fmtTime(result.elapsedSec)} · ур. {result.level} · убито{" "}
-              {result.killed}
-            </p>
-            <p className="ember-result__cinders">+{result.cinders} угольков</p>
-            <button type="button" className="primary" onClick={claimResult}>
-              {result.outcome === "clear" && result.onClearEventId
-                ? "Забрать и смотреть сцену"
-                : "Забрать"}
-            </button>
+        {result ? (
+          <div className="ember-result" role="dialog">
+            <div className="ember-result__card">
+              <h2>{result.outcome === "clear" ? "Победа" : "Поражение"}</h2>
+              <p className="muted">
+                {fmtTime(result.elapsedSec)} · ур. {result.level} · убито{" "}
+                {result.killed}
+              </p>
+              <p className="ember-result__cinders">+{result.cinders} угольков</p>
+              <button type="button" className="primary" onClick={claimResult}>
+                {result.outcome === "clear" && result.onClearEventId
+                  ? "Забрать и смотреть сцену"
+                  : "Забрать"}
+              </button>
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {playDialogueId && pack && !shop ? (
-        <div className="ember-scene-host ember-scene-host--overlay">
-          <ScenePlayer
-            pack={pack}
-            sceneId={playDialogueId}
-            variant="play"
-            onGrantCinders={onReward}
-            onClose={() => {
-              setPlayDialogueId(null);
-              apiRef.current?.advanceDialogue();
-            }}
-          />
-        </div>
-      ) : null}
+        {playDialogueId && pack && !shop ? (
+          <div className="ember-scene-host ember-scene-host--overlay">
+            <ScenePlayer
+              pack={pack}
+              sceneId={playDialogueId}
+              variant="play"
+              onGrantCinders={onReward}
+              onClose={() => {
+                setPlayDialogueId(null);
+                apiRef.current?.advanceDialogue();
+              }}
+            />
+          </div>
+        ) : null}
 
-      {sceneId && pack ? (
-        <div className="ember-scene-host">
-          <ScenePlayer
-            pack={pack}
-            sceneId={sceneId}
-            variant="stage"
-            onGrantCinders={onReward}
-            onClose={() => setSceneId(null)}
-          />
-        </div>
-      ) : null}
+        {sceneId && pack ? (
+          <div className="ember-scene-host">
+            <ScenePlayer
+              pack={pack}
+              sceneId={sceneId}
+              variant="stage"
+              onGrantCinders={onReward}
+              onClose={() => setSceneId(null)}
+            />
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

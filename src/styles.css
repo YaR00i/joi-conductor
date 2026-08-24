@@ -298,13 +298,46 @@ button:focus-visible {
   border: none;
 }
 
+.app-frame--fullscreen .shell {
+  grid-template-columns: 1fr;
+}
+
+.app-frame--fullscreen .side-nav {
+  display: none;
+}
+
+.app-frame--fullscreen .page--ember {
+  padding: 0;
+}
+
+.app-frame--fullscreen .ember-play-bar {
+  display: none;
+}
+
+.app-frame--fullscreen .ember-play__stage {
+  border: none;
+  border-radius: 0;
+}
+
 /* Fallback if HTML fullscreen is used without React state */
 :fullscreen .titlebar,
 :fullscreen .app-frame {
   --titlebar-h: 0px;
 }
-:fullscreen .titlebar {
+:fullscreen .titlebar,
+:fullscreen .side-nav,
+:fullscreen .ember-play-bar {
   display: none !important;
+}
+:fullscreen .shell {
+  grid-template-columns: 1fr;
+}
+:fullscreen .page--ember {
+  padding: 0;
+}
+:fullscreen .ember-play__stage {
+  border: none;
+  border-radius: 0;
 }
 
 .titlebar {
@@ -511,6 +544,12 @@ button:focus-visible {
 }
 
 .shell__main:has(.page--minigames) {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell__main:has(.page--ember) {
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -15808,6 +15847,34 @@ html[data-mistress="furina"] {
   flex-direction: column;
 }
 
+.ember-play-shell .ember-scene-host,
+.ember-play-shell .ember-shop-overlay,
+.ember-play-shell .ember-inv-overlay,
+.ember-play-shell .ember-loot-overlay,
+.ember-play-shell .ember-result {
+  position: absolute;
+}
+
+.ember-play-shell .ember-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 5.25rem;
+}
+
+.ember-play-shell .ember-shop-card {
+  width: min(420px, 94%);
+  max-height: min(92%, 720px);
+}
+
+.ember-play-shell .ember-inv-card {
+  width: min(520px, 94%);
+  max-height: min(92%, 720px);
+}
+
+.ember-play-shell .ember-result__card {
+  width: min(22rem, 94%);
+}
+
 .ember-play__errors {
   flex-shrink: 0;
   max-height: 5.5rem;
@@ -16311,6 +16378,7 @@ html[data-mistress="furina"] {
 .ember-dlg--play {
   position: absolute;
   inset: 0;
+  container-type: size;
 }
 
 .ember-dlg--stage {
@@ -16429,7 +16497,7 @@ html[data-mistress="furina"] {
 
 .ember-dlg__text {
   margin: 0;
-  font-size: clamp(1.05rem, 2.1vw, 1.35rem);
+  font-size: clamp(1.05rem, 4.2cqi, 1.35rem);
   line-height: 1.55;
   font-weight: 500;
   color: #fff;

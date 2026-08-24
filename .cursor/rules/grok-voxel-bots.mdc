@@ -1,0 +1,14 @@
+---
+description: Grok voxel-боты кидают PR в main — не мержить без «всё ок»
+alwaysApply: true
+---
+
+# Grok Voxel Bots
+
+Пользователь параллельно гоняет **Grok / Voxel bro** (`docs/EMBER_VOXEL_BOT.md`). Они рисуют пропы в `content/ember/voxels/models/` и открывают PR в `main` (ветки `cursor/ember-fantasy-env*`, `cursor/ember-kit*`). Пока идёт другая работа, `origin/main` часто уезжает вперёд.
+
+- Снимок `git status` в начале чата не описывает remote. Перед коммитом и пушем: `git fetch origin main`, сравнить `HEAD` с `origin/main`.
+- Пуш в `main` только fast-forward после `git pull --rebase origin main`. Не force-push, не reset/checkout чужих voxel JSON/`.vox`.
+- Не перезаписывать модели из открытых bot-PR и не занимать те же новые `vox_*` id без проверки `origin/main` и открытых PR.
+- **Не слать пользователя в браузер** мержить env/kit PR. Боты сами не мержат. После «всё ок» / «можно мержить» / «мержи ботов» / «пропы ок» — skill `merge-voxel-bot-prs`: `gh pr merge` всех готовых, драфты не трогать.
+- Конфликт с ботом по ассету — rebase/merge, не «затереть их волну». Движок и карты ботам не отдавать: пайплайн ассетов у них, код — здесь.

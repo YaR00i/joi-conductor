@@ -78,7 +78,7 @@ Ember — встроенная в JOI Conductor игра и редактор к�
 - `TileEditorPanel.tsx` — тайлы и материалы поверхности.
 - `SpriteEditorPanel.tsx` — пиксельные спрайты.
 - `VoxelSculptPanel.tsx` — воксельные модели и сцены.
-- `SceneEditorPanel.tsx` — нарративные сцены. `EmberScene.use`: `cutscene` | `talk` | `shop_intro`. Один граф, один `ScenePlayer`. Play overlay — HSR (без коробки). Кнопки **+ Сцена** / **+ Болтовня**. На объект вешается `scriptId` (dropdown сцен + `scripts/`). Trigger `scriptId` — action list (`talk` / `change_map` / `open_shop` / `give_item` / `set_flag` / `wait` / `run_script`) или id сцены.
+- `SceneEditorPanel.tsx` — нарративные сцены. `EmberScene.use`: `cutscene` | `talk` | `shop_intro`. Один граф, один `ScenePlayer`. Play overlay — HSR (без коробки), якорится на `.ember-play-shell` (холст), не на `position: fixed` всего окна. F11 прячет шапку/сайдбар/play-bar, игра на весь экран. Кнопки **+ Сцена** / **+ Болтовня**. На объект вешается `scriptId` (dropdown сцен + `scripts/`). Trigger `scriptId` — action list (`talk` / `change_map` / `open_shop` / `give_item` / `set_flag` / `wait` / `run_script`) или id сцены.
 - `StageEditorPanel.tsx`, `SpawnEditorPanel.tsx` — стадии и волны.
 - `ArtsEditorPanel.tsx` — библиотека артов/портретов и связанного контента.
 - `ItemsEditorPanel.tsx` — каталог предметов и 16×16 иконки (вкладка **Предметы**).
@@ -534,7 +534,7 @@ Outliner voxel-сцены с 2026-08-25 поддерживает привычн�
 ## 13. Рабочий процесс для следующего ИИ
 
 1. Прочитать корневой `AGENTS.md`, этот файл (сначала §2.1 песочница) и релевантный раздел `docs/EMBER_ANOMALY.md`. Для рефакторинга прочитать `docs/EMBER_RESTRUCTURE_PLAN.md`. Если задача — **воксельные модельки для Grok / Voxel bro**, читать также `docs/EMBER_VOXEL_BOT.md`; это не даёт боту права менять движок.
-2. Выполнить `git status --short`. Рабочее дерево содержит пользовательские и предыдущие незакоммиченные изменения — не применять reset/checkout и не удалять несвязанные файлы.
+2. Выполнить `git status --short` и `git fetch`. Grok / Voxel bro параллельно кидают PR с пропами в `main` — не считать локальный снимок актуальным remote. Перед пушем rebase на `origin/main`; не reset/checkout и не затирать `voxels/models` из этих PR. Мержить их PR только после явного «всё ок».
 3. Проверить browser overrides перед правкой content JSON.
 4. Найти существующий owner, общий контракт, всех потребителей и тесты до добавления нового поля, helper или файла. Для нового модуля объяснить, какую ответственность он забирает у существующего кода и почему это не вторая система.
 5. Реализовать минимальный вертикальный slice через schema/types → validation → editor → preview → runtime → serialization → tests.
