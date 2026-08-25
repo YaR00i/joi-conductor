@@ -457,6 +457,255 @@
         "................",
         "................"
       ]
+    },
+    {
+      "id": "tunic",
+      "nameRu": "Туника",
+      "size": 16,
+      "palette": {
+        ".": "",
+        "S": "#efe4d4",
+        "F": "#e8c8a0",
+        "M": "#c87850",
+        "P": "#8b3048",
+        "K": "#1c100c"
+      },
+      "rows": [
+        "................",
+        "....SS....SS....",
+        "...SFF....FFS...",
+        "...SFFFFFFFFS...",
+        "...SFFSSSSFFS...",
+        "...SFFFFFFFFS...",
+        "....SPPPPPPS....",
+        "....SFFFFFFS....",
+        "....SFFFFFFS....",
+        ".....SMMMMS.....",
+        "......KKKK......",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................"
+      ]
+    },
+    {
+      "id": "bell",
+      "nameRu": "Колокольчик",
+      "size": 16,
+      "palette": {
+        ".": "",
+        "K": "#1c100c",
+        "M": "#c87850",
+        "R": "#c45c26",
+        "L": "#ffb040",
+        "Y": "#f4e8a0"
+      },
+      "rows": [
+        "................",
+        ".......KK.......",
+        "......MLLM......",
+        ".....MLMMLM.....",
+        "....MLYYYMLM....",
+        "....MLMMMRRM....",
+        "...MLMMMMRRRM...",
+        "...MRKKKKKKRM...",
+        "....MK....KM....",
+        "......K..K......",
+        ".......MM.......",
+        ".......KK.......",
+        "................",
+        "................",
+        "................",
+        "................"
+      ]
+    },
+    {
+      "id": "lapis",
+      "nameRu": "Кор ляпис",
+      "size": 16,
+      "palette": {
+        ".": "",
+        "Y": "#f4e8a0",
+        "L": "#ffb040",
+        "G": "#d4b44a",
+        "R": "#c45c26",
+        "K": "#1c100c"
+      },
+      "rows": [
+        "................",
+        ".......Y........",
+        "......YLY.......",
+        ".....YLGLY......",
+        "....YLGGGLY.....",
+        "....YLGGGGY.....",
+        "...YLGRGGGLY....",
+        "...YLGGGGGGY....",
+        "....YLGGGGY.....",
+        ".....YLGRY......",
+        "......YKK.......",
+        ".......K........",
+        "................",
+        "................",
+        "................",
+        "................"
+      ]
+    },
+    {
+      "id": "lily",
+      "nameRu": "Лилия",
+      "size": 16,
+      "palette": {
+        ".": "",
+        "S": "#efe4d4",
+        "I": "#c8dce8",
+        "Y": "#f4e8a0",
+        "G": "#d4b44a",
+        "C": "#6a4030",
+        "B": "#4a2c1c"
+      },
+      "rows": [
+        "................",
+        "......SYS.......",
+        ".....SIIIS......",
+        "....SIYYYIS.....",
+        "...SIYIGIYIS....",
+        "....SIYYYIS.....",
+        ".....SIIIS......",
+        "......SCS.......",
+        ".......C........",
+        ".......B........",
+        "......BB........",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................"
+      ]
+    },
+    {
+      "id": "paper",
+      "nameRu": "Бумага",
+      "size": 16,
+      "palette": {
+        ".": "",
+        "Y": "#f4e8a0",
+        "G": "#d4b44a",
+        "P": "#8b3048",
+        "K": "#1c100c"
+      },
+      "rows": [
+        "................",
+        ".....YYYYYYY....",
+        "....YGGGGGGY....",
+        "....YGPPPPGY....",
+        "....YGPKKPGY....",
+        "....YGPPPPGY....",
+        "....YGGGGGGY....",
+        "....YYYYYYYY....",
+        "...YYYYYYYYY....",
+        "..YYYYYYYYYY....",
+        "..KKKKKKKKKK....",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................"
+      ]
+    },
+    {
+      "id": "incense",
+      "nameRu": "Благовония",
+      "size": 16,
+      "palette": {
+        ".": "",
+        "C": "#6a4030",
+        "B": "#4a2c1c",
+        "G": "#d4b44a",
+        "P": "#8b3048",
+        "K": "#1c100c"
+      },
+      "rows": [
+        "................",
+        "....C.C.C.C.....",
+        "....B.B.B.B.....",
+        "....B.B.B.B.....",
+        "....B.B.B.B.....",
+        "...GPPPPPPG.....",
+        "....B.B.B.B.....",
+        "....B.B.B.B.....",
+        "....B.B.B.B.....",
+        "....K.K.K.K.....",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................"
+      ]
+    },
+    {
+      "id": "tofu",
+      "nameRu": "Тофу",
+      "size": 16,
+      "palette": {
+        ".": "",
+        "S": "#efe4d4",
+        "Y": "#f4e8a0",
+        "K": "#1c100c",
+        "B": "#4a2c1c",
+        "F": "#e8c8a0"
+      },
+      "rows": [
+        "................",
+        "................",
+        ".....SS.SYS.....",
+        ".....SS.SSS.....",
+        "....SSSSSSSS....",
+        "...KBBBBBBBBK...",
+        "...BFFFFFFFFB...",
+        "....BFFFFFFB....",
+        ".....BBBBBB.....",
+        "......KKKK......",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................"
+      ]
+    },
+    {
+      "id": "silk_flower",
+      "nameRu": "Шёлковый цветок",
+      "size": 16,
+      "palette": {
+        ".": "",
+        "I": "#e8a8b8",
+        "N": "#c86880",
+        "P": "#8b3048",
+        "Y": "#f4e8a0",
+        "C": "#6a4030",
+        "B": "#4a2c1c"
+      },
+      "rows": [
+        "................",
+        ".....I.I.I......",
+        "....INININI.....",
+        "...INPNYNPNI....",
+        "....INYYYNI.....",
+        "...INPNYNPNI....",
+        "....INININI.....",
+        ".....I.P.I......",
+        ".......C........",
+        ".......B........",
+        "......BB........",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................"
+      ]
     }
   ],
   "items": [
@@ -525,7 +774,7 @@
       "stackMax": 99,
       "useIn": "explore",
       "tags": ["forage", "liyue"],
-      "iconId": "herb",
+      "iconId": "silk_flower",
       "sellPrice": 2
     },
     {
@@ -673,6 +922,114 @@
       "tags": ["key"],
       "iconId": "key",
       "unsellable": true
+    },
+    {
+      "id": "bamboo_jian",
+      "name": "Bamboo jian",
+      "nameRu": "Бамбуковый меч",
+      "kind": "weapon_jrpg",
+      "slot": "weapon",
+      "rarity": "common",
+      "stackMax": 1,
+      "useIn": "explore",
+      "atk": 6,
+      "tags": ["sword", "jrpg"],
+      "iconId": "sword",
+      "sellPrice": 7
+    },
+    {
+      "id": "traveler_tunic",
+      "name": "Traveler tunic",
+      "nameRu": "Туника путника",
+      "kind": "armor",
+      "slot": "body",
+      "rarity": "common",
+      "stackMax": 1,
+      "useIn": "explore",
+      "def": 3,
+      "tags": ["armor"],
+      "iconId": "tunic",
+      "sellPrice": 5
+    },
+    {
+      "id": "copper_bell",
+      "name": "Copper bell",
+      "nameRu": "Медный колокольчик",
+      "kind": "accessory",
+      "slot": "accessory",
+      "rarity": "common",
+      "stackMax": 1,
+      "useIn": "explore",
+      "atk": 1,
+      "tags": ["charm"],
+      "iconId": "bell",
+      "sellPrice": 3
+    },
+    {
+      "id": "cor_lapis",
+      "name": "Cor lapis",
+      "nameRu": "Кор ляпис",
+      "kind": "material",
+      "slot": "none",
+      "rarity": "uncommon",
+      "stackMax": 99,
+      "useIn": "explore",
+      "tags": ["ore", "liyue"],
+      "iconId": "lapis",
+      "sellPrice": 3
+    },
+    {
+      "id": "glaze_lily",
+      "name": "Glaze lily",
+      "nameRu": "Глазурная лилия",
+      "kind": "material",
+      "slot": "none",
+      "rarity": "rare",
+      "stackMax": 99,
+      "useIn": "explore",
+      "tags": ["forage", "liyue"],
+      "iconId": "lily",
+      "sellPrice": 4
+    },
+    {
+      "id": "spirit_paper",
+      "name": "Spirit paper",
+      "nameRu": "Погребальная бумага",
+      "kind": "material",
+      "slot": "none",
+      "rarity": "common",
+      "stackMax": 99,
+      "useIn": "explore",
+      "tags": ["craft", "hu_tao"],
+      "iconId": "paper",
+      "sellPrice": 1
+    },
+    {
+      "id": "incense_bundle",
+      "name": "Incense bundle",
+      "nameRu": "Связка благовоний",
+      "kind": "material",
+      "slot": "none",
+      "rarity": "common",
+      "stackMax": 99,
+      "useIn": "explore",
+      "tags": ["craft", "hu_tao"],
+      "iconId": "incense",
+      "sellPrice": 2
+    },
+    {
+      "id": "almond_tofu",
+      "name": "Almond tofu",
+      "nameRu": "Миндальный тофу",
+      "kind": "consumable",
+      "slot": "none",
+      "rarity": "common",
+      "stackMax": 10,
+      "useIn": "explore",
+      "hpRestore": 10,
+      "tags": ["food"],
+      "iconId": "tofu",
+      "sellPrice": 2
     }
   ]
 }
