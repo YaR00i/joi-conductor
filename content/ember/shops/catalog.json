@@ -27,6 +27,18 @@
           "buyPrice": 12,
           "sellPrice": 6,
           "stock": 2
+        },
+        {
+          "itemId": "almond_tofu",
+          "buyPrice": 5,
+          "sellPrice": 2,
+          "stock": 6
+        },
+        {
+          "itemId": "traveler_tunic",
+          "buyPrice": 10,
+          "sellPrice": 5,
+          "stock": 2
         }
       ]
     },
@@ -63,6 +75,42 @@
           "buyPrice": 5,
           "sellPrice": 2,
           "stock": 4
+        },
+        {
+          "itemId": "bamboo_jian",
+          "buyPrice": 14,
+          "sellPrice": 7,
+          "stock": 2
+        },
+        {
+          "itemId": "copper_bell",
+          "buyPrice": 6,
+          "sellPrice": 3,
+          "stock": 3
+        },
+        {
+          "itemId": "cor_lapis",
+          "buyPrice": 8,
+          "sellPrice": 3,
+          "stock": 6
+        },
+        {
+          "itemId": "glaze_lily",
+          "buyPrice": 10,
+          "sellPrice": 4,
+          "stock": 3
+        },
+        {
+          "itemId": "spirit_paper",
+          "buyPrice": 4,
+          "sellPrice": 1,
+          "stock": 12
+        },
+        {
+          "itemId": "incense_bundle",
+          "buyPrice": 4,
+          "sellPrice": 2,
+          "stock": 8
         }
       ]
     }
