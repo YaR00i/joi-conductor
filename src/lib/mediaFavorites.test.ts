@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  favoriteLookupPlan,
   favoriteMatchesKindFilter,
   favoriteMatchesTagFilter,
   favoriteMediaKind,
+  favoriteRecordToListItem,
   filterFavoriteMetadata,
+  findMatchingFavorite,
   type FavoriteMetadata,
+  type FavoriteRecord,
 } from "./mediaFavorites";
+import { splitMediaTags, type MediaItem } from "./media";
 
 function meta(
   partial: Partial<FavoriteMetadata> & Pick<FavoriteMetadata, "id">,
@@ -103,5 +108,84 @@ describe("favoriteMatchesTagFilter", () => {
     expect(
       favoriteMatchesTagFilter("hu_tao oral", ["hu_tao", "furina"], ""),
     ).toBe(false);
+  });
+});
+
+function rec(
+  partial: Partial<FavoriteRecord> & Pick<FavoriteRecord, "id">,
+): FavoriteRecord {
+  return {
+    kind: "image",
+    mime: "image/jpeg",
+    fileName: `${partial.id}.jpg`,
+    blob: new Blob(["x"]),
+    savedAt: 1,
+    ...partial,
+  };
+}
+
+function item(
+  partial: Partial<MediaItem> & Pick<MediaItem, "id" | "url">,
+): MediaItem {
+  return {
+    kind: "image",
+    source: "gelbooru",
+    ...partial,
+  };
+}
+
+describe("favoriteLookupPlan", () => {
+  it("tries the gb- id when the feed card only has a gelbooruId", () => {
+    const plan = favoriteLookupPlan({
+      id: "tmp-9",
+      url: "https://img.example/a.jpg?x=1",
+      gelbooruId: "42",
+    });
+    expect(plan.ids).toEqual(["tmp-9", "gb-42"]);
+    expect(plan.gelbooruId).toBe("42");
+    expect(plan.remoteUrls).toContain("https://img.example/a.jpg?x=1");
+    expect(plan.remoteUrls).toContain("https://img.example/a.jpg");
+  });
+});
+
+describe("findMatchingFavorite", () => {
+  it("matches a site card to a saved post by gelbooru id", () => {
+    const saved = rec({ id: "gb-42", gelbooruId: "42" });
+    const feed = item({
+      id: "gb-42",
+      url: "https://cdn.example/file.jpg",
+      gelbooruId: "42",
+    });
+    expect(findMatchingFavorite(feed, [saved])?.id).toBe("gb-42");
+  });
+});
+
+describe("favoriteRecordToListItem", () => {
+  it("drops blob URLs so lists keep a remote Gelbooru file", () => {
+    expect(
+      favoriteRecordToListItem(
+        rec({ id: "gb-1", gelbooruId: "1", remoteUrl: "blob:http://local/x" }),
+      ),
+    ).toBeNull();
+    expect(
+      favoriteRecordToListItem(
+        rec({
+          id: "gb-1",
+          gelbooruId: "1",
+          remoteUrl: "https://cdn.example/file.jpg",
+        }),
+      ),
+    ).toMatchObject({
+      id: "gb-1",
+      source: "gelbooru",
+      url: "https://cdn.example/file.jpg",
+    });
+  });
+});
+
+describe("splitMediaTags", () => {
+  it("splits space-separated booru tags", () => {
+    expect(splitMediaTags("  1girl  hu_tao ")).toEqual(["1girl", "hu_tao"]);
+    expect(splitMediaTags("")).toEqual([]);
   });
 });

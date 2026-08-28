@@ -14,7 +14,8 @@ export type ContentMediaTypeId =
   | "gifs"
   | "video"
   | "photo_gifs"
-  | "all";
+  | "all"
+  | "list";
 
 export type CharacterCatalogEntry = {
   id: ContentCharacterId;
@@ -129,7 +130,25 @@ export const MEDIA_TYPE_CATALOG: MediaTypeCatalogEntry[] = [
     weight: 1.15,
     hint: "без фильтра",
   },
+  {
+    id: "list",
+    labelRu: "Список",
+    queryTags: "",
+    kinds: [],
+    weight: 1.05,
+    hint: "готовая очередь",
+  },
 ];
+
+export function isContentMediaTypeId(
+  value: string,
+): value is ContentMediaTypeId {
+  return MEDIA_TYPE_CATALOG.some((row) => row.id === value);
+}
+
+export function isListMediaType(value: string): boolean {
+  return value === "list";
+}
 
 /** Tags that belong to character / person identity — not fetish content. */
 export const PERSON_CONTENT_TAGS = new Set([

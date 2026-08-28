@@ -218,6 +218,9 @@ function configureSessionPermissions() {
     permission === "media" ||
     permission === "audioCapture" ||
     permission === "mediaKeySystem" ||
+    // Native <video> controls call requestFullscreen(); denying this makes
+    // the player's fullscreen button a silent no-op.
+    permission === "fullscreen" ||
     // Ember's relative mouse-look depends on Pointer Lock. Denying it forces
     // the OS cursor-warp fallback, whose synthetic moves are less regular.
     permission === "pointerLock";

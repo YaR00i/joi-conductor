@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { FavoriteTasteProfile } from "./favoriteTagTaste";
 import {
   buildTastePassportView,
+  favoritesShelfLoadedRu,
   favoritesTasteLoopCtas,
   formatLikesCountRu,
   likesWordRu,
@@ -127,5 +128,12 @@ describe("tasteChipRu", () => {
   it("null when empty, chip when likes exist", () => {
     expect(tasteChipRu(0)).toBeNull();
     expect(tasteChipRu(9)).toBe("вкус: 9 лайков");
+  });
+});
+
+describe("favoritesShelfLoadedRu", () => {
+  it("formats the masonry window against the shelf", () => {
+    expect(favoritesShelfLoadedRu(36, 873)).toBe("36 / 873 загружено");
+    expect(favoritesShelfLoadedRu(-1, 0)).toBe("0 / 0 загружено");
   });
 });

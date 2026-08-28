@@ -1,4 +1,10 @@
+import {
+  favoriteWallThumbConcurrency,
+  mapWithConcurrency,
+  stillBlobToWallThumb,
+} from "./favoriteWallThumb";
 import { displayMediaUrl, type MediaItem, type MediaKind } from "./media";
+import type { HubKindFilter } from "./mediaTypeFilter";
 import { isJunkBooruTag } from "./shopTagNoise";
 
 const DB_NAME = "joi-conductor-favorites";
@@ -18,6 +24,8 @@ export interface FavoriteRecord {
   /** Stable Gelbooru post id */
   gelbooruId?: string;
   blob: Blob;
+  /** Sample-sized still for the masonry wall. Lightbox uses `blob`. */
+  thumbBlob?: Blob;
   savedAt: number;
 }
 
@@ -308,6 +316,88 @@ export async function getFavoriteRecord(
   return row ?? null;
 }
 
+/** Keys to try in IndexedDB so a Gelbooru card can reuse a saved file. */
+export function favoriteLookupPlan(item: {
+  id: string;
+  url?: string;
+  previewUrl?: string;
+  gelbooruId?: string;
+}): { ids: string[]; gelbooruId: string | null; remoteUrls: string[] } {
+  const gid = resolveGelbooruId(item);
+  const ids = [item.id];
+  if (gid) {
+    const gb = `gb-${gid}`;
+    if (gb !== item.id) ids.push(gb);
+  }
+  const remoteUrls: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of [item.url, item.previewUrl]) {
+    if (!raw?.trim()) continue;
+    for (const key of [raw, normalizeRemoteUrl(raw)]) {
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      remoteUrls.push(key);
+    }
+  }
+  return { ids, gelbooruId: gid, remoteUrls };
+}
+
+/**
+ * One-record IndexedDB lookup. Does not load the whole shelf.
+ * Used when a site card is already saved — play the local blob instead of CDN.
+ */
+export async function getMatchingFavoriteRecord(
+  item: Pick<MediaItem, "id" | "url" | "previewUrl" | "gelbooruId">,
+): Promise<FavoriteRecord | null> {
+  const plan = favoriteLookupPlan(item);
+  const db = await openDb();
+  const tx = db.transaction(STORE, "readonly");
+  const store = tx.objectStore(STORE);
+  for (const id of plan.ids) {
+    const row = await idbReq(
+      store.get(id) as IDBRequest<FavoriteRecord | undefined>,
+    );
+    if (row) return row;
+  }
+  if (plan.gelbooruId && store.indexNames.contains("gelbooruId")) {
+    const row = await idbReq(
+      store
+        .index("gelbooruId")
+        .get(plan.gelbooruId) as IDBRequest<FavoriteRecord | undefined>,
+    );
+    if (row) return row;
+  }
+  if (store.indexNames.contains("remoteUrl")) {
+    const index = store.index("remoteUrl");
+    for (const key of plan.remoteUrls) {
+      const row = await idbReq(
+        index.get(key) as IDBRequest<FavoriteRecord | undefined>,
+      );
+      if (row) return row;
+    }
+  }
+  return null;
+}
+
+export async function revealFavoriteOnDisk(
+  item: Pick<MediaItem, "id" | "url" | "previewUrl" | "gelbooruId">,
+): Promise<{ ok: boolean; detail?: string }> {
+  const row = await getMatchingFavoriteRecord(item);
+  if (!row) return { ok: false, detail: "нет файла на полке" };
+  const bytes = new Uint8Array(await row.blob.arrayBuffer());
+  const desktop = window.joiDesktop?.shell?.showTempFile;
+  if (desktop) {
+    return desktop({ fileName: row.fileName, bytes });
+  }
+  const url = URL.createObjectURL(row.blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = row.fileName;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 4_000);
+  return { ok: true };
+}
+
 export async function getFavoritesIndex(): Promise<FavoritesIndex> {
   const rows = await listFavoriteRecords();
   return buildFavoritesIndex(rows);
@@ -351,9 +441,12 @@ export async function loadFavoritesAsMedia(opts?: {
 
 export function favoriteRecordToMedia(r: FavoriteRecord): MediaItem {
   const gid = r.gelbooruId?.trim() || gelbooruIdFromMediaId(r.id) || undefined;
+  const url = URL.createObjectURL(r.blob);
+  const previewUrl = r.thumbBlob ? URL.createObjectURL(r.thumbBlob) : undefined;
   return {
     id: r.id,
-    url: URL.createObjectURL(r.blob),
+    url,
+    previewUrl,
     kind: r.kind,
     source: "favorites" as const,
     tags: r.tags,
@@ -361,11 +454,30 @@ export function favoriteRecordToMedia(r: FavoriteRecord): MediaItem {
   };
 }
 
+/** Remote Gelbooru shape for lists — blob URLs cannot be stored in a playlist. */
+export function favoriteRecordToListItem(r: FavoriteRecord): MediaItem | null {
+  const remote = r.remoteUrl?.trim();
+  if (!remote || remote.startsWith("blob:") || remote.startsWith("data:")) {
+    return null;
+  }
+  const gid = r.gelbooruId?.trim() || gelbooruIdFromMediaId(r.id) || undefined;
+  return {
+    id: gid ? `gb-${gid}` : r.id,
+    url: remote,
+    kind: r.kind,
+    source: "gelbooru",
+    tags: r.tags,
+    gelbooruId: gid,
+  };
+}
+
 export function revokeFavoriteMedia(items: MediaItem[]): void {
   for (const item of items) {
-    if (item.source === "favorites" && item.url.startsWith("blob:")) {
-      URL.revokeObjectURL(item.url);
-    }
+    if (item.source !== "favorites") continue;
+    const urls = new Set<string>();
+    if (item.url.startsWith("blob:")) urls.add(item.url);
+    if (item.previewUrl?.startsWith("blob:")) urls.add(item.previewUrl);
+    for (const url of urls) URL.revokeObjectURL(url);
   }
 }
 
@@ -426,7 +538,7 @@ export function favoriteMatchesTagFilter(
   });
 }
 
-export type FavoriteKindFilter = "all" | "image" | "gif" | "video";
+export type FavoriteKindFilter = HubKindFilter;
 
 /** Resolve kind from v5 metadata, falling back to mime for older rows. */
 export function favoriteMediaKind(
@@ -484,8 +596,20 @@ export async function listFavoriteRecordsByIds(
   return rows.filter((row): row is FavoriteRecord => Boolean(row));
 }
 
+async function fetchFavoriteBlob(item: MediaItem): Promise<Blob> {
+  const fetchUrl = displayMediaUrl(item);
+  const res = await fetch(fetchUrl);
+  if (!res.ok) {
+    throw new Error(`Не удалось скачать медиа (${res.status})`);
+  }
+  return res.blob();
+}
+
 /** Download current booru (or any remote) item and store locally. */
-export async function addFavoriteFromItem(item: MediaItem): Promise<void> {
+export async function addFavoriteFromItem(
+  item: MediaItem,
+  cachedBlob?: Blob | null,
+): Promise<void> {
   if (item.source === "favorites") return;
 
   const existing = findMatchingFavorite(item, await listFavoriteRecords());
@@ -496,38 +620,34 @@ export async function addFavoriteFromItem(item: MediaItem): Promise<void> {
       item.tags && contentBooruTags(item.tags).length > contentBooruTags(existing.tags).length
         ? item.tags
         : existing.tags;
-    if (
-      (gid && gid !== existing.gelbooruId) ||
-      (tags && tags !== existing.tags)
-    ) {
-      const db = await openDb();
-      const tx = db.transaction([STORE, METADATA_STORE], "readwrite");
-      const next: FavoriteRecord = {
-        ...existing,
-        gelbooruId: gid,
-        tags: tags ?? existing.tags,
-        remoteUrl: existing.remoteUrl || item.url,
-      };
-      const done = txComplete(tx);
-      await Promise.all([
-        idbReq(tx.objectStore(STORE).put(next)),
-        idbReq(tx.objectStore(METADATA_STORE).put(toFavoriteMetadata(next))),
-      ]);
-      await done;
+    let thumbBlob = existing.thumbBlob;
+    if (!thumbBlob && existing.kind === "image") {
+      thumbBlob = await resolveFavoriteThumbBlob(item, existing.blob);
+    }
+    const next: FavoriteRecord = {
+      ...existing,
+      gelbooruId: gid,
+      tags: tags ?? existing.tags,
+      remoteUrl: existing.remoteUrl || item.url,
+      thumbBlob,
+    };
+    const metaChanged =
+      (gid && gid !== existing.gelbooruId) || (tags && tags !== existing.tags);
+    const thumbChanged = Boolean(thumbBlob && thumbBlob !== existing.thumbBlob);
+    if (metaChanged || thumbChanged) {
+      await putFavoriteRecord(next);
     }
     return;
   }
 
-  const fetchUrl = displayMediaUrl(item);
-  const res = await fetch(fetchUrl);
-  if (!res.ok) {
-    throw new Error(`Не удалось скачать медиа (${res.status})`);
-  }
-  const blob = await res.blob();
+  const blob = cachedBlob && cachedBlob.size > 0
+    ? cachedBlob
+    : await fetchFavoriteBlob(item);
   const mime = blob.type || guessMime(item);
   const ext = extFromMime(mime, item.kind);
   const gid = resolveGelbooruId(item) ?? undefined;
   const stableId = gid ? `gb-${gid}` : item.id;
+  const thumbBlob = await resolveFavoriteThumbBlob(item, blob);
   const record: FavoriteRecord = {
     id: stableId,
     kind: item.kind,
@@ -537,6 +657,7 @@ export async function addFavoriteFromItem(item: MediaItem): Promise<void> {
     remoteUrl: item.url,
     gelbooruId: gid,
     blob,
+    thumbBlob,
     savedAt: Date.now(),
   };
 
@@ -573,6 +694,31 @@ export async function putFavoriteRecord(record: FavoriteRecord): Promise<void> {
   await done;
 }
 
+/**
+ * Encode a wall thumb for stills that were saved before thumbs existed.
+ * GIFs/videos stay on the original blob. Persists so the next visit skips work.
+ */
+export async function ensureFavoriteWallThumb(
+  record: FavoriteRecord,
+): Promise<FavoriteRecord> {
+  if (record.kind !== "image" || record.thumbBlob) return record;
+  const thumb = await stillBlobToWallThumb(record.blob);
+  if (!thumb) return record;
+  const next: FavoriteRecord = { ...record, thumbBlob: thumb };
+  await putFavoriteRecord(next);
+  return next;
+}
+
+export async function ensureFavoriteWallThumbs(
+  records: FavoriteRecord[],
+): Promise<FavoriteRecord[]> {
+  return mapWithConcurrency(
+    records,
+    favoriteWallThumbConcurrency(),
+    (record) => ensureFavoriteWallThumb(record),
+  );
+}
+
 /** Wipe all favorites (progress backup replace). */
 export async function clearAllFavorites(): Promise<void> {
   const db = await openDb();
@@ -591,6 +737,32 @@ export async function removeFavoriteForItem(item: MediaItem): Promise<boolean> {
   if (!match) return false;
   await removeFavorite(match.id);
   return true;
+}
+
+async function resolveFavoriteThumbBlob(
+  item: MediaItem,
+  original: Blob,
+): Promise<Blob | undefined> {
+  if (item.kind !== "image") return undefined;
+  const sampleUrl = item.sampleUrl?.trim();
+  if (sampleUrl && sampleUrl !== item.url) {
+    try {
+      const res = await fetch(displayMediaUrl({ ...item, url: sampleUrl }));
+      if (res.ok) {
+        const sample = await res.blob();
+        if (
+          sample.size > 0 &&
+          sample.type.startsWith("image/") &&
+          sample.type !== "image/gif"
+        ) {
+          return (await stillBlobToWallThumb(sample)) ?? sample;
+        }
+      }
+    } catch {
+      /* downsample the original instead */
+    }
+  }
+  return (await stillBlobToWallThumb(original)) ?? undefined;
 }
 
 function txComplete(tx: IDBTransaction): Promise<void> {

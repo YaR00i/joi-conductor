@@ -5,6 +5,16 @@ import {
 } from "./contentCatalog";
 import type { MediaKind } from "./media";
 
+/** Hub / shelf pills: Все · Картинки · Гифки · Видео */
+export type HubKindFilter = "all" | "image" | "gif" | "video";
+
+const HUB_KIND_TO_MEDIA_TYPE = {
+  all: "all",
+  image: "photo",
+  gif: "gifs",
+  video: "video",
+} as const satisfies Record<HubKindFilter, ContentMediaTypeId>;
+
 export const MEDIA_TYPE_FILTER_IDS: ContentMediaTypeId[] = [
   "photo",
   "gifs",
@@ -46,4 +56,12 @@ export function applyMediaTypeQuery(tags: string, typeId: string): string {
       return !MEDIA_META_TAGS.has(raw);
     });
   return [...kept, ...extra].join(" ").replace(/\s+/g, " ").trim();
+}
+
+export function applyHubKindQuery(tags: string, kind: HubKindFilter): string {
+  return applyMediaTypeQuery(tags, HUB_KIND_TO_MEDIA_TYPE[kind]);
+}
+
+export function kindsForHubKind(kind: HubKindFilter): MediaKind[] {
+  return kindsForMediaType(HUB_KIND_TO_MEDIA_TYPE[kind]);
 }

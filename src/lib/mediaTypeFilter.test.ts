@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { filterMediaByKinds, inferMediaKind, type MediaItem } from "./media";
 import {
+  applyHubKindQuery,
   applyMediaTypeQuery,
   isMediaTypeFilterId,
+  kindsForHubKind,
   kindsForMediaType,
 } from "./mediaTypeFilter";
 
@@ -23,6 +25,7 @@ describe("isMediaTypeFilterId", () => {
     expect(isMediaTypeFilterId("video")).toBe(true);
     expect(isMediaTypeFilterId("photo_gifs")).toBe(true);
     expect(isMediaTypeFilterId("all")).toBe(true);
+    expect(isMediaTypeFilterId("list")).toBe(false);
     expect(isMediaTypeFilterId("image")).toBe(false);
   });
 });
@@ -48,6 +51,37 @@ describe("applyMediaTypeQuery", () => {
     expect(applyMediaTypeQuery("rating:explicit 1girl", "all")).toBe(
       "rating:explicit 1girl",
     );
+  });
+
+  it("does not add booru meta for a saved list", () => {
+    expect(applyMediaTypeQuery("rating:explicit 1girl", "list")).toBe(
+      "rating:explicit 1girl",
+    );
+    expect(kindsForMediaType("list")).toEqual([]);
+  });
+});
+
+describe("applyHubKindQuery", () => {
+  it("maps shelf pills onto Gelbooru media-type tokens", () => {
+    expect(applyHubKindQuery("hu_tao rating:explicit", "all")).toBe(
+      "hu_tao rating:explicit",
+    );
+    expect(applyHubKindQuery("hu_tao rating:explicit", "image")).toBe(
+      "hu_tao rating:explicit -animated -video",
+    );
+    expect(applyHubKindQuery("hu_tao rating:explicit", "gif")).toBe(
+      "hu_tao rating:explicit animated -video",
+    );
+    expect(applyHubKindQuery("hu_tao rating:explicit", "video")).toBe(
+      "hu_tao rating:explicit video",
+    );
+  });
+
+  it("maps pills onto client kind allow-lists", () => {
+    expect(kindsForHubKind("all")).toEqual([]);
+    expect(kindsForHubKind("image")).toEqual(["image"]);
+    expect(kindsForHubKind("gif")).toEqual(["gif"]);
+    expect(kindsForHubKind("video")).toEqual(["video"]);
   });
 });
 

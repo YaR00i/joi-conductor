@@ -12,6 +12,8 @@ type Props = {
   onNavigate?: (id: NavId) => void;
   /** Compact strip for daily brief / hub — fewer chrome. */
   compact?: boolean;
+  /** Masonry window vs shelf size, top-right on the card. */
+  shelfLoadedLabel?: string;
 };
 
 function ctaToNav(id: TasteLoopCta["id"]): NavId {
@@ -36,6 +38,7 @@ export function TastePassportPanel({
   ctas = [],
   onNavigate,
   compact = false,
+  shelfLoadedLabel,
 }: Props) {
   return (
     <section
@@ -55,6 +58,9 @@ export function TastePassportPanel({
             )}
           </p>
         </div>
+        {shelfLoadedLabel ? (
+          <p className="taste-passport__shelf">{shelfLoadedLabel}</p>
+        ) : null}
       </header>
 
       <p className="taste-passport__explain">{view.explanationRu}</p>

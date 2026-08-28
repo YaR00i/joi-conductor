@@ -36,6 +36,7 @@ type BooruTagInputProps = {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  ariaLabel?: string;
   /** Prefer Gelbooru network suggest (default true). */
   useGelbooru?: boolean;
   /** Shop unlocks — used to show ✓ / ✗ for gated tags. */
@@ -132,6 +133,7 @@ export function BooruTagInput({
   placeholder,
   disabled = false,
   className = "",
+  ariaLabel,
   useGelbooru = true,
   unlocks = EMPTY_UI_UNLOCKS,
 }: BooruTagInputProps) {
@@ -342,6 +344,7 @@ export function BooruTagInput({
         value={value}
         disabled={disabled}
         placeholder={placeholder}
+        aria-label={ariaLabel}
         autoComplete="off"
         spellCheck={false}
         role="combobox"

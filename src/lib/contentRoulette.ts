@@ -3,6 +3,7 @@ import {
   MEDIA_META_TAGS,
   MEDIA_TYPE_CATALOG,
   PERSON_CONTENT_TAGS,
+  isContentMediaTypeId,
   type ContentMediaTypeId,
 } from "./contentCatalog";
 import { resolveFetishTagPick } from "./fetishTiers";
@@ -223,11 +224,7 @@ export function composeContentQuery(
 
   const mediaTypeIdRaw = picks.media_type?.payload?.mediaTypeId;
   const mediaTypeId: ContentMediaTypeId =
-    mediaTypeIdRaw === "photo" ||
-    mediaTypeIdRaw === "gifs" ||
-    mediaTypeIdRaw === "video" ||
-    mediaTypeIdRaw === "photo_gifs" ||
-    mediaTypeIdRaw === "all"
+    typeof mediaTypeIdRaw === "string" && isContentMediaTypeId(mediaTypeIdRaw)
       ? mediaTypeIdRaw
       : "all";
 

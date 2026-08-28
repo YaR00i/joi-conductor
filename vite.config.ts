@@ -1,3 +1,4 @@
+import type { IncomingMessage } from "node:http";
 import {
   cpSync,
   existsSync,
@@ -99,69 +100,176 @@ function emberContentPlugin(): Plugin {
   };
 }
 
-/** Proxy remote booru CDN files so <img>/<video> aren't blocked by hotlink/CORS. */
+function mediaProxyReferer(hostname: string): string {
+  if (hostname === "nhentai.net" || hostname.endsWith(".nhentai.net")) {
+    return "https://nhentai.net/";
+  }
+  return "https://gelbooru.com/";
+}
+
+function mediaProxyMiddleware(): Connect.NextHandleFunction {
+  return async (req, res, next) => {
+    if (!req.url?.startsWith("/api/media-proxy")) {
+      next();
+      return;
+    }
+
+    try {
+      const incoming = new URL(req.url, "http://127.0.0.1");
+      const target = incoming.searchParams.get("url");
+      if (!target) {
+        res.statusCode = 400;
+        res.end("missing url");
+        return;
+      }
+
+      let parsed: URL;
+      try {
+        parsed = new URL(target);
+      } catch {
+        res.statusCode = 400;
+        res.end("bad url");
+        return;
+      }
+
+      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+        res.statusCode = 400;
+        res.end("protocol");
+        return;
+      }
+
+      const upstream = await fetch(parsed.toString(), {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+          Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+          Referer: mediaProxyReferer(parsed.hostname),
+        },
+        redirect: "follow",
+      });
+
+      if (!upstream.ok || !upstream.body) {
+        res.statusCode = upstream.status || 502;
+        res.end(`upstream ${upstream.status}`);
+        return;
+      }
+
+      const type = upstream.headers.get("content-type") || "application/octet-stream";
+      res.setHeader("Content-Type", type);
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+
+      const buf = Buffer.from(await upstream.arrayBuffer());
+      res.end(buf);
+    } catch (err) {
+      res.statusCode = 502;
+      res.end(err instanceof Error ? err.message : "proxy error");
+    }
+  };
+}
+
+/** Proxy remote booru / nhentai CDN files so <img> isn't blocked by hotlink/CORS. */
 function mediaProxyPlugin(): Plugin {
+  const middleware = mediaProxyMiddleware();
   return {
     name: "joi-media-proxy",
     configureServer(server) {
-      server.middlewares.use(async (req, res, next) => {
-        if (!req.url?.startsWith("/api/media-proxy")) {
-          next();
-          return;
-        }
+      server.middlewares.use(middleware);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(middleware);
+    },
+  };
+}
 
-        try {
-          const incoming = new URL(req.url, "http://127.0.0.1");
-          const target = incoming.searchParams.get("url");
-          if (!target) {
-            res.statusCode = 400;
-            res.end("missing url");
-            return;
-          }
+const NHENTAI_API_UA = "JOI-Conductor/0.1 (local desktop)";
 
-          let parsed: URL;
-          try {
-            parsed = new URL(target);
-          } catch {
-            res.statusCode = 400;
-            res.end("bad url");
-            return;
-          }
+function readRequestBody(req: IncomingMessage): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk) => {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
+}
 
-          if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-            res.statusCode = 400;
-            res.end("protocol");
-            return;
-          }
+function nhentaiApiMiddleware(): Connect.NextHandleFunction {
+  return async (req, res, next) => {
+    if (!req.url?.startsWith("/api/nhentai")) {
+      next();
+      return;
+    }
 
-          const upstream = await fetch(parsed.toString(), {
-            headers: {
-              "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-              Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-              Referer: "https://gelbooru.com/",
-            },
-            redirect: "follow",
-          });
+    if (req.method === "OPTIONS") {
+      res.statusCode = 204;
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+      res.end();
+      return;
+    }
 
-          if (!upstream.ok || !upstream.body) {
-            res.statusCode = upstream.status || 502;
-            res.end(`upstream ${upstream.status}`);
-            return;
-          }
+    const method = (req.method || "GET").toUpperCase();
+    if (method !== "GET" && method !== "POST" && method !== "DELETE") {
+      res.statusCode = 405;
+      res.end("method not allowed");
+      return;
+    }
 
-          const type = upstream.headers.get("content-type") || "application/octet-stream";
-          res.setHeader("Content-Type", type);
-          res.setHeader("Cache-Control", "public, max-age=3600");
-          res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const incoming = new URL(req.url, "http://127.0.0.1");
+      const rest = incoming.pathname.replace(/^\/api\/nhentai/, "") || "/";
+      const target = new URL(`https://nhentai.net/api/v2${rest}`);
+      target.search = incoming.search;
 
-          const buf = Buffer.from(await upstream.arrayBuffer());
-          res.end(buf);
-        } catch (err) {
-          res.statusCode = 502;
-          res.end(err instanceof Error ? err.message : "proxy error");
-        }
+      const headers: Record<string, string> = {
+        "User-Agent": NHENTAI_API_UA,
+        Accept: "application/json",
+      };
+      const auth = req.headers.authorization;
+      if (typeof auth === "string" && auth.trim()) {
+        headers.Authorization = auth;
+      }
+      const contentType = req.headers["content-type"];
+      if (typeof contentType === "string" && contentType.trim()) {
+        headers["Content-Type"] = contentType;
+      }
+
+      const body =
+        method === "GET" ? undefined : await readRequestBody(req);
+
+      const upstream = await fetch(target.toString(), {
+        method,
+        headers,
+        body: body && body.length > 0 ? body : undefined,
+        redirect: "follow",
       });
+      const text = await upstream.text();
+      res.statusCode = upstream.status;
+      res.setHeader(
+        "Content-Type",
+        upstream.headers.get("content-type") || "application/json",
+      );
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.end(text);
+    } catch (err) {
+      res.statusCode = 502;
+      res.end(err instanceof Error ? err.message : "nhentai proxy error");
+    }
+  };
+}
+
+function nhentaiApiPlugin(): Plugin {
+  const middleware = nhentaiApiMiddleware();
+  return {
+    name: "joi-nhentai-api",
+    configureServer(server) {
+      server.middlewares.use(middleware);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(middleware);
     },
   };
 }
@@ -224,6 +332,7 @@ export default defineConfig({
     react(),
     emberContentPlugin(),
     mediaProxyPlugin(),
+    nhentaiApiPlugin(),
     gtranslateProxyPlugin(),
   ],
   assetsInclude: ["**/*.svg"],

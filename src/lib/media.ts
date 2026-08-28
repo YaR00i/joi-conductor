@@ -1,4 +1,14 @@
+import { snapMediaQueueSize } from "./mediaQueue";
+
 export type MediaKind = "image" | "video" | "gif";
+
+export function splitMediaTags(tags?: string | null): string[] {
+  if (!tags) return [];
+  return tags
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
 
 export type MediaSourceKind = "gelbooru" | "local" | "favorites";
 
@@ -12,6 +22,8 @@ export interface MediaItem {
   id: string;
   url: string;
   previewUrl?: string;
+  /** Gelbooru sample (~850px). Wall upgrade target — not the original file. */
+  sampleUrl?: string;
   kind: MediaKind;
   source: MediaSourceKind;
   /** Space-separated booru tags (prefer post tags, not the search query). */
@@ -47,16 +59,18 @@ export interface MediaSettings {
   wd14Threshold: number;
   /**
    * Hub / session media-type filter (same ids as the roulette wheel:
-   * photo, gifs, video, photo_gifs, all).
+   * photo, gifs, video, photo_gifs, all, list).
    */
-  mediaTypeId: "photo" | "gifs" | "video" | "photo_gifs" | "all";
+  mediaTypeId: "photo" | "gifs" | "video" | "photo_gifs" | "all" | "list";
+  /** Saved Gelbooru play-list when mediaTypeId is `list`. */
+  listId: string | null;
 }
 
 export const DEFAULT_MEDIA_SETTINGS: MediaSettings = {
   source: "gelbooru",
   tags: "rating:explicit 1girl",
   slideSec: 12,
-  limit: 40,
+  limit: 80,
   gelbooruUserId: "",
   gelbooruApiKey: "",
   videoVolume: 1,
@@ -65,6 +79,7 @@ export const DEFAULT_MEDIA_SETTINGS: MediaSettings = {
   wd14Url: "http://127.0.0.1:7878",
   wd14Threshold: 0.35,
   mediaTypeId: "all",
+  listId: null,
 };
 
 const SETTINGS_KEY = "joi-conductor-media-settings";
@@ -110,9 +125,17 @@ export function loadMediaSettings(): MediaSettings {
       typeId === "gifs" ||
       typeId === "video" ||
       typeId === "photo_gifs" ||
-      typeId === "all"
+      typeId === "all" ||
+      typeId === "list"
         ? typeId
         : "all";
+    parsed.listId =
+      typeof parsed.listId === "string" && parsed.listId.trim()
+        ? parsed.listId.trim()
+        : null;
+    parsed.limit = snapMediaQueueSize(
+      typeof parsed.limit === "number" ? parsed.limit : DEFAULT_MEDIA_SETTINGS.limit,
+    );
     return parsed;
   } catch {
     return { ...DEFAULT_MEDIA_SETTINGS };
@@ -131,6 +154,7 @@ export function saveMediaPlaylist(items: MediaItem[]): void {
       id: item.id,
       url: item.url,
       previewUrl: item.previewUrl,
+      sampleUrl: item.sampleUrl,
       kind: item.kind,
       source: "gelbooru" as const,
       tags: item.tags,
@@ -460,6 +484,7 @@ export async function fetchGelbooru(
       id: gelbooruId ? `gb-${gelbooruId}` : `gb-url-${simpleHash(url)}`,
       url,
       previewUrl: p.preview_url || p.sample_url || url,
+      sampleUrl: p.sample_url || undefined,
       kind: inferMediaKind(url, p.tags),
       source: "gelbooru",
       // Prefer post tags from API (booru-style); fall back to search query
@@ -648,6 +673,36 @@ export function filterMediaByKinds(
   return items.filter((item) => allow.has(item.kind));
 }
 
+const GELBOORU_PAGE_SIZE = 100;
+
+/** Walk pid pages until we have `limit` unique posts (API cap is 100/request). */
+export async function collectGelbooruPages(
+  tags: string,
+  limit: number,
+  credentials?: { userId: string; apiKey: string },
+  opts?: { startPid?: number },
+): Promise<MediaItem[]> {
+  const want = Math.max(1, Math.floor(limit));
+  const out: MediaItem[] = [];
+  const seen = new Set<string>();
+  const startPid = Math.max(0, opts?.startPid ?? 0);
+  const maxPages = Math.max(1, Math.ceil(want / GELBOORU_PAGE_SIZE) + 1);
+  for (let i = 0; i < maxPages && out.length < want; i += 1) {
+    const batch = await fetchGelbooru(tags, GELBOORU_PAGE_SIZE, credentials, {
+      pid: startPid + i,
+    });
+    if (batch.length === 0) break;
+    for (const item of batch) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      out.push(item);
+      if (out.length >= want) break;
+    }
+    if (batch.length < GELBOORU_PAGE_SIZE) break;
+  }
+  return out;
+}
+
 export type GelbooruFlexibleResult = {
   items: MediaItem[];
   /** Tags that actually returned posts */
@@ -676,10 +731,9 @@ export async function fetchGelbooruFlexible(
           .join(" "),
       );
   const excludes = extractExcludeTags(tags);
-  // Over-fetch a bit so client-side excludes still leave enough slides
-  const fetchLimit = Math.min(
-    100,
-    Math.max(limit, excludes.length > 0 ? Math.ceil(limit * 1.5) : limit),
+  const need = Math.max(
+    limit,
+    excludes.length > 0 ? Math.ceil(limit * 1.5) : limit,
   );
 
   // Random page offset adds variety when sort:random is ignored / identical.
@@ -689,29 +743,20 @@ export async function fetchGelbooruFlexible(
 
   for (const q of attempted) {
     if (!q.trim()) continue;
-    const rawItems = await fetchGelbooru(q, fetchLimit, credentials, {
-      pid: q.includes("sort:random") ? 0 : pid,
+    const startPid = q.includes("sort:random") ? 0 : pid;
+    let rawItems = await collectGelbooruPages(q, need, credentials, {
+      startPid,
     });
     if (rawItems.length === 0) {
       // Rare-tag + high pid can miss — retry page 0 once for this query.
-      if (pid > 0 && !q.includes("sort:random")) {
-        const retry = await fetchGelbooru(q, fetchLimit, credentials, {
-          pid: 0,
+      if (startPid > 0) {
+        rawItems = await collectGelbooruPages(q, need, credentials, {
+          startPid: 0,
         });
-        if (retry.length === 0) continue;
-        const filteredRetry = filterMediaByExcludes(retry, excludes);
-        const itemsRetry = (
-          filteredRetry.length > 0 ? filteredRetry : retry
-        ).slice(0, limit);
-        if (itemsRetry.length > 0) {
-          return {
-            items: shuffleMediaItems(itemsRetry),
-            usedTags: q,
-            attempted,
-          };
-        }
+        if (rawItems.length === 0) continue;
+      } else {
+        continue;
       }
-      continue;
     }
 
     const filtered = filterMediaByExcludes(rawItems, excludes);
@@ -904,6 +949,34 @@ export function displayMediaUrl(item: MediaItem): string {
   }
   if (item.url.startsWith("/")) return item.url;
   return `/api/media-proxy?url=${encodeURIComponent(item.url)}`;
+}
+
+function isRemoteGelbooruStill(item: MediaItem): boolean {
+  if (item.kind === "video") return false;
+  if (item.source === "local" || item.source === "favorites") return false;
+  if (item.url.startsWith("blob:") || item.url.startsWith("data:")) return false;
+  return true;
+}
+
+/** Tiny preview for the first paint of a masonry card. */
+export function masonryPreviewSrc(item: MediaItem): string {
+  return displayMediaUrl({
+    ...item,
+    url: item.previewUrl || item.sampleUrl || item.url,
+  });
+}
+
+/**
+ * Sharper wall source (Gelbooru sample). Null when preview is already best
+ * or when upgrading would pull the original file.
+ */
+export function masonryUpgradeSrc(item: MediaItem): string | null {
+  if (!isRemoteGelbooruStill(item)) return null;
+  const hi = item.sampleUrl?.trim();
+  if (!hi) return null;
+  const lo = (item.previewUrl || hi).trim();
+  if (hi === lo) return null;
+  return displayMediaUrl({ ...item, url: hi });
 }
 
 /** How long to keep a slide on screen / whether video should HTML-loop. */

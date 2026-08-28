@@ -56,6 +56,7 @@ export const BASE_CHARACTER_IDS: ContentCharacterId[] = ["girl"];
 export const BASE_MEDIA_TYPE_IDS: ContentMediaTypeId[] = [
   "photo",
   "photo_gifs",
+  "list",
 ];
 
 export const BASE_MODE_IDS: SessionMode[] = ["stroke"];

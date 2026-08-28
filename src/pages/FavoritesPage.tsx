@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { BookmarkIcon, FavLightbox } from "../components/FavLightbox";
 import { FavMasonryMedia } from "../components/FavMasonryMedia";
 import { FavTagChip } from "../components/FavTagChip";
+import { MediaKindFilter } from "../components/MediaKindFilter";
 import type { NavId } from "../components/SideNav";
 import { TastePassportPanel } from "../components/TastePassportPanel";
 import { TagTypePickerModal } from "../components/TagTypePickerModal";
+import { gelbooruQueryFromFavoriteFilters } from "../lib/contentHub";
 import {
   tagPurchaseStatus,
   type ContentUnlockLists,
@@ -12,6 +15,9 @@ import { buildFavoriteTasteProfile } from "../lib/favoriteTagTaste";
 import type { MediaItem } from "../lib/media";
 import {
   collectFavoriteTagStats,
+  ensureFavoriteWallThumbs,
+  favoriteRecordToListItem,
+  favoriteRecordToMedia,
   filterFavoriteMetadata,
   listFavoriteMetadata,
   listFavoriteRecordsByIds,
@@ -21,6 +27,10 @@ import {
   type FavoriteMetadata,
   type FavoriteRecord,
 } from "../lib/mediaFavorites";
+import {
+  lightboxCanGoNext,
+  lightboxShouldPrefetch,
+} from "../lib/lightboxPrefetch";
 import { setShopFocusTag } from "../lib/shopFocus";
 import {
   getTagType,
@@ -33,16 +43,24 @@ import {
 } from "../lib/tagTypes";
 import {
   buildTastePassportView,
+  favoritesShelfLoadedRu,
   favoritesTasteLoopCtas,
 } from "../lib/tasteLoopDisplay";
 import { playUiClick, playUiConfirm, primeUiAudio } from "../lib/uiSound";
 import { emptyWallet } from "../lib/wallet";
+import { splitIntoColumns, useFavColumnCount } from "./content/favWallLayout";
 
 interface FavoritesPageProps {
   /** Called after add/remove so App can refresh counts / playlist */
   onFavoritesChanged: () => void;
   onNavigate?: (id: NavId) => void;
   unlocks?: ContentUnlockLists;
+  /** Hide the standalone h1 when nested under Content chrome. */
+  embedded?: boolean;
+  listedIds?: Set<string>;
+  onOpenLists?: (item: MediaItem) => void;
+  onPackFound?: (pool: MediaItem[]) => void;
+  onOpenSearch?: (query: string, kind: FavoriteKindFilter) => void;
 }
 
 type FavView = {
@@ -52,40 +70,6 @@ type FavView = {
 
 const TAG_CHIP_LIMIT = 48;
 const FAVORITES_PAGE_SIZE = 36;
-
-function favColumnCountForWidth(width: number): number {
-  if (width <= 700) return 1;
-  if (width <= 1100) return 2;
-  return 3;
-}
-
-/** Left-to-right, then down: 1 2 3 / 4 5 6, packed in columns so heights don't leave holes. */
-function splitIntoColumns<T>(items: T[], columnCount: number): T[][] {
-  const count = Math.max(1, columnCount);
-  const cols: T[][] = Array.from({ length: count }, () => []);
-  items.forEach((item, index) => {
-    cols[index % count]!.push(item);
-  });
-  return cols;
-}
-
-function useFavColumnCount(): number {
-  const [count, setCount] = useState(() =>
-    favColumnCountForWidth(window.innerWidth),
-  );
-  useEffect(() => {
-    function onResize() {
-      setCount(favColumnCountForWidth(window.innerWidth));
-    }
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-  return count;
-}
-
-function isFullscreenActive(): boolean {
-  return Boolean(document.fullscreenElement);
-}
 
 /** Detach media pipeline when leaving a slide so audio cannot keep playing. */
 function disposeVideoElement(video: HTMLVideoElement | null | undefined): void {
@@ -99,10 +83,37 @@ function disposeVideoElement(video: HTMLVideoElement | null | undefined): void {
   }
 }
 
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden>
+      <circle
+        cx="7"
+        cy="7"
+        r="4.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.45"
+      />
+      <path
+        d="m10.2 10.2 3 3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.45"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function FavoritesPage({
   onFavoritesChanged,
   onNavigate,
   unlocks = { ...emptyWallet().unlocks, pendingShopTags: [] },
+  embedded = false,
+  listedIds,
+  onOpenLists,
+  onPackFound,
+  onOpenSearch,
 }: FavoritesPageProps) {
   const [views, setViews] = useState<FavView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,13 +129,12 @@ export function FavoritesPage({
   const [tagsExpanded, setTagsExpanded] = useState(false);
   const [editTag, setEditTag] = useState<string | null>(null);
   const [bulkTypeOpen, setBulkTypeOpen] = useState(false);
-  const [isFs, setIsFs] = useState(false);
   const [tagTypeMap, setTagTypeMap] = useState<TagTypeMap>(() =>
     loadTagTypeMap(),
   );
-  const lightboxRef = useRef<HTMLDivElement | null>(null);
   const viewerVideoRef = useRef<HTMLVideoElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const wantNextRef = useRef(false);
   const loadingRef = useRef(false);
   const loadGenRef = useRef(0);
   const viewsRef = useRef<FavView[]>([]);
@@ -204,6 +214,23 @@ export function FavoritesPage({
     () => splitIntoColumns(filtered, columnCount),
     [filtered, columnCount],
   );
+  const searchQuery = useMemo(
+    () =>
+      gelbooruQueryFromFavoriteFilters({
+        selectedTags,
+        search,
+      }),
+    [selectedTags, search],
+  );
+  const listPool = useMemo(() => {
+    if (!onPackFound) return [];
+    const out: MediaItem[] = [];
+    for (const view of views) {
+      const row = favoriteRecordToListItem(view.record);
+      if (row) out.push(row);
+    }
+    return out;
+  }, [onPackFound, views]);
   const enterIndexById = useMemo(() => {
     const map = new Map<string, number>();
     enterIds.forEach((id, index) => map.set(id, index));
@@ -215,8 +242,9 @@ export function FavoritesPage({
     [filtered, viewerId],
   );
   const viewer = viewerIndex >= 0 ? (filtered[viewerIndex] ?? null) : null;
+  const hasMore = views.length < matchedIds.length;
   const canPrev = viewerIndex > 0;
-  const canNext = viewerIndex >= 0 && viewerIndex < filtered.length - 1;
+  const canNext = lightboxCanGoNext(viewerIndex, filtered.length, hasMore);
 
   function revokeViews(list: FavView[]) {
     revokeFavoriteMedia(list.map((v) => v.item));
@@ -237,23 +265,15 @@ export function FavoritesPage({
       }
       const pageIds = ids.slice(offset, offset + FAVORITES_PAGE_SIZE);
       const rows = await listFavoriteRecordsByIds(pageIds);
-      const byId = new Map(rows.map((record) => [record.id, record]));
+      const ready = await ensureFavoriteWallThumbs(rows);
+      if (gen !== loadGenRef.current) {
+        return;
+      }
+      const byId = new Map(ready.map((record) => [record.id, record]));
       const next: FavView[] = pageIds.flatMap((id) => {
         const record = byId.get(id);
         if (!record) return [];
-        return [
-          {
-            record,
-            item: {
-              id: record.id,
-              url: URL.createObjectURL(record.blob),
-              kind: record.kind,
-              source: "favorites" as const,
-              tags: record.tags,
-              gelbooruId: record.gelbooruId,
-            },
-          },
-        ];
+        return [{ record, item: favoriteRecordToMedia(record) }];
       });
       if (gen !== loadGenRef.current) {
         revokeViews(next);
@@ -284,10 +304,6 @@ export function FavoritesPage({
   const refreshFavoriteMetadata = useCallback(async (): Promise<void> => {
     setFavoriteMetadata(await listFavoriteMetadata());
   }, []);
-
-  async function reload(): Promise<void> {
-    await Promise.all([loadPage(true), refreshFavoriteMetadata()]);
-  }
 
   useEffect(() => {
     void refreshFavoriteMetadata();
@@ -346,15 +362,9 @@ export function FavoritesPage({
     pendingDisposeRef.current = leaving;
   }, []);
 
-  const closeViewer = useCallback(async () => {
+  const closeViewer = useCallback(() => {
+    wantNextRef.current = false;
     disposeViewerPlayback();
-    if (isFullscreenActive()) {
-      try {
-        await document.exitFullscreen();
-      } catch {
-        // ignore
-      }
-    }
     setViewerId(null);
   }, [disposeViewerPlayback]);
 
@@ -362,50 +372,47 @@ export function FavoritesPage({
     if (viewerIndex <= 0) return;
     const prev = filtered[viewerIndex - 1];
     if (!prev) return;
+    wantNextRef.current = false;
     leaveCurrentSlide();
     setViewerId(prev.record.id);
   }, [filtered, viewerIndex, leaveCurrentSlide]);
 
   const showNext = useCallback(() => {
+    if (viewerIndex < 0) return;
+    if (viewerIndex < filtered.length - 1) {
+      const next = filtered[viewerIndex + 1];
+      if (!next) return;
+      wantNextRef.current = false;
+      leaveCurrentSlide();
+      setViewerId(next.record.id);
+      return;
+    }
+    if (!hasMore) return;
+    wantNextRef.current = true;
+    void loadPage(false);
+  }, [filtered, hasMore, leaveCurrentSlide, loadPage, viewerIndex]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!lightboxShouldPrefetch(viewerIndex, filtered.length, hasMore)) return;
+    void loadPage(false);
+  }, [filtered.length, hasMore, loadPage, loading, viewerIndex]);
+
+  useEffect(() => {
+    if (!wantNextRef.current) return;
     if (viewerIndex < 0 || viewerIndex >= filtered.length - 1) return;
     const next = filtered[viewerIndex + 1];
     if (!next) return;
+    wantNextRef.current = false;
     leaveCurrentSlide();
     setViewerId(next.record.id);
-  }, [filtered, viewerIndex, leaveCurrentSlide]);
-
-  const toggleFullscreen = useCallback(async () => {
-    const el = lightboxRef.current;
-    if (!el) return;
-    try {
-      if (isFullscreenActive()) {
-        await document.exitFullscreen();
-      } else {
-        await el.requestFullscreen();
-      }
-    } catch {
-      // Fullscreen API blocked / unavailable
-    }
-  }, []);
-
-  useEffect(() => {
-    function onFsChange() {
-      setIsFs(isFullscreenActive());
-    }
-    document.addEventListener("fullscreenchange", onFsChange);
-    return () => document.removeEventListener("fullscreenchange", onFsChange);
-  }, []);
+  }, [filtered, leaveCurrentSlide, viewerIndex]);
 
   useEffect(() => {
     if (!viewerId) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        if (isFullscreenActive()) {
-          void document.exitFullscreen();
-          e.preventDefault();
-          return;
-        }
-        void closeViewer();
+        closeViewer();
         return;
       }
       if (e.key === "ArrowLeft") {
@@ -416,22 +423,11 @@ export function FavoritesPage({
       if (e.key === "ArrowRight") {
         e.preventDefault();
         showNext();
-        return;
-      }
-      if (e.key === "f" || e.key === "F" || e.key === "а" || e.key === "А") {
-        if (
-          e.target instanceof HTMLElement &&
-          (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")
-        ) {
-          return;
-        }
-        e.preventDefault();
-        void toggleFullscreen();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [viewerId, showPrev, showNext, toggleFullscreen, closeViewer]);
+  }, [viewerId, showPrev, showNext, closeViewer]);
 
   useEffect(() => {
     if (!viewerId) return;
@@ -517,110 +513,40 @@ export function FavoritesPage({
     }
   }
 
-  const viewerTags = viewer
-    ? (viewer.record.tags ?? "").trim().split(/\s+/).filter(Boolean)
-    : [];
-
-  const gelbooruId = viewer?.record.gelbooruId;
-  const canOpenSite = Boolean(gelbooruId);
-
-  const openOnSite = useCallback(async () => {
-    if (!gelbooruId) return;
-    void primeUiAudio();
-    playUiClick();
-    const url = `https://gelbooru.com/index.php?page=post&s=view&id=${gelbooruId}`;
-    const desktop = window.joiDesktop?.shell?.openExternal;
-    if (desktop) {
-      await desktop(url);
-      return;
-    }
-    window.open(url, "_blank", "noopener,noreferrer");
-  }, [gelbooruId]);
-
-  const openInExplorer = useCallback(async () => {
-    if (!viewer) return;
-    void primeUiAudio();
-    playUiClick();
-    const show = window.joiDesktop?.shell?.showTempFile;
-    if (!show) {
-      setError("Открыть в проводнике можно только в десктоп-приложении");
-      return;
-    }
-    try {
-      const buf = await viewer.record.blob.arrayBuffer();
-      const bytes = Array.from(new Uint8Array(buf));
-      const res = await show({
-        fileName: viewer.record.fileName || `favorite-${viewer.record.id}`,
-        bytes,
-      });
-      if (!res.ok) setError(res.detail ?? "Не удалось открыть файл");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось открыть файл");
-    }
-  }, [viewer]);
+  const listItem = viewer ? favoriteRecordToListItem(viewer.record) : null;
+  const listed = Boolean(
+    viewer &&
+      (listedIds?.has(viewer.record.id) ||
+        (viewer.record.gelbooruId &&
+          listedIds?.has(`gb-${viewer.record.gelbooruId}`))),
+  );
 
   return (
-    <div className="favorites-page">
-      <header className="favorites-page__head">
-        <div>
+    <div className={"favorites-page" + (embedded ? " is-embedded" : "")}>
+      {embedded ? null : (
+        <header className="favorites-page__head">
           <h1 className="favorites-page__title">Избранное</h1>
-          <p className="favorites-page__sub">
-            Локальные копии с тегами booru. Повторно подтянутый пост с
-            Gelbooru снова отметится как ♥.
-          </p>
-        </div>
-        <div className="favorites-page__actions">
-          <span className="favorites-page__count">
-            {hasActiveFilter ? `${matchedIds.length} найдено · ` : ""}
-            {views.length} / {matchedIds.length} загружено
-          </span>
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => void reload().then(() => onFavoritesChanged())}
-          >
-            Обновить
-          </button>
-        </div>
-      </header>
+        </header>
+      )}
 
-      {!loading || views.length > 0 ? (
-        <TastePassportPanel
-          view={tastePassport.view}
-          ctas={onNavigate ? tastePassport.ctas : []}
-          onNavigate={onNavigate}
-        />
-      ) : null}
+      <TastePassportPanel
+        view={tastePassport.view}
+        ctas={onNavigate ? tastePassport.ctas : []}
+        onNavigate={onNavigate}
+        shelfLoadedLabel={
+          matchedIds.length > 0
+            ? favoritesShelfLoadedRu(views.length, matchedIds.length)
+            : undefined
+        }
+      />
 
       {favoriteMetadata.length > 0 ? (
         <div className="favorites-page__filters">
-          <div className="favorites-page__search-row">
-            <div className="favorites-page__kind" role="group" aria-label="Тип медиа">
-              {(
-                [
-                  ["all", "Все"],
-                  ["image", "Картинки"],
-                  ["gif", "Гифки"],
-                  ["video", "Видео"],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  className={`favorites-page__kind-btn${
-                    kindFilter === id ? " is-active" : ""
-                  }`}
-                  aria-pressed={kindFilter === id}
-                  onClick={() => {
-                    void primeUiAudio();
-                    playUiClick();
-                    setKindFilter(id);
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <div className="favorites-page__search-row">
+            <MediaKindFilter
+              value={kindFilter}
+              onChange={setKindFilter}
+            />
             <input
               className="favorites-page__search"
               type="search"
@@ -629,6 +555,30 @@ export function FavoritesPage({
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Поиск по тегам"
             />
+            {onPackFound ? (
+              <button
+                type="button"
+                className="favorites-page__pack"
+                disabled={listPool.length === 0}
+                title="В список из найденного"
+                aria-label="В список из найденного"
+                onClick={() => onPackFound(listPool)}
+              >
+                <BookmarkIcon filled={false} />
+              </button>
+            ) : null}
+            {onOpenSearch ? (
+              <button
+                type="button"
+                className="favorites-page__pack"
+                disabled={!searchQuery}
+                title="Искать в облаке gelbooru"
+                aria-label="Искать в облаке gelbooru"
+                onClick={() => onOpenSearch(searchQuery, kindFilter)}
+              >
+                <SearchIcon />
+              </button>
+            ) : null}
             {tagStats.length > 0 ? (
               <button
                 type="button"
@@ -756,6 +706,16 @@ export function FavoritesPage({
               <div key={colIndex} className="fav-masonry__col">
                 {column.map(({ record, item }) => {
                   const enterI = enterIndexById.get(record.id);
+                  const listItem = onOpenLists
+                    ? favoriteRecordToListItem(record)
+                    : null;
+                  const listed = Boolean(
+                    listItem &&
+                      (listedIds?.has(listItem.id) ||
+                        listedIds?.has(record.id) ||
+                        (record.gelbooruId &&
+                          listedIds?.has(`gb-${record.gelbooruId}`))),
+                  );
                   return (
                   <article
                     key={record.id}
@@ -779,6 +739,24 @@ export function FavoritesPage({
                       <FavMasonryMedia item={item} />
                       <span className="fav-masonry__glow" aria-hidden />
                     </button>
+                    {listItem ? (
+                      <div className="doujin-card__actions">
+                        <button
+                          type="button"
+                          className={
+                            "doujin-card__list" + (listed ? " is-on" : "")
+                          }
+                          aria-pressed={listed}
+                          title={listed ? "В списках" : "Добавить в список"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenLists?.(listItem);
+                          }}
+                        >
+                          <BookmarkIcon filled={listed} />
+                        </button>
+                      </div>
+                    ) : null}
                     <div className="fav-masonry__bar">
                       <span className="fav-masonry__kind">
                         {item.kind === "video"
@@ -881,133 +859,30 @@ export function FavoritesPage({
       ) : null}
 
       {viewer ? (
-        <div
-          ref={lightboxRef}
-          className={`fav-lightbox${isFs ? " is-fullscreen" : ""}`}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Просмотр избранного"
-          onClick={() => {
-            if (!isFullscreenActive()) void closeViewer();
-          }}
-        >
-          <div className="fav-lightbox__toolbar" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              className="fav-lightbox__tool fav-lightbox__tool--text"
-              title="Открыть файл в проводнике"
-              aria-label="Открыть в проводнике"
-              onClick={() => void openInExplorer()}
-            >
-              Проводник
-            </button>
-            <button
-              type="button"
-              className="fav-lightbox__tool fav-lightbox__tool--text"
-              title="Открыть пост на Gelbooru"
-              aria-label="Открыть на сайте"
-              disabled={!canOpenSite}
-              onClick={() => void openOnSite()}
-            >
-              На сайте
-            </button>
-            <button
-              type="button"
-              className="fav-lightbox__tool"
-              title={isFs ? "Свернуть (F)" : "На весь экран (F)"}
-              aria-label={isFs ? "Свернуть" : "На весь экран"}
-              onClick={() => void toggleFullscreen()}
-            >
-              {isFs ? "⛶" : "⧉"}
-            </button>
-            <button
-              type="button"
-              className="fav-lightbox__tool fav-lightbox__tool--close"
-              title="Закрыть"
-              aria-label="Закрыть"
-              onClick={() => void closeViewer()}
-            >
-              ×
-            </button>
-          </div>
-
-          <button
-            type="button"
-            className="fav-lightbox__nav fav-lightbox__nav--prev"
-            title="Предыдущая (←)"
-            aria-label="Предыдущая"
-            disabled={!canPrev}
-            onClick={(e) => {
-              e.stopPropagation();
-              showPrev();
-            }}
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            className="fav-lightbox__nav fav-lightbox__nav--next"
-            title="Следующая (→)"
-            aria-label="Следующая"
-            disabled={!canNext}
-            onClick={(e) => {
-              e.stopPropagation();
-              showNext();
-            }}
-          >
-            ›
-          </button>
-
-          <div
-            className="fav-lightbox__stage"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="fav-lightbox__media-wrap">
-              {viewer.item.kind === "video" ? (
-                <video
-                  key={viewer.record.id}
-                  ref={viewerVideoRef}
-                  className="fav-lightbox__media"
-                  src={viewer.item.url}
-                  controls
-                  autoPlay
-                  loop
-                  playsInline
-                />
-              ) : (
-                <img
-                  key={viewer.record.id}
-                  className="fav-lightbox__media"
-                  src={viewer.item.url}
-                  alt={viewer.record.tags ?? ""}
-                  draggable={false}
-                />
-              )}
-            </div>
-            {viewerTags.length > 0 && !isFs ? (
-              <div className="fav-lightbox__tags">
-                {viewerTags.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    className="fav-tag is-active"
-                    onClick={() => {
-                      toggleTag(tag);
-                      void closeViewer();
-                    }}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {filtered.length > 1 ? (
-              <p className="fav-lightbox__counter" aria-live="polite">
-                {viewerIndex + 1} / {filtered.length}
-              </p>
-            ) : null}
-          </div>
-        </div>
+        <FavLightbox
+          item={viewer.item}
+          videoRef={viewerVideoRef}
+          label="Просмотр избранного"
+          canPrev={canPrev}
+          canNext={canNext}
+          saved
+          listed={listed}
+          saveBusy={busyId === viewer.record.id}
+          counter={
+            filtered.length > 1
+              ? `${viewerIndex + 1} / ${filtered.length}${hasMore ? "+" : ""}`
+              : null
+          }
+          onClose={closeViewer}
+          onPrev={showPrev}
+          onNext={showNext}
+          onToggleSave={() => void handleDelete(viewer.record.id)}
+          onOpenLists={
+            onOpenLists && listItem
+              ? () => onOpenLists(listItem)
+              : undefined
+          }
+        />
       ) : null}
     </div>
   );

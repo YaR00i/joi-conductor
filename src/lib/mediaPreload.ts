@@ -1,4 +1,5 @@
 import { displayMediaUrl, type MediaItem, type MediaKind } from "./media";
+import { getMatchingFavoriteRecord } from "./mediaFavorites";
 
 export type PreloadProgress = {
   percent: number | null;
@@ -184,12 +185,15 @@ function shortLabel(item: MediaItem, order: number): string {
 
 function evict(id: string) {
   if (retainedIds.has(id)) return;
-  const entry = cache.get(id);
+  forgetCachedMedia(id);
+}
+
+/** Drop a cached blob so the next ensureMediaCached actually re-downloads. */
+export function forgetCachedMedia(itemId: string): void {
+  const entry = cache.get(itemId);
   if (!entry) return;
-  if (entry.blobUrl) {
-    URL.revokeObjectURL(entry.blobUrl);
-  }
-  cache.delete(id);
+  if (entry.blobUrl) URL.revokeObjectURL(entry.blobUrl);
+  cache.delete(itemId);
 }
 
 function trimToMax() {
@@ -393,8 +397,88 @@ export function isMediaCached(itemId: string): boolean {
   return Boolean(entry?.ready && !entry.error);
 }
 
+/** Wait out an in-flight RAM cache download so a shelf save can reuse it. */
+export async function waitForMediaCache(itemId: string): Promise<void> {
+  const pending = cache.get(itemId)?.promise;
+  if (!pending) return;
+  try {
+    await pending;
+  } catch {
+    /* save can still fetch */
+  }
+}
+
+/** Copy RAM-cache bytes without hitting the CDN again. */
+export async function readCachedMediaBlob(
+  itemId: string,
+): Promise<Blob | null> {
+  const entry = cache.get(itemId);
+  const url = entry?.blobUrl?.trim();
+  if (!entry?.ready || entry.error || !url) return null;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return blob.size > 0 ? blob : null;
+  } catch {
+    return null;
+  }
+}
+
+function commitReadyBlob(
+  itemId: string,
+  stub: CacheEntry,
+  blobUrl: string,
+  size: number,
+): string {
+  const live = cache.get(itemId) ?? stub;
+  live.playUrl = blobUrl;
+  live.blobUrl = blobUrl;
+  live.ready = true;
+  live.error = false;
+  live.promise = null;
+  live.lastUsed = now();
+  live.loadedBytes = size;
+  live.totalBytes = size;
+  live.lastError = null;
+  live.retryAt = null;
+  live.progressListeners.clear();
+  cache.set(itemId, live);
+  setFilePhase(itemId, "ready");
+  trimToMax();
+  fanOutProgress(live, {
+    percent: 100,
+    phase: "ready",
+    loadedBytes: size,
+    totalBytes: size,
+  });
+  emitDetail(lastStatus.active, true);
+  return blobUrl;
+}
+
+async function playUrlFromSavedFavorite(
+  item: MediaItem,
+): Promise<{ url: string; size: number } | null> {
+  if (
+    item.source === "local" ||
+    item.source === "favorites" ||
+    item.url.startsWith("blob:") ||
+    item.url.startsWith("data:")
+  ) {
+    return null;
+  }
+  try {
+    const rec = await getMatchingFavoriteRecord(item);
+    if (!rec?.blob || rec.blob.size <= 0) return null;
+    return { url: URL.createObjectURL(rec.blob), size: rec.blob.size };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Ensure item bytes are local (blob URL). Reuses in-flight downloads.
+ * If the post is already on the shelf, plays that file instead of the CDN.
  */
 export function ensureMediaCached(
   item: MediaItem,
@@ -486,6 +570,11 @@ export function ensureMediaCached(
   };
 
   const promise = (async () => {
+    const saved = await playUrlFromSavedFavorite(item);
+    if (saved) {
+      return commitReadyBlob(item.id, entryStub, saved.url, saved.size);
+    }
+
     let lastErr: unknown;
     for (let attempt = 0; attempt < MEDIA_DOWNLOAD_ATTEMPTS; attempt++) {
       const cur = cache.get(item.id) ?? entryStub;
@@ -543,28 +632,7 @@ export function ensureMediaCached(
 
         const live = cache.get(item.id) ?? entryStub;
         const blobUrl = URL.createObjectURL(blob);
-        live.playUrl = blobUrl;
-        live.blobUrl = blobUrl;
-        live.ready = true;
-        live.error = false;
-        live.promise = null;
-        live.lastUsed = now();
-        live.loadedBytes = blob.size;
-        live.totalBytes = blob.size;
-        live.lastError = null;
-        live.retryAt = null;
-        live.progressListeners.clear();
-        cache.set(item.id, live);
-        setFilePhase(item.id, "ready");
-        trimToMax();
-        fanOutProgress(live, {
-          percent: 100,
-          phase: "ready",
-          loadedBytes: blob.size,
-          totalBytes: blob.size,
-        });
-        emitDetail(lastStatus.active, true);
-        return blobUrl;
+        return commitReadyBlob(item.id, live, blobUrl, blob.size);
       } catch (err) {
         lastErr = err;
         const cur = cache.get(item.id) ?? entryStub;

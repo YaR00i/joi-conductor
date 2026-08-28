@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MediaListCards } from "./MediaListCards";
 import { QuestMetaBoard } from "./QuestMetaBoard";
 import { BooruTagInput } from "./BooruTagInput";
 import { TagLibraryPanel } from "./TagLibraryPanel";
@@ -55,7 +56,13 @@ import {
 import { notifyDenialQuestChanged } from "./DenialQuestPill";
 import { MODE_LABELS, PARAM_LABELS } from "../lib/labels";
 import type { MediaSettings } from "../lib/media";
-import { MEDIA_TYPE_CATALOG } from "../lib/contentCatalog";
+import { isListMediaType, MEDIA_TYPE_CATALOG } from "../lib/contentCatalog";
+import {
+  MEDIA_QUEUE_MAX,
+  MEDIA_QUEUE_MIN,
+  MEDIA_QUEUE_STEP,
+  snapMediaQueueSize,
+} from "../lib/mediaQueue";
 import type { PlaylistPreloadStatus } from "../lib/mediaPreload";
 import { listMistressPresets, type SessionPreset } from "../lib/presets";
 import type { SessionMode, SessionParams, ToyDef } from "../lib/types";
@@ -83,6 +90,7 @@ import {
   primeUiAudio,
 } from "../lib/uiSound";
 import { emptyWallet } from "../lib/wallet";
+import type { GelbooruListOption } from "../lib/gelbooruLists";
 import {
   getActiveMistress,
   getActiveRouletteBias,
@@ -120,6 +128,9 @@ export type RouletteHubPanelsProps = {
   onApplyPreset: (presetId: string) => void;
   onMedia: (next: MediaSettings) => void;
   onLoadGelbooru: () => void;
+  onLoadMediaList?: () => void;
+  onAssembleMediaList?: () => void;
+  mediaLists?: ReadonlyArray<GelbooruListOption>;
   onPickLocal: (files: FileList) => void;
   onSaveMedia: () => void;
   /** WD14 auto-tagger backend status (shown in the local-source panel). */
@@ -852,6 +863,9 @@ function MediaPanel({
   unlocks,
   onMedia,
   onLoadGelbooru,
+  onLoadMediaList,
+  onAssembleMediaList,
+  mediaLists = [],
   onPickLocal,
   onSaveMedia,
   wd14Status,
@@ -859,7 +873,10 @@ function MediaPanel({
   onStartWd14,
   onRefreshWd14,
 }: RouletteHubPanelsProps & { unlocks: ContentUnlockLists }) {
-  const limitItems = useMemo(() => rangeWheelItems(5, 100, 5), []);
+  const limitItems = useMemo(
+    () => rangeWheelItems(MEDIA_QUEUE_MIN, MEDIA_QUEUE_MAX, MEDIA_QUEUE_STEP),
+    [],
+  );
   const slideItems = useMemo(
     () => rangeWheelItems(3, 60, 1, (n) => `${n}с`),
     [],
@@ -872,6 +889,14 @@ function MediaPanel({
       })),
     [],
   );
+  const usingList = isListMediaType(media.mediaTypeId);
+  const keyed = Boolean(
+    media.gelbooruUserId.trim() && media.gelbooruApiKey.trim(),
+  );
+  const listValue =
+    (media.listId && mediaLists.some((row) => row.id === media.listId)
+      ? media.listId
+      : mediaLists[0]?.id) ?? "";
 
   return (
     <div className="roulette-hub__panel">
@@ -886,19 +911,54 @@ function MediaPanel({
         />
         <WheelPicker
           label="Тип контента"
-          hint="Фото, гифки, видео — тот же фильтр, что на колесе рулетки."
+          hint={
+            usingList
+              ? "Карточка госпожи собирает очередь. Остальные — ваши списки."
+              : "Фото, гифки, видео — тот же фильтр, что на колесе рулетки."
+          }
           items={mediaTypeItems}
           value={media.mediaTypeId}
           itemWidth={128}
-          onChange={(mediaTypeId) => onMedia({ ...media, mediaTypeId })}
+          onChange={(mediaTypeId) =>
+            onMedia({
+              ...media,
+              mediaTypeId,
+              source: isListMediaType(mediaTypeId) ? "gelbooru" : media.source,
+              listId: isListMediaType(mediaTypeId)
+                ? media.listId ?? mediaLists[0]?.id ?? null
+                : media.listId,
+            })
+          }
         />
+        {usingList ? (
+          <div className="hub-media__pick">
+            <div className="wheel-picker__label">Список</div>
+            <MediaListCards
+              lists={mediaLists}
+              selectedId={listValue}
+              onSelect={(listId) =>
+                onMedia({ ...media, listId, source: "gelbooru" })
+              }
+              onAssemble={onAssembleMediaList}
+              assembling={mediaLoading}
+              keyed={keyed}
+            />
+            <p className="wheel-picker__hint">
+              Те же очереди, что вкладка Контент → Списки.
+            </p>
+          </div>
+        ) : null}
         <div className="hub-wheels__row">
           {media.source === "gelbooru" ? (
             <WheelPicker
-              label="Лимит постов"
-              hint="Сколько тянуть за раз с Gelbooru."
+              label={usingList ? "Длина" : "Лимит постов"}
+              hint={
+                usingList
+                  ? "Сколько постов собрать в автоочередь (80–140)."
+                  : "Сколько тянуть в сессию с Gelbooru (80–140)."
+              }
               items={limitItems}
-              value={snapToRange(media.limit, 5, 100, 5)}
+              value={snapMediaQueueSize(media.limit)}
               onChange={(limit) => onMedia({ ...media, limit })}
             />
           ) : null}
@@ -914,6 +974,15 @@ function MediaPanel({
 
       {media.source === "gelbooru" ? (
         <section className="hub-wheels__section hub-wheels__section--fire hub-media">
+          {usingList ? (
+            <div className="hub-media__head">
+              <span className="hub-media__title">Очередь</span>
+              <span className="hub-media__sub">
+                Выбранный список — в сессию. Автоочередь собирается выше.
+              </span>
+            </div>
+          ) : (
+            <>
           <div className="hub-media__head">
             <span className="hub-media__title">Теги</span>
             <span className="hub-media__sub">
@@ -939,18 +1008,30 @@ function MediaPanel({
               onMedia({ ...media, tags: next });
             }}
           />
+            </>
+          )}
           <div className="hub-media__actions">
             <button
               type="button"
               className="hub-ember-btn hub-ember-btn--primary"
-              disabled={mediaLoading}
+              disabled={
+                mediaLoading ||
+                (usingList && (!listValue || !onLoadMediaList))
+              }
               onClick={() => {
                 void primeUiAudio();
                 playUiConfirm();
-                onLoadGelbooru();
+                if (usingList) onLoadMediaList?.();
+                else onLoadGelbooru();
               }}
             >
-              {mediaLoading ? "Тяну…" : "Подтянуть с Gelbooru"}
+              {mediaLoading
+                ? usingList
+                  ? "Ставлю…"
+                  : "Тяну…"
+                : usingList
+                  ? "Поставить список в сессию"
+                  : "Подтянуть с Gelbooru"}
             </button>
             <button
               type="button"

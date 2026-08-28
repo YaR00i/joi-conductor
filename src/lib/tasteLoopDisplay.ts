@@ -128,6 +128,13 @@ export function buildTastePassportView(
   };
 }
 
+/** Masonry window vs matched shelf size, shown on the Taste card. */
+export function favoritesShelfLoadedRu(loaded: number, total: number): string {
+  const have = Math.max(0, Math.floor(loaded));
+  const of = Math.max(0, Math.floor(total));
+  return `${have} / ${of} загружено`;
+}
+
 /** One-line hint under Taste Passport CTAs. */
 export function tastePassportCtaHintRu(): string {
   return "Лайки в сессии усиливают вкус и полку магазина";
