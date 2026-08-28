@@ -1,5 +1,10 @@
 import { useEffect, useRef } from "react";
-import type { DoodleDifficulty } from "../../lib/doodleReward";
+import {
+  DOODLE_FALL_SALVAGE,
+  DOODLE_HEAT_FULL_M,
+  heatMultiplier,
+  type DoodleDifficulty,
+} from "../../lib/doodleReward";
 import type { PuzzleTask } from "../../lib/puzzleTasks";
 
 /**
@@ -17,7 +22,22 @@ import type { PuzzleTask } from "../../lib/puzzleTasks";
  */
 
 export interface DoodleOutcome {
+  /** Max height reached, meters (banking-independent, drives records). */
   heightM: number;
+  /** Effective (heat-multiplied) meters banked at hearths. */
+  bankedMeters: number;
+  /** Salvage of the hot part at the fall (multiplier-applied, 25%). */
+  burnedMeters: number;
+  /** Heat fraction (0..1) at the moment of the fall. */
+  heat: number;
+  /** Hearths touched. */
+  hearths: number;
+  /** Frost blobs smashed with a stomp. */
+  stomps: number;
+  /** Cinders earned from stomps. */
+  stompReward: number;
+  /** How the run ended. */
+  deathCause: "fall" | "frost";
   bounces: number;
   springs: number;
   tasksGood: number;
@@ -51,8 +71,30 @@ export const DOODLE_VIEW_H = 480;
 export const DOODLE_PLAYER_R = 15;
 const START_Y = 80;
 const PLAT_H = 11;
+/** Frost blob horizontal drift amplitude (world units). */
+const BLOB_DRIFT = 26;
+/** Stomp bounce fraction of the base jump velocity. */
+const BLOB_STOMP_V = 0.9;
+/** Cinders per stomped frost blob. */
+const STOMP_REWARD = 4;
+/** Seconds of slippery steering after an icy bounce. */
+const ICE_SLIDE_SEC = 1.1;
+/** Slide multiplies steering speed — the ember keeps drifting sideways. */
+const ICE_SLIDE_MULT = 1.9;
+/** Phantom platform cycle: period, solid seconds, ghost alpha. */
+const PHANTOM_PERIOD = 2.6;
+const PHANTOM_SOLID = 1.4;
+const PHANTOM_GHOST_ALPHA = 0.18;
 
-export type PlatKind = "normal" | "moving" | "break" | "spring" | "task";
+export type PlatKind =
+  | "normal"
+  | "moving"
+  | "break"
+  | "spring"
+  | "task"
+  | "hearth"
+  | "ice"
+  | "phantom";
 
 export interface GenPlat {
   y: number;
@@ -65,13 +107,25 @@ export interface GenPlat {
 
 interface Plat extends GenPlat {
   om: number; // moving: angular speed
-  ph: number; // moving: phase
+  ph: number; // moving/phantom: phase
   broken: boolean;
   fallV: number;
   rot: number;
   spin: number;
   springT: number;
   taskUsed: boolean;
+}
+
+/** Frost blob: a drifting hazard between platforms. Stomp from above = bonus,
+ *  any other touch freezes the ember mid-run. */
+interface Blob {
+  cx: number;
+  y: number;
+  om: number;
+  ph: number;
+  r: number;
+  dead: boolean;
+  deadT: number;
 }
 
 interface Floater {
@@ -101,6 +155,23 @@ interface World {
   topY: number;
   topCx: number;
   sinceTask: number;
+  /** Heat economy: raw meters banked at hearths + effective banked meters. */
+  bankedRawM: number;
+  bankedEffM: number;
+  hearths: number;
+  /** Next hearth is scheduled at/beyond this world y. */
+  nextHearthY: number;
+  /** A hearth is waiting for the next suitable platform. */
+  hearthDue: boolean;
+  /** Heat fraction at the moment of death (drives the fall punishment). */
+  heatAtDeath: number;
+  /** How the run ended — frost blobs add a death of their own. */
+  deathCause: "fall" | "frost";
+  blobs: Blob[];
+  stomps: number;
+  stompReward: number;
+  /** > 0 while the ember still slides after an icy bounce. */
+  slideT: number;
   playerX: number;
   playerY: number;
   vy: number;
@@ -191,6 +262,12 @@ export function genPlatform(
       kind = "moving";
       w = diff.platWidth;
       amp = 40 + rng() * 60;
+    } else if (
+      r <
+      diff.springChance + diff.breakChance + diff.movingChance + diff.iceChance
+    ) {
+      kind = "ice";
+      w = diff.platWidth * 0.95;
     }
   }
 
@@ -231,6 +308,9 @@ const PLAT_COLORS: Record<PlatKind, { main: string; top: string; base: string }>
   break: { main: "#8a5f4e", top: "#a97a63", base: "#5d3e32" },
   spring: { main: "#3dd68c", top: "#7cf0b8", base: "#1d6b46" },
   task: { main: "#ff8a4a", top: "#ffc49a", base: "#b3541f" },
+  hearth: { main: "#ffd23e", top: "#fff3c4", base: "#a5811a" },
+  ice: { main: "#7fc4f5", top: "#d8f0ff", base: "#3a7db5" },
+  phantom: { main: "#5d4e7e", top: "#8f7db5", base: "#39304f" },
 };
 const PLAT_USED_COLOR = { main: "#4a3a33", top: "#6b564c", base: "#332620" };
 const TRAIL_COLORS = ["#ffb066", "#ff8a4a", "#ffd9a0", "#ff7c3a"];
@@ -290,6 +370,20 @@ export function DoodleTrack({
       topY: START_Y,
       topCx: DOODLE_LW / 2,
       sinceTask: 0,
+      bankedRawM: 0,
+      bankedEffM: 0,
+      hearths: 0,
+      nextHearthY:
+        START_Y +
+        (difficulty.hearthMinM + rng() * (difficulty.hearthMaxM - difficulty.hearthMinM)) *
+          DOODLE_METER,
+      hearthDue: false,
+      heatAtDeath: 0,
+      deathCause: "fall",
+      blobs: [],
+      stomps: 0,
+      stompReward: 0,
+      slideT: 0,
       playerX: DOODLE_LW / 2,
       playerY: START_Y + DOODLE_PLAYER_R * 0.8,
       vy: DOODLE_JUMP_V,
@@ -318,10 +412,33 @@ export function DoodleTrack({
     const platX = (p: Plat): number =>
       p.kind === "moving" ? p.cx + p.amp * Math.sin(p.om * world.time + p.ph) : p.cx;
 
+    const blobX = (b: Blob): number =>
+      b.cx + Math.sin(b.om * world.time + b.ph) * BLOB_DRIFT;
+
+    /** Phantom platforms fade on a cycle; solid only while bright. */
+    const phantomAlpha = (p: Plat): number => {
+      const t = (world.time + p.ph) % PHANTOM_PERIOD;
+      if (t < PHANTOM_SOLID) return 1;
+      if (t < PHANTOM_SOLID + 0.12) {
+        return 1 - (1 - PHANTOM_GHOST_ALPHA) * ((t - PHANTOM_SOLID) / 0.12);
+      }
+      if (t < PHANTOM_PERIOD - 0.12) return PHANTOM_GHOST_ALPHA;
+      return (
+        PHANTOM_GHOST_ALPHA +
+        (1 - PHANTOM_GHOST_ALPHA) *
+          ((t - (PHANTOM_PERIOD - 0.12)) / 0.12)
+      );
+    };
+
     const wrapDx = (a: number, b: number): number => {
       const d = Math.abs(a - b);
       return Math.min(d, DOODLE_LW - d);
     };
+
+    const heightMeters = () => Math.max(0, (world.maxY - START_Y) / DOODLE_METER);
+    /** Meters climbed since the last hearth — the "hot" part of the run. */
+    const unbankedM = () => Math.max(0, heightMeters() - world.bankedRawM);
+    const heat = () => Math.min(1, unbankedM() / DOODLE_HEAT_FULL_M);
 
     // ---- sizing ----
     const resize = () => {
@@ -407,8 +524,17 @@ export function DoodleTrack({
     };
     const emitOutcome = () => {
       world.done = true;
+      const maxM = Math.floor(heightMeters());
+      const unbanked = Math.max(0, maxM - world.bankedRawM);
       onOutcomeRef.current({
-        heightM: Math.max(0, Math.floor((world.maxY - START_Y) / DOODLE_METER)),
+        heightM: maxM,
+        bankedMeters: world.bankedEffM,
+        burnedMeters: Math.round(unbanked * heatMultiplier(unbanked) * DOODLE_FALL_SALVAGE),
+        heat: world.heatAtDeath,
+        hearths: world.hearths,
+        stomps: world.stomps,
+        stompReward: world.stompReward,
+        deathCause: world.phase === "dead" ? world.deathCause : "fall",
         bounces: world.bounces,
         springs: world.springs,
         tasksGood: world.tasksGood,
@@ -430,6 +556,63 @@ export function DoodleTrack({
           rng,
         );
         world.sinceTask = sinceTask;
+        // Hearth scheduling: convert a suitable platform into a bank point
+        // once the climbed height crosses the next hearth mark. Geometry is
+        // untouched, so the reachability guarantees still hold.
+        if (plat.kind === "normal" && (world.hearthDue || plat.y >= world.nextHearthY)) {
+          plat.kind = "hearth";
+          plat.task = null;
+          world.hearthDue = false;
+          world.nextHearthY =
+            plat.y +
+            (difficulty.hearthMinM +
+              rng() * (difficulty.hearthMaxM - difficulty.hearthMinM)) *
+              DOODLE_METER;
+        } else if (plat.y >= world.nextHearthY) {
+          world.hearthDue = true;
+        }
+        // Shadow platforms blink (solid only while bright). A solid twin
+        // halfway below keeps the chain landable even through the ghost
+        // phase: both half-gaps stay within the reachability budget.
+        let shadowTwin = false;
+        if (plat.kind === "normal" && rng() < difficulty.phantomChance) {
+          shadowTwin = true;
+        }
+        // Frost blobs drift in the space between platforms once the climb
+        // has warmed up — dodge them or stomp from above.
+        if (
+          rng() < difficulty.blobChance &&
+          plat.y > START_Y + difficulty.blobAfterM * DOODLE_METER
+        ) {
+          world.blobs.push({
+            cx: clamp(world.topCx + (rng() - 0.5) * 240, 40, DOODLE_LW - 40),
+            y: world.topY + (plat.y - world.topY) * 0.55,
+            om: 0.8 + rng() * 0.8,
+            ph: rng() * Math.PI * 2,
+            r: 20 + rng() * 5,
+            dead: false,
+            deadT: 0,
+          });
+        }
+        if (shadowTwin) {
+          world.plats.push({
+            y: (world.topY + plat.y) / 2,
+            cx: (world.topCx + plat.cx) / 2,
+            w: plat.w * 0.8,
+            kind: "normal",
+            amp: 0,
+            task: null,
+            om: 0,
+            ph: 0,
+            broken: false,
+            fallV: 0,
+            rot: 0,
+            spin: 0,
+            springT: 0,
+            taskUsed: true,
+          });
+          plat.kind = "phantom";
+        }
         world.plats.push({
           ...plat,
           om: 0.9 + rng() * 0.8,
@@ -460,6 +643,27 @@ export function DoodleTrack({
       if (p.kind === "break" && !p.broken) {
         p.broken = true; // one bounce, then it crumbles away
         burst(p.cx, p.y, 10, ["#8a5f4e", "#5d3e32", "#a97a63"]);
+      }
+      if (p.kind === "hearth" && !p.taskUsed) {
+        // Bank the heat: fix the climbed meters at the current multiplier.
+        p.taskUsed = true;
+        const gained = unbankedM();
+        const m = heatMultiplier(gained);
+        const eff = Math.round(gained * m);
+        world.bankedEffM += eff;
+        world.bankedRawM = heightMeters();
+        world.hearths++;
+        addFloater(`Жар ×${m.toFixed(1)} → +${eff}`, "#ffd23e", 26);
+        world.flash = { color: "255,210,62", t: 0.6 };
+        burst(world.playerX, world.playerY - DOODLE_PLAYER_R, 20, [
+          "#ffd23e",
+          "#fff3c4",
+          "#ff8a4a",
+        ]);
+      }
+      if (p.kind === "ice") {
+        // slippery: steering keeps its momentum for a short while
+        world.slideT = ICE_SLIDE_SEC;
       }
       if (p.kind === "task" && p.task && !p.taskUsed) {
         const task = p.task;
@@ -495,6 +699,10 @@ export function DoodleTrack({
         if (world.flash.t <= 0) world.flash = null;
       }
       if (world.fogT > 0) world.fogT = Math.max(0, world.fogT - dt);
+      if (world.slideT > 0) world.slideT = Math.max(0, world.slideT - dt);
+      for (const b of world.blobs) {
+        if (b.dead) b.deadT += dt;
+      }
       for (const f of world.floaters) {
         f.t += dt;
         f.y += f.vy * dt;
@@ -523,21 +731,36 @@ export function DoodleTrack({
 
       const blocked = world.pendingTask !== null;
       if (world.phase === "run" && !blocked) {
-        // horizontal steering (shortest way around the wrap)
+        // horizontal steering (shortest way around the wrap); icy bounces
+        // keep their momentum — the ember slides
+        const slide = world.slideT > 0 ? ICE_SLIDE_MULT : 1;
         let dir = 0;
         if (keysRef.current.has("ArrowLeft") || keysRef.current.has("KeyA")) dir -= 1;
         if (keysRef.current.has("ArrowRight") || keysRef.current.has("KeyD")) dir += 1;
         if (dir !== 0) {
-          world.targetX += dir * DOODLE_STRAFE * 1.35 * dt;
+          world.targetX += dir * DOODLE_STRAFE * 1.35 * slide * dt;
         }
         if (world.targetX - world.playerX > DOODLE_LW / 2) world.targetX -= DOODLE_LW;
         else if (world.targetX - world.playerX < -DOODLE_LW / 2) world.targetX += DOODLE_LW;
         const dx = clamp(
           world.targetX - world.playerX,
-          -DOODLE_STRAFE * dt,
-          DOODLE_STRAFE * dt,
+          -DOODLE_STRAFE * slide * dt,
+          DOODLE_STRAFE * slide * dt,
         );
         world.playerX += dx;
+        // ice shavings while sliding fast
+        if (world.slideT > 0 && Math.abs(dx) > 0.01 && Math.random() < 0.5) {
+          world.particles.push({
+            wx: world.playerX + (Math.random() - 0.5) * 14,
+            wy: world.playerY - DOODLE_PLAYER_R * 0.6,
+            vx: (Math.random() - 0.5) * 60,
+            vy: -20 - Math.random() * 30,
+            color: Math.random() < 0.5 ? "#d8f0ff" : "#9fd8ff",
+            size: 1.4 + Math.random() * 1.8,
+            t: 0,
+            life: 0.3 + Math.random() * 0.2,
+          });
+        }
         if (world.playerX >= DOODLE_LW) {
           world.playerX -= DOODLE_LW;
           world.targetX -= DOODLE_LW;
@@ -570,6 +793,7 @@ export function DoodleTrack({
         if (world.vy < 0) {
           for (const p of world.plats) {
             if (p.broken) continue;
+            if (p.kind === "phantom" && phantomAlpha(p) <= 0.5) continue;
             if (p.y <= prevBottom && p.y > bottom) {
               if (wrapDx(platX(p), world.playerX) <= p.w / 2 + DOODLE_PLAYER_R * 0.55) {
                 land(p);
@@ -579,28 +803,63 @@ export function DoodleTrack({
           }
         }
 
-        world.maxY = Math.max(world.maxY, world.playerY);
-        const { viewH } = dimsRef.current;
-        world.camY = Math.max(world.camY, world.playerY - viewH * 0.45);
-        generate();
-        world.plats = world.plats.filter((p) => p.y > world.camY - 200);
-
-        // milestone every 100 m
-        const heightM = Math.floor((world.maxY - START_Y) / DOODLE_METER);
-        if (Math.floor(heightM / 100) > world.milestone) {
-          world.milestone = Math.floor(heightM / 100);
-          const m = world.milestone * 100;
-          addFloater(`${m} М!`, "#ffd23e", 32);
-          burst(world.playerX, world.playerY, 22, ["#ffd23e", "#ff8a4a", "#3dd68c"]);
-          world.flash = { color: "255,210,62", t: 0.45 };
-          onMilestoneRef.current?.(m);
+        // frost blobs: stomp from above = bonus, any other touch = frozen
+        for (const b of world.blobs) {
+          if (b.dead) continue;
+          const bx = blobX(b);
+          const ddx = wrapDx(bx, world.playerX);
+          const ddy = world.playerY - b.y;
+          const rr = b.r + DOODLE_PLAYER_R * 0.75;
+          if (ddx * ddx + ddy * ddy >= rr * rr) continue;
+          if (world.vy < 0 && ddy > b.r * 0.1) {
+            b.dead = true;
+            b.deadT = 0;
+            world.vy = DOODLE_JUMP_V * BLOB_STOMP_V;
+            world.stomps++;
+            world.stompReward += STOMP_REWARD;
+            addFloater(`Расколот! +${STOMP_REWARD}`, "#bfe6ff", 24);
+            world.flash = { color: "190,230,255", t: 0.4 };
+            burst(bx, b.y, 18, ["#bfe6ff", "#7fc4f5", "#ffffff"]);
+          } else {
+            world.phase = "dead";
+            world.phaseT = 0;
+            world.deathCause = "frost";
+            world.heatAtDeath = heat();
+            world.shake = 1;
+            world.flash = { color: "150,200,255", t: 0.8 };
+            burst(world.playerX, world.playerY, 26, ["#bfe6ff", "#7fc4f5", "#ffffff"]);
+            break;
+          }
         }
+        if (world.phase === "run") {
+          world.maxY = Math.max(world.maxY, world.playerY);
+          const { viewH } = dimsRef.current;
+          world.camY = Math.max(world.camY, world.playerY - viewH * 0.45);
+          generate();
+          world.plats = world.plats.filter((p) => p.y > world.camY - 200);
+          world.blobs = world.blobs.filter((b) =>
+            b.dead ? b.deadT < 0.5 : b.y > world.camY - 100,
+          );
 
-        // fell below the view — the run is over
-        if (world.playerY - DOODLE_PLAYER_R < world.camY - 30) {
-          world.phase = "dead";
-          world.phaseT = 0;
-          world.shake = 0.6;
+          // milestone every 100 m
+          const heightM = Math.floor((world.maxY - START_Y) / DOODLE_METER);
+          if (Math.floor(heightM / 100) > world.milestone) {
+            world.milestone = Math.floor(heightM / 100);
+            const m = world.milestone * 100;
+            addFloater(`${m} М!`, "#ffd23e", 32);
+            burst(world.playerX, world.playerY, 22, ["#ffd23e", "#ff8a4a", "#3dd68c"]);
+            world.flash = { color: "255,210,62", t: 0.45 };
+            onMilestoneRef.current?.(m);
+          }
+
+          // fell below the view — the run is over
+          if (world.playerY - DOODLE_PLAYER_R < world.camY - 30) {
+            world.phase = "dead";
+            world.phaseT = 0;
+            world.deathCause = "fall";
+            world.shake = 0.6;
+            world.heatAtDeath = heat();
+          }
         }
       } else if (world.phase === "dead") {
         world.vy -= DOODLE_GRAVITY * dt;
@@ -671,6 +930,64 @@ export function DoodleTrack({
       ctx.beginPath();
       ctx.rect(x0, -20, fieldPx, h + 40);
       ctx.clip();
+
+      // ---- frost blobs ----
+      for (const b of world.blobs) {
+        const by = sy(b.y);
+        if (by < -60 || by > h + 60) continue;
+        const bx = sx(blobX(b));
+        if (b.dead) {
+          // shatter: expanding ring of ice
+          const k = b.deadT / 0.5;
+          ctx.globalAlpha = clamp(1 - k, 0, 1);
+          ctx.strokeStyle = "#d8f0ff";
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.arc(bx, by, b.r * (1 + k * 1.6) * scale, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+          continue;
+        }
+        const rpx = b.r * scale;
+        // cold glow
+        const glowB = ctx.createRadialGradient(bx, by, rpx * 0.2, bx, by, rpx * 2.2);
+        glowB.addColorStop(0, "rgba(190,230,255,0.32)");
+        glowB.addColorStop(1, "rgba(150,200,255,0)");
+        ctx.fillStyle = glowB;
+        ctx.beginPath();
+        ctx.arc(bx, by, rpx * 2.2, 0, Math.PI * 2);
+        ctx.fill();
+        // spiky star body, slowly rotating
+        const rot = world.time * 0.5 + b.ph;
+        ctx.beginPath();
+        for (let k = 0; k < 12; k++) {
+          const a2 = rot + (k * Math.PI) / 6;
+          const rr2 = (k % 2 === 0 ? b.r : b.r * 0.6) * scale;
+          const xk = bx + Math.cos(a2) * rr2;
+          const yk = by + Math.sin(a2) * rr2;
+          if (k === 0) ctx.moveTo(xk, yk);
+          else ctx.lineTo(xk, yk);
+        }
+        ctx.closePath();
+        const bodyB = ctx.createRadialGradient(bx, by, rpx * 0.1, bx, by, rpx);
+        bodyB.addColorStop(0, "#f0faff");
+        bodyB.addColorStop(0.6, "#a8d8ff");
+        bodyB.addColorStop(1, "#5a9fd0");
+        ctx.fillStyle = bodyB;
+        ctx.fill();
+        ctx.lineWidth = Math.max(1.5, 2 * scale);
+        ctx.strokeStyle = "rgba(30,60,100,0.7)";
+        ctx.stroke();
+        // white core diamond
+        ctx.beginPath();
+        ctx.moveTo(bx, by - rpx * 0.35);
+        ctx.lineTo(bx + rpx * 0.35, by);
+        ctx.lineTo(bx, by + rpx * 0.35);
+        ctx.lineTo(bx - rpx * 0.35, by);
+        ctx.closePath();
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.fill();
+      }
 
       // altitude lines every 25 m
       const m0 = Math.max(
@@ -744,18 +1061,23 @@ export function DoodleTrack({
         const glow =
           p.kind === "task" && !p.taskUsed
             ? 10 + 7 * Math.sin(world.time * 5)
-            : p.kind === "spring"
-              ? 6
-              : 0;
+            : p.kind === "hearth" && !p.taskUsed
+              ? 9 + 5 * Math.sin(world.time * 4)
+              : p.kind === "spring"
+                ? 6
+                : 0;
         if (glow > 0) {
           ctx.shadowColor = PLAT_COLORS[p.kind].main;
           ctx.shadowBlur = glow * scale * 1.6;
         }
+        const alpha = p.kind === "phantom" ? phantomAlpha(p) : 1;
         if (p.broken) {
-          ctx.globalAlpha = 0.85;
+          ctx.globalAlpha = alpha * 0.85;
           ctx.translate(px, py);
           ctx.rotate(p.rot);
           ctx.translate(-px, -py);
+        } else if (alpha < 1) {
+          ctx.globalAlpha = alpha;
         }
         // base plate
         ctx.beginPath();
@@ -811,6 +1133,57 @@ export function DoodleTrack({
           ctx.fillStyle = "#ffb27a";
           ctx.fill();
         }
+        if (p.kind === "ice") {
+          // glossy sheen + icicles under the plate
+          ctx.strokeStyle = "rgba(255,255,255,0.55)";
+          ctx.lineWidth = Math.max(1, 1.6 * scale);
+          ctx.beginPath();
+          ctx.moveTo(px - wpx * 0.3, py + 1.5);
+          ctx.lineTo(px - wpx * 0.05, py + ph * 0.55);
+          ctx.stroke();
+          ctx.fillStyle = "rgba(216,240,255,0.85)";
+          for (let k = -1; k <= 1; k++) {
+            const ix = px + k * wpx * 0.28;
+            const ih = (5 + ((k + 2) % 2) * 3) * scale;
+            ctx.beginPath();
+            ctx.moveTo(ix - 2.5 * scale, py + ph * 0.9);
+            ctx.lineTo(ix + 2.5 * scale, py + ph * 0.9);
+            ctx.lineTo(ix, py + ph * 0.9 + ih);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+        if (p.kind === "phantom" && alpha <= 0.5) {
+          // ghost phase: dashed outline says "you will fall through"
+          ctx.setLineDash([5, 4]);
+          ctx.strokeStyle = "rgba(143,125,181,0.85)";
+          ctx.lineWidth = Math.max(1, 1.4 * scale);
+          ctx.strokeRect(px - wpx / 2, py, wpx, ph);
+          ctx.setLineDash([]);
+        }
+        if (p.kind === "hearth") {
+          const bowlR = 9 * scale;
+          const bowlY = py - 2 * scale;
+          if (!p.taskUsed) {
+            // brazier bowl with a living flame — the bank marker
+            ctx.beginPath();
+            ctx.arc(px, bowlY, bowlR, 0, Math.PI);
+            ctx.closePath();
+            ctx.fillStyle = "#5d3a16";
+            ctx.fill();
+            ctx.strokeStyle = "#8a5f2a";
+            ctx.lineWidth = Math.max(1, 1.5 * scale);
+            ctx.stroke();
+            drawFlame(px, bowlY - 2 * scale, Math.max(7, 11 * scale));
+          } else {
+            // spent hearth: cold bowl, no flame
+            ctx.beginPath();
+            ctx.arc(px, bowlY, bowlR * 0.8, 0, Math.PI);
+            ctx.closePath();
+            ctx.fillStyle = "#4a3620";
+            ctx.fill();
+          }
+        }
         if (p.kind === "task" && !p.taskUsed) {
           drawFlame(px, py - 6 * scale, Math.max(6, 11 * scale));
         }
@@ -818,8 +1191,8 @@ export function DoodleTrack({
           ctx.translate(px, py);
           ctx.rotate(-p.rot);
           ctx.translate(-px, -py);
-          ctx.globalAlpha = 1;
         }
+        ctx.globalAlpha = 1;
       };
 
       // Platforms are generated strictly inside the field (cx is clamped with
@@ -847,6 +1220,7 @@ export function DoodleTrack({
         if (py < -80 || py > h + 80) return;
 
         const dead = world.phase === "dead";
+        const frozen = dead && world.deathCause === "frost";
         // squash & stretch by vertical speed, lean into the steering
         const stretch = 1 + Math.min(0.28, Math.abs(world.vy) / 3400);
         const rx = r / stretch;
@@ -891,23 +1265,30 @@ export function DoodleTrack({
           ctx.closePath();
         };
 
-        // outer coat + sticker outline
+        // outer coat + sticker outline (frozen ember goes cold blue)
+        const coatOuter = frozen
+          ? ["#1f4d80", "#3f7fb8", "#9fd4f5"]
+          : ["#c8401c", "#f26a28", "#ff9a4e"];
+        const coatMid = frozen ? ["#5a9fd0", "#d8f0ff"] : ["#ff8a3c", "#ffcf8a"];
+        const coreStops = frozen
+          ? ["#f0faff", "#cfe8ff", "#a8d8ff"]
+          : ["#fff7e6", "#ffe0ae", "#ffb877"];
         flame(rx * 1.14, ry * 1.22, tipLen, sway);
         let g = ctx.createLinearGradient(0, ry, 0, -ry - tipLen);
-        g.addColorStop(0, "#c8401c");
-        g.addColorStop(0.5, "#f26a28");
-        g.addColorStop(1, "#ff9a4e");
+        g.addColorStop(0, coatOuter[0]);
+        g.addColorStop(0.5, coatOuter[1]);
+        g.addColorStop(1, coatOuter[2]);
         ctx.fillStyle = g;
         ctx.fill();
         ctx.lineWidth = Math.max(1.2, r * 0.08);
-        ctx.strokeStyle = "rgba(60,20,8,0.55)";
+        ctx.strokeStyle = frozen ? "rgba(20,45,80,0.55)" : "rgba(60,20,8,0.55)";
         ctx.stroke();
 
         // mid coat
         flame(rx * 0.85, ry * 1.02, tipLen * 0.62, sway * 0.8);
         g = ctx.createLinearGradient(0, ry, 0, -ry - tipLen * 0.62);
-        g.addColorStop(0, "#ff8a3c");
-        g.addColorStop(1, "#ffcf8a");
+        g.addColorStop(0, coatMid[0]);
+        g.addColorStop(1, coatMid[1]);
         ctx.fillStyle = g;
         ctx.fill();
 
@@ -916,9 +1297,9 @@ export function DoodleTrack({
           -rx * 0.2, ry * 0.05, rx * 0.1,
           0, ry * 0.22, rx * 1.05,
         );
-        core.addColorStop(0, "#fff7e6");
-        core.addColorStop(0.6, "#ffe0ae");
-        core.addColorStop(1, "#ffb877");
+        core.addColorStop(0, coreStops[0]);
+        core.addColorStop(0.6, coreStops[1]);
+        core.addColorStop(1, coreStops[2]);
         ctx.beginPath();
         ctx.ellipse(0, ry * 0.26, rx * 0.8, ry * 0.66, 0, 0, Math.PI * 2);
         ctx.fillStyle = core;
@@ -1038,6 +1419,39 @@ export function DoodleTrack({
       ctx.font = `700 10px system-ui, 'Segoe UI', sans-serif`;
       ctx.fillStyle = "rgba(176,112,77,0.9)";
       ctx.fillText("ВЫСОТА", hudX, 40);
+
+      // heat bar (top-left): unbanked meters → multiplier ×1…×2
+      {
+        const hfrac = clamp(unbankedM() / DOODLE_HEAT_FULL_M, 0, 1);
+        const hbW = Math.min(150, fieldPx * 0.34);
+        const hbH = 8;
+        const hbX = x0 + 10;
+        const hbY = 14;
+        ctx.beginPath();
+        ctx.roundRect(hbX, hbY, hbW, hbH, 4);
+        ctx.fillStyle = "rgba(12,7,6,0.72)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,210,62,0.3)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        if (hfrac > 0.005) {
+          const pulse = hfrac >= 1 ? 0.75 + 0.25 * Math.sin(world.time * 6) : 1;
+          const fill = ctx.createLinearGradient(hbX, 0, hbX + hbW, 0);
+          fill.addColorStop(0, "#ff8a4a");
+          fill.addColorStop(1, "#ffd23e");
+          ctx.globalAlpha = pulse;
+          ctx.fillStyle = fill;
+          ctx.beginPath();
+          ctx.roundRect(hbX + 1.5, hbY + 1.5, Math.max(2, (hbW - 3) * hfrac), hbH - 3, 2.5);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        ctx.font = `700 10px system-ui, 'Segoe UI', sans-serif`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = hfrac >= 1 ? "#ffd23e" : "#b0704d";
+        ctx.fillText(`ЖАР ×${(1 + hfrac).toFixed(1)}`, hbX, hbY + hbH + 9);
+      }
 
       if (world.fogT > 0) {
         const label = `Туман ${Math.ceil(world.fogT)} с`;

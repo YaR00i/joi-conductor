@@ -12,6 +12,7 @@ import {
 } from "./DoodleTrack";
 import {
   DOODLE_DIFFICULTIES,
+  DOODLE_HEIGHT_K,
   getDoodleDifficulty,
   type DoodleDifficultyId,
 } from "../../lib/doodleReward";
@@ -244,7 +245,7 @@ describe("doodle balance simulation", () => {
     // sanity link between sim and reward math: same climb, bigger multiplier
     const sample = 150;
     const pay = (id: DoodleDifficultyId) =>
-      Math.round(Math.sqrt(sample) * 3.2 * getDoodleDifficulty(id).heightMult);
+      Math.round(Math.sqrt(sample) * DOODLE_HEIGHT_K * getDoodleDifficulty(id).heightMult);
     expect(pay("warmup")).toBeLessThan(pay("climb"));
     expect(pay("climb")).toBeLessThan(pay("storm"));
   });
