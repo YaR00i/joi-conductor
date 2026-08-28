@@ -5,6 +5,8 @@ export type EmberWorldLoadSnapshot = {
   shadowCached: number;
   shadowTotal: number;
   warmupComplete: boolean;
+  /** MeshToon compile after bake; overlay stays up. */
+  compiling?: boolean;
   /** 0..1 streaming fraction; overrides boolean settled when set. */
   terrainFrac?: number;
   propsFrac?: number;
@@ -20,6 +22,9 @@ export function emberWorldLoadProgress(
 ): EmberWorldLoadProgress {
   if (snapshot.warmupComplete) {
     return { ratio: 1, labelRu: "Готово" };
+  }
+  if (snapshot.compiling) {
+    return { ratio: 0.96, labelRu: "Шейдеры…" };
   }
   const terrain =
     snapshot.terrainFrac ?? (snapshot.terrainSettled ? 1 : 0);

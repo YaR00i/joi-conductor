@@ -74,6 +74,7 @@ import {
 import type { EmberAssetReference } from "../../../game/editor/emberLibraryIndex";
 import { writeEmberJson } from "../../../game/content/io";
 import { resolveMapAutoAttack } from "../../../game/content/playProfile";
+import { EmberCameraRigFields } from "./EmberCameraRigFields";
 import {
   packWithVoxels,
   writeVoxelRegistry,
@@ -159,6 +160,7 @@ import {
   lampParamsFromSource,
   lightsFileFromPresets,
 } from "../../../game/content/lightPresets";
+import { camerasFileFromPresets } from "../../../game/content/cameraPresets";
 import { voxelPlacementModifiersFromModel } from "../../../game/voxel/voxelModelApply";
 import { clampVoxelDirectLightScale } from "../../../game/voxel/voxelMesher";
 import {
@@ -3102,6 +3104,26 @@ export function MapEditorPanel({
     [onPackChange, onSaved, pack],
   );
 
+  const persistCameraPresets = useCallback(
+    async (next: EmberPack["cameraPresets"], msg: string) => {
+      if (!onPackChange) {
+        onSaved("Нет колбэка пака — пресет камеры не сохранён");
+        return;
+      }
+      const res = await writeEmberJson(
+        "cameras/registry.json",
+        camerasFileFromPresets(next),
+      );
+      if (!res.ok) {
+        onSaved(res.error || "Не удалось сохранить пресеты камеры");
+        return;
+      }
+      onPackChange({ ...pack, cameraPresets: next });
+      onSaved(msg);
+    },
+    [onPackChange, onSaved, pack],
+  );
+
   const editLibraryObjectField = useCallback(
     (edit: EmberInspectorFieldEdit) => {
       const selection = selectionRef.current;
@@ -3762,6 +3784,21 @@ export function MapEditorPanel({
       pushHistory(current, "Изменить профиль запуска");
       const next = cloneMap(current);
       next.playProfile = profile;
+      publishMap(next);
+    },
+    [publishMap, pushHistory],
+  );
+
+  const commitCamera = useCallback(
+    (camera: EmberMap["camera"]) => {
+      const current = mapRef.current;
+      if (JSON.stringify(current.camera ?? null) === JSON.stringify(camera ?? null)) {
+        return;
+      }
+      pushHistory(current, "Изменить камеру");
+      const next = cloneMap(current);
+      if (camera) next.camera = camera;
+      else delete next.camera;
       publishMap(next);
     },
     [publishMap, pushHistory],
@@ -6180,11 +6217,15 @@ export function MapEditorPanel({
             ? "дождь"
             : atm.fog > 0.05
               ? "туман"
-              : atm.cloudShadows > 0.05
-                ? "облака"
-                : atm.fireflies > 0.05
-                  ? "светлячки"
-                  : "ясно";
+              : atm.sparkle > 0.05
+                ? "блёстки"
+                : atm.tiltShift > 0.05
+                  ? "макро"
+                  : atm.cloudShadows > 0.05
+                    ? "облака"
+                    : atm.fireflies > 0.05
+                      ? "светлячки"
+                      : "ясно";
         return {
           caption: "Настройки",
           detail: fx,
@@ -6915,6 +6956,27 @@ export function MapEditorPanel({
                       >
                         Explore · Q
                       </button>
+                    </section>
+
+                    <section className="ember-map-view__section">
+                      <h4>Play / Explore</h4>
+                      <p className="ember-map-view__hint">
+                        Пишется в карту. Play и Explore·Q берут этот риг. Колёсико
+                        зума превью карту не меняет.
+                      </p>
+                      <EmberCameraRigFields
+                        camera={map.camera}
+                        tileSize={map.tileSize}
+                        mapId={map.id}
+                        presets={pack.cameraPresets ?? {}}
+                        onChange={commitCamera}
+                        onLive={(rig, mode) => {
+                          threePreviewRef.current?.setCameraRig(rig, mode);
+                        }}
+                        onPresetsPersist={
+                          onPackChange ? persistCameraPresets : undefined
+                        }
+                      />
                     </section>
 
                     <section className="ember-map-view__section">

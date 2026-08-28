@@ -134,7 +134,7 @@ describe("ember explore save", () => {
         inventory: { coin: 20, herb: 1 },
         equipment: compactEquipment({ weapon: "funeral_polearm" }),
         openedChests: ["agent_sandbox:chest"],
-        shopStock: { village_kiosk: { herb: 2 } },
+        shopStock: { village_kiosk: { herb: 2, qingxin_tea: 0 } },
         flags: { sandbox_chain_done: true },
       },
       hp: 80,
@@ -156,6 +156,7 @@ describe("ember explore save", () => {
       const loaded = readExploreSave(files, "ember_p1", 3);
       expect(loaded?.inventory).toEqual({ coin: 20, herb: 1 });
       expect(loaded?.shopStock.village_kiosk?.herb).toBe(2);
+      expect(loaded?.shopStock.village_kiosk?.qingxin_tea).toBe(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -20,6 +20,7 @@ import {
   autoAttackValidationMessage,
   playProfileValidationMessage,
 } from "./playProfile";
+import { cameraValidationMessage } from "./emberCamera";
 import { validateChestLootIds, validateItemCatalog } from "./emberItem";
 import { validateShops } from "./emberShop";
 
@@ -310,6 +311,16 @@ export function validatePack(pack: EmberPack): ValidationIssue[] {
     });
   }
 
+  for (const preset of Object.values(pack.cameraPresets ?? {})) {
+    if (preset.mapId && !pack.maps[preset.mapId]) {
+      issues.push({
+        level: "warn",
+        path: `cameraPresets/${preset.id}.mapId`,
+        message: `Камера «${preset.nameRu}» привязана к отсутствующей карте «${preset.mapId}»`,
+      });
+    }
+  }
+
   for (const tileset of Object.values(pack.tilesets)) {
     for (const tile of tileset.tiles) {
       validateTileSemantics(
@@ -393,6 +404,16 @@ export function validatePack(pack: EmberPack): ValidationIssue[] {
         level: "error",
         path: `${mapBase}.autoAttack`,
         message: autoAttackIssue,
+      });
+    }
+    const cameraIssue = cameraValidationMessage(
+      (map as { camera?: unknown }).camera,
+    );
+    if (cameraIssue) {
+      issues.push({
+        level: "error",
+        path: `${mapBase}.camera`,
+        message: cameraIssue,
       });
     }
     if (!pack.tilesets[map.tilesetId]) {

@@ -3,6 +3,7 @@ import {
   accumulatePlayLookMovement,
   isPlayMenuToggleKey,
   isPlayPointerLockTarget,
+  playCameraPitchFromMovement,
   playCameraYawFromMovement,
   playCanvasCursor,
   playLookActive,
@@ -14,6 +15,7 @@ import {
   playCursorClipShouldApply,
   playLookTakeMove,
   playLookWarpSkipCount,
+  playBackgroundShouldPause,
 } from "./playPointer";
 
 describe("play pointer look", () => {
@@ -21,6 +23,11 @@ describe("play pointer look", () => {
     expect(playCameraYawFromMovement(10, 0.01)).toBeCloseTo(-0.1);
     expect(playCameraYawFromMovement(0)).toBe(0);
     expect(playCameraYawFromMovement(Number.NaN)).toBe(0);
+  });
+
+  it("pitches the camera with mouse Y when unlocked", () => {
+    expect(playCameraPitchFromMovement(10, 0.01)).toBeCloseTo(0.1);
+    expect(playCameraPitchFromMovement(0)).toBe(0);
   });
 
   it("coalesces pointer events before the render-frame camera update", () => {
@@ -47,6 +54,27 @@ describe("play pointer look", () => {
   it("hides the cursor while looking, even without pointer lock", () => {
     expect(playCanvasCursor(true)).toBe("none");
     expect(playCanvasCursor(false)).toBe("default");
+  });
+
+  it("pauses when the window is backgrounded after warmup", () => {
+    expect(
+      playBackgroundShouldPause({
+        warmupComplete: true,
+        movementFrozen: false,
+      }),
+    ).toBe(true);
+    expect(
+      playBackgroundShouldPause({
+        warmupComplete: false,
+        movementFrozen: false,
+      }),
+    ).toBe(false);
+    expect(
+      playBackgroundShouldPause({
+        warmupComplete: true,
+        movementFrozen: true,
+      }),
+    ).toBe(false);
   });
 
   it("skips synthetic moves after recentering the cursor", () => {

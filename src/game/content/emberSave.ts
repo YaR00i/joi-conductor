@@ -195,12 +195,27 @@ function parseCountMap(raw: unknown): Record<string, number> {
   return compactInventory(raw as Record<string, number>) ?? {};
 }
 
+/** Unlike inventory, finite shop stock must retain an explicit sold-out zero. */
+function parseStockCountMap(raw: unknown): Record<string, number> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const next: Record<string, number> = {};
+  for (const [itemId, count] of Object.entries(
+    raw as Record<string, unknown>,
+  )) {
+    if (!itemId.trim() || typeof count !== "number" || !Number.isFinite(count)) {
+      continue;
+    }
+    next[itemId] = Math.max(0, Math.round(count));
+  }
+  return next;
+}
+
 function parseShopStock(raw: unknown): Record<string, Record<string, number>> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   const next: Record<string, Record<string, number>> = {};
   for (const [shopId, stock] of Object.entries(raw as Record<string, unknown>)) {
     if (!shopId.trim()) continue;
-    next[shopId] = parseCountMap(stock);
+    next[shopId] = parseStockCountMap(stock);
   }
   return next;
 }

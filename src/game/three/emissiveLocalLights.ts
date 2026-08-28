@@ -56,6 +56,7 @@ import {
   type EmberEmissiveLightMeta,
 } from "./emissiveAnimTick";
 import { MAP_POINT_LIGHTS_MAX } from "../tile/lightLimits";
+import { setPointLightShadowGranted } from "./dynamicShadowPolicy";
 import { packLampDiscDecay } from "./threeLighting";
 
 export const THREE_MAX_EMISSIVE_LIGHTS = 48;
@@ -461,7 +462,8 @@ export function listEmissiveLocalLights(
         const distance = rangeTiles * ts;
         const rank =
           (castShadows ? 20 : 8) +
-          (place.emissiveLightShadows === true ? 8 : 0);
+          (place.emissiveLightShadows === true ? 8 : 0) +
+          (torchFlicker || lanternFlicker ? 16 : 0);
         out.push({
           id: voxelLampSourceId(`emvox:${place.id}`, lamps, lamp),
           x: place.x,
@@ -606,8 +608,18 @@ export function listEmissiveLocalLights(
 
   // Prefer map voxel lanterns / shadow casters when over the light/shadow caps.
   out.sort((a, b) => {
-    const ra = (a.rank ?? 0) + (a.castShadows ? 40 : 0) + a.intensity * 0.02;
-    const rb = (b.rank ?? 0) + (b.castShadows ? 40 : 0) + b.intensity * 0.02;
+    const flickerBonus = (src: EmissiveLocalLightSource) =>
+      src.meta.torchFlicker || src.meta.lanternFlicker ? 16 : 0;
+    const ra =
+      (a.rank ?? 0) +
+      (a.castShadows ? 40 : 0) +
+      flickerBonus(a) +
+      a.intensity * 0.02;
+    const rb =
+      (b.rank ?? 0) +
+      (b.castShadows ? 40 : 0) +
+      flickerBonus(b) +
+      b.intensity * 0.02;
     return rb - ra;
   });
   return out.slice(0, THREE_MAX_EMISSIVE_LIGHTS);
@@ -642,7 +654,7 @@ function enableEmissiveShadow(
   leak = 0,
   forceSoft = false,
 ): void {
-  pl.castShadow = true;
+  pl.castShadow = false;
   const res = Math.max(128, Math.round(mapSize));
   pl.shadow.mapSize.set(res, res);
   pl.shadow.bias = -0.0002;
@@ -677,6 +689,11 @@ export function addThreeEmissiveLocalLights(
     maxLights?: number;
     /** Cap cube-shadow emissive lights (default THREE_MAX_EMISSIVE_SHADOWS). */
     maxShadows?: number;
+    /**
+     * Explore: only torch/lantern-flicker lamps may consume cube slots.
+     * Windows keep PointLight fill without a cube sampler.
+     */
+    lampFlickerShadowsOnly?: boolean;
     shadowMapSize?: number;
     voxelModels?: EmberVoxelModelLib;
     voxelScenes?: EmberVoxelSceneLib;
@@ -742,8 +759,14 @@ export function addThreeEmissiveLocalLights(
         src.y * ts + src.localZ,
       );
     }
-    const shadowRequested = allowShadows && src.castShadows;
-    if (shadowRequested) {
+    const shadowRequested =
+      allowShadows &&
+      src.castShadows &&
+      (opts?.lampFlickerShadowsOnly !== true ||
+        src.meta.torchFlicker === true ||
+        src.meta.lanternFlicker === true);
+    const granted = shadowRequested && shadowSlots > 0;
+    if (granted) {
       enableEmissiveShadow(
         pl,
         ts,
@@ -751,9 +774,9 @@ export function addThreeEmissiveLocalLights(
         src.shadowLeak ?? 0,
         src.softShadows === true,
       );
-      if (shadowSlots > 0) shadowSlots -= 1;
-      else pl.castShadow = false;
+      shadowSlots -= 1;
     }
+    setPointLightShadowGranted(pl, granted);
     pl.userData.emberEmissiveLight = true;
     pl.userData.emberEmissiveSourceId = src.id;
     pl.userData.emberShadowRequested = shadowRequested;

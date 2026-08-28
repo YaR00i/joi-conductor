@@ -17,100 +17,81 @@
  */
 import {
   ShaderChunk,
+  DataTexture,
+  NearestFilter,
+  RGBAFormat,
+  UnsignedByteType,
+  ClampToEdgeWrapping,
+  Vector2,
+  Vector3,
+  Vector4,
   type Material,
+  type Texture,
   type WebGLProgramParametersWithUniforms,
 } from "three";
+import { POINT_SHADOW_SHADER_SLOTS } from "./pointShadowAtlas";
 
 const MARKER = "Ember voxel light snap";
-const CACHE_TAG = "ember-voxel-light-snap-v12";
+const CACHE_TAG = "ember-voxel-light-snap-v17";
 const INCLUDE_LIGHTS = "#include <lights_fragment_begin>";
 const INCLUDE_WORLDPOS = "#include <worldpos_vertex>";
 const INCLUDE_SHADOWMAP = "#include <shadowmap_pars_fragment>";
-const PENUMBRA_MARKER = "emberPointPenumbra";
 
-const EMBER_GET_POINT_SHADOW = `float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {
+/** Atlas sample plus stock cubeToUV / texture2DCompare helpers. */
+export function patchedShadowmapParsFragment(): string {
+  const chunk = ShaderChunk.shadowmap_pars_fragment;
+  if (chunk.includes("emberAtlasShadow")) {
+    return chunk;
+  }
+  const endif = chunk.lastIndexOf("#endif");
+  if (endif < 0) return chunk + emberAtlasShadowGlsl();
+  return chunk.slice(0, endif) + emberAtlasShadowGlsl() + "\n#endif\n";
+}
+
+function emberAtlasShadowGlsl(): string {
+  const slots: string[] = [];
+  for (let i = 0; i < POINT_SHADOW_SHADER_SLOTS; i += 1) {
+    slots.push(`	if ( emberAtlasOccupied[ ${i} ] > 0.5 ) {
+		slotView = ( viewMatrix * vec4( emberAtlasLightWorld[ ${i} ], 1.0 ) ).xyz;
+		if ( distance( slotView, lightViewPos ) < 1.5 ) {
+			lightToPos = worldProbe - emberAtlasLightWorld[ ${i} ];
+			len = length( lightToPos );
+			nf = emberAtlasNearFar[ ${i} ];
+			if ( len - nf.y <= 0.0 && len - nf.x >= 0.0 ) {
+				dp = ( len - nf.x ) / max( nf.y - nf.x, 1e-4 ) + emberAtlasBias[ ${i} ];
+				bd3D = normalize( lightToPos );
+				cubeUv = cubeToUV( bd3D, texelY );
+				so = emberAtlasScaleOffset[ ${i} ];
+				uv = cubeUv * so.xy + so.zw;
+				shadow = mix( 1.0, texture2DCompare( emberPointShadowAtlas, uv, dp ), emberAtlasIntensity[ ${i} ] );
+			}
+		}
+	}`);
+  }
+  return `
+
+float emberAtlasShadow( vec3 lightViewPos, vec3 worldProbe ) {
+
+	if ( emberAtlasEnabled < 0.5 ) return 1.0;
 
 	float shadow = 1.0;
+	vec3 slotView;
+	vec3 lightToPos;
+	float len;
+	vec2 nf;
+	float dp;
+	vec3 bd3D;
+	vec2 cubeUv;
+	vec4 so;
+	vec2 uv;
+	float texelY = 1.0 / max( emberAtlasFaceSize * 2.0, 1.0 );
 
-	vec3 lightToPosition = shadowCoord.xyz;
+${slots.join("\n")}
 
-	float lightToPositionLength = length( lightToPosition );
-
-	if ( lightToPositionLength - shadowCameraFar <= 0.0 && lightToPositionLength - shadowCameraNear >= 0.0 ) {
-
-		float dp = ( lightToPositionLength - shadowCameraNear ) / ( shadowCameraFar - shadowCameraNear );
-		dp += shadowBias;
-
-		vec3 bd3D = normalize( lightToPosition );
-
-		vec2 texelSize = vec2( 1.0 ) / ( shadowMapSize * vec2( 4.0, 2.0 ) );
-
-		// ${PENUMBRA_MARKER}: radius 0 keeps a hard lantern umbra. Analog leak
-		// uses radius > 0 so the umbra greys and widens farther from the lamp.
-		if ( shadowRadius < 0.05 ) {
-
-			shadow = texture2DCompare( shadowMap, cubeToUV( bd3D, texelSize.y ), dp );
-
-		} else {
-
-			float distN = clamp( ( lightToPositionLength - shadowCameraNear ) / max( shadowCameraFar - shadowCameraNear, 1e-3 ), 0.0, 1.0 );
-			float blurCells = ( 0.55 + distN * 2.8 ) * clamp( shadowRadius / 2.2, 0.5, 3.5 );
-			float dirOff = ( emberVoxelSize * blurCells ) / max( lightToPositionLength, emberVoxelSize );
-			vec2 offset = vec2( - 1.0, 1.0 ) * dirOff;
-
-			shadow = (
-				texture2DCompare( shadowMap, cubeToUV( bd3D + offset.xyy, texelSize.y ), dp ) +
-				texture2DCompare( shadowMap, cubeToUV( bd3D + offset.yyy, texelSize.y ), dp ) +
-				texture2DCompare( shadowMap, cubeToUV( bd3D + offset.xyx, texelSize.y ), dp ) +
-				texture2DCompare( shadowMap, cubeToUV( bd3D + offset.yyx, texelSize.y ), dp ) +
-				texture2DCompare( shadowMap, cubeToUV( bd3D, texelSize.y ), dp ) +
-				texture2DCompare( shadowMap, cubeToUV( bd3D + offset.xxy, texelSize.y ), dp ) +
-				texture2DCompare( shadowMap, cubeToUV( bd3D + offset.yxy, texelSize.y ), dp ) +
-				texture2DCompare( shadowMap, cubeToUV( bd3D + offset.xxx, texelSize.y ), dp ) +
-				texture2DCompare( shadowMap, cubeToUV( bd3D + offset.yxx, texelSize.y ), dp )
-			) * ( 1.0 / 9.0 );
-
-		}
-
-	}
-
-	return mix( 1.0, shadow, shadowIntensity );
+	return shadow;
 
 }
 `;
-
-function replaceGlslFunction(
-  chunk: string,
-  signature: string,
-  replacement: string,
-): string {
-  const start = chunk.indexOf(signature);
-  if (start < 0) return chunk;
-  const brace = chunk.indexOf("{", start);
-  if (brace < 0) return chunk;
-  let depth = 0;
-  for (let i = brace; i < chunk.length; i++) {
-    const ch = chunk[i];
-    if (ch === "{") depth += 1;
-    else if (ch === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        return chunk.slice(0, start) + replacement + chunk.slice(i + 1);
-      }
-    }
-  }
-  return chunk;
-}
-
-/** Stock Three point-shadow PCF, with distance-scaled penumbra when radius > 0. */
-export function patchedShadowmapParsFragment(): string {
-  const chunk = ShaderChunk.shadowmap_pars_fragment;
-  if (chunk.includes(PENUMBRA_MARKER)) return chunk;
-  return replaceGlslFunction(
-    chunk,
-    "float getPointShadow(",
-    EMBER_GET_POINT_SHADOW,
-  );
 }
 
 /** Shared across all Ember lit materials. */
@@ -120,10 +101,115 @@ export const emberVoxelLightSnapState = {
   voxelSize: 1,
 };
 
+const atlasOccupied = Array.from(
+  { length: POINT_SHADOW_SHADER_SLOTS },
+  () => 0,
+);
+const atlasScaleOffset = Array.from(
+  { length: POINT_SHADOW_SHADER_SLOTS },
+  () => new Vector4(1, 1, 0, 0),
+);
+const atlasLightWorld = Array.from(
+  { length: POINT_SHADOW_SHADER_SLOTS },
+  () => new Vector3(),
+);
+const atlasNearFar = Array.from(
+  { length: POINT_SHADOW_SHADER_SLOTS },
+  () => new Vector2(0.5, 1),
+);
+const atlasBias = Array.from({ length: POINT_SHADOW_SHADER_SLOTS }, () => 0);
+const atlasIntensity = Array.from(
+  { length: POINT_SHADOW_SHADER_SLOTS },
+  () => 1,
+);
+
+function createFallbackAtlasTexture(): DataTexture {
+  const tex = new DataTexture(
+    new Uint8Array([255, 255, 255, 255]),
+    1,
+    1,
+    RGBAFormat,
+    UnsignedByteType,
+  );
+  tex.magFilter = NearestFilter;
+  tex.minFilter = NearestFilter;
+  tex.wrapS = ClampToEdgeWrapping;
+  tex.wrapT = ClampToEdgeWrapping;
+  tex.generateMipmaps = false;
+  tex.needsUpdate = true;
+  tex.name = "emberPointShadowAtlasFallback";
+  return tex;
+}
+
+const fallbackAtlasTexture = createFallbackAtlasTexture();
+
 const sharedUniforms = {
   emberVoxelLightSnap: { value: 0 },
   emberVoxelSize: { value: 1 },
+  emberPointShadowAtlas: { value: fallbackAtlasTexture as Texture },
+  emberAtlasEnabled: { value: 0 },
+  emberAtlasFaceSize: { value: 256 },
+  emberAtlasOccupied: { value: atlasOccupied },
+  emberAtlasScaleOffset: { value: atlasScaleOffset },
+  emberAtlasLightWorld: { value: atlasLightWorld },
+  emberAtlasNearFar: { value: atlasNearFar },
+  emberAtlasBias: { value: atlasBias },
+  emberAtlasIntensity: { value: atlasIntensity },
 };
+
+export type EmberPointShadowAtlasSlot = {
+  occupied: boolean;
+  scaleX: number;
+  scaleY: number;
+  offsetX: number;
+  offsetY: number;
+  x: number;
+  y: number;
+  z: number;
+  near: number;
+  far: number;
+  bias: number;
+  intensity: number;
+};
+
+/**
+ * Bind the point-shadow atlas for every patched Ember material.
+ * Compile-time slot count stays POINT_SHADOW_SHADER_SLOTS.
+ */
+export function setEmberPointShadowAtlas(args: {
+  enabled: boolean;
+  texture?: Texture | null;
+  faceSize?: number;
+  slots?: readonly EmberPointShadowAtlasSlot[];
+}): void {
+  sharedUniforms.emberAtlasEnabled.value = args.enabled ? 1 : 0;
+  sharedUniforms.emberPointShadowAtlas.value =
+    args.texture ?? fallbackAtlasTexture;
+  sharedUniforms.emberAtlasFaceSize.value = Math.max(1, args.faceSize ?? 256);
+  const slots = args.slots ?? [];
+  for (let i = 0; i < POINT_SHADOW_SHADER_SLOTS; i += 1) {
+    const slot = slots[i];
+    atlasOccupied[i] = slot?.occupied ? 1 : 0;
+    if (!slot) {
+      atlasScaleOffset[i]!.set(1, 1, 0, 0);
+      atlasLightWorld[i]!.set(0, 0, 0);
+      atlasNearFar[i]!.set(0.5, 1);
+      atlasBias[i] = 0;
+      atlasIntensity[i] = 1;
+      continue;
+    }
+    atlasScaleOffset[i]!.set(
+      slot.scaleX,
+      slot.scaleY,
+      slot.offsetX,
+      slot.offsetY,
+    );
+    atlasLightWorld[i]!.set(slot.x, slot.y, slot.z);
+    atlasNearFar[i]!.set(slot.near, Math.max(slot.near + 1e-4, slot.far));
+    atlasBias[i] = slot.bias;
+    atlasIntensity[i] = Math.max(0, Math.min(1, slot.intensity));
+  }
+}
 
 function syncSharedUniforms(): void {
   sharedUniforms.emberVoxelLightSnap.value = emberVoxelLightSnapState.enabled
@@ -244,18 +330,6 @@ function patchDirShadowSamples(chunk: string): string {
   return chunk.replaceAll(from, combineDirCascadeShadowExpr());
 }
 
-function patchPointShadowSamples(chunk: string): string {
-  const from =
-    "getPointShadow( pointShadowMap[ i ], pointLightShadow.shadowMapSize, pointLightShadow.shadowIntensity, pointLightShadow.shadowBias, pointLightShadow.shadowRadius, vPointShadowCoord[ i ], pointLightShadow.shadowCameraNear, pointLightShadow.shadowCameraFar )";
-  if (!chunk.includes(from)) return chunk;
-  const biased = SHADOW_WORLD_WITH_BIAS(
-    "pointLightShadows[ i ].shadowNormalBias",
-  );
-  // vPointShadowCoord stores light→fragment via pointShadowMatrix * worldPos.
-  const to = `getPointShadow( pointShadowMap[ i ], pointLightShadow.shadowMapSize, pointLightShadow.shadowIntensity, pointLightShadow.shadowBias, pointLightShadow.shadowRadius, emberVoxelLightSnap > 0.5 ? ( pointShadowMatrix[ i ] * vec4( ${biased}, 1.0 ) ) : vPointShadowCoord[ i ], pointLightShadow.shadowCameraNear, pointLightShadow.shadowCameraFar )`;
-  return chunk.replaceAll(from, to);
-}
-
 /**
  * Stock Three computes viewDir from smooth `vViewPosition` even after we snap
  * `geometryPosition` — that leaves soft specular gradients (esp. on water).
@@ -300,12 +374,36 @@ function patchedLightsFragmentBegin(): string {
     chunk = chunk.replace(VIEWDIR_FROM_VPOS_TIGHT, VIEWDIR_SNAPPED);
   }
 
-  return patchPointShadowSamples(patchDirShadowSamples(chunk));
+  return patchAtlasPointShadows(patchDirShadowSamples(chunk));
+}
+
+const ATLAS_LIGHT_NEEDLE =
+  "getPointLightInfo( pointLight, geometryPosition, directLight );";
+
+function patchAtlasPointShadows(chunk: string): string {
+  if (chunk.includes("emberAtlasShadow( pointLight.position")) return chunk;
+  if (!chunk.includes(ATLAS_LIGHT_NEEDLE)) return chunk;
+  return chunk.replace(
+    ATLAS_LIGHT_NEEDLE,
+    `${ATLAS_LIGHT_NEEDLE}
+
+		#if defined( USE_SHADOWMAP ) && ( NUM_POINT_LIGHT_SHADOWS < 1 )
+		directLight.color *= ( directLight.visible && receiveShadow ) ? emberAtlasShadow( pointLight.position, emberVoxelLightSnap > 0.5 ? ${SHADOW_WORLD_WITH_BIAS("0.05")} : vEmberWorldPos ) : 1.0;
+		#endif`,
+  );
+}
+
+/** Patched lights_fragment_begin (voxel snap + atlas). Exported for shader tests. */
+export function patchedEmberLightsFragmentBegin(): string {
+  return patchedLightsFragmentBegin();
 }
 
 function injectFragmentSnap(fragmentShader: string): string {
   let fs = fragmentShader;
-  if (fs.includes(INCLUDE_SHADOWMAP) && !fs.includes(PENUMBRA_MARKER)) {
+  if (
+    fs.includes(INCLUDE_SHADOWMAP) &&
+    !fs.includes("emberAtlasShadow")
+  ) {
     fs = fs.replace(INCLUDE_SHADOWMAP, patchedShadowmapParsFragment());
   }
   if (fs.includes(MARKER)) return fs;
@@ -341,6 +439,17 @@ export function patchEmberVoxelLightSnap(material: Material): void {
     prevCompile(shader, renderer);
     shader.uniforms.emberVoxelLightSnap = sharedUniforms.emberVoxelLightSnap;
     shader.uniforms.emberVoxelSize = sharedUniforms.emberVoxelSize;
+    shader.uniforms.emberPointShadowAtlas =
+      sharedUniforms.emberPointShadowAtlas;
+    shader.uniforms.emberAtlasEnabled = sharedUniforms.emberAtlasEnabled;
+    shader.uniforms.emberAtlasFaceSize = sharedUniforms.emberAtlasFaceSize;
+    shader.uniforms.emberAtlasOccupied = sharedUniforms.emberAtlasOccupied;
+    shader.uniforms.emberAtlasScaleOffset =
+      sharedUniforms.emberAtlasScaleOffset;
+    shader.uniforms.emberAtlasLightWorld = sharedUniforms.emberAtlasLightWorld;
+    shader.uniforms.emberAtlasNearFar = sharedUniforms.emberAtlasNearFar;
+    shader.uniforms.emberAtlasBias = sharedUniforms.emberAtlasBias;
+    shader.uniforms.emberAtlasIntensity = sharedUniforms.emberAtlasIntensity;
 
     if (!shader.vertexShader.includes("varying vec3 vEmberWorldPos")) {
       shader.vertexShader =
@@ -349,11 +458,17 @@ export function patchEmberVoxelLightSnap(material: Material): void {
     const fragUniforms = `varying vec3 vEmberWorldPos;
 uniform float emberVoxelLightSnap;
 uniform float emberVoxelSize;
+uniform sampler2D emberPointShadowAtlas;
+uniform float emberAtlasEnabled;
+uniform float emberAtlasFaceSize;
+uniform float emberAtlasOccupied[ ${POINT_SHADOW_SHADER_SLOTS} ];
+uniform vec4 emberAtlasScaleOffset[ ${POINT_SHADOW_SHADER_SLOTS} ];
+uniform vec3 emberAtlasLightWorld[ ${POINT_SHADOW_SHADER_SLOTS} ];
+uniform vec2 emberAtlasNearFar[ ${POINT_SHADOW_SHADER_SLOTS} ];
+uniform float emberAtlasBias[ ${POINT_SHADOW_SHADER_SLOTS} ];
+uniform float emberAtlasIntensity[ ${POINT_SHADOW_SHADER_SLOTS} ];
 #if defined( USE_SHADOWMAP ) && ( NUM_DIR_LIGHT_SHADOWS > 0 )
 	uniform mat4 directionalShadowMatrix[ NUM_DIR_LIGHT_SHADOWS ];
-#endif
-#if defined( USE_SHADOWMAP ) && ( NUM_POINT_LIGHT_SHADOWS > 0 )
-	uniform mat4 pointShadowMatrix[ NUM_POINT_LIGHT_SHADOWS ];
 #endif
 `;
     if (!shader.fragmentShader.includes("varying vec3 vEmberWorldPos")) {
@@ -364,15 +479,6 @@ uniform float emberVoxelSize;
       shader.fragmentShader =
         fragUniforms.replace("varying vec3 vEmberWorldPos;\n", "") +
         shader.fragmentShader;
-    } else if (
-      !shader.fragmentShader.includes("uniform mat4 pointShadowMatrix")
-    ) {
-      // Older patched materials may already declare dir matrix — add point.
-      shader.fragmentShader =
-        `#if defined( USE_SHADOWMAP ) && ( NUM_POINT_LIGHT_SHADOWS > 0 )
-	uniform mat4 pointShadowMatrix[ NUM_POINT_LIGHT_SHADOWS ];
-#endif
-` + shader.fragmentShader;
     }
 
     shader.vertexShader = injectVertexWorldVarying(shader.vertexShader);

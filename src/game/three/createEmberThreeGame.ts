@@ -41,6 +41,7 @@ export function createEmberThreeGame(
     advanceDialogue: () => world.advanceDialogue(),
     captureExploreSave: () => world.captureExploreSave(),
     applyExploreSave: (save) => world.applyExploreSave(save),
+    applyCameraSettings: (camera) => world.applyCameraSettings(camera),
     destroy: () => world.destroy(),
   };
 }

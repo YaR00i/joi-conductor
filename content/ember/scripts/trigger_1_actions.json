@@ -1,0 +1,11 @@
+{
+  "id": "trigger_1_actions",
+  "nameRu": "Новая цепочка",
+  "steps": [
+    {
+      "type": "give_item",
+      "itemId": "coin",
+      "count": 10
+    }
+  ]
+}

@@ -276,7 +276,9 @@ function mimeForRel(rel: string): string {
   if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
   if (lower.endsWith(".gif")) return "image/gif";
   if (lower.endsWith(".svg")) return "image/svg+xml";
-  if (lower.endsWith(".vox")) return "application/octet-stream";
+  if (lower.endsWith(".vox") || lower.endsWith(".aseprite") || lower.endsWith(".ase")) {
+    return "application/octet-stream";
+  }
   return "application/octet-stream";
 }
 

@@ -6,23 +6,23 @@ import {
 } from "./localShadowDebugOverlay";
 
 describe("local shadow debug overlay", () => {
-  it("distinguishes active, cached, warming, and unshadowed lights", () => {
+  it("distinguishes recook, baked, warming, and fill-only lights", () => {
     const dynamic = new THREE.PointLight();
-    dynamic.castShadow = true;
+    dynamic.userData.emberShadowGranted = true;
     const baked = new THREE.PointLight();
-    baked.castShadow = true;
-    const cached = new THREE.PointLight();
-    cached.userData.emberShadowRequested = true;
-    cached.userData.emberStaticShadowCached = true;
+    baked.userData.emberShadowGranted = true;
+    baked.userData.emberStaticShadowCached = true;
     const warming = new THREE.PointLight();
-    warming.userData.emberShadowRequested = true;
+    warming.userData.emberShadowGranted = true;
+    const fill = new THREE.PointLight();
+    fill.userData.emberShadowRequested = true;
     const noShadow = new THREE.PointLight();
     const active = new Set([dynamic]);
 
     expect(localShadowDebugStatus(dynamic, active)).toBe("dynamic");
     expect(localShadowDebugStatus(baked, active)).toBe("baked");
-    expect(localShadowDebugStatus(cached, active)).toBe("cached");
     expect(localShadowDebugStatus(warming, active)).toBe("warming");
+    expect(localShadowDebugStatus(fill, active)).toBe("no-shadow");
     expect(localShadowDebugStatus(noShadow, active)).toBe("no-shadow");
   });
 

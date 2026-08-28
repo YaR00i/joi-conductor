@@ -107,24 +107,15 @@ export function resolveEmberRenderBudget(
     ),
   );
 
-  // Each PointLight shadow is one cube sampler. Reserve eight units for the
-  // heaviest Ember surface path, then expose remaining hardware capacity.
-  // CPU cost is the real cliff: six cube faces per shadowed point light.
-  const samplerLimited = Math.max(0, caps.maxTextures - 8);
-  const maxPointShadowsHard = clampInt(
-    samplerLimited,
-    0,
-    MAP_POINT_SHADOWS_MAX,
-  );
+  // Atlas umbras use one 2D sampler, not one cube sampler per lamp. Bake-cache
+  // size is the authored cap (up to MAP_POINT_SHADOWS_MAX). Shader loop stays K=8.
+  const maxPointShadowsHard = MAP_POINT_SHADOWS_MAX;
   // Auto stays conservative (6 in play, 4 in the editor). An explicit map
-  // slider may go up to `maxPointShadowsHard` without this profile clamp.
+  // slider may go up to `maxPointShadowsHard`.
   const maxPointShadows = clampInt(
-    samplerLimited,
+    profileBudget?.maxPointShadows ?? (mode === "play" ? 6 : 4),
     0,
-    Math.min(
-      maxPointShadowsHard,
-      profileBudget?.maxPointShadows ?? (mode === "play" ? 6 : 4),
-    ),
+    maxPointShadowsHard,
   );
 
   const cubeLimit = Math.max(128, caps.maxCubemapSize || 128);
@@ -171,14 +162,22 @@ export function applyMapLightBudget(
 }
 
 /**
- * Explore maps often author 12 cubes for the editor. Play clamps to the
- * profile so every toon material is not sampling a dozen cube maps.
+ * Atlas bake-cache cap for play. Shader slot count stays
+ * `POINT_SHADOW_SHADER_SLOTS`; this is not a cube-sampler count.
  */
 export function playPointShadowCap(
   budget: EmberRenderBudget,
-  profile: EmberPlayProfileBudget,
+  _profile: EmberPlayProfileBudget,
 ): number {
-  return Math.min(budget.maxPointShadows, profile.maxPointShadows);
+  return budget.maxPointShadows;
+}
+
+/** Cube slots left for emissive voxel/sprite lamps after authored lanterns. */
+export function remainingEmissiveShadowSlots(
+  cubeCap: number,
+  lanternCubes: number,
+): number {
+  return Math.max(0, Math.floor(cubeCap) - Math.max(0, Math.floor(lanternCubes)));
 }
 
 /** How many lantern PointLights to spawn before emissive fill takes the rest. */

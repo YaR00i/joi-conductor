@@ -102,6 +102,12 @@ import {
   stageUsesTimedClear,
 } from "../content/playProfile";
 import {
+  resolveMapCamera,
+  resolvePackMapCamera,
+  type ResolvedEmberCamera,
+} from "../content/emberCamera";
+import type { EmberMapCamera } from "../content/types";
+import {
   emissivePlacementSeed,
   emissiveSmoothstep,
   hasEmissiveInk,
@@ -152,10 +158,12 @@ import {
 import { addQuestMarkerOverlays } from "./questMarkerOverlay";
 import {
   accumulatePlayLookMovement,
+  PLAY_CAMERA_YAW_SENSITIVITY,
   PLAY_LOOK_LOCK_UI_SELECTOR,
   PLAY_POINTER_LOCK_RELOCK_MS,
   isPlayMenuToggleKey,
   isPlayPointerLockTarget,
+  playCameraPitchFromMovement,
   playCameraYawFromMovement,
   playCanvasCursor,
   playLookActive,
@@ -167,6 +175,7 @@ import {
   playLookTakeMove,
   playLookWarpSkipCount,
   warpPlayCursorIfNeeded,
+  playBackgroundShouldPause,
 } from "./playPointer";
 import { emberWorldLoadProgress } from "./emberLoadProgress";
 import { getEmberEnvMap } from "./envMap";
@@ -176,6 +185,7 @@ import {
   applyMapLightBudget,
   lanternVisibleShare,
   playPointShadowCap,
+  remainingEmissiveShadowSlots,
   resolveEmberRenderBudget,
   resolvePlayProfileBudget,
   type EmberPlayProfileBudget,
@@ -192,7 +202,7 @@ import {
   sunDirectionFromAngles,
 } from "./threeLighting";
 import { addThreeEmissiveLocalLights } from "./emissiveLocalLights";
-import { setEmberVoxelLightSnap } from "./voxelLightSnap";
+import { setEmberVoxelLightSnap, setEmberPointShadowAtlas } from "./voxelLightSnap";
 import {
   hitsSolidVoxels,
   jumpLedgeVoxels,
@@ -226,6 +236,7 @@ import {
   applyInteriorCutawayTagged,
   collectCutawayTagged,
   tagCutawayObject,
+  withCutawayCastersVisible,
 } from "./interiorCutaway";
 import { createEditorVoxelInstanceBatch } from "./editorVoxelInstancing";
 import {
@@ -259,6 +270,17 @@ import {
 } from "./localShadowDebugOverlay";
 import { LocalPointShadowMapBank } from "./localPointShadowMapBank";
 import {
+  POINT_SHADOW_SHADER_SLOTS,
+  layoutPointShadowAtlas,
+} from "./pointShadowAtlas";
+import {
+  pointShadowDynamicCacheId,
+} from "./pointShadowAtlasGpu";
+import {
+  bakePointShadowCacheTile,
+  presentPointShadowAtlas as presentBoundPointShadowAtlas,
+} from "./pointShadowAtlasPass";
+import {
   createEmberFrameProfiler,
   type EmberFrameProfiler,
   type EmberProfilerExtras,
@@ -266,15 +288,15 @@ import {
 import {
   DYNAMIC_LOCAL_SHADOW_MAX_LIGHTS,
   EMBER_DYNAMIC_ACTOR_LAYER,
-  beginPointShadowBake,
   configureCachedSunShadow,
   dynamicLocalShadowLimitForCrowd,
   mapWideDirectionalHalf,
   directionalShadowLightDistance,
   fitDirectionalShadowToFocus,
+  grantedPointShadowLights,
   invalidatePointLightShadows,
   pickDynamicPointShadowLightsFrom,
-  pointLightRequestsShadow,
+  pointLightActorRecookBlocked,
   setObjectRenderLayer,
 } from "./dynamicShadowPolicy";
 import {
@@ -546,6 +568,7 @@ export class EmberThreeWorld {
   private terrainSettled = false;
   private staticPropsSettled = false;
   private shadowWarmupComplete = false;
+  private shaderCompiling = false;
   private localLightsSpawned = false;
   private lastLoadRatio = -1;
   private lastLoadLabel = "";
@@ -701,9 +724,11 @@ export class EmberThreeWorld {
   private pausedLogic = false;
   private lookWarpSkip = 0;
   private pendingLookMovementX = 0;
+  private pendingLookMovementY = 0;
   private lookWarpPending = false;
   private finished = false;
   private followDist = 120;
+  private cameraRig: ResolvedEmberCamera = resolveMapCamera({});
   private readonly followTarget = new THREE.Vector3();
   private keyLight: THREE.DirectionalLight | null = null;
   private readonly sunDir = new THREE.Vector3(0, 1, 0);
@@ -711,6 +736,8 @@ export class EmberThreeWorld {
   private localShadowSkip = 0;
   private localPointShadowLimit = 0;
   private readonly localShadowMapBank = new LocalPointShadowMapBank();
+  private atlasSlotIds: (string | null)[] = [];
+  private atlasBlitDirty = true;
   private dynamicLocalLights: THREE.PointLight[] = [];
   private localShadowCandidates: THREE.PointLight[] = [];
   private readonly localShadowActorFocuses: THREE.Vector3[] = [];
@@ -802,19 +829,28 @@ export class EmberThreeWorld {
       this.pendingLookMovementX,
       ev.movementX,
     );
+    this.pendingLookMovementY = accumulatePlayLookMovement(
+      this.pendingLookMovementY,
+      ev.movementY,
+    );
     if (!locked) this.lookWarpPending = true;
   };
   private readonly onPointerLockChange = () => {
     this.pendingLookMovementX = 0;
+    this.pendingLookMovementY = 0;
     this.lookWarpPending = false;
     this.lookWarpSkip = 0;
     this.syncPointerLock();
   };
   private readonly onWindowBlur = () => {
     this.syncPointerLock();
+    this.pauseIfBackgrounded();
   };
   private readonly onWindowFocus = () => {
     this.syncPointerLock();
+  };
+  private readonly onVisibilityChange = () => {
+    if (document.hidden) this.pauseIfBackgrounded();
   };
   private readonly onContextLost = (ev: Event) => {
     ev.preventDefault();
@@ -833,6 +869,8 @@ export class EmberThreeWorld {
     this.clock.getDelta();
     this.localShadowMapBank.resetGpuResources();
     this.dynamicLocalLights = [];
+    this.atlasBlitDirty = true;
+    this.atlasSlotIds = this.atlasSlotIds.map(() => null);
     this.invalidateStaticShadows();
     this.onResize();
     this.scene.traverse((obj) => {
@@ -874,6 +912,7 @@ export class EmberThreeWorld {
       }
     }
     this.autoAttackEnabled = resolveMapAutoAttack(this.map);
+    this.cameraRig = resolvePackMapCamera(this.map, this.pack);
     this.enemySpatial = new RuntimeActorSpatialIndex(
       Math.max(24, this.map.tileSize * 2),
     );
@@ -934,7 +973,12 @@ export class EmberThreeWorld {
     this.scene.background = new THREE.Color(0x0e0a08);
     this.scene.environment = getEmberEnvMap();
     this.localShadowDebug = createLocalShadowDebugOverlay(this.scene);
-    this.camera = new THREE.PerspectiveCamera(40, width / height, 1, 5000);
+    this.camera = new THREE.PerspectiveCamera(
+      this.cameraRig.fov,
+      width / height,
+      this.cameraRig.near,
+      this.cameraRig.far,
+    );
     this.camera.layers.enable(EMBER_DYNAMIC_ACTOR_LAYER);
     this.renderer = new THREE.WebGLRenderer({
       antialias: false,
@@ -947,6 +991,17 @@ export class EmberThreeWorld {
       this.renderer.capabilities,
       "play",
       resolveMapPlayProfile(this.map),
+    );
+    this.localShadowMapBank.enableAtlas(
+      layoutPointShadowAtlas(
+        POINT_SHADOW_SHADER_SLOTS,
+        this.renderBudget.pointShadowMapSize,
+        this.renderer.capabilities.maxTextureSize,
+      ),
+    );
+    this.atlasSlotIds = Array.from(
+      { length: POINT_SHADOW_SHADER_SLOTS },
+      () => null,
     );
     this.renderer.setSize(width, height);
     // Cap DPR — bloom + shadows already dominate GPU cost.
@@ -987,12 +1042,16 @@ export class EmberThreeWorld {
     this.controls.enablePan = false;
     this.controls.enableRotate = false;
     this.controls.enableZoom = true;
-    // Locked isometric pitch — mouse look only yaws around the player.
-    const isoPolar = 0.95;
-    this.controls.minPolarAngle = isoPolar;
-    this.controls.maxPolarAngle = isoPolar;
-    this.controls.minDistance = 64;
-    this.controls.maxDistance = 220;
+    const rig = this.cameraRig;
+    if (rig.pitchLock) {
+      this.controls.minPolarAngle = rig.polarAngle;
+      this.controls.maxPolarAngle = rig.polarAngle;
+    } else {
+      this.controls.minPolarAngle = rig.polarMin;
+      this.controls.maxPolarAngle = rig.polarMax;
+    }
+    this.controls.minDistance = Math.max(48, rig.followDistance * 0.45);
+    this.controls.maxDistance = Math.max(rig.followDistance * 1.85, 220);
     this.lightRoot.name = "lights";
     this.fillLightRoot.name = "fillLights";
     this.localLightRoot.name = "localLights";
@@ -1026,7 +1085,7 @@ export class EmberThreeWorld {
       this.player.lx,
       this.player.ly,
       this.playerFeetElev,
-      6,
+      this.cameraRig.lookHeight,
       this.map.tileSize,
     );
     const delta = new THREE.Vector3(
@@ -1042,6 +1101,7 @@ export class EmberThreeWorld {
     window.addEventListener("keyup", this.onKeyUp, true);
     window.addEventListener("blur", this.onWindowBlur);
     window.addEventListener("focus", this.onWindowFocus);
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
     this.onResize = this.onResize.bind(this);
     window.addEventListener("resize", this.onResize);
     document.addEventListener("pointerdown", this.onPointerDown, true);
@@ -1115,7 +1175,11 @@ export class EmberThreeWorld {
       threshold: lightCfg.bloomThreshold,
       radius: lightCfg.bloomRadius,
     });
-    this.post.setGrade(lightCfg.grade, lightCfg.atmosphere.vignette);
+    this.post.setGrade(
+      lightCfg.grade,
+      lightCfg.atmosphere.vignette,
+      lightCfg.atmosphere.tiltShift,
+    );
     this.atmosphere.apply(
       lightCfg.atmosphere,
       this.map.width * this.map.tileSize,
@@ -1130,7 +1194,9 @@ export class EmberThreeWorld {
 
     this.clearLightRoot();
     // Fixed isometric framing around player (retargeted after spawn).
-    this.followDist = THREE.MathUtils.clamp(this.map.tileSize * 7.5, 96, 160);
+    this.cameraRig = resolvePackMapCamera(this.map, this.pack);
+    this.applyCameraLens();
+    this.followDist = this.cameraRig.followDistance;
     sunDirectionFromAngles(
       lightCfg.sunAzimuth,
       lightCfg.sunElevation,
@@ -1161,8 +1227,8 @@ export class EmberThreeWorld {
         snapMin: 0,
       });
     }
-    const isoPolar = 0.95;
-    const yaw = Math.PI * 0.25;
+    const isoPolar = this.cameraRig.polarAngle;
+    const yaw = this.cameraRig.yaw;
     const spherical = new THREE.Spherical(this.followDist, isoPolar, yaw);
     this.controls.target.copy(mapCenter);
     this.camera.position.setFromSpherical(spherical).add(this.controls.target);
@@ -1313,9 +1379,7 @@ export class EmberThreeWorld {
       shadowMapSize: this.renderBudget.pointShadowMapSize,
       shadowFocus: explore ? this.player.mesh.position : undefined,
     });
-    const lanternCubes = this.lanternLights.filter(
-      (light) => light.castShadow,
-    ).length;
+    const lanternGranted = grantedPointShadowLights(this.lanternLights).length;
     this.emissiveLights = addThreeEmissiveLocalLights(
       this.localLightRoot,
       this.map,
@@ -1327,18 +1391,17 @@ export class EmberThreeWorld {
           0,
           lightCaps.maxPointLights - this.lanternLights.length,
         ),
-        maxShadows: this.playProfileBudget.emissiveShadows
-          ? Math.max(0, pointShadowCap - lanternCubes)
-          : 0,
+        maxShadows: remainingEmissiveShadowSlots(pointShadowCap, lanternGranted),
+        lampFlickerShadowsOnly: !this.playProfileBudget.emissiveShadows,
         shadowMapSize: this.renderBudget.pointShadowMapSize,
         voxelModels: this.pack.voxelModels,
         voxelScenes: this.pack.voxelScenes,
       },
     );
-    this.localShadowCandidates = [
+    this.localShadowCandidates = grantedPointShadowLights([
       ...this.lanternLights,
       ...this.emissiveLights,
-    ].filter(pointLightRequestsShadow);
+    ]);
     this.localPointShadowLimit = this.localShadowCandidates.length;
     this.localShadowMapBank.replaceLights(this.localShadowCandidates);
     this.localShadowDebug.rebuild(
@@ -1834,10 +1897,10 @@ export class EmberThreeWorld {
   }
 
   /**
-   * Sun/moon and most lamp cubes contain authored geometry and stay cached
+   * Sun/moon and atlas lamp umbras contain authored geometry and stay cached
    * while the camera and actors move. Local PointLights still add light
-   * inside the baked umbra. The nearest in-range lamp also captures the
-   * player/enemy layer.
+   * inside the baked umbra. The nearest in-range lamp also recooks one
+   * atlas slot with the player/enemy layer.
    */
   private invalidateStaticShadows(): void {
     this.staticShadowDirty = true;
@@ -1898,6 +1961,39 @@ export class EmberThreeWorld {
     }
   }
 
+  private pointShadowCacheId(light: THREE.PointLight): string {
+    return this.localShadowMapBank.cacheIdFor(light);
+  }
+
+  private atlasBlitSlotIds(
+    slotIds: readonly (string | null)[],
+  ): (string | null)[] {
+    const gpu = this.localShadowMapBank.atlas();
+    const dynamic = new Set(
+      this.dynamicLocalLights.map((light) => this.pointShadowCacheId(light)),
+    );
+    return slotIds.map((id) => {
+      if (!id || !gpu) return id;
+      const dyn = pointShadowDynamicCacheId(id);
+      if (dynamic.has(id) && gpu.hasCacheTile(dyn)) return dyn;
+      return id;
+    });
+  }
+
+  private presentPointShadowAtlas(): void {
+    const presented = presentBoundPointShadowAtlas({
+      gpu: this.localShadowMapBank.atlas(),
+      lights: this.localShadowCandidates,
+      focus: this.player?.mesh.position ?? null,
+      slotIds: this.atlasSlotIds,
+      blitDirty: this.atlasBlitDirty,
+      renderer: this.renderer,
+      blitSlotIds: (slotIds) => this.atlasBlitSlotIds(slotIds),
+    });
+    this.atlasSlotIds = presented.slotIds;
+    this.atlasBlitDirty = presented.blitDirty;
+  }
+
   private bakeStaticPointShadows(): boolean {
     if (
       (!this.staticShadowDirty && !this.sunShadowDirty) ||
@@ -1908,46 +2004,63 @@ export class EmberThreeWorld {
     }
 
     const sun = this.keyLight;
+    const gpu = this.localShadowMapBank.atlas();
     const dirtyLights =
       this.localPointShadowLimit > 0
         ? this.localShadowMapBank.dirtyLights()
         : [];
-    const batchSize = this.shadowWarmupComplete
-      ? 1
-      : Math.max(1, this.localPointShadowLimit);
+    const batchSize = 1;
     const batch = dirtyLights.slice(0, batchSize);
     const includeSun = this.sunShadowDirty && sun?.castShadow === true;
-    this.localShadowMapBank.prepareStaticBatch(batch);
-    const allowed = new Set<THREE.Light>(batch);
-    if (includeSun && sun) allowed.add(sun);
-    const frozen = this.freezeShadowsExcept((light) => allowed.has(light));
-    const pointBake = beginPointShadowBake(batch);
-    if (sun?.castShadow) {
-      sun.shadow.autoUpdate = false;
-      sun.shadow.needsUpdate = includeSun;
-    }
+
     let rendered = false;
-    try {
-      if (pointBake.count > 0 || includeSun) {
-        this.renderOffscreenShadowPass(false);
-        rendered = true;
+    let warmupNow = false;
+    withCutawayCastersVisible(this.cutawayTagged, () => {
+      this.localShadowMapBank.prepareStaticBatch(batch);
+      if (includeSun && sun) {
+        const frozen = this.freezeShadowsExcept((light) => light === sun);
+        sun.shadow.autoUpdate = false;
+        sun.shadow.needsUpdate = true;
+        try {
+          this.renderOffscreenShadowPass(false);
+          rendered = true;
+        } finally {
+          this.restoreFrozenShadows(frozen);
+          sun.shadow.needsUpdate = false;
+        }
       }
-    } finally {
-      pointBake.restore();
+      if (gpu) {
+        for (const light of batch) {
+          const tile = gpu.ensureCacheTile(this.pointShadowCacheId(light));
+          try {
+            bakePointShadowCacheTile({
+              renderer: this.renderer,
+              scene: this.scene,
+              light,
+              target: tile,
+              faceSize: gpu.layout.faceSize,
+              includeActors: false,
+            });
+          } catch (err) {
+            console.warn("[ember] point-shadow bake failed", err);
+          }
+          rendered = true;
+        }
+      }
       this.localShadowMapBank.captureStaticBatch(batch);
-      this.restoreFrozenShadows(frozen);
-      if (sun) sun.shadow.needsUpdate = false;
-    }
-    this.sunShadowDirty = false;
-    this.staticShadowDirty =
-      this.localPointShadowLimit > 0 &&
-      this.localShadowMapBank.dirtyLights().length > 0;
-    this.localShadowMapBank.applyAssignments(
-      this.localShadowCandidates,
-      this.dynamicLocalLights,
-    );
-    this.localShadowDebug.update(this.dynamicLocalLights);
-    if (!this.staticShadowDirty) this.completeShadowWarmup();
+      this.atlasBlitDirty = true;
+      this.sunShadowDirty = false;
+      this.staticShadowDirty =
+        this.localPointShadowLimit > 0 &&
+        this.localShadowMapBank.dirtyLights().length > 0;
+      this.localShadowMapBank.applyAssignments(
+        this.localShadowCandidates,
+        this.dynamicLocalLights,
+      );
+      this.localShadowDebug.update(this.dynamicLocalLights);
+      warmupNow = !this.staticShadowDirty;
+    });
+    if (warmupNow) this.completeShadowWarmup();
     else this.emitLoadProgress();
     return rendered;
   }
@@ -1955,14 +2068,12 @@ export class EmberThreeWorld {
   private completeShadowWarmup(): void {
     if (this.shadowWarmupComplete) return;
     if (!this.disposed) {
+      this.shaderCompiling = true;
       this.lastLoadRatio = -1;
-      this.onBridge({
-        type: "load_progress",
-        ratio: 0.96,
-        labelRu: "Кадр…",
-      });
+      this.emitLoadProgress();
       this.bakeDynamicLocalPointShadows(true);
       this.primePlayPresent();
+      this.shaderCompiling = false;
     }
     this.shadowWarmupComplete = true;
     this.emitLoadProgress();
@@ -1998,6 +2109,7 @@ export class EmberThreeWorld {
   private primePlayPresent(): void {
     this.camera.updateMatrixWorld(true);
     this.renderer.compile(this.scene, this.camera);
+    this.presentPointShadowAtlas();
     if (this.waterReflect) {
       this.waterReflect.render(this.renderer, this.scene, this.camera);
       this.lastWaterReflectionMs = this.nowMs;
@@ -2011,6 +2123,16 @@ export class EmberThreeWorld {
   private emitLoadProgress(): void {
     if (this.disposed) return;
     const bank = this.localShadowMapBank.stats();
+    const terrain = this.terrainChunks?.getStreamingStats();
+    const terrainFrac = this.terrainSettled
+      ? 1
+      : terrain && terrain.totalChunks > 0
+        ? Math.min(
+            0.98,
+            Math.max(0, terrain.totalChunks - terrain.pendingChunks) /
+              terrain.totalChunks,
+          )
+        : 0;
     const progress = emberWorldLoadProgress({
       terrainSettled: this.terrainSettled,
       staticPropsSettled: this.staticPropsSettled,
@@ -2018,6 +2140,8 @@ export class EmberThreeWorld {
       shadowCached: bank.cached,
       shadowTotal: Math.max(this.localPointShadowLimit, bank.cached + bank.dirty),
       warmupComplete: this.shadowWarmupComplete,
+      compiling: this.shaderCompiling,
+      terrainFrac,
     });
     if (
       !this.shadowWarmupComplete &&
@@ -2044,7 +2168,7 @@ export class EmberThreeWorld {
     for (const npc of this.npcs) {
       if (!npc.dead) this.localShadowActorFocuses.push(npc.mesh.position);
     }
-    const selected = pickDynamicPointShadowLightsFrom(
+    const picked = pickDynamicPointShadowLightsFrom(
       this.localShadowCandidates,
       this.player.mesh.position,
       {
@@ -2062,6 +2186,15 @@ export class EmberThreeWorld {
         actorFocuses: this.localShadowActorFocuses,
         camera: this.camera,
       },
+    );
+    const selected = picked.filter(
+      (light) =>
+        !pointLightActorRecookBlocked(
+          light,
+          this.player.mesh.position,
+          this.player.radius,
+          this.localShadowActorFocuses,
+        ),
     );
     const selectionChanged = !samePointLights(
       selected,
@@ -2081,14 +2214,28 @@ export class EmberThreeWorld {
       staticJustBaked ||
       (actorsMoved && (this.localShadowSkip & 1) === 0);
     if (selected.length > 0 && lampDue) {
-      const allowed = new Set<THREE.Light>(selected);
-      const frozen = this.freezeShadowsExcept((light) => allowed.has(light));
-      const bake = beginPointShadowBake(selected);
-      try {
-        if (bake.count > 0) this.renderOffscreenShadowPass(true);
-      } finally {
-        bake.restore();
-        this.restoreFrozenShadows(frozen);
+      const gpu = this.localShadowMapBank.atlas();
+      if (gpu) {
+        withCutawayCastersVisible(this.cutawayTagged, () => {
+          for (const light of selected) {
+            const tile = gpu.ensureCacheTile(
+              pointShadowDynamicCacheId(this.pointShadowCacheId(light)),
+            );
+            try {
+              bakePointShadowCacheTile({
+                renderer: this.renderer,
+                scene: this.scene,
+                light,
+                target: tile,
+                faceSize: gpu.layout.faceSize,
+                includeActors: true,
+              });
+            } catch (err) {
+              console.warn("[ember] point-shadow recook failed", err);
+            }
+          }
+        });
+        this.atlasBlitDirty = true;
       }
     }
 
@@ -2343,13 +2490,44 @@ export class EmberThreeWorld {
   /** Apply all raw pointer deltas once per render frame. */
   private consumePendingLookInput(): void {
     const movementX = this.pendingLookMovementX;
+    const movementY = this.pendingLookMovementY;
     this.pendingLookMovementX = 0;
-    const yaw = playCameraYawFromMovement(movementX);
-    if (yaw !== 0) {
-      this.lookOffset.copy(this.camera.position).sub(this.controls.target);
-      this.lookOffset.applyAxisAngle(this.lookAxis, yaw);
-      this.camera.position.copy(this.controls.target).add(this.lookOffset);
+    this.pendingLookMovementY = 0;
+    const sens =
+      PLAY_CAMERA_YAW_SENSITIVITY * this.cameraRig.mouseSensitivity;
+    const yaw = playCameraYawFromMovement(movementX, sens);
+    const pitch = this.cameraRig.pitchLock
+      ? 0
+      : playCameraPitchFromMovement(movementY, sens);
+    if (yaw === 0 && pitch === 0) {
+      if (!this.lookWarpPending) return;
+      this.lookWarpPending = false;
+      const locked = this.hasLookLock();
+      const warped = warpPlayCursorIfNeeded(true, locked);
+      this.lookWarpSkip = playLookWarpSkipCount(locked, warped);
+      return;
     }
+    this.lookOffset.copy(this.camera.position).sub(this.controls.target);
+    if (yaw !== 0) {
+      this.lookOffset.applyAxisAngle(this.lookAxis, yaw);
+    }
+    if (pitch !== 0) {
+      const right = new THREE.Vector3()
+        .crossVectors(this.lookOffset, this.lookAxis)
+        .normalize();
+      if (right.lengthSq() > 1e-6) {
+        this.lookOffset.applyAxisAngle(right, pitch);
+      }
+      const sph = new THREE.Spherical().setFromVector3(this.lookOffset);
+      sph.phi = THREE.MathUtils.clamp(
+        sph.phi,
+        this.cameraRig.polarMin,
+        this.cameraRig.polarMax,
+      );
+      sph.radius = this.followDist;
+      this.lookOffset.setFromSpherical(sph);
+    }
+    this.camera.position.copy(this.controls.target).add(this.lookOffset);
     if (!this.lookWarpPending) return;
     this.lookWarpPending = false;
     const locked = this.hasLookLock();
@@ -2450,7 +2628,7 @@ export class EmberThreeWorld {
       this.player.lx,
       this.player.ly,
       this.playerFeetElev,
-      6,
+      this.cameraRig.lookHeight,
       this.map.tileSize,
     );
     this.followTarget.set(focus.x, focus.y, focus.z);
@@ -2501,12 +2679,21 @@ export class EmberThreeWorld {
 
     // Cached sun bake + lamp cubes. Radius flicker only changes light cutoff.
     const shadowsStartedAt = profileWork ? performance.now() : 0;
+    const warming = !this.shadowWarmupComplete;
     const staticJustBaked = this.bakeStaticPointShadows();
-    if (this.shadowWarmupComplete) {
+    if (!warming && this.shadowWarmupComplete) {
       this.bakeDynamicLocalPointShadows(staticJustBaked);
     }
     if (profileWork) {
       this.profilerWork.shadowsMs = performance.now() - shadowsStartedAt;
+    }
+    if (warming) {
+      this.profiler.beginGpu();
+      this.profiler.endGpu();
+      this.profiler.endFrame(
+        profileWork ? this.profilerExtras() : undefined,
+      );
+      return;
     }
 
     // Dynamic lamp cubes are rendered explicitly above. Only an authored
@@ -2558,6 +2745,7 @@ export class EmberThreeWorld {
       this.noteWaterReflectionCameraPose();
     }
     const mainRenderStartedAt = profileWork ? performance.now() : 0;
+    this.presentPointShadowAtlas();
     this.post.render();
     if (profileWork) {
       this.profilerWork.mainRenderMs =
@@ -2581,15 +2769,11 @@ export class EmberThreeWorld {
     const transientPoolStats = this.transientActors.stats();
     let activeLights = 0;
     let shadowLights = 0;
-    let pointShadowLights = 0;
     this.lightRoot.traverse((object) => {
       const light = object as THREE.Light;
       if (!light.isLight || !light.visible) return;
       activeLights += 1;
-      if (light.castShadow) {
-        shadowLights += 1;
-        if (light instanceof THREE.PointLight) pointShadowLights += 1;
-      }
+      if (light.castShadow) shadowLights += 1;
     });
     const dynamicIds = this.dynamicLocalLights
       .map((light, index) => {
@@ -2618,16 +2802,13 @@ export class EmberThreeWorld {
       lights: {
         active: activeLights,
         shadows: shadowLights,
-        staticPointShadows: Math.max(
-          0,
-          pointShadowLights - this.dynamicLocalLights.length,
-        ),
         dynamicPointShadows: this.dynamicLocalLights.length,
         dynamicIds,
         cachedPointShadows: shadowBank.cached,
         dirtyPointShadows: shadowBank.dirty,
-        activePointShadowSlots: shadowBank.active,
-        pooledDynamicShadows: shadowBank.pooledDynamic,
+        atlasSlots: POINT_SHADOW_SHADER_SLOTS,
+        atlasOccupied: this.atlasSlotIds.filter(Boolean).length,
+        atlasCached: shadowBank.atlasTiles,
       },
       actors: {
         enemies: this.enemies.length,
@@ -3127,6 +3308,7 @@ export class EmberThreeWorld {
     }
 
     this.map = ensureMapLayers(arrival.map);
+    this.cameraRig = resolvePackMapCamera(this.map, this.pack);
     this.tileset = tileset;
     this.enemyCrowdOpenField = buildEnemyCrowdOpenField(
       this.map,
@@ -3171,7 +3353,7 @@ export class EmberThreeWorld {
       this.player.lx,
       this.player.ly,
       this.playerFeetElev,
-      6,
+      this.cameraRig.lookHeight,
       this.map.tileSize,
     );
     this.followTarget.copy(focus);
@@ -4977,6 +5159,18 @@ export class EmberThreeWorld {
     this.onBridge({ type: "pause_menu", relockWaitMs });
   }
 
+  private pauseIfBackgrounded(): void {
+    if (
+      !playBackgroundShouldPause({
+        warmupComplete: this.shadowWarmupComplete,
+        movementFrozen: playMovementFrozen(this.overlayFlags()),
+      })
+    ) {
+      return;
+    }
+    this.openPauseMenu(PLAY_POINTER_LOCK_RELOCK_MS);
+  }
+
   resume(): void {
     this.pausedLogic = false;
     restorePlayOverlayFocus(this.renderer.domElement);
@@ -5004,6 +5198,51 @@ export class EmberThreeWorld {
     this.requestLookLock();
   }
 
+  applyCameraSettings(camera: EmberMapCamera | undefined): void {
+    this.cameraRig = resolvePackMapCamera(
+      { camera, tileSize: this.map.tileSize },
+      this.pack,
+      this.map.tileSize,
+    );
+    this.applyCameraLens();
+    this.followDist = this.cameraRig.followDistance;
+    const sph = new THREE.Spherical().setFromVector3(
+      this.camera.position.clone().sub(this.controls.target),
+    );
+    sph.radius = this.followDist;
+    if (this.cameraRig.pitchLock) {
+      sph.phi = this.cameraRig.polarAngle;
+    } else {
+      sph.phi = THREE.MathUtils.clamp(
+        sph.phi,
+        this.cameraRig.polarMin,
+        this.cameraRig.polarMax,
+      );
+    }
+    this.camera.position.copy(this.controls.target).add(
+      new THREE.Vector3().setFromSpherical(sph),
+    );
+    this.lookOffset.copy(this.camera.position).sub(this.controls.target);
+    this.controls.update();
+  }
+
+  private applyCameraLens(): void {
+    const rig = this.cameraRig;
+    this.camera.fov = rig.fov;
+    this.camera.near = rig.near;
+    this.camera.far = rig.far;
+    this.camera.updateProjectionMatrix();
+    if (rig.pitchLock) {
+      this.controls.minPolarAngle = rig.polarAngle;
+      this.controls.maxPolarAngle = rig.polarAngle;
+    } else {
+      this.controls.minPolarAngle = rig.polarMin;
+      this.controls.maxPolarAngle = rig.polarMax;
+    }
+    this.controls.minDistance = Math.max(48, rig.followDistance * 0.45);
+    this.controls.maxDistance = Math.max(rig.followDistance * 1.85, 220);
+  }
+
   private hasLookLock(): boolean {
     return isPlayPointerLockTarget(
       document.pointerLockElement,
@@ -5024,6 +5263,7 @@ export class EmberThreeWorld {
     const looking = playLookActive(this.lookState());
     if (!looking) {
       this.pendingLookMovementX = 0;
+      this.pendingLookMovementY = 0;
       this.lookWarpPending = false;
       this.lookWarpSkip = 0;
     }
@@ -5076,6 +5316,7 @@ export class EmberThreeWorld {
     window.removeEventListener("keyup", this.onKeyUp, true);
     window.removeEventListener("blur", this.onWindowBlur);
     window.removeEventListener("focus", this.onWindowFocus);
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
     document.removeEventListener("pointerdown", this.onPointerDown, true);
     document.removeEventListener("pointermove", this.onPointerMove);
     document.removeEventListener("pointerlockchange", this.onPointerLockChange);
@@ -5126,6 +5367,7 @@ export class EmberThreeWorld {
     this.enemyBillboards.dispose();
     this.effectBillboards.dispose();
     this.transientActors.clear();
+    setEmberPointShadowAtlas({ enabled: false });
     this.localShadowMapBank.dispose();
     this.clearLightRoot();
     this.localShadowDebug.dispose();

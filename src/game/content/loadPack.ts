@@ -10,6 +10,8 @@ import type {
   EmberLightsFile,
   EmberLookPreset,
   EmberLooksFile,
+  EmberUserCameraPreset,
+  EmberCamerasFile,
   EmberMap,
   EmberPack,
   EmberPackMeta,
@@ -32,9 +34,11 @@ import { SHOP_CATALOG_REL, parseShopsFile } from "./emberShop";
 import { normalizePixelSprite } from "./pixelSprite";
 import { presetsFromLightsFile } from "./lightPresets";
 import { presetsFromLooksFile } from "./lookPresets";
+import { presetsFromCamerasFile } from "./cameraPresets";
 import { validatePack } from "./validate";
 import { ensureMapLayers } from "../tile/mapUtils";
 import { normalizeMapPlayProfile } from "./playProfile";
+import { cameraValidationMessage, normalizeMapCamera } from "./emberCamera";
 import {
   normalizeVoxelModel,
   stampSolidBlock,
@@ -83,6 +87,10 @@ async function loadJsonOptionalReported<T>(
         }
       : { data: res.data };
   }
+  // Empty optional catalogs (cameras/looks/…) must not block Start.
+  if (isMissingOptionalCatalog(res.error)) {
+    return { data: fallback };
+  }
   return {
     data: fallback,
     issue: {
@@ -91,6 +99,10 @@ async function loadJsonOptionalReported<T>(
       message: `Ресурс не загружен: ${res.error}`,
     },
   };
+}
+
+function isMissingOptionalCatalog(error: string): boolean {
+  return /:\s*404\b/.test(error) || /\bnot found\b/i.test(error);
 }
 
 async function loadJsonDir<T extends { id: string }>(
@@ -249,6 +261,7 @@ export async function loadEmberPack(): Promise<{
     voxelLibs,
     lightsLoad,
     looksLoad,
+    camerasLoad,
     itemsLoad,
     shopsLoad,
   ] = await Promise.all([
@@ -278,6 +291,9 @@ export async function loadEmberPack(): Promise<{
     loadJsonOptionalReported<EmberLooksFile>("looks/registry.json", {
       presets: [],
     }),
+    loadJsonOptionalReported<EmberCamerasFile>("cameras/registry.json", {
+      presets: [],
+    }),
     loadJsonOptionalReported<unknown>(ITEM_CATALOG_REL, {
       icons: [],
       items: [],
@@ -291,6 +307,7 @@ export async function loadEmberPack(): Promise<{
   const voxelsFile = voxelLibs.file;
   const lightsFile = lightsLoad.data;
   const looksFile = looksLoad.data;
+  const camerasFile = camerasLoad.data;
 
   const maps: Record<string, EmberMap> = {};
   for (const map of Object.values(mapsRaw)) {
@@ -345,6 +362,7 @@ export async function loadEmberPack(): Promise<{
 
   const lightPresets = presetsFromLightsFile(lightsFile);
   const lookPresets = presetsFromLooksFile(looksFile);
+  const cameraPresets = presetsFromCamerasFile(camerasFile);
   const { items, itemIcons } = parseItemsFile(itemsLoad.data);
   const shops = parseShopsFile(shopsLoad.data);
   const scripts: Record<string, EmberActionScript> = {};
@@ -376,6 +394,7 @@ export async function loadEmberPack(): Promise<{
     voxelLibraryFiles: voxelLibs.sources,
     lightPresets,
     lookPresets,
+    cameraPresets,
     paletteFavorites: prunePaletteFavorites(
       spritesFile.paletteFavorites ?? [],
     ),
@@ -386,6 +405,7 @@ export async function loadEmberPack(): Promise<{
     ...voxelLibs.issues,
     lightsLoad.issue,
     looksLoad.issue,
+    camerasLoad.issue,
     itemsLoad.issue,
     shopsLoad.issue,
   ].filter((issue): issue is ValidationIssue => Boolean(issue));
@@ -397,15 +417,21 @@ function normalizeLoadedMap(map: EmberMap): EmberMap {
   const raw = (map as { playProfile?: unknown }).playProfile;
   if (raw == null || raw === "") {
     delete next.playProfile;
-    return next;
+  } else {
+    const playProfile = normalizeMapPlayProfile(raw);
+    if (playProfile) next.playProfile = playProfile;
+    else (next as { playProfile?: unknown }).playProfile = raw;
   }
-  const playProfile = normalizeMapPlayProfile(raw);
-  if (playProfile) {
-    next.playProfile = playProfile;
-    return next;
+  const rawCam = (map as { camera?: unknown }).camera;
+  if (rawCam == null || rawCam === "") {
+    delete next.camera;
+  } else if (cameraValidationMessage(rawCam)) {
+    (next as { camera?: unknown }).camera = rawCam;
+  } else {
+    const camera = normalizeMapCamera(rawCam, next.tileSize);
+    if (camera) next.camera = camera;
+    else delete next.camera;
   }
-  // Keep the unknown value so validatePack can report it.
-  (next as { playProfile?: unknown }).playProfile = raw;
   return next;
 }
 
@@ -475,6 +501,13 @@ export function upsertLookPresets(
   lookPresets: Record<string, EmberLookPreset>,
 ): EmberPack {
   return { ...pack, lookPresets: { ...lookPresets } };
+}
+
+export function upsertCameraPresets(
+  pack: EmberPack,
+  cameraPresets: Record<string, EmberUserCameraPreset>,
+): EmberPack {
+  return { ...pack, cameraPresets: { ...cameraPresets } };
 }
 
 export function upsertItems(

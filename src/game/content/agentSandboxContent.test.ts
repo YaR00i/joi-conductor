@@ -65,6 +65,7 @@ describe("agent_sandbox content", () => {
       interactivity: {
         kind: "quest_marker",
         triggerId: "notice",
+        scriptId: "sandbox_notice_read",
         iconId: "quest",
         questStatus: "available",
       },

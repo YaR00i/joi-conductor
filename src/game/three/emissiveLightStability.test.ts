@@ -108,17 +108,74 @@ describe("emissive local-light stability", () => {
     );
 
     expect(lights).toHaveLength(2);
-    const light = lights.find((entry) => entry.castShadow)!;
-    const budgetedOut = lights.find((entry) => !entry.castShadow)!;
-    expect(light.castShadow).toBe(true);
+    const light = lights.find(
+      (entry) => entry.userData.emberShadowGranted === true,
+    )!;
+    const budgetedOut = lights.find(
+      (entry) => entry.userData.emberShadowGranted !== true,
+    )!;
+    expect(light.castShadow).toBe(false);
+    expect(budgetedOut.castShadow).toBe(false);
     expect(light.userData.emberShadowRequested).toBe(true);
     expect(light.shadow.normalBias).toBeLessThanOrEqual(0.08);
     expect(light.shadow.camera.near).toBeLessThanOrEqual(0.2);
     expect(light.shadow.camera.far).toBeGreaterThanOrEqual(light.distance * 1.5);
     expect(budgetedOut.userData.emberShadowRequested).toBe(true);
-    expect(budgetedOut.shadow.camera.far).toBeGreaterThanOrEqual(
-      budgetedOut.distance * 1.5,
+  });
+
+  it("keeps explore window fill off the cube budget when only lamps flicker", () => {
+    const map = ensureMapLayers(createEmptyMap("flicker-shadows", 4, 4, "tiles", 16));
+    map.voxelProps = [
+      { id: "window", modelId: "window", x: 1, y: 1 },
+      { id: "lamp", modelId: "lamp", x: 2, y: 1 },
+    ];
+    const windowModel: EmberVoxelModel = {
+      id: "window",
+      sizeBlocks: { x: 1, y: 1, z: 1 },
+      palette: ["", "#ffcc66"],
+      voxels: [1],
+      emissive: [255],
+      emissiveCastsLight: true,
+      emissiveLightShadows: true,
+      emissiveLightRange: 2,
+    };
+    const lamp: EmberVoxelModel = {
+      id: "lamp",
+      sizeBlocks: { x: 1, y: 1, z: 1 },
+      palette: ["", "#ffcc66"],
+      voxels: [1],
+      emissive: [255],
+      emissiveCastsLight: true,
+      emissiveLightShadows: true,
+      emissiveTorchFlicker: true,
+      emissiveLightRange: 2,
+    };
+    const root = new THREE.Group();
+    const lights = addThreeEmissiveLocalLights(
+      root,
+      map,
+      { id: "tiles", tileSize: 16, columns: 1, tileCount: 1, tiles: [] },
+      undefined,
+      {
+        voxelModels: { window: windowModel, lamp },
+        shadows: true,
+        maxLights: 4,
+        maxShadows: 4,
+        lampFlickerShadowsOnly: true,
+      },
     );
+
+    const lampLight = lights.find((entry) =>
+      String(entry.userData.emberEmissiveSourceId).includes("lamp"),
+    )!;
+    const windowLight = lights.find((entry) =>
+      String(entry.userData.emberEmissiveSourceId).includes("window"),
+    )!;
+    expect(lampLight.castShadow).toBe(false);
+    expect(lampLight.userData.emberShadowGranted).toBe(true);
+    expect(windowLight.castShadow).toBe(false);
+    expect(windowLight.userData.emberShadowGranted).toBe(false);
+    expect(windowLight.userData.emberShadowRequested).toBe(false);
   });
 
   it("counts authored lanterns and emissive light objects on the map", () => {

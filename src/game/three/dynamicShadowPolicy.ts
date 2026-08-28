@@ -358,6 +358,32 @@ export function pointLightRequestsShadow(light: THREE.PointLight): boolean {
   );
 }
 
+/** Bake-cache grant. Never PointLight.castShadow after the atlas migration. */
+export function setPointLightShadowGranted(
+  light: THREE.PointLight,
+  granted: boolean,
+): void {
+  light.userData.emberShadowGranted = granted;
+  light.castShadow = false;
+}
+
+export function pointLightHasGrantedShadow(light: THREE.PointLight): boolean {
+  return light.userData.emberShadowGranted === true;
+}
+
+/**
+ * Lights that received a bake-cache slot after spawn.
+ *
+ * `emberShadowRequested` stays true on over-budget fill lamps (windows,
+ * extra lanterns) so debug/UI still show intent. The atlas bank registers
+ * only granted lights; PointLight.castShadow stays false.
+ */
+export function grantedPointShadowLights(
+  lights: readonly THREE.PointLight[],
+): THREE.PointLight[] {
+  return lights.filter(pointLightHasGrantedShadow);
+}
+
 export function pointLightAffectsPoint(
   light: THREE.PointLight,
   point: THREE.Vector3,
@@ -503,6 +529,38 @@ export function pickDynamicPointShadowLightsFrom(
     Math.floor(opts.maxLights ?? DYNAMIC_LOCAL_SHADOW_MAX_LIGHTS),
   );
   return ranked.slice(0, limit).map((entry) => entry.light);
+}
+
+/**
+ * Recook keep-out: a caster closer than this clips the cube near plane
+ * and black-out faces (player hugging a voxel lantern).
+ */
+export function pointShadowRecookKeepOut(
+  light: THREE.PointLight,
+  actorRadius: number,
+): number {
+  const near =
+    Number.isFinite(light.shadow.camera.near) && light.shadow.camera.near > 0
+      ? light.shadow.camera.near
+      : 0.1;
+  const radius = Number.isFinite(actorRadius) ? Math.max(0, actorRadius) : 0;
+  return Math.max(near * 16, radius * 6, 12);
+}
+
+export function pointLightActorRecookBlocked(
+  light: THREE.PointLight,
+  playerPos: THREE.Vector3,
+  playerRadius: number,
+  extraActors: readonly THREE.Vector3[] = [],
+): boolean {
+  light.getWorldPosition(_lightWorld);
+  const keepOutSq =
+    pointShadowRecookKeepOut(light, playerRadius) ** 2;
+  if (_lightWorld.distanceToSquared(playerPos) < keepOutSq) return true;
+  for (const actorPos of extraActors) {
+    if (_lightWorld.distanceToSquared(actorPos) < keepOutSq) return true;
+  }
+  return false;
 }
 
 /** Backwards-compatible scene-root helper used by focused tests/tools. */

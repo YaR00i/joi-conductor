@@ -23,6 +23,7 @@ export {
   upsertEvent,
   upsertLightPresets,
   upsertLookPresets,
+  upsertCameraPresets,
   upsertScene,
   upsertStage,
 } from "./content/loadPack";
@@ -32,7 +33,9 @@ export type {
   EmberLampParams,
   EmberLightPreset,
   EmberLookPreset,
+  EmberUserCameraPreset,
   EmberMap,
+  EmberMapCamera,
   EmberMapGrade,
   EmberMapLight,
   EmberMapPlayProfile,
@@ -58,6 +61,7 @@ export {
 export {
   applyLookPresetToLight,
   BUILTIN_SUNNY_EVENING_LOOK,
+  BUILTIN_TOY_LOOK,
   isBuiltinLookPreset,
   listLookPresets,
   lookSnapshotFromLight,

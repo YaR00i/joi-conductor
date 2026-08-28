@@ -38,13 +38,13 @@ export type EmberProfilerExtras = {
   lights?: {
     active: number;
     shadows: number;
-    staticPointShadows?: number;
     dynamicPointShadows?: number;
     dynamicIds?: string;
     cachedPointShadows?: number;
     dirtyPointShadows?: number;
-    activePointShadowSlots?: number;
-    pooledDynamicShadows?: number;
+    atlasSlots?: number;
+    atlasOccupied?: number;
+    atlasCached?: number;
   };
   actors?: {
     enemies: number;
@@ -378,19 +378,19 @@ export function createEmberFrameProfiler(
         lines.push(
           `Lights ${extras.lights.active}  shadows ${extras.lights.shadows}`,
         );
-        if (
-          extras.lights.staticPointShadows != null ||
-          extras.lights.dynamicPointShadows != null
-        ) {
+        if (extras.lights.atlasSlots != null) {
+          const recook =
+            extras.lights.dynamicPointShadows != null
+              ? `  recook ${extras.lights.dynamicPointShadows}${extras.lights.dynamicIds ? `  [${extras.lights.dynamicIds}]` : ""}`
+              : "";
           lines.push(
-            `Point cubes static ${extras.lights.staticPointShadows ?? 0}  dynamic ${extras.lights.dynamicPointShadows ?? 0}${extras.lights.dynamicIds ? `  [${extras.lights.dynamicIds}]` : ""}`,
-            "Light marks  GREEN dynamic  BLUE baked  ORANGE cached",
+            `Atlas slots ${extras.lights.atlasOccupied ?? 0}/${extras.lights.atlasSlots}  cached ${extras.lights.atlasCached ?? 0}${recook}`,
           );
-          if (extras.lights.cachedPointShadows != null) {
-            lines.push(
-              `Shadow bank cached ${extras.lights.cachedPointShadows}  dirty ${extras.lights.dirtyPointShadows ?? 0}  slots ${extras.lights.activePointShadowSlots ?? 0}  pool ${extras.lights.pooledDynamicShadows ?? 0}`,
-            );
-          }
+        }
+        if (extras.lights.dirtyPointShadows != null) {
+          lines.push(
+            `Shadow bank dirty ${extras.lights.dirtyPointShadows}  cached ${extras.lights.cachedPointShadows ?? 0}`,
+          );
         }
       }
       if (extras.actors) {

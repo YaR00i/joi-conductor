@@ -1,0 +1,15 @@
+{
+  "id": "sbx_planter_nw_actions",
+  "nameRu": "Новая цепочка",
+  "steps": [
+    {
+      "type": "open_shop",
+      "shopId": "village_kiosk"
+    },
+    {
+      "type": "set_flag",
+      "flag": "test",
+      "value": true
+    }
+  ]
+}

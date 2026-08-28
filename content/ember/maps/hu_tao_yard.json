@@ -6125,7 +6125,7 @@
         0,
         0,
         0,
-        0,
+        1,
         0,
         0,
         0,
@@ -8435,7 +8435,7 @@
         0,
         0,
         0,
-        0,
+        8,
         0,
         0,
         0,
@@ -23274,7 +23274,7 @@
       "saturation": 1.61
     },
     "atmosphere": {
-      "fog": 0.06,
+      "fog": 0.098,
       "fogColor": "#141018",
       "rain": 0,
       "wind": 0.35,
@@ -23282,9 +23282,11 @@
       "cloudSpeed": 0.94,
       "dust": 0.55,
       "fireflies": 1,
+      "sparkle": 0.66,
       "vignette": 0.5,
-      "haze": 0,
-      "sunGlare": 0
+      "tiltShift": 0.03,
+      "haze": 0.02,
+      "sunGlare": 0.04
     },
     "maxPointLights": 24,
     "maxPointShadows": 7
@@ -23488,5 +23490,10 @@
   ],
   "worldPhysicsVersion": 2,
   "terrainHeightUnit": "voxels",
-  "playProfile": "arena"
+  "playProfile": "arena",
+  "camera": {
+    "fov": 37,
+    "followDistance": 86,
+    "polarAngle": 1.257
+  }
 }

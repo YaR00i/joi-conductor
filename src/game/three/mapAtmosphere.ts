@@ -1,11 +1,12 @@
 /**
  * Map-wide atmosphere: fog, rain, drifting cloud shadows, dust, fireflies,
- * warm haze, and horizon sun glare.
+ * sun sparkle, warm haze, and horizon sun glare.
  * Driven by `map.light.atmosphere` (see resolveMapAtmosphere).
  */
 import * as THREE from "three";
 import type { ResolvedMapAtmosphere } from "../tile/mapUtils";
 import { parseHexRgb } from "../tile/mapUtils";
+import { FOG_EXP2_MIN_DENSITY, fogExp2Density } from "./fogDensity";
 import { createPixelSkybox } from "./pixelSkybox";
 import { sunDirectionFromAngles } from "./threeLighting";
 
@@ -169,6 +170,35 @@ function makeMotesGeo(count: number, mapW: number, mapD: number, height: number)
   return geo;
 }
 
+function makeSparkleTexture(): THREE.CanvasTexture {
+  const size = 32;
+  const c = document.createElement("canvas");
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext("2d")!;
+  const cx = size * 0.5;
+  const cy = size * 0.5;
+  ctx.clearRect(0, 0, size, size);
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.48);
+  g.addColorStop(0, "rgba(255,255,240,1)");
+  g.addColorStop(0.22, "rgba(255,236,180,0.85)");
+  g.addColorStop(0.55, "rgba(255,210,120,0.2)");
+  g.addColorStop(1, "rgba(255,200,80,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.48, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.fillRect(cx - 1, 2, 2, size - 4);
+  ctx.fillRect(2, cy - 1, size - 4, 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 export function createMapAtmosphere(scene: THREE.Scene): MapAtmosphereHandle {
   const root = new THREE.Group();
   root.name = "map-atmosphere";
@@ -237,6 +267,23 @@ export function createMapAtmosphere(scene: THREE.Scene): MapAtmosphereHandle {
     blending: THREE.AdditiveBlending,
   });
   let fireflies: THREE.Points | null = null;
+
+  const sparkleTex = makeSparkleTexture();
+  const sparkleMat = new THREE.PointsMaterial({
+    map: sparkleTex,
+    color: 0xffffff,
+    size: 2.6,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: true,
+    sizeAttenuation: true,
+    blending: THREE.AdditiveBlending,
+    vertexColors: true,
+    fog: false,
+    toneMapped: false,
+  });
+  let sparkles: THREE.Points | null = null;
 
   const glareTex = (() => {
     const size = 128;
@@ -372,6 +419,11 @@ export function createMapAtmosphere(scene: THREE.Scene): MapAtmosphereHandle {
       fireflies.geometry.dispose();
       fireflies = null;
     }
+    if (sparkles) {
+      root.remove(sparkles);
+      sparkles.geometry.dispose();
+      sparkles = null;
+    }
     if (!atm) return;
     const rainCount = Math.round(atm.rain * 900);
     if (rainCount > 0) {
@@ -400,6 +452,18 @@ export function createMapAtmosphere(scene: THREE.Scene): MapAtmosphereHandle {
       fireflies.frustumCulled = false;
       root.add(fireflies);
     }
+    const sparkleCount = Math.round(atm.sparkle * 160);
+    if (sparkleCount > 0) {
+      const geo = makeMotesGeo(sparkleCount, mapW * 0.95, mapD * 0.95, 16);
+      const colors = new Float32Array(sparkleCount * 3);
+      colors.fill(1);
+      geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      sparkles = new THREE.Points(geo, sparkleMat);
+      sparkles.frustumCulled = false;
+      sparkles.renderOrder = 12;
+      sparkles.userData.emberSkipWaterReflect = true;
+      root.add(sparkles);
+    }
   };
 
   return {
@@ -411,13 +475,12 @@ export function createMapAtmosphere(scene: THREE.Scene): MapAtmosphereHandle {
       mapD = Math.max(32, d);
 
       const haze = next.haze;
-      const fogAmt = Math.min(1, next.fog + haze * 0.28);
       const fogCol = hexToColor(next.fogColor);
       if (haze > 0.01) {
         fogCol.lerp(new THREE.Color(0xd4a070), Math.min(0.65, haze * 0.85));
       }
-      if (fogAmt > 0.01) {
-        const density = 0.002 + fogAmt * 0.018 + haze * 0.004;
+      const density = fogExp2Density(next.fog, haze);
+      if (density > FOG_EXP2_MIN_DENSITY) {
         scene.fog = new THREE.FogExp2(fogCol.getHex(), density);
       } else if (scene.fog) {
         scene.fog = null;
@@ -433,6 +496,7 @@ export function createMapAtmosphere(scene: THREE.Scene): MapAtmosphereHandle {
       // Opacity here is blend strength; pull back under heavy fog.
       // Cap hard — multiply clouds over a night grade can crush terrain to void
       // while MeshBasic lamp cores / water mirrors still pop.
+      const fogAmt = Math.min(1, next.fog + haze * 0.28);
       const fogSoft = 1 - Math.min(0.55, fogAmt * 0.7);
       const cloudOp = Math.min(0.38, next.cloudShadows * 0.55 * fogSoft);
       cloudMat.opacity = cloudOp;
@@ -446,6 +510,8 @@ export function createMapAtmosphere(scene: THREE.Scene): MapAtmosphereHandle {
       dustMat.color.setRGB(0.78 * dustWarm, 0.69 * (0.85 + haze * 0.1), 0.56);
       dustMat.opacity = Math.min(0.65, next.dust * 0.5 + haze * 0.12);
       fireMat.opacity = Math.min(0.9, next.fireflies * 0.85);
+      sparkleMat.opacity = Math.min(0.95, next.sparkle * 0.9);
+      sparkleMat.size = 2.2 + next.sparkle * 1.1;
 
       if (sunOpts) {
         const night = Math.max(0, Math.min(1, sunOpts.night ?? 0.35));
@@ -572,10 +638,28 @@ export function createMapAtmosphere(scene: THREE.Scene): MapAtmosphereHandle {
       };
       driftMotes(dust, 0.6, 0.7);
       driftMotes(fireflies, 0.9, 1.1);
+      driftMotes(sparkles, 0.35, 0.45);
       if (fireflies) {
         fireMat.opacity =
           Math.min(0.95, atm.fireflies * 0.85) *
           (0.55 + 0.45 * Math.sin(time * 3.1));
+      }
+      if (sparkles) {
+        const col = sparkles.geometry.getAttribute("color") as THREE.BufferAttribute;
+        const phase = sparkles.geometry.getAttribute("phase") as THREE.BufferAttribute;
+        const carr = col.array as Float32Array;
+        const parr = phase.array as Float32Array;
+        for (let i = 0; i < col.count; i++) {
+          const tw = Math.max(0, Math.sin(parr[i]! + time * 7.2));
+          const flash = tw * tw * tw * tw;
+          const v = 0.12 + flash * 0.88;
+          const i3 = i * 3;
+          carr[i3] = v;
+          carr[i3 + 1] = v * 0.94;
+          carr[i3 + 2] = v * 0.72;
+        }
+        col.needsUpdate = true;
+        sparkleMat.opacity = Math.min(0.95, atm.sparkle * 0.9);
       }
     },
     dispose() {
@@ -587,6 +671,8 @@ export function createMapAtmosphere(scene: THREE.Scene): MapAtmosphereHandle {
       rainMat.dispose();
       dustMat.dispose();
       fireMat.dispose();
+      sparkleMat.dispose();
+      sparkleTex.dispose();
       glareMat.dispose();
       glareTex.dispose();
       scene.remove(celestialSprite);
@@ -595,6 +681,7 @@ export function createMapAtmosphere(scene: THREE.Scene): MapAtmosphereHandle {
       if (rain) rain.geometry.dispose();
       if (dust) dust.geometry.dispose();
       if (fireflies) fireflies.geometry.dispose();
+      if (sparkles) sparkles.geometry.dispose();
       if (scene.background === skybox.texture) {
         scene.background = new THREE.Color(0x0a0810);
       }

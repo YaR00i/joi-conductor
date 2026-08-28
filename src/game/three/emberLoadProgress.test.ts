@@ -50,5 +50,17 @@ describe("emberWorldLoadProgress", () => {
         warmupComplete: true,
       }),
     ).toEqual({ ratio: 1, labelRu: "Готово" });
+
+    expect(
+      emberWorldLoadProgress({
+        terrainSettled: true,
+        staticPropsSettled: true,
+        lightsReady: true,
+        shadowCached: 12,
+        shadowTotal: 12,
+        warmupComplete: false,
+        compiling: true,
+      }),
+    ).toEqual({ ratio: 0.96, labelRu: "Шейдеры…" });
   });
 });

@@ -250,6 +250,7 @@ describe("hu_tao_village explore content", () => {
       voxelScenes: {},
       lightPresets: {},
       lookPresets: {},
+      cameraPresets: {},
       items: {},
       itemIcons: {},
       shops,

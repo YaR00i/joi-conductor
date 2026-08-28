@@ -12,6 +12,12 @@ import type {
   EmberVoxelModel,
 } from "../content/types";
 import { resolveMapPlayProfile } from "../content/playProfile";
+import {
+  DEFAULT_CAMERA_POLAR,
+  defaultFollowDistance,
+  resolvePackMapCamera,
+  type ResolvedEmberCamera,
+} from "../content/emberCamera";
 import { clampElevation, MAX_ELEVATION, MIN_ELEVATION } from "../content/types";
 import { elevTileIdAt } from "../tile/elevGroundLayers";
 import { blockStoryHeight, elevFromWorldY, elevStoryWorldSpan } from "../tile/extruded";
@@ -65,6 +71,7 @@ import { createPostFx, type EmberPostFx } from "./postFx";
 import {
   applyMapLightBudget,
   lanternVisibleShare,
+  remainingEmissiveShadowSlots,
   resolveEmberRenderBudget,
   resolvePlayProfileBudget,
 } from "./renderBudget";
@@ -103,16 +110,27 @@ import {
 } from "./emissiveAnimTick";
 import { tickTorchFlicker } from "./torchFlickerTick";
 import {
-  beginStaticPointShadowBake,
-  cachePointLightShadows,
-  invalidatePointLightShadows,
+  grantedPointShadowLights,
 } from "./dynamicShadowPolicy";
 import { emberWorldLoadProgress } from "./emberLoadProgress";
 import {
   collectPlanarReflectMaterials,
   estimatePlanarFloorY,
 } from "./planarReflectMaterial";
-import { setEmberVoxelLightSnap } from "./voxelLightSnap";
+import { setEmberPointShadowAtlas, setEmberVoxelLightSnap } from "./voxelLightSnap";
+import { LocalPointShadowMapBank } from "./localPointShadowMapBank";
+import {
+  POINT_SHADOW_SHADER_SLOTS,
+  layoutPointShadowAtlas,
+} from "./pointShadowAtlas";
+import {
+  pointShadowAtlasFocusFromMap,
+  pointShadowAtlasFocusFromTile,
+} from "./pointShadowAtlasFocus";
+import {
+  bakePointShadowCacheTile,
+  presentPointShadowAtlas,
+} from "./pointShadowAtlasPass";
 import {
   createChunkedVoxelTerrain,
   type ChunkedVoxelTerrain,
@@ -204,12 +222,12 @@ export type EditorOverlayMarks = {
   lampRange?: LampRangeMark | null;
 };
 
-/** Polar angle from +Y (0 = top-down). Locked isometric pitch вЂ” same as play. */
-export const EDITOR_ISO_POLAR = 0.95;
+/** Polar angle from +Y (0 = top-down). Locked isometric pitch — same as play. */
+export const EDITOR_ISO_POLAR = DEFAULT_CAMERA_POLAR;
 
 /** Play follow distance for the explore-camera preview. */
 export function exploreFollowDist(tileSize: number): number {
-  return THREE.MathUtils.clamp(tileSize * 7.5, 96, 160);
+  return defaultFollowDistance(tileSize);
 }
 
 const YAW_PRESET: Record<MapViewMode, number> = {
@@ -326,10 +344,15 @@ export type EditorThreePreview = {
   /** Pan orbit target to a map tile (world center of cell). */
   focusTile: (tx: number, ty: number) => void;
   /**
-   * Snap to play explore camera: iso polar, SE yaw, follow distance,
+   * Snap to play explore camera: authored FOV/polar/yaw/distance,
    * optional tile focus (selection or player_start).
    */
   setExploreCamera: (tx?: number, ty?: number) => void;
+  /** Live lens + orbit from the camera panel (does not rebuild the map). */
+  setCameraRig: (
+    rig: ResolvedEmberCamera,
+    mode?: "lens" | "preview" | "play",
+  ) => void;
   projectTile: (
     tx: number,
     ty: number,
@@ -506,6 +529,19 @@ export function createEditorThreePreview(
   // Editor geometry and authored lights are static between explicit edits.
   // Re-render cube shadows only when setMap/applyLook marks them dirty.
   renderer.shadowMap.autoUpdate = false;
+  const pointShadowBank = new LocalPointShadowMapBank(0);
+  pointShadowBank.enableAtlas(
+    layoutPointShadowAtlas(
+      POINT_SHADOW_SHADER_SLOTS,
+      renderBudget.pointShadowMapSize,
+      renderer.capabilities.maxTextureSize,
+    ),
+  );
+  let atlasSlotIds: (string | null)[] = Array.from(
+    { length: POINT_SHADOW_SHADER_SLOTS },
+    () => null,
+  );
+  let atlasBlitDirty = true;
   renderer.domElement.style.display = "block";
   renderer.domElement.style.imageRendering = "pixelated";
   renderer.domElement.style.width = "100%";
@@ -547,6 +583,7 @@ export function createEditorThreePreview(
   let viewW = 64;
   let viewH = 64;
   let yaw = YAW_PRESET.top;
+  let polar = EDITOR_ISO_POLAR;
   let zoomDist = 140;
   let camReady = false;
   let lastViewMode: MapViewMode | null = null;
@@ -559,6 +596,7 @@ export function createEditorThreePreview(
   let worldLoadPropsSettled = false;
   let worldLoadLightsReady = false;
   let worldLoadWarmupComplete = false;
+  let worldLoadCompiling = false;
   let worldLoadPropsDone = 0;
   let worldLoadPropsTotal = 0;
   let propsRebuildGen = 0;
@@ -591,6 +629,7 @@ export function createEditorThreePreview(
     lampRange: null,
   };
   const target = new THREE.Vector3();
+  const atlasFocus = new THREE.Vector3();
   const spherical = new THREE.Spherical();
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
@@ -618,6 +657,11 @@ export function createEditorThreePreview(
   let emissiveLights: THREE.PointLight[] = [];
   let lanternLights: THREE.PointLight[] = [];
   let staticPointShadowBakePending = false;
+  const dirtyPointShadowCache = () => {
+    pointShadowBank.markAllDirty();
+    staticPointShadowBakePending = true;
+    atlasBlitDirty = true;
+  };
   let emissiveAnimAcc = 0;
   let atmospherePreview = true;
   let lookPreview = true;
@@ -919,8 +963,10 @@ export function createEditorThreePreview(
           cloudShadows: 0,
           dust: 0,
           fireflies: 0,
+          sparkle: 0,
           haze: 0,
           sunGlare: 0,
+          tiltShift: 0,
           fogColor: src.fogColor,
           wind: src.wind,
           cloudSpeed: src.cloudSpeed,
@@ -949,13 +995,15 @@ export function createEditorThreePreview(
     clearLightRoot(lightRoot);
     const vignette =
       atmospherePreview && lastAtmosphere ? lastAtmosphere.vignette : 0;
+    const tiltShift =
+      atmospherePreview && lastAtmosphere ? lastAtmosphere.tiltShift : 0;
     if (lookPreview) {
       post.setBloom({
         strength: lastLightCfg.bloomStrength,
         threshold: lastLightCfg.bloomThreshold,
         radius: lastLightCfg.bloomRadius,
       });
-      post.setGrade(lastLightCfg.grade, vignette);
+      post.setGrade(lastLightCfg.grade, vignette, tiltShift);
       addThreeFillLights(lightRoot, lastLightCfg, lastLightCenter, {
         keyLight: true,
         shadows: true,
@@ -964,9 +1012,8 @@ export function createEditorThreePreview(
         mapDepth: lastMapD,
       });
       const lightCaps = applyMapLightBudget(renderBudget, lastLightCfg);
-      const explore = resolvePlayProfileBudget(
-        resolveMapPlayProfile(map),
-      ).allowHorde === false;
+      const playProfile = resolvePlayProfileBudget(resolveMapPlayProfile(map));
+      const explore = playProfile.allowHorde === false;
       lanternLights = addThreeLanternLights(lightRoot, {
         map,
         light: lastLightCfg,
@@ -980,7 +1027,9 @@ export function createEditorThreePreview(
         maxShadows: lightCaps.maxPointShadows,
         shadows: true,
         shadowMapSize: renderBudget.pointShadowMapSize,
+        shadowFocus: explore ? atlasFocus : undefined,
       });
+      const lanternGranted = grantedPointShadowLights(lanternLights).length;
       emissiveLights = addThreeEmissiveLocalLights(
         lightRoot,
         map,
@@ -993,26 +1042,28 @@ export function createEditorThreePreview(
           ),
           voxelModels: lastPack?.voxelModels,
           voxelScenes: lastPack?.voxelScenes,
-          maxShadows: resolvePlayProfileBudget(
-            resolveMapPlayProfile(map),
-          ).emissiveShadows
-            ? Math.max(
-                0,
-                lightCaps.maxPointShadows -
-                  lanternLights.filter((light) => light.castShadow).length,
-              )
-            : 0,
+          maxShadows: remainingEmissiveShadowSlots(
+            lightCaps.maxPointShadows,
+            lanternGranted,
+          ),
+          lampFlickerShadowsOnly: !playProfile.emissiveShadows,
           shadowMapSize: renderBudget.pointShadowMapSize,
         },
       );
-      // Editor geometry is static between edits, so radius flicker can reuse
-      // the same cube depth while the light cutoff changes in the main pass.
-      cachePointLightShadows(lightRoot);
-      staticPointShadowBakePending = true;
+      // Editor geometry is static between edits. Atlas cache is dirtied here
+      // and baked one lamp per frame without PointLight.castShadow.
+      const granted = grantedPointShadowLights([
+        ...lanternLights,
+        ...emissiveLights,
+      ]);
+      pointShadowBank.replaceLights(granted);
+      atlasSlotIds = atlasSlotIds.map(() => null);
+      atlasBlitDirty = true;
+      staticPointShadowBakePending = granted.length > 0;
     } else {
       post.setBloom({ strength: 0, threshold: 1, radius: 0 });
       // Neutral grade; vignette still follows atmosphere toggle.
-      post.setGrade({ ...DEFAULT_MAP_GRADE, brightness: 1 }, vignette);
+      post.setGrade({ ...DEFAULT_MAP_GRADE, brightness: 1 }, vignette, tiltShift);
       addThreeFillLights(lightRoot, CLEAN_LOOK_LIGHT, lastLightCenter, {
         keyLight: true,
         shadows: true,
@@ -1023,6 +1074,9 @@ export function createEditorThreePreview(
       // No lanterns / bloom glow / emissive fill in clean look.
       lanternLights = [];
       emissiveLights = [];
+      pointShadowBank.replaceLights([]);
+      atlasBlitDirty = true;
+      setEmberPointShadowAtlas({ enabled: false });
     }
     emissiveAnim =
       emissiveMats.length > 0 ||
@@ -1049,8 +1103,15 @@ export function createEditorThreePreview(
     );
   };
 
+  const applyLens = (rig: ResolvedEmberCamera) => {
+    camera.fov = rig.fov;
+    camera.near = rig.near;
+    camera.far = rig.far;
+    camera.updateProjectionMatrix();
+  };
+
   const applyCamera = () => {
-    spherical.set(zoomDist, EDITOR_ISO_POLAR, yaw);
+    spherical.set(zoomDist, polar, yaw);
     camera.position.setFromSpherical(spherical).add(target);
     camera.lookAt(target);
     camera.updateMatrixWorld();
@@ -1193,6 +1254,7 @@ export function createEditorThreePreview(
       };
     }
     const reflection = reflectionScheduler.snapshot(now);
+    const bank = pointShadowBank.stats();
     return {
       chunks: terrain
         ? {
@@ -1208,6 +1270,11 @@ export function createEditorThreePreview(
       lights: {
         active: profilerSceneStats.activeLights,
         shadows: profilerSceneStats.shadowLights,
+        atlasSlots: POINT_SHADOW_SHADER_SLOTS,
+        atlasOccupied: atlasSlotIds.filter(Boolean).length,
+        atlasCached: bank.atlasTiles,
+        cachedPointShadows: bank.cached,
+        dirtyPointShadows: bank.dirty,
       },
       renderables: {
         terrain: profilerSceneStats.terrain,
@@ -1222,53 +1289,107 @@ export function createEditorThreePreview(
     };
   };
 
+  const presentEditorAtlas = () => {
+    const presented = presentPointShadowAtlas({
+      gpu: pointShadowBank.atlas(),
+      lights: pointShadowBank.registeredLights(),
+      focus: atlasFocus,
+      slotIds: atlasSlotIds,
+      blitDirty: atlasBlitDirty,
+      renderer,
+    });
+    atlasSlotIds = presented.slotIds;
+    atlasBlitDirty = presented.blitDirty;
+  };
+
   const renderOnce = () => {
     if (disposed) return;
-    const pointBake = staticPointShadowBakePending
-      ? beginStaticPointShadowBake(lightRoot)
-      : null;
-    if (pointBake) staticPointShadowBakePending = false;
-    try {
-      profiler.beginFrame();
-      reflectionScheduler.beginFrame();
-      applyCamera();
-      reflectionScheduler.trackCamera(camera);
-      updateYawBillboards(propRoot, camera);
-      updateYawBillboards(placementGhostRoot, camera);
-      // Billboard AABBs move with yaw вЂ” refresh object frames each paint.
-      const hoverObj =
-        overlayMarks.hover?.kind === "sprite" ||
-        overlayMarks.hover?.kind === "voxel";
-      const selObj =
-        overlayMarks.selected?.kind === "sprite" ||
-        overlayMarks.selected?.kind === "voxel";
-      const pulsing =
-        overlayMarks.pulseRegion &&
-        (overlayMarks.regionTiles.length > 0 ||
-          Boolean(overlayMarks.regionBounds));
-      if (hoverObj || selObj || pulsing || outlinesNeedRebuild) {
-        rebuildOutlines();
-        outlinesNeedRebuild = false;
+    if (staticPointShadowBakePending) {
+      const gpu = pointShadowBank.atlas();
+      const dirty = pointShadowBank.dirtyLights();
+      if (gpu && dirty[0]) {
+        const light = dirty[0];
+        const tile = gpu.ensureCacheTile(pointShadowBank.cacheIdFor(light));
+        try {
+          bakePointShadowCacheTile({
+            renderer,
+            scene,
+            light,
+            target: tile,
+            faceSize: gpu.layout.faceSize,
+            includeActors: false,
+          });
+        } catch (err) {
+          console.warn("[ember] point-shadow bake failed", err);
+        }
+        pointShadowBank.captureStaticBatch([light]);
+        atlasBlitDirty = true;
       }
-      // Planar water / metal floor mirror (lights dimmed via intensity).
+      if (pointShadowBank.dirtyLights().length > 0) needsFrame = true;
+      else staticPointShadowBakePending = false;
+    }
+    profiler.beginFrame();
+    reflectionScheduler.beginFrame();
+    applyCamera();
+    reflectionScheduler.trackCamera(camera);
+    updateYawBillboards(propRoot, camera);
+    updateYawBillboards(placementGhostRoot, camera);
+    // Billboard AABBs move with yaw — refresh object frames each paint.
+    const hoverObj =
+      overlayMarks.hover?.kind === "sprite" ||
+      overlayMarks.hover?.kind === "voxel";
+    const selObj =
+      overlayMarks.selected?.kind === "sprite" ||
+      overlayMarks.selected?.kind === "voxel";
+    const pulsing =
+      overlayMarks.pulseRegion &&
+      (overlayMarks.regionTiles.length > 0 ||
+        Boolean(overlayMarks.regionBounds));
+    if (hoverObj || selObj || pulsing || outlinesNeedRebuild) {
+      rebuildOutlines();
+      outlinesNeedRebuild = false;
+    }
+    const loadingWorld = worldLoadActive && !worldLoadWarmupComplete;
+    if (loadingWorld) {
+      const shadowsReady =
+        worldLoadLightsReady &&
+        worldLoadTerrainSettled &&
+        worldLoadPropsSettled &&
+        !staticPointShadowBakePending &&
+        pointShadowBank.dirtyLights().length === 0;
       profiler.beginGpu();
-      const reflectNow = performance.now();
-      if (waterReflect && reflectionScheduler.shouldRender(reflectNow)) {
-        waterReflect.render(renderer, scene, camera);
-        reflectionScheduler.markRendered(reflectNow);
+      if (shadowsReady) {
+        worldLoadCompiling = true;
+        emitWorldLoadProgress();
+        renderer.compile(scene, camera);
+        presentEditorAtlas();
+        post.render();
+        worldLoadCompiling = false;
+        worldLoadWarmupComplete = true;
+        emitWorldLoadProgress();
+      } else {
+        emitWorldLoadProgress();
+        if (staticPointShadowBakePending) needsFrame = true;
       }
-      post.render();
       profiler.endGpu();
       profiler.endFrame(
         profiler.isVisible() ? profilerExtras() : undefined,
       );
-    } finally {
-      pointBake?.restore();
+      return;
     }
-    if (worldLoadActive && worldLoadLightsReady && !worldLoadWarmupComplete) {
-      worldLoadWarmupComplete = true;
-      emitWorldLoadProgress();
+    // Planar water / metal floor mirror (lights dimmed via intensity).
+    profiler.beginGpu();
+    const reflectNow = performance.now();
+    if (waterReflect && reflectionScheduler.shouldRender(reflectNow)) {
+      waterReflect.render(renderer, scene, camera);
+      reflectionScheduler.markRendered(reflectNow);
     }
+    presentEditorAtlas();
+    post.render();
+    profiler.endGpu();
+    profiler.endFrame(
+      profiler.isVisible() ? profilerExtras() : undefined,
+    );
   };
 
   const rebuildEmissiveMats = () => {
@@ -1423,8 +1544,8 @@ export function createEditorThreePreview(
     if (disposed) return;
     contextLost = false;
     lastFrameMs = performance.now();
-    invalidatePointLightShadows(lightRoot);
-    staticPointShadowBakePending = true;
+    pointShadowBank.resetGpuResources();
+    dirtyPointShadowCache();
     renderer.shadowMap.needsUpdate = true;
     scene.traverse((obj) => {
       if (!(obj instanceof THREE.Mesh || obj instanceof THREE.Sprite)) return;
@@ -1462,13 +1583,16 @@ export function createEditorThreePreview(
       : worldLoadTerrainSettled
         ? 1
         : 0;
+    const bank = pointShadowBank.stats();
+    const shadowTotal = Math.max(bank.cached + bank.dirty, 0);
     const progress = emberWorldLoadProgress({
       terrainSettled: worldLoadTerrainSettled,
       staticPropsSettled: worldLoadPropsSettled,
       lightsReady: worldLoadLightsReady,
-      shadowCached: worldLoadWarmupComplete ? 1 : 0,
-      shadowTotal: 1,
+      shadowCached: bank.cached,
+      shadowTotal,
       warmupComplete: worldLoadWarmupComplete,
+      compiling: worldLoadCompiling,
       terrainFrac: worldLoadTerrainSettled
         ? 1
         : Math.min(0.98, terrainLoaded / terrainTotal),
@@ -1507,6 +1631,7 @@ export function createEditorThreePreview(
     worldLoadPropsSettled = false;
     worldLoadLightsReady = false;
     worldLoadWarmupComplete = false;
+    worldLoadCompiling = false;
     worldLoadPropsDone = 0;
     worldLoadPropsTotal = 0;
     loadProgressCb?.({ ratio: 0.04, labelRu: "Местность…" });
@@ -2074,7 +2199,10 @@ export function createEditorThreePreview(
 
       const mapKey = `${map.id}:${map.width}x${map.height}:${map.tileSize}`;
       const mapIdentityChanged = lastMapKey !== mapKey;
-      if (mapIdentityChanged) beginWorldLoad();
+      if (mapIdentityChanged) {
+        beginWorldLoad();
+        pointShadowAtlasFocusFromMap(map, atlasFocus);
+      }
 
       const terrainSig = terrainSignature(map, tileset.id);
       const propsStructSig = propsStructureSignature(map);
@@ -2126,8 +2254,7 @@ export function createEditorThreePreview(
           scene.add(mapGroup);
         }
         terrainChunks.scheduleUpdate(map, tileset, (complete) => {
-          invalidatePointLightShadows(lightRoot);
-          staticPointShadowBakePending = true;
+          dirtyPointShadowCache();
           renderer.shadowMap.needsUpdate = true;
           reflectionScheduler.markSceneDirty();
           outlinesNeedRebuild = true;
@@ -2181,6 +2308,7 @@ export function createEditorThreePreview(
       lastPack = pack;
       lastMapW = map.width * map.tileSize;
       lastMapD = map.height * map.tileSize;
+      applyLens(resolvePackMapCamera(map, pack));
       updateAssetPlacementPreview();
       const lightCfg = resolveMapLight(map);
       lastLightCfg = lightCfg;
@@ -2226,8 +2354,7 @@ export function createEditorThreePreview(
           propsMissing ||
           lightDirty)
       ) {
-        invalidatePointLightShadows(lightRoot);
-        staticPointShadowBakePending = true;
+        dirtyPointShadowCache();
         renderer.shadowMap.needsUpdate = true;
         reflectionScheduler.markSceneDirty();
       }
@@ -2445,8 +2572,7 @@ export function createEditorThreePreview(
       loadProgressCb = cb;
     },
     rebuildStaticShadows() {
-      invalidatePointLightShadows(lightRoot);
-      staticPointShadowBakePending = true;
+      dirtyPointShadowCache();
       renderer.shadowMap.needsUpdate = true;
       reflectionScheduler.markSceneDirty();
       requestRender();
@@ -2463,25 +2589,39 @@ export function createEditorThreePreview(
       requestRender();
     },
     setExploreCamera(tx, ty) {
-      yaw = YAW_PRESET.top;
-      if (map) {
-        zoomDist = exploreFollowDist(map.tileSize);
-        if (
-          tx != null &&
-          ty != null &&
-          tx >= 0 &&
-          ty >= 0 &&
-          tx < map.width &&
-          ty < map.height
-        ) {
-          const elev = tileSurfaceElev(map, tx, ty);
-          target.set(
-            (tx + 0.5) * map.tileSize,
-            elev * blockStoryHeight(map.tileSize) + 6,
-            (ty + 0.5) * map.tileSize,
-          );
-        }
+      if (!map) return;
+      const rig = resolvePackMapCamera(map, lastPack);
+      applyLens(rig);
+      polar = rig.polarAngle;
+      yaw = rig.yaw;
+      zoomDist = rig.followDistance;
+      if (
+        tx != null &&
+        ty != null &&
+        tx >= 0 &&
+        ty >= 0 &&
+        tx < map.width &&
+        ty < map.height
+      ) {
+        const elev = tileSurfaceElev(map, tx, ty);
+        target.set(
+          (tx + 0.5) * map.tileSize,
+          elev * blockStoryHeight(map.tileSize) + rig.lookHeight,
+          (ty + 0.5) * map.tileSize,
+        );
+        pointShadowAtlasFocusFromTile(tx, ty, map.tileSize, atlasFocus);
       }
+      requestRender();
+    },
+    setCameraRig(rig, mode = "preview") {
+      applyLens(rig);
+      if (mode === "lens") {
+        requestRender();
+        return;
+      }
+      polar = rig.polarAngle;
+      zoomDist = THREE.MathUtils.clamp(rig.followDistance, 48, 700);
+      if (mode === "play") yaw = rig.yaw;
       requestRender();
     },
     projectTile(tx, ty, elev = 0) {
@@ -2548,6 +2688,8 @@ export function createEditorThreePreview(
       voxelInstanceBatches = [];
       waterReflect?.dispose();
       waterReflect = null;
+      setEmberPointShadowAtlas({ enabled: false });
+      pointShadowBank.dispose();
       clearObjectRoot(propRoot);
       clearAssetPlacementPreview();
       clearOutlineRoot(outlineRoot);

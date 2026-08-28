@@ -51,12 +51,11 @@ export function localShadowDebugStatus(
   light: THREE.PointLight,
   dynamicLights: ReadonlySet<THREE.PointLight>,
 ): LocalShadowDebugStatus {
-  if (light.castShadow) {
-    return dynamicLights.has(light) ? "dynamic" : "baked";
-  }
-  if (light.userData.emberShadowRequested === true) {
+  const granted = light.userData.emberShadowGranted === true;
+  if (granted && dynamicLights.has(light)) return "dynamic";
+  if (granted) {
     return light.userData.emberStaticShadowCached === true
-      ? "cached"
+      ? "baked"
       : "warming";
   }
   return "no-shadow";

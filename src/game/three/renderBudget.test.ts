@@ -4,12 +4,13 @@ import {
   lanternShadowShare,
   lanternVisibleShare,
   playPointShadowCap,
+  remainingEmissiveShadowSlots,
   resolveEmberRenderBudget,
   resolvePlayProfileBudget,
 } from "./renderBudget";
 
 describe("Ember WebGL render budget", () => {
-  it("keeps a 16-sampler GPU below the point-shadow sampler cliff", () => {
+  it("keeps auto atlas bake conservative; authored maps may use the full cache cap", () => {
     const budget = resolveEmberRenderBudget(
       {
         maxFragmentUniforms: 224,
@@ -22,7 +23,7 @@ describe("Ember WebGL render budget", () => {
 
     expect(budget.maxPointLights).toBe(28);
     expect(budget.maxPointShadows).toBe(6);
-    expect(budget.maxPointShadowsHard).toBe(8);
+    expect(budget.maxPointShadowsHard).toBe(40);
     expect(lanternShadowShare(budget)).toBe(6);
     expect(budget.pointShadowMapSize).toBe(256);
     expect(budget.directionalShadowMapSize).toBe(1024);
@@ -40,8 +41,8 @@ describe("Ember WebGL render budget", () => {
     );
 
     expect(budget.maxPointLights).toBe(8);
-    expect(budget.maxPointShadows).toBe(0);
-    expect(budget.maxPointShadowsHard).toBe(0);
+    expect(budget.maxPointShadows).toBe(4);
+    expect(budget.maxPointShadowsHard).toBe(40);
     expect(budget.pointShadowMapSize).toBe(256);
     expect(budget.directionalShadowMapSize).toBe(256);
   });
@@ -154,6 +155,9 @@ describe("Ember WebGL render budget", () => {
     expect(authored.maxPointShadows).toBe(12);
     expect(
       playPointShadowCap(authored, resolvePlayProfileBudget("explore")),
-    ).toBe(6);
+    ).toBe(12);
+    expect(remainingEmissiveShadowSlots(6, 2)).toBe(4);
+    expect(remainingEmissiveShadowSlots(6, 6)).toBe(0);
+    expect(remainingEmissiveShadowSlots(0, 3)).toBe(0);
   });
 });

@@ -3426,7 +3426,9 @@ export type ResolvedMapAtmosphere = {
   cloudSpeed: number;
   dust: number;
   fireflies: number;
+  sparkle: number;
   vignette: number;
+  tiltShift: number;
   haze: number;
   sunGlare: number;
 };
@@ -3461,7 +3463,9 @@ export const DEFAULT_MAP_ATMOSPHERE: ResolvedMapAtmosphere = {
   cloudSpeed: 0.45,
   dust: 0,
   fireflies: 0,
+  sparkle: 0,
   vignette: 0.15,
+  tiltShift: 0,
   haze: 0,
   sunGlare: 0,
 };
@@ -3606,7 +3610,9 @@ export function resolveMapAtmosphere(
     ),
     dust: clamp01(a.dust, DEFAULT_MAP_ATMOSPHERE.dust),
     fireflies: clamp01(a.fireflies, DEFAULT_MAP_ATMOSPHERE.fireflies),
+    sparkle: clamp01(a.sparkle, DEFAULT_MAP_ATMOSPHERE.sparkle),
     vignette: clamp01(a.vignette, DEFAULT_MAP_ATMOSPHERE.vignette),
+    tiltShift: clamp01(a.tiltShift, DEFAULT_MAP_ATMOSPHERE.tiltShift),
     haze: clamp01(a.haze, DEFAULT_MAP_ATMOSPHERE.haze),
     sunGlare: clamp01(a.sunGlare, DEFAULT_MAP_ATMOSPHERE.sunGlare),
   };

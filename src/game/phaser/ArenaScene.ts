@@ -1921,6 +1921,7 @@ export class ArenaScene extends Phaser.Scene {
       advanceDialogue: () => undefined,
       captureExploreSave: () => null,
       applyExploreSave: () => false,
+      applyCameraSettings: () => undefined,
       destroy: () => {
         this.game.destroy(true);
       },

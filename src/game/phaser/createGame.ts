@@ -76,6 +76,7 @@ export function createEmberPhaserGame(opts: CreateEmberGameOpts): EmberGameApi {
     advanceDialogue: () => undefined,
     captureExploreSave: () => null,
     applyExploreSave: () => false,
+    applyCameraSettings: () => undefined,
     destroy: () => {
       game.destroy(true);
     },

@@ -6,7 +6,13 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { writeEmberJson } from "../../../game/content/io";
+import { writeEmberBytes, writeEmberJson } from "../../../game/content/io";
+import { asepriteSourceRel } from "../../../game/content/asepriteFile";
+import {
+  importAsepriteBytes,
+  spriteIdFromAsepriteName,
+} from "../../../game/content/asepriteImport";
+import { EmberAsepriteImportButton } from "./EmberAsepriteImportButton";
 import { createSlasherCharacterSprite } from "../../../game/content/slasherCharacterPreset";
 import {
   formatEmberLibraryTags,
@@ -592,6 +598,7 @@ export function SpriteEditorPanel({
     if (initialSpriteId) return false;
     return !hasOpenedEditor("sprite");
   });
+  const [editorLoadNonce, setEditorLoadNonce] = useState(0);
   const canvasView = usePixelCanvasView({
     referenceKey: spriteId ? `${pack.meta.id}:sprite:${spriteId}` : null,
   });
@@ -1052,7 +1059,7 @@ export function SpriteEditorPanel({
     redoRef.current = [];
     setHistoryLen(0);
     setRedoLen(0);
-  }, [spriteId, sprite?.id]);
+  }, [spriteId, sprite?.id, editorLoadNonce]);
 
   useEffect(() => {
     if (spriteId && !pack.sprites[spriteId]) {
@@ -3048,6 +3055,37 @@ export function SpriteEditorPanel({
     selectSprite(id);
   };
 
+  const importAsepriteFile = async (file: File, replace: boolean) => {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const replaceId = replace ? spriteId : null;
+    const existing = replaceId ? packRef.current.sprites[replaceId] : undefined;
+    let id = replaceId ?? spriteIdFromAsepriteName(file.name);
+    if (!replaceId && packRef.current.sprites[id]) {
+      id = `spr_${Date.now().toString(36)}`;
+    }
+    const result = await importAsepriteBytes(bytes, {
+      id,
+      nameRu: existing?.nameRu,
+      existing,
+    });
+    if (!result.ok) {
+      onSaved(`Aseprite: ${result.error}`);
+      return;
+    }
+    const current = packRef.current;
+    onChangePack({
+      ...current,
+      sprites: { ...current.sprites, [result.sprite.id]: result.sprite },
+    });
+    void writeEmberBytes(asepriteSourceRel(result.sprite.id), bytes);
+    selectSprite(result.sprite.id);
+    setEditorLoadNonce((n) => n + 1);
+    const warn = result.warnings.length
+      ? ` · ${result.warnings[0]}`
+      : "";
+    onSaved(`Aseprite → ${result.sprite.id}${warn}`);
+  };
+
   const deleteSprite = () => {
     if (!spriteId) return;
     const sprites = { ...pack.sprites };
@@ -3406,6 +3444,12 @@ export function SpriteEditorPanel({
                 >
                   Slasher персонаж
                 </button>
+                <EmberAsepriteImportButton
+                  className="ember-ed-open-picker__create"
+                  label="Из Aseprite"
+                  title="Новый спрайт из .aseprite"
+                  onFile={(file) => void importAsepriteFile(file, false)}
+                />
               </div>
             </header>
             <label className="ember-ed-open-picker__search">
@@ -3466,6 +3510,12 @@ export function SpriteEditorPanel({
               >
                 S
               </button>
+              <EmberAsepriteImportButton
+                className="ember-chip ember-chip--sm"
+                label="Ase"
+                title="Новый спрайт из Aseprite"
+                onFile={(file) => void importAsepriteFile(file, false)}
+              />
             </div>
           </div>
           <label className="ember-studio-search ember-studio-search--dock">
@@ -3501,6 +3551,13 @@ export function SpriteEditorPanel({
                   {width}×{canvasH}
                 </span>
                 <div className="ember-sprite-chrome__actions">
+                  <EmberAsepriteImportButton
+                    className="ghost"
+                    label="Aseprite"
+                    title="Заменить пиксели текущего спрайта из .aseprite"
+                    disabled={!sprite}
+                    onFile={(file) => void importAsepriteFile(file, true)}
+                  />
                   <button
                     type="button"
                     className="primary"

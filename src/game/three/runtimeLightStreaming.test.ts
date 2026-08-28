@@ -78,9 +78,15 @@ describe("runtime local-light streaming", () => {
       shadowFocus: new THREE.Vector3((4 + 0.5) * map.tileSize, 0, (4 + 0.5) * map.tileSize),
     });
 
-    const shadowed = lights.filter((light) => light.castShadow);
+    const shadowed = lights.filter(
+      (light) => light.userData.emberShadowGranted === true,
+    );
     expect(shadowed).toHaveLength(1);
     expect(shadowed[0]?.position.x).toBe((4 + 0.5) * map.tileSize);
-    expect(lights.filter((light) => !light.castShadow).length).toBeGreaterThan(0);
+    expect(lights.every((light) => light.castShadow === false)).toBe(true);
+    expect(
+      lights.filter((light) => light.userData.emberShadowGranted !== true)
+        .length,
+    ).toBeGreaterThan(0);
   });
 });

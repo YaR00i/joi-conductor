@@ -53,6 +53,30 @@ export function applyInteriorCutaway(
   applyInteriorCutawayTagged(collectCutawayTagged(root), hide);
 }
 
+type CutawayVisibility = { object: Object3D; visible: boolean };
+
+/**
+ * Play hides roofs/walls for the camera, then bakes sun + lamp cubes in the
+ * same tick. Hidden casters never write depth, so play umbras look like a
+ * different light map than the editor (which never cutaways). Reveal for the
+ * bake, then restore the occupancy hide for the color pass.
+ */
+export function withCutawayCastersVisible<T>(
+  tagged: readonly Object3D[],
+  fn: () => T,
+): T {
+  const prev: CutawayVisibility[] = [];
+  for (const object of tagged) {
+    prev.push({ object, visible: object.visible });
+    object.visible = true;
+  }
+  try {
+    return fn();
+  } finally {
+    for (const entry of prev) entry.object.visible = entry.visible;
+  }
+}
+
 export function tagCutawayObject(
   obj: Object3D,
   tx: number,

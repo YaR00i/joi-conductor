@@ -6,6 +6,42 @@ export type EmberRarity = "common" | "rare" | "epic";
 
 export type EmberMapPlayProfile = "arena" | "explore";
 
+/** Named play/editor camera framings. Omit `camera` on a map = iso JRPG defaults. */
+export const EMBER_CAMERA_PRESET_IDS = [
+  "iso",
+  "close",
+  "high",
+  "wide",
+] as const;
+export type EmberCameraPresetId = (typeof EMBER_CAMERA_PRESET_IDS)[number];
+
+/**
+ * Authored perspective follow camera (play + Explore·Q).
+ * Vertical FOV is Three.js `PerspectiveCamera.fov` in degrees.
+ */
+export type EmberMapCamera = {
+  /** Builtin `iso|close|high|wide` or saved pack preset `cam_*`. */
+  presetId?: string;
+  /** Vertical field of view in degrees. Default 40. */
+  fov?: number;
+  /** Orbit radius in world units. Omit = `tileSize * 7.5` clamped. */
+  followDistance?: number;
+  /** Spherical polar from +Y, radians. Default 0.95 (iso). */
+  polarAngle?: number;
+  /** Spherical yaw, radians. Default π/4 (south-east). */
+  yaw?: number;
+  /** Extra look-at height in world units. Default 6. */
+  lookHeight?: number;
+  near?: number;
+  far?: number;
+  /** When true, mouse only yaws (current play). Default true. */
+  pitchLock?: boolean;
+  polarMin?: number;
+  polarMax?: number;
+  /** Multiplier on play mouse yaw/pitch. Default 1. */
+  mouseSensitivity?: number;
+};
+
 export type MapRegionKind =
   | "player_start"
   | "spawn"
@@ -219,7 +255,10 @@ export type EmberMapGrade = {
  * All intensities 0 = off.
  */
 export type EmberMapAtmosphere = {
-  /** Exponential fog amount 0..1. */
+  /**
+   * Exponential fog amount 0..1. Linear through origin: 0.001–0.05 is light
+   * aerial haze; 1 matches the previous FogExp2 max density.
+   */
   fog?: number;
   /** Fog tint `#RRGGBB`. */
   fogColor?: string;
@@ -235,8 +274,14 @@ export type EmberMapAtmosphere = {
   dust?: number;
   /** Night fireflies (looks best with deep ambient) 0..1. */
   fireflies?: number;
+  /** Sun glitter motes 0..1 (toy / diorama sparkle). */
+  sparkle?: number;
   /** Screen vignette 0..1. */
   vignette?: number;
+  /**
+   * Miniature tilt-shift blur 0..1 — screen-Y diorama falloff, no depth buffer.
+   */
+  tiltShift?: number;
   /**
    * Warm air haze 0..1 — densifies fog slightly and warms dust/motes
    * (golden-hour feel without crushing visibility).
@@ -1054,6 +1099,20 @@ export type EmberLooksFile = {
   presets: EmberLookPreset[];
 };
 
+/**
+ * User-saved camera rig. Stored in `cameras/registry.json`.
+ * Omit `mapId` = pack-global; set = only listed on that map.
+ */
+export type EmberUserCameraPreset = EmberMapCamera & {
+  id: string;
+  nameRu: string;
+  mapId?: string;
+};
+
+export type EmberCamerasFile = {
+  presets: EmberUserCameraPreset[];
+};
+
 export type EmberSceneLocalTransform = {
   position: { x: number; y: number; z: number };
   rotationQuarterTurns: number;
@@ -1114,6 +1173,11 @@ export type EmberMap = {
   terrainHeightUnit?: "voxels";
   layers: EmberTileLayer[];
   regions: EmberMapRegion[];
+  /**
+   * Play / Explore·Q perspective rig. Omit = iso JRPG (FOV 40, polar 0.95).
+   * Not the `camera_bound` region.
+   */
+  camera?: EmberMapCamera;
   /** Global ambient + default lamp look for this map. */
   light?: EmberMapLight;
   /** Optional per-cell lantern overrides / free-standing lights. */
@@ -1771,6 +1835,8 @@ export type EmberPack = {
   lightPresets: Record<string, EmberLightPreset>;
   /** Named atmosphere + fill looks for map settings. */
   lookPresets: Record<string, EmberLookPreset>;
+  /** Named play/editor camera rigs (`cameras/registry.json`). */
+  cameraPresets: Record<string, EmberUserCameraPreset>;
   /** User-added palette swatches (shared across tile/sprite editors). */
   paletteFavorites?: string[];
 };

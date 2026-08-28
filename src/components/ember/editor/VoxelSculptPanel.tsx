@@ -243,6 +243,9 @@ type Props = {
   pack: EmberPack;
   modelId: string | null;
   onPackChange: (pack: EmberPack) => void;
+  /** Used by external editor bridges; normal in-app navigation keeps session state. */
+  initialWorkspaceMode?: VoxelWorkspaceMode;
+  initialTool?: SculptTool;
   /** Keep parent focus in sync when the user switches models locally. */
   onActiveModelChange?: (modelId: string | null) => void;
   /** If omitted, panel is a top-level editor tab (no close button). */
@@ -1306,6 +1309,8 @@ export function VoxelSculptPanel({
   pack,
   modelId,
   onPackChange,
+  initialWorkspaceMode,
+  initialTool,
   onActiveModelChange,
   onClose,
   onSaved,
@@ -1545,8 +1550,9 @@ export function VoxelSculptPanel({
     !onClose &&
     Object.keys(pack.voxelModels).length > 0 &&
     (browsePicker || !activeId);
-  const [tool, setTool] = useState<SculptTool>("add");
+  const [tool, setTool] = useState<SculptTool>(initialTool ?? "add");
   const [workspaceMode, setWorkspaceMode] = useState<VoxelWorkspaceMode>(() => {
+    if (initialWorkspaceMode) return initialWorkspaceMode;
     try {
       const saved = sessionStorage.getItem("ember-voxel-workspace");
       return VOXEL_WORKSPACES.some((item) => item.id === saved)

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   applyLookPresetToLight,
   BUILTIN_SUNNY_EVENING_LOOK,
+  BUILTIN_TOY_LOOK,
   isBuiltinLookPreset,
   listLookPresets,
   lookSnapshotFromLight,
@@ -296,6 +297,15 @@ export function MapSettingsPanel({
             }
           >
             Солнечный вечер
+          </button>
+          <button
+            type="button"
+            className="ghost ember-chip--sm"
+            onClick={() =>
+              applyLook(BUILTIN_TOY_LOOK, "Игрушечный образ применён")
+            }
+          >
+            Игрушечный
           </button>
           <button
             type="button"
@@ -696,12 +706,26 @@ export function MapSettingsPanel({
           />
           <strong>{fmtNum(atm.vignette)}</strong>
         </label>
+        <label className="ember-map-settings__field ember-map-settings__field--full">
+          <span>Макро (игрушечный blur)</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={atm.tiltShift}
+            onChange={onAtmosRange("tiltShift")}
+            onPointerUp={flushAtmos}
+            onKeyUp={flushAtmos}
+          />
+          <strong>{fmtNum(atm.tiltShift)}</strong>
+        </label>
       </section>
 
       <section className="ember-map-settings__section ember-map-settings__section--tune ember-map-settings__section--atm">
         <div className="ember-map-settings__section-head">
           <h4>Атмосфера</h4>
-          <EditorHint text="Туман, дымка, дождь, облака, пыль, блик солнца и светлячки. Превью на карте — облачко в шапке, не эта кнопка." />
+          <EditorHint text="Туман теперь линейный с нуля: 0.001–0.05 — лёгкая дымка, без скачка на 0.02. Плюс дымка, дождь, облака, пыль, блёстки, блик солнца и светлячки. Превью на карте — облачко в шапке, не эта кнопка." />
           <button
             type="button"
             className="ghost"
@@ -731,13 +755,13 @@ export function MapSettingsPanel({
               type="range"
               min={0}
               max={1}
-              step={0.01}
+              step={0.001}
               value={atm.fog}
               onChange={onAtmosRange("fog")}
               onPointerUp={flushAtmos}
               onKeyUp={flushAtmos}
             />
-            <strong>{fmtNum(atm.fog)}</strong>
+            <strong>{fmtNum(atm.fog, 3)}</strong>
           </div>
         </label>
 
@@ -841,6 +865,20 @@ export function MapSettingsPanel({
             onKeyUp={flushAtmos}
           />
           <strong>{fmtNum(atm.dust)}</strong>
+        </label>
+        <label className="ember-map-settings__field ember-map-settings__field--full">
+          <span>Блёстки</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={atm.sparkle}
+            onChange={onAtmosRange("sparkle")}
+            onPointerUp={flushAtmos}
+            onKeyUp={flushAtmos}
+          />
+          <strong>{fmtNum(atm.sparkle)}</strong>
         </label>
         <label className="ember-map-settings__field ember-map-settings__field--full">
           <span>Светлячки</span>

@@ -26,7 +26,11 @@ import {
   type ResolvedMapLight,
 } from "../tile/mapUtils";
 import { MAP_POINT_LIGHTS_MAX } from "../tile/lightLimits";
-import { applyDirectionalShadowBias } from "./dynamicShadowPolicy";
+import { pointShadowTileInfluenceScore } from "./pointShadowAtlas";
+import {
+  applyDirectionalShadowBias,
+  setPointLightShadowGranted,
+} from "./dynamicShadowPolicy";
 
 export const THREE_MAX_LAMPS = 32;
 /** Every authored lamp can keep a baked cube; dynamic updates stay pooled. */
@@ -79,8 +83,8 @@ export type ThreeLightBuildOpts = {
   /** Optional tile-space runtime window for local lamp streaming. */
   sourceBounds?: { x0: number; y0: number; x1: number; y1: number };
   /**
-   * When set, cube-shadow slots go to lamps nearest this world-space point
-   * (explore street lanterns). Default ranks by authored strength.
+   * When set, bake-cache grants go to lamps nearest this world-space point
+   * (explore spawn / player). Default ranks by authored strength.
    */
   shadowFocus?: THREE.Vector3;
 };
@@ -290,7 +294,7 @@ export function addThreeLanternLights(
   const outLights: THREE.PointLight[] = [];
 
   const enableLampShadow = (pl: THREE.PointLight, mapSize: number) => {
-    pl.castShadow = true;
+    pl.castShadow = false;
     pl.shadow.mapSize.set(mapSize, mapSize);
     // Seal umbra fully — any intensity < 1 lets disc rings bleed past walls.
     pl.shadow.bias = -0.0002;
@@ -345,6 +349,7 @@ export function addThreeLanternLights(
     pl.userData.emberLamp = lampUd;
     pl.userData.emberShadowRequested = shadows;
     if (withShadow) enableLampShadow(pl, lampShadowMap);
+    setPointLightShadowGranted(pl, withShadow);
     root.add(pl);
     outLights.push(pl);
 
@@ -376,16 +381,28 @@ export function addThreeLanternLights(
   // real source.
   if (allLamps.length === 0) return outLights;
 
-  // Strongest lamps first get the scarce shadow slots, unless explore
-  // streaming asked for nearest-to-player street cubes.
+  // Strongest lamps first get the scarce bake grants, unless explore
+  // asked for nearest-to-focus street umbras (same score as atlas slots).
   const ranked = [...lamps].sort((a, b) => {
     if (opts.shadowFocus) {
       const focus = opts.shadowFocus;
-      const ax = (a.x + 0.5) * ts - focus.x;
-      const az = (a.y + 0.5) * ts - focus.z;
-      const bx = (b.x + 0.5) * ts - focus.x;
-      const bz = (b.y + 0.5) * ts - focus.z;
-      return ax * ax + az * az - (bx * bx + bz * bz);
+      const scoreA = pointShadowTileInfluenceScore(
+        a.x,
+        a.y,
+        focus.x,
+        focus.z,
+        ts,
+        lampPointDistance(ts, a.params.lampRange),
+      );
+      const scoreB = pointShadowTileInfluenceScore(
+        b.x,
+        b.y,
+        focus.x,
+        focus.z,
+        ts,
+        lampPointDistance(ts, b.params.lampRange),
+      );
+      return scoreA - scoreB || a.id.localeCompare(b.id);
     }
     return b.params.lampStrength0 - a.params.lampStrength0;
   });

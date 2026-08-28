@@ -4,6 +4,7 @@
 import type {
   EmberLookPreset,
   EmberLooksFile,
+  EmberMapAtmosphere,
   EmberMapLight,
 } from "./types";
 import {
@@ -39,19 +40,61 @@ export const BUILTIN_SUNNY_EVENING_LOOK: EmberLookPreset = {
     cloudShadows: 0.22,
     cloudSpeed: 0.18,
     dust: 0.42,
-    fireflies: 0.12,
     vignette: 0.3,
+    tiltShift: 0,
     haze: 0.55,
     sunGlare: 0.72,
+    sparkle: 0,
+    fireflies: 0.12,
+  },
+};
+
+/** Built-in toy diorama: high sun, pastel haze, sparkle, tilt-shift. */
+export const BUILTIN_TOY_LOOK: EmberLookPreset = {
+  id: "look_toy_diorama",
+  nameRu: "Игрушечный",
+  ambientColor: "#3a2418",
+  ambientAlpha: 0.1,
+  fillIntensity: 1.22,
+  sunAzimuth: 52,
+  sunElevation: 54,
+  sunColor: "#ffe8b8",
+  sunIntensity: 1.18,
+  bloomStrength: 0.48,
+  bloomThreshold: 0.52,
+  bloomRadius: 0.44,
+  grade: {
+    tone: 0.16,
+    brightness: 1.12,
+    saturation: 1.22,
+  },
+  atmosphere: {
+    fog: 0.04,
+    fogColor: "#c8e4f0",
+    rain: 0,
+    wind: 0.18,
+    cloudShadows: 0.16,
+    cloudSpeed: 0.2,
+    dust: 0.1,
+    fireflies: 0,
+    sparkle: 0.55,
+    vignette: 0.16,
+    tiltShift: 0.42,
+    haze: 0.12,
+    sunGlare: 0.4,
   },
 };
 
 const BUILTIN_LOOKS: Record<string, EmberLookPreset> = {
   [BUILTIN_SUNNY_EVENING_LOOK.id]: BUILTIN_SUNNY_EVENING_LOOK,
+  [BUILTIN_TOY_LOOK.id]: BUILTIN_TOY_LOOK,
 };
 
 export function normalizeLookPreset(
-  raw: Partial<EmberLookPreset> & { id?: string },
+  raw: Omit<Partial<EmberLookPreset>, "atmosphere"> & {
+    id?: string;
+    atmosphere?: EmberMapAtmosphere;
+  },
 ): EmberLookPreset | null {
   if (!raw?.id || typeof raw.id !== "string") return null;
   const resolved = resolveMapLight({
@@ -177,8 +220,13 @@ export function listLookPresets(
 ): EmberLookPreset[] {
   const merged = { ...BUILTIN_LOOKS, ...(packPresets ?? {}) };
   return Object.values(merged).sort((a, b) => {
-    if (a.id === BUILTIN_SUNNY_EVENING_LOOK.id) return -1;
-    if (b.id === BUILTIN_SUNNY_EVENING_LOOK.id) return 1;
+    const rank = (id: string) => {
+      if (id === BUILTIN_SUNNY_EVENING_LOOK.id) return 0;
+      if (id === BUILTIN_TOY_LOOK.id) return 1;
+      return 2;
+    };
+    const d = rank(a.id) - rank(b.id);
+    if (d !== 0) return d;
     return a.nameRu.localeCompare(b.nameRu, "ru");
   });
 }

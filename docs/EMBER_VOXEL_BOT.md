@@ -195,7 +195,7 @@ Ember — кубичный/воксельный мир внутри Electron-п�
 4. Не печатать тысячи нулей в чат.
 5. Не править существующие `vox_vil_*.json`, карты, тайлы, `src/**`, кроме случая «подключить файл» — **подключать не нужно**.
 6. После скрипта: `node scripts/gen-ember-fantasy-props.mjs`.
-7. В отчёте: список id, куда смотреть (Ember Editor → карта → библиотека → Воксели → поиск `fan` или тег `fantasy`), что должно быть видно с орбиты.
+7. В отчёте: список id, куда смотреть (Мини-игры → Ember Editor → карта → библиотека → Воксели → поиск `fan` или тег `fantasy`), что должно быть видно с орбиты.
 
 Теги на модели: lowercase через дефис, например `fantasy`, `outdoor`, `light`. Поиск в лотке идёт по id, `nameRu` и тегам.
 
@@ -259,7 +259,7 @@ Ember — кубичный/воксельный мир внутри Electron-п�
 `vox_fan_chimney`, `vox_fan_porch`, `vox_fan_mail_box`, `vox_fan_banner` (`physical: false`).
 Теги: `fantasy`, `outdoor`, `town`, `building`. Дверь — только меш; `kind:door` вешается на карте.
 
-**Карты `fan_town*`.** JRPG-городок `content/ember/maps/fan_town.json` + интерьеры `fan_town_inn` / `fan_town_smith` / `fan_town_mage` / `fan_town_house`. Входы: `vox_fan_door` + `vox_fan_porch` (регионы `*_enter` на крыльце). Kit2 display goods на `fan_town_smith` / `fan_town_inn` (не дублируют `weapon_rack` / `armor_stand`). Не править `hu_tao_*`.
+**Карты `fan_town*`.** JRPG-городок `content/ember/maps/fan_town.json` + интерьеры `fan_town_inn` / `fan_town_smith` / `fan_town_mage` / `fan_town_house`. Входы: `vox_fan_door` + `vox_fan_porch` (регионы `*_enter` на крыльце). Kit2 display goods на `fan_town_smith` / `fan_town_inn` (не дублируют `weapon_rack` / `armor_stand`). Play берёт **стадии**, не список карт: хаб виден в **Мини-игры → Аномалия** через `content/ember/stages/fan_town.json` + пустой `spawns/fan_town.json`. Новую explore-карту без стадии в play не класть. Не править `hu_tao_*`. Default stage пака (`hu_tao_p1`) не менять.
 
 **Крупные вещи** (мельница, лодка, мост) — несколько пропов или voxel scene, не один гигантский массив.
 

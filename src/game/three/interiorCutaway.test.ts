@@ -6,6 +6,7 @@ import {
   applyInteriorCutawayTagged,
   collectCutawayTagged,
   tagCutawayObject,
+  withCutawayCastersVisible,
 } from "./interiorCutaway";
 
 describe("interiorCutaway", () => {
@@ -50,5 +51,31 @@ describe("interiorCutaway", () => {
     });
     expect(roof.visible).toBe(false);
     expect(extra.visible).toBe(true);
+  });
+
+  it("reveals tagged casters for a bake then restores the occupancy hide", () => {
+    const roof = new Object3D();
+    tagCutawayObject(roof, 1, 1, 2, "roof");
+    roof.visible = false;
+    const seen: boolean[] = [];
+    const result = withCutawayCastersVisible([roof], () => {
+      seen.push(roof.visible);
+      return "baked";
+    });
+    expect(result).toBe("baked");
+    expect(seen).toEqual([true]);
+    expect(roof.visible).toBe(false);
+  });
+
+  it("restores hide even when the bake throws", () => {
+    const wall = new Object3D();
+    tagCutawayObject(wall, 2, 2, 1, "wall");
+    wall.visible = false;
+    expect(() =>
+      withCutawayCastersVisible([wall], () => {
+        throw new Error("bake failed");
+      }),
+    ).toThrow("bake failed");
+    expect(wall.visible).toBe(false);
   });
 });

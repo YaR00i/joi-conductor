@@ -1,4 +1,4 @@
-import type { EmberDialogueUse } from "../content/types";
+import type { EmberDialogueUse, EmberMapCamera } from "../content/types";
 import type {
   EmberExploreAutosaveReason,
   EmberExploreSaveState,
@@ -119,5 +119,6 @@ export type EmberGameApi = {
   advanceDialogue: () => void;
   captureExploreSave: () => EmberExploreSaveState | null;
   applyExploreSave: (save: EmberExploreSaveState) => boolean;
+  applyCameraSettings: (camera: EmberMapCamera | undefined) => void;
   destroy: () => void;
 };

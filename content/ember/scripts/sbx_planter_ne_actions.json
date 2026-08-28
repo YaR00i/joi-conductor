@@ -1,0 +1,15 @@
+{
+  "id": "sbx_planter_ne_actions",
+  "nameRu": "Новая цепочка",
+  "steps": [
+    {
+      "type": "talk",
+      "dialogueId": "sandbox_guard_talk"
+    },
+    {
+      "type": "change_map",
+      "targetMapId": "agent_sandbox_interior",
+      "targetRegionId": "start"
+    }
+  ]
+}

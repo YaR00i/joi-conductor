@@ -8,6 +8,14 @@ export function playCameraYawFromMovement(
   return -movementX * sensitivity;
 }
 
+export function playCameraPitchFromMovement(
+  movementY: number,
+  sensitivity = PLAY_CAMERA_YAW_SENSITIVITY,
+): number {
+  if (!Number.isFinite(movementY) || movementY === 0) return 0;
+  return movementY * sensitivity;
+}
+
 /** Coalesce irregular pointer events into one camera update per render frame. */
 export function accumulatePlayLookMovement(
   pendingMovementX: number,
@@ -131,6 +139,14 @@ export function releasePlayCursorClip(): void {
  * even with a fresh click. Programmatic exitPointerLock() can re-lock immediately.
  */
 export const PLAY_POINTER_LOCK_RELOCK_MS = 1500;
+
+/** Alt-tab / hidden tab: freeze play. Do not auto-resume on focus. */
+export function playBackgroundShouldPause(opts: {
+  warmupComplete: boolean;
+  movementFrozen: boolean;
+}): boolean {
+  return opts.warmupComplete === true && opts.movementFrozen !== true;
+}
 
 export function playPointerLockRelockReady(
   unlockedAtMs: number,

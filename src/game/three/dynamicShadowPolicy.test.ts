@@ -13,13 +13,17 @@ import {
   directionalShadowHalfExtent,
   directionalShadowLightDistance,
   fitDirectionalShadowToFocus,
+  grantedPointShadowLights,
   invalidatePointLightShadows,
   mapWideDirectionalHalf,
   pickDynamicPointShadowLights,
   pickDynamicPointShadowLightsFrom,
   pickPointShadowSlotLights,
+  pointLightActorRecookBlocked,
   pointLightAffectsPoint,
+  pointShadowRecookKeepOut,
   setObjectRenderLayer,
+  setPointLightShadowGranted,
   snapShadowFocusToTexel,
   snapStickyGroundLookDir,
 } from "./dynamicShadowPolicy";
@@ -42,6 +46,20 @@ describe("dynamic shadow policy", () => {
     expect(root.layers.isEnabled(0)).toBe(false);
     expect(child.layers.isEnabled(EMBER_DYNAMIC_ACTOR_LAYER)).toBe(true);
     expect(child.layers.isEnabled(0)).toBe(false);
+  });
+
+  it("does not treat over-budget requested fill lamps as granted bake slots", () => {
+    const slotted = new THREE.PointLight();
+    slotted.userData.emberShadowRequested = true;
+    setPointLightShadowGranted(slotted, true);
+    const fill = new THREE.PointLight();
+    fill.castShadow = true;
+    fill.userData.emberShadowRequested = true;
+    setPointLightShadowGranted(fill, false);
+
+    expect(grantedPointShadowLights([slotted, fill])).toEqual([slotted]);
+    expect(slotted.castShadow).toBe(false);
+    expect(fill.castShadow).toBe(false);
   });
 
   it("caches only point-light shadows and can invalidate them", () => {
@@ -347,6 +365,17 @@ describe("dynamic shadow policy", () => {
         },
       ),
     ).toEqual([]);
+  });
+
+  it("blocks actor recook when the player is hugging the lamp", () => {
+    const light = new THREE.PointLight(0xffffff, 1, 40);
+    light.position.set(0, 12, 0);
+    light.shadow.camera.near = 0.1;
+    const hugging = new THREE.Vector3(0, 0, 0);
+    const street = new THREE.Vector3(28, 0, 0);
+    expect(pointShadowRecookKeepOut(light, 2.5)).toBeGreaterThanOrEqual(12);
+    expect(pointLightActorRecookBlocked(light, hugging, 2.5)).toBe(true);
+    expect(pointLightActorRecookBlocked(light, street, 2.5)).toBe(false);
   });
 
   it("lets a visible actor nominate a second on-screen lamp", () => {
