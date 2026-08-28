@@ -13,6 +13,7 @@ import {
 import { EveningRouteOverlay } from "./components/EveningRouteOverlay";
 import { SectionBriefingOverlay } from "./components/SectionBriefingOverlay";
 import { SideNav, type NavId } from "./components/SideNav";
+import { parseEmberVoxelEditorDeepLink } from "./game/content/emberEditorDeepLink";
 import { TitleBar } from "./components/TitleBar";
 import type { VibeHudDeviceInfo, VibeHudState } from "./components/VibeHud";
 import { DebugAvatar, type AvatarSnapshot } from "./lib/avatar/debugAvatar";
@@ -58,12 +59,17 @@ import {
   shouldShowEveningRoute,
 } from "./lib/eveningRoute";
 import {
-  isBriefableNav,
+  briefingNavFor,
   markSectionBriefingCompleted,
   markSectionBriefingDismissed,
   shouldShowSectionBriefing,
   type BriefableNavId,
 } from "./lib/sectionBriefings";
+import { rememberHubNav } from "./lib/hubNav";
+import {
+  isContentNav,
+  rememberFavoritesRedirect,
+} from "./lib/contentHub";
 import {
   fetchGelbooruFlexible,
   filterMediaByKinds,
@@ -192,7 +198,6 @@ import {
 } from "./lib/achievements";
 import { computeSessionEndProgress } from "./lib/sessionEndProgress";
 import { AchievementsPage } from "./pages/AchievementsPage";
-import { FavoritesPage } from "./pages/FavoritesPage";
 import { ContractMediaDrillHud } from "./components/ContractMediaDrillHud";
 import { ContractsPage } from "./pages/ContractsPage";
 import { DiaryPage } from "./pages/DiaryPage";
@@ -204,6 +209,7 @@ import { SessionPage, type SessionSpeech } from "./pages/SessionPage";
 import { ShopPage } from "./pages/ShopPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { MinigamesPage } from "./pages/MinigamesPage";
+import { FavoriteSaveToastHost } from "./pages/doujin/FavoriteSaveToast";
 import { SessionDebriefSheet } from "./components/SessionDebriefSheet";
 import { AbortDebriefSheet } from "./components/AbortDebriefSheet";
 import {
@@ -306,6 +312,18 @@ import {
   applyMediaTypeQuery,
   kindsForMediaType,
 } from "./lib/mediaTypeFilter";
+import { isListMediaType } from "./lib/contentCatalog";
+import {
+  assembleGelbooruMistressList,
+  saveTagPullAsGelbooruList,
+} from "./lib/gelbooruListBuild";
+import {
+  getGelbooruList,
+  gelbooruListOption,
+  listGelbooruLists,
+  type GelbooruListOption,
+} from "./lib/gelbooruLists";
+import { snapMediaQueueSize } from "./lib/mediaQueue";
 import {
   hasMoreShopOffersFromFavorites,
   loadMoreShopOffersFromFavorites,
@@ -338,6 +356,11 @@ const LazyEmberPlayPage = lazy(() =>
 const LazyEmberEditorPage = lazy(() =>
   import("./pages/EmberEditorPage").then((module) => ({
     default: module.EmberEditorPage,
+  })),
+);
+const LazyDoujinPage = lazy(() =>
+  import("./pages/doujin/DoujinPage").then((module) => ({
+    default: module.DoujinPage,
   })),
 );
 
@@ -400,7 +423,11 @@ function filterPlaylistByMediaType(
 }
 
 export function App() {
-  const [nav, setNav] = useState<NavId>("roulette");
+  const [nav, setNav] = useState<NavId>(() =>
+    parseEmberVoxelEditorDeepLink(window.location.search)
+      ? "ember_editor"
+      : "roulette",
+  );
   const [fullscreen, setFullscreen] = useState(false);
   const [eveningRouteOpen, setEveningRouteOpen] = useState(() =>
     shouldShowEveningRoute(),
@@ -522,6 +549,7 @@ export function App() {
   });
   const [mediaLoading, setMediaLoading] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [mediaLists, setMediaLists] = useState<GelbooruListOption[]>([]);
   const [mediaSaveStatus, setMediaSaveStatus] = useState<string | null>(null);
   const mediaSaveTimerRef = useRef(0);
   const [wd14Status, setWd14Status] = useState<Wd14Status | null>(null);
@@ -2057,6 +2085,15 @@ export function App() {
     void refreshFavoriteMeta();
   }, []);
 
+  const refreshMediaLists = useCallback(async () => {
+    const rows = await listGelbooruLists();
+    setMediaLists(rows.map(gelbooruListOption));
+  }, []);
+
+  useEffect(() => {
+    void refreshMediaLists();
+  }, [refreshMediaLists, nav]);
+
   useEffect(() => {
     if (mediaSettings.source === "favorites") {
       void loadFavoritesPlaylist();
@@ -2185,6 +2222,83 @@ export function App() {
     } catch (err) {
       setMediaError(
         err instanceof Error ? err.message : "Не удалось открыть избранное",
+      );
+    } finally {
+      setMediaLoading(false);
+    }
+  }
+
+  async function loadGelbooruListPlaylist(
+    items: MediaItem[],
+    listId?: string,
+  ): Promise<void> {
+    setMediaLoading(true);
+    setMediaError(null);
+    try {
+      revokeLocalMedia(mediaItemsRef.current);
+      revokeFavoriteMedia(mediaItemsRef.current);
+      const next = {
+        ...mediaSettingsRef.current,
+        source: "gelbooru" as const,
+        mediaTypeId: listId
+          ? ("list" as const)
+          : mediaSettingsRef.current.mediaTypeId,
+        listId: listId ?? mediaSettingsRef.current.listId,
+      };
+      setMediaSettings(next);
+      setMediaItems(items);
+      saveMediaLibrary(next, items);
+      if (items.length === 0) {
+        setMediaError("Список пуст");
+      }
+      preloadEntirePlaylist(items);
+      void refreshMediaLists();
+    } catch (err) {
+      setMediaError(
+        err instanceof Error ? err.message : "Не удалось открыть список",
+      );
+    } finally {
+      setMediaLoading(false);
+    }
+  }
+
+  async function applyMediaList(listId?: string): Promise<void> {
+    const id = (listId ?? mediaSettingsRef.current.listId)?.trim();
+    if (!id) {
+      setMediaError("Сначала выбери список в Медиа");
+      return;
+    }
+    const list = await getGelbooruList(id);
+    if (!list || list.items.length === 0) {
+      setMediaError(
+        "Список пуст — собери автоочередь кнопкой «Выбор» на этой вкладке",
+      );
+      return;
+    }
+    await loadGelbooruListPlaylist(list.items, list.id);
+  }
+
+  async function assembleMediaList(): Promise<void> {
+    const media = mediaSettingsRef.current;
+    if (!media.gelbooruUserId.trim() || !media.gelbooruApiKey.trim()) {
+      setMediaError("Ключи Gelbooru — в Настройках");
+      return;
+    }
+    setMediaLoading(true);
+    setMediaError(null);
+    try {
+      const list = await assembleGelbooruMistressList(
+        snapMediaQueueSize(media.limit),
+      );
+      await refreshMediaLists();
+      if (list.items.length === 0) {
+        setMediaError("Автоочередь пуста — проверь теги и ключ Gelbooru");
+        return;
+      }
+      await loadGelbooruListPlaylist(list.items, list.id);
+    } catch (err) {
+      setMediaError(
+        err instanceof Error ? err.message : "Не удалось собрать автоочередь",
       );
     } finally {
       setMediaLoading(false);
@@ -2442,7 +2556,33 @@ export function App() {
     }
   }
 
+  async function rememberTagPullAsList(
+    items: MediaItem[],
+    pull: {
+      tags: string;
+      query: string;
+      usedTags?: string;
+      attempted?: readonly string[];
+      mediaTypeId: MediaSettings["mediaTypeId"];
+      want: number;
+    },
+  ): Promise<string | undefined> {
+    if (items.length === 0) return undefined;
+    try {
+      const list = await saveTagPullAsGelbooruList({ ...pull, items });
+      await refreshMediaLists();
+      return list.id;
+    } catch {
+      return undefined;
+    }
+  }
+
   async function loadGelbooru(opts?: { tags?: string; limit?: number }) {
+    const base = mediaSettingsRef.current;
+    if (isListMediaType(resolveMediaTypeId(base))) {
+      await applyMediaList(base.listId ?? undefined);
+      return;
+    }
     setMediaLoading(true);
     setMediaError(null);
     try {
@@ -2480,6 +2620,14 @@ export function App() {
       if (items.length === 0) {
         setMediaError("Пусто — попробуй другие теги или другой тип контента");
       }
+      const listId = await rememberTagPullAsList(items, {
+        tags: sanitized.tags,
+        query,
+        usedTags: flex.usedTags,
+        attempted: flex.attempted,
+        mediaTypeId: typeId,
+        want: limit,
+      });
       setMediaItems(items);
       const saved: MediaSettings = {
         ...mediaSettingsRef.current,
@@ -2487,6 +2635,7 @@ export function App() {
         limit,
         mediaTypeId: typeId,
         tags: sanitized.tags,
+        listId: listId ?? mediaSettingsRef.current.listId,
       };
       setMediaSettings(saved);
       saveMediaLibrary(saved, items);
@@ -2781,7 +2930,7 @@ export function App() {
       };
       setMediaSettings(patched);
       saveMediaSettings(patched);
-      if (patched.source === "gelbooru") {
+      if (patched.source === "gelbooru" && !isListMediaType(patched.mediaTypeId)) {
         try {
           const flex = await fetchGelbooruFlexible(
             applyMediaTypeQuery(sanitized.tags, patched.mediaTypeId ?? "all"),
@@ -2797,8 +2946,21 @@ export function App() {
               patched.mediaTypeId ?? "all",
             );
             if (items.length > 0) {
+              const listId = await rememberTagPullAsList(items, {
+                tags: sanitized.tags,
+                query: applyMediaTypeQuery(
+                  sanitized.tags,
+                  patched.mediaTypeId ?? "all",
+                ),
+                usedTags: flex.usedTags,
+                attempted: flex.attempted,
+                mediaTypeId: patched.mediaTypeId ?? "all",
+                want: patched.limit,
+              });
+              const next = listId ? { ...patched, listId } : patched;
+              setMediaSettings(next);
               setMediaItems(items);
-              saveMediaLibrary(patched, items);
+              saveMediaLibrary(next, items);
               mediaItemsRef.current = items;
             }
           }
@@ -2922,29 +3084,53 @@ export function App() {
     try {
       revokeLocalMedia(mediaItemsRef.current);
       revokeFavoriteMedia(mediaItemsRef.current);
-      const { items, usedTags, attempted } = await fetchGelbooruFlexible(
-        sanitized.tags,
-        nextMedia.limit,
-        {
-          userId: nextMedia.gelbooruUserId,
-          apiKey: nextMedia.gelbooruApiKey,
-        },
-      );
-      const filtered = filterMediaByKinds(items, result.mediaKinds ?? []);
-      const playlistItems =
-        filtered.length > 0
-          ? filtered
-          : items;
-      if (playlistItems.length === 0) {
-        throw new Error(
-          `Booru пуст (пробовал ${attempted.length} запросов, от «${sanitized.tags}» до упрощённых). Проверь API key или крути заново`,
+      let playlistItems: MediaItem[];
+      let mediaWithTags: MediaSettings;
+      if (isListMediaType(result.mediaTypeId)) {
+        const listId = nextMedia.listId;
+        const list = listId ? await getGelbooruList(listId) : undefined;
+        if (!list || list.items.length === 0) {
+          throw new Error(
+            "Нет списка — собери автоочередь или выбери список в Медиа",
+          );
+        }
+        playlistItems = list.items.slice();
+        mediaWithTags = {
+          ...nextMedia,
+          mediaTypeId: "list",
+          listId: list.id,
+        };
+      } else {
+        const { items, usedTags, attempted } = await fetchGelbooruFlexible(
+          sanitized.tags,
+          nextMedia.limit,
+          {
+            userId: nextMedia.gelbooruUserId,
+            apiKey: nextMedia.gelbooruApiKey,
+          },
         );
+        const filtered = filterMediaByKinds(items, result.mediaKinds ?? []);
+        playlistItems = filtered.length > 0 ? filtered : items;
+        if (playlistItems.length === 0) {
+          throw new Error(
+            `Booru пуст (пробовал ${attempted.length} запросов, от «${sanitized.tags}» до упрощённых). Проверь API key или крути заново`,
+          );
+        }
+        const listId = await rememberTagPullAsList(playlistItems, {
+          tags: sanitized.tags,
+          query: sanitized.tags,
+          usedTags,
+          attempted,
+          mediaTypeId: result.mediaTypeId,
+          want: nextMedia.limit,
+        });
+        mediaWithTags = {
+          ...nextMedia,
+          tags: usedTags,
+          mediaTypeId: result.mediaTypeId,
+          listId: listId ?? nextMedia.listId,
+        };
       }
-      const mediaWithTags: MediaSettings = {
-        ...nextMedia,
-        tags: usedTags,
-        mediaTypeId: result.mediaTypeId,
-      };
       setMediaSettings(mediaWithTags);
       saveMediaSettings(mediaWithTags);
       setMediaItems(playlistItems);
@@ -3015,8 +3201,8 @@ export function App() {
           ? toyNames.join(" · ")
           : toysCountLabel || undefined;
       diaryMetaRef.current = {
-        tagsLabelRu: result.tagsLabelRu || usedTags || undefined,
-        mediaTags: usedTags || sanitized.tags || undefined,
+        tagsLabelRu: result.tagsLabelRu || mediaWithTags.tags || undefined,
+        mediaTags: mediaWithTags.tags || sanitized.tags || undefined,
         bpmLabelRu: bpmPick?.labelRu,
         toysLabelRu,
       };
@@ -3187,6 +3373,25 @@ export function App() {
     state?.status === "paused" ||
     preflight != null;
 
+  const goNav = useCallback((id: NavId) => {
+    if (id === "favorites") {
+      rememberFavoritesRedirect();
+      setNav("doujin");
+      return;
+    }
+    setNav(id);
+  }, []);
+
+  useEffect(() => {
+    rememberHubNav(nav);
+  }, [nav]);
+
+  useEffect(() => {
+    if (nav !== "favorites") return;
+    rememberFavoritesRedirect();
+    setNav("doujin");
+  }, [nav]);
+
   useEffect(() => {
     if (
       eveningRouteOpen ||
@@ -3197,15 +3402,16 @@ export function App() {
       setActiveSectionBriefing(null);
       return;
     }
+    const briefingId = briefingNavFor(nav);
     if (
-      !isBriefableNav(nav) ||
-      skippedSectionBriefingsRef.current.has(nav) ||
-      !shouldShowSectionBriefing(nav)
+      !briefingId ||
+      skippedSectionBriefingsRef.current.has(briefingId) ||
+      !shouldShowSectionBriefing(briefingId)
     ) {
       setActiveSectionBriefing(null);
       return;
     }
-    setActiveSectionBriefing(nav);
+    setActiveSectionBriefing(briefingId);
   }, [nav, eveningRouteOpen, sessionLive, sessionDebrief, abortDebrief]);
 
   const previewBlock = queue[0];
@@ -3246,8 +3452,8 @@ export function App() {
           .join(" ")}
       >
         <SideNav
-          active={nav}
-          onChange={setNav}
+          active={nav === "favorites" ? "doujin" : nav}
+          onChange={goNav}
           sessionLive={sessionLive}
           collapsed={navCollapsed}
           favoritesCount={favoritesCount}
@@ -3330,8 +3536,9 @@ export function App() {
               }}
               onResetSectionBriefings={() => {
                 skippedSectionBriefingsRef.current.clear();
-                if (isBriefableNav(nav) && shouldShowSectionBriefing(nav)) {
-                  setActiveSectionBriefing(nav);
+                const briefingId = briefingNavFor(nav);
+                if (briefingId && shouldShowSectionBriefing(briefingId)) {
+                  setActiveSectionBriefing(briefingId);
                 }
               }}
             />
@@ -3363,6 +3570,9 @@ export function App() {
               onApplyPreset={applyPresetId}
               onMedia={setMediaSettings}
               onLoadGelbooru={() => void loadGelbooru()}
+              onLoadMediaList={() => void applyMediaList()}
+              onAssembleMediaList={() => void assembleMediaList()}
+              mediaLists={mediaLists}
               onPickLocal={pickLocal}
               onSaveMedia={handleSaveMedia}
               wd14Status={wd14Status}
@@ -3385,7 +3595,7 @@ export function App() {
               onOpenContracts={() => setNav("contracts")}
               onOpenSession={() => setNav("session")}
               onOpenShop={() => setNav("shop")}
-              onOpenFavorites={() => setNav("favorites")}
+              onOpenFavorites={() => goNav("favorites")}
             />
           ) : nav === "ember" ? (
             <EmberLazyBoundary>
@@ -3396,6 +3606,7 @@ export function App() {
                     setWallet((w) => creditCinders(w, n));
                   }}
                   onOpenEditor={() => setNav("ember_editor")}
+                  onNavigate={goNav}
                 />
               </Suspense>
             </EmberLazyBoundary>
@@ -3408,6 +3619,7 @@ export function App() {
                     if (n <= 0) return;
                     setWallet((w) => creditCinders(w, n));
                   }}
+                  onNavigate={goNav}
                 />
               </Suspense>
             </EmberLazyBoundary>
@@ -3415,30 +3627,44 @@ export function App() {
             <DiaryPage
               revision={diaryRevision}
               onRepeatPlan={repeatDiaryPlan}
+              onNavigate={goNav}
             />
           ) : nav === "stats" || nav === "contract_journal" ? (
             <StatsPage
               revision={diaryRevision}
               journalRevision={contractsRevision}
-              onNavigate={setNav}
+              onNavigate={goNav}
             />
           ) : nav === "achievements" ? (
             <AchievementsPage
               revision={achievementsRevision}
-              onNavigate={setNav}
+              onNavigate={goNav}
             />
-          ) : nav === "favorites" ? (
-            <FavoritesPage
-              onNavigate={setNav}
-              unlocks={contentUnlocksFromWallet(wallet)}
-              onFavoritesChanged={() => {
-                void refreshFavoriteMeta();
-                void refreshShopOffers();
-                if (mediaSettings.source === "favorites") {
-                  void loadFavoritesPlaylist();
-                }
-              }}
-            />
+          ) : isContentNav(nav) ? (
+            <Suspense
+              fallback={
+                <div className="page page--doujin" aria-busy="true">
+                  <div className="empty-state">Загрузка контента…</div>
+                </div>
+              }
+            >
+              <LazyDoujinPage
+                fromFavorites={nav === "favorites"}
+                onNavigate={goNav}
+                unlocks={contentUnlocksFromWallet(wallet)}
+                onFavoritesChanged={() => {
+                  void refreshFavoriteMeta();
+                  void refreshShopOffers();
+                  if (mediaSettings.source === "favorites") {
+                    void loadFavoritesPlaylist();
+                  }
+                }}
+                onPlayPlaylist={(items, listId) => {
+                  void loadGelbooruListPlaylist(items, listId);
+                  goNav("roulette");
+                }}
+              />
+            </Suspense>
           ) : nav === "contracts" ? (
             <ContractsPage
               wallet={wallet}
@@ -3472,7 +3698,7 @@ export function App() {
               wallet={wallet}
               favoritesHasMore={shopFavoritesHasMore}
               favoritesCount={favoritesCount}
-              onNavigate={setNav}
+              onNavigate={goNav}
               onLoadMoreFavorites={loadMoreFavoriteShopOffers}
               onSearchFavorites={searchFavoriteShopOffers}
               onPurchase={(itemId) => {
@@ -3578,6 +3804,7 @@ export function App() {
                 setWallet((w) => (w.balance >= n ? debitCinders(w, n) : w));
               }}
               walletBalance={wallet.balance}
+              onNavigate={goNav}
             />
           ) : (
             <SessionPage
@@ -3890,7 +4117,7 @@ export function App() {
                 setSessionDebrief(null);
                 if (highlight) setContractsHighlightTitle(highlight);
                 else if (id === "contracts") setContractsHighlightTitle(null);
-                setNav(id);
+                goNav(id);
               }}
             />
           ) : null}
@@ -3906,7 +4133,7 @@ export function App() {
                 setAbortDebrief(null);
                 if (highlight) setContractsHighlightTitle(highlight);
                 else if (id === "contracts") setContractsHighlightTitle(null);
-                setNav(id);
+                goNav(id);
               }}
             />
           ) : null}
@@ -3915,7 +4142,7 @@ export function App() {
               unlocks={mistressUnlockSnapshotFromWallet(wallet)}
               sessionLive={sessionLive}
               onMistressSwitched={handleMistressSwitched}
-              onNavigate={setNav}
+              onNavigate={goNav}
               onComplete={() => {
                 markEveningRouteCompleted();
                 markSectionBriefingCompleted("roulette");
@@ -3942,7 +4169,7 @@ export function App() {
           !abortDebrief ? (
             <SectionBriefingOverlay
               sectionId={activeSectionBriefing}
-              onNavigate={setNav}
+              onNavigate={goNav}
               onComplete={() => {
                 markSectionBriefingCompleted(activeSectionBriefing);
                 skippedSectionBriefingsRef.current.add(activeSectionBriefing);
@@ -3961,6 +4188,12 @@ export function App() {
           ) : null}
         </div>
       </div>
+      <FavoriteSaveToastHost
+        onIdle={() => {
+          void refreshFavoriteMeta();
+          void refreshShopOffers();
+        }}
+      />
     </div>
   );
 }

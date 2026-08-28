@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { NavId } from "../components/SideNav";
+import { ProgressHubChrome } from "../components/HubChrome";
 import {
   buildDiaryStats,
   formatAbortPct,
@@ -53,33 +54,43 @@ export function StatsPage({
     onNavigate(id);
   };
 
+  const ranges = (
+    <div className="stats-page__ranges" role="tablist" aria-label="Период">
+      {RANGES.map((r) => (
+        <button
+          key={r.id}
+          type="button"
+          role="tab"
+          aria-selected={range === r.id}
+          className={`stats-page__range${range === r.id ? " is-active" : ""}`}
+          onClick={() => setRange(r.id)}
+        >
+          {r.label}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <div className="stats-page page--stats">
+      {onNavigate ? (
+        <ProgressHubChrome active="stats" onChange={onNavigate} />
+      ) : (
+        <header className="stats-page__head">
+          <div>
+            <p className="stats-page__eyebrow">Из дневника</p>
+            <h1 className="stats-page__title">Статистика</h1>
+          </div>
+        </header>
+      )}
       <header className="stats-page__head">
-        <div>
-          <p className="stats-page__eyebrow">Из дневника</p>
-          <h1 className="stats-page__title">Статистика</h1>
-          <p className="stats-page__sub">
-            Все записи дневника за период входят в сессии, минуты и эджи —
-            и завершённые, и прерванные. Новые строки пишутся кнопкой
-            «Завершить»; прерванные учитываются, только если уже лежат в
-            дневнике.
-          </p>
-        </div>
-        <div className="stats-page__ranges" role="tablist" aria-label="Период">
-          {RANGES.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              role="tab"
-              aria-selected={range === r.id}
-              className={`stats-page__range${range === r.id ? " is-active" : ""}`}
-              onClick={() => setRange(r.id)}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
+        <p className="stats-page__sub">
+          Все записи дневника за период входят в сессии, минуты и эджи —
+          и завершённые, и прерванные. Новые строки пишутся кнопкой
+          «Завершить»; прерванные учитываются, только если уже лежат в
+          дневнике.
+        </p>
+        {ranges}
       </header>
 
       {empty ? (

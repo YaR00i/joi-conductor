@@ -1,4 +1,10 @@
-export type { MistressId, MistressPack } from "./types";
+export type {
+  AssembleTag,
+  AssembleTagKind,
+  MistressAssemblePreset,
+  MistressId,
+  MistressPack,
+} from "./types";
 export {
   getActiveMistress,
   initActiveMistress,

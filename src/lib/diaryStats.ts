@@ -321,8 +321,10 @@ export function buildDiaryStats(
 
     bumpNamed(
       byMode,
-      entry.mode,
-      modeFallback(entry.mode, entry.modeNameRu),
+      entry.source === "reading" ? "reading" : entry.mode,
+      entry.source === "reading"
+        ? "Чтение"
+        : modeFallback(entry.mode, entry.modeNameRu),
     );
     bumpNamed(
       byFinale,

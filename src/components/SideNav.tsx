@@ -1,3 +1,9 @@
+import {
+  isPlayNav,
+  isProgressNav,
+  lastPlayNav,
+  lastProgressNav,
+} from "../lib/hubNav";
 import { playUiClick, playUiNav, primeUiAudio } from "../lib/uiSound";
 
 export type NavId =
@@ -13,6 +19,7 @@ export type NavId =
   | "stats"
   | "achievements"
   | "favorites"
+  | "doujin"
   | "minigames"
   | "settings";
 
@@ -135,12 +142,12 @@ export function SideNav({
 
       <button
         type="button"
-        className={`side-nav__item ${active === "diary" ? "is-active" : ""}`}
-        onClick={() => go("diary")}
-        title="Дневник сессий"
+        className={`side-nav__item ${isProgressNav(active) ? "is-active" : ""}`}
+        onClick={() => go(lastProgressNav())}
+        title="Дневник, статистика и достижения"
       >
         <DiaryIcon />
-        <span>Дневник</span>
+        <span>Прогресс</span>
         {diaryCount > 0 ? (
           <span className="side-nav__badge">{diaryCount}</span>
         ) : null}
@@ -148,32 +155,12 @@ export function SideNav({
 
       <button
         type="button"
-        className={`side-nav__item ${active === "stats" || active === "contract_journal" ? "is-active" : ""}`}
-        onClick={() => go("stats")}
-        title="Статистика сессий и журнал контрактов"
+        className={`side-nav__item ${active === "doujin" || active === "favorites" ? "is-active" : ""}`}
+        onClick={() => go("doujin")}
+        title="Контент: nhentai и Gelbooru"
       >
-        <StatsIcon />
-        <span>Статистика</span>
-      </button>
-
-      <button
-        type="button"
-        className={`side-nav__item ${active === "achievements" ? "is-active" : ""}`}
-        onClick={() => go("achievements")}
-        title="Достижения"
-      >
-        <TrophyIcon />
-        <span>Достижения</span>
-      </button>
-
-      <button
-        type="button"
-        className={`side-nav__item ${active === "favorites" ? "is-active" : ""}`}
-        onClick={() => go("favorites")}
-        title="Избранное"
-      >
-        <HeartIcon />
-        <span>Избранное</span>
+        <BookIcon />
+        <span>Контент</span>
         {favoritesCount > 0 ? (
           <span className="side-nav__badge">{favoritesCount}</span>
         ) : null}
@@ -181,29 +168,9 @@ export function SideNav({
 
       <button
         type="button"
-        className={`side-nav__item ${active === "ember" ? "is-active" : ""}`}
-        onClick={() => go("ember")}
-        title="Ember Anomaly"
-      >
-        <EmberIcon />
-        <span>Аномалия</span>
-      </button>
-
-      <button
-        type="button"
-        className={`side-nav__item ${active === "ember_editor" ? "is-active" : ""}`}
-        onClick={() => go("ember_editor")}
-        title="Ember Editor"
-      >
-        <EmberEditIcon />
-        <span>Ember Editor</span>
-      </button>
-
-      <button
-        type="button"
-        className={`side-nav__item ${active === "minigames" ? "is-active" : ""}`}
-        onClick={() => go("minigames")}
-        title="Мини-игры на Угольки"
+        className={`side-nav__item ${isPlayNav(active) ? "is-active" : ""}`}
+        onClick={() => go(lastPlayNav())}
+        title="Мини-игры, Аномалия и Ember Editor"
       >
         <PuzzleIcon />
         <span>Мини-игры</span>
@@ -258,23 +225,15 @@ export function SideNav({
   );
 }
 
-function EmberIcon() {
+function BookIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
       <path
-        d="M12 3c2.5 3.5 6 5.5 6 10a6 6 0 0 1-12 0c0-3 1.5-5.5 3-7.5C10 7 11 8.5 12 10c.8-1.8 1.2-3.5 0-7z"
+        d="M5 4.5h11.5A2.5 2.5 0 0 1 19 7v13.2H7.2A2.2 2.2 0 0 0 5 22.4V4.5Z"
         strokeLinejoin="round"
       />
-      <path d="M10 16c.5 1.5 1.2 2 2 2s1.5-.5 2-2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function EmberEditIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-      <rect x="4" y="4" width="16" height="16" rx="2" />
-      <path d="M8 14h3M8 10h8M14 14l3-3 1.5 1.5L15.5 15.5z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 4.5A2.2 2.2 0 0 1 7.2 2.3H19" strokeLinecap="round" />
+      <path d="M8.5 8h7.5M8.5 12h7.5M8.5 16h5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -435,64 +394,6 @@ function DiaryIcon() {
     >
       <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
       <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
-    </svg>
-  );
-}
-
-function StatsIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden
-    >
-      <path d="M4 19h16" strokeLinecap="round" />
-      <path
-        d="M6 15.5 9.2 11l3.1 3.4L17.5 7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="6" cy="15.5" r="1.2" fill="currentColor" stroke="none" />
-      <circle cx="9.2" cy="11" r="1.2" fill="currentColor" stroke="none" />
-      <circle cx="12.3" cy="14.4" r="1.2" fill="currentColor" stroke="none" />
-      <circle cx="17.5" cy="7" r="1.2" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function TrophyIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden
-    >
-      <path
-        d="M8 4h8v3a4 4 0 0 1-8 0V4Z"
-        strokeLinejoin="round"
-      />
-      <path d="M8 5H5.5A2.5 2.5 0 0 0 5.5 10H8" strokeLinecap="round" />
-      <path d="M16 5h2.5A2.5 2.5 0 0 1 18.5 10H16" strokeLinecap="round" />
-      <path d="M12 11v3.5" strokeLinecap="round" />
-      <path d="M9 20h6" strokeLinecap="round" />
-      <path d="M10 17h4l-.5 3h-3L10 17Z" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function HeartIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M12 21s-6.7-4.35-9.33-8.1C.8 10.1 1.1 6.7 3.7 5.05 6.05 3.55 8.85 4.3 12 7.05c3.15-2.75 5.95-3.5 8.3-2 2.6 1.65 2.9 5.05 1.03 7.85C18.7 16.65 12 21 12 21z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
     </svg>
   );
 }

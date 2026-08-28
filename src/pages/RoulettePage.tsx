@@ -9,6 +9,7 @@ import {
 } from "../components/RouletteHubPanels";
 import { TypewriterText } from "../components/TypewriterText";
 import type { ContentUnlockLists } from "../lib/contentUnlocks";
+import type { GelbooruListOption } from "../lib/gelbooruLists";
 import {
   getActiveMistress,
   mistressUnlockSnapshotFrom,
@@ -156,6 +157,9 @@ interface RoulettePageProps {
   onApplyPreset: (presetId: string) => void;
   onMedia: (next: MediaSettings) => void;
   onLoadGelbooru: () => void;
+  onLoadMediaList?: () => void;
+  onAssembleMediaList?: () => void;
+  mediaLists?: ReadonlyArray<GelbooruListOption>;
   onPickLocal: (files: FileList) => void;
   onSaveMedia: () => void;
   /** WD14 auto-tagger: backend status for the local-source panel. */
@@ -212,6 +216,9 @@ export function RoulettePage({
   onApplyPreset,
   onMedia,
   onLoadGelbooru,
+  onLoadMediaList,
+  onAssembleMediaList,
+  mediaLists,
   onPickLocal,
   onSaveMedia,
   wd14Status,
@@ -1044,6 +1051,9 @@ export function RoulettePage({
                     onApplyPreset={onApplyPreset}
                     onMedia={onMedia}
                     onLoadGelbooru={onLoadGelbooru}
+                    onLoadMediaList={onLoadMediaList}
+                    onAssembleMediaList={onAssembleMediaList}
+                    mediaLists={mediaLists}
                     onPickLocal={onPickLocal}
                     onSaveMedia={onSaveMedia}
                     wd14Status={wd14Status}

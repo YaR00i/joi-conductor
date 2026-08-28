@@ -108,6 +108,18 @@ export type DiaryEntry = {
    * Absent on older diary entries.
    */
   resultImageUrl?: string;
+  /** Doujin reading run — not a metronome session. */
+  source?: "session" | "reading";
+  reading?: {
+    listId: string;
+    listName: string;
+    origin: "user" | "mistress";
+    galleries: number;
+    pagesShown: number;
+    pagesContent: number;
+    strokesDone: number;
+    slapsDone: number;
+  };
 };
 
 export type DiarySessionMeta = {

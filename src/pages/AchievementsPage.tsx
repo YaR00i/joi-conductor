@@ -1,5 +1,6 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import type { NavId } from "../components/SideNav";
+import { ProgressHubChrome } from "../components/HubChrome";
 import {
   ACHIEVEMENT_SET_ORDER,
   cindersForAchievementLevel,
@@ -53,17 +54,23 @@ export function AchievementsPage({ revision = 0, onNavigate }: Props) {
 
   return (
     <div className="achievements-page page--achievements">
+      {onNavigate ? (
+        <ProgressHubChrome active="achievements" onChange={onNavigate} />
+      ) : (
+        <header className="achievements-page__head">
+          <div>
+            <p className="achievements-page__eyebrow">
+              Витрина {getActiveMistress().displayNameRu}
+            </p>
+            <h1 className="achievements-page__title">Достижения</h1>
+          </div>
+        </header>
+      )}
       <header className="achievements-page__head">
-        <div>
-          <p className="achievements-page__eyebrow">
-            Витрина {getActiveMistress().displayNameRu}
-          </p>
-          <h1 className="achievements-page__title">Достижения</h1>
-          <p className="achievements-page__sub">
-            Сессии · контроль грани · режимы · финал · госпожи. Счётчики растут
-            только после «Завершить». За каждый новый уровень — угольки.
-          </p>
-        </div>
+        <p className="achievements-page__sub">
+          Сессии · контроль грани · режимы · финал · госпожи. Счётчики растут
+          только после «Завершить». За каждый новый уровень — угольки.
+        </p>
         <div className="achievements-page__totals" aria-label="Сводка">
           <div className="achievements-page__total">
             <span className="achievements-page__total-val">

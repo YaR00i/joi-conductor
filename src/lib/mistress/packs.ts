@@ -7,6 +7,7 @@ import sparkleMoodLinesData from "../../../data/character/sparkle-mood-lines.jso
 import sunnaBibleData from "../../../data/character/sunna.json";
 import sunnaMoodLinesData from "../../../data/character/sunna-mood-lines.json";
 import type { CharacterBible } from "../character";
+import { withAssembleActs } from "../gelbooruAssemblePreset";
 import {
   HU_TAO_AVATAR_SRC,
   HU_TAO_MOOD_AVATAR,
@@ -15,7 +16,7 @@ import {
 } from "../huTaoEmoji";
 import type { SessionMood } from "../types";
 import type { MoodLinesPack } from "../voice/moodLines";
-import type { MistressPack, MistressId } from "./types";
+import type { AssembleTag, MistressPack, MistressId } from "./types";
 import { SESSION_MOODS } from "./types";
 import {
   FURINA_SURFACES,
@@ -36,6 +37,23 @@ const sunnaBible = sunnaBibleData as CharacterBible;
 const sunnaMoodLines = sunnaMoodLinesData as MoodLinesPack;
 const sparkleBible = sparkleBibleData as CharacterBible;
 const sparkleMoodLines = sparkleMoodLinesData as MoodLinesPack;
+
+const FURINA_ASSEMBLE_ACTS: AssembleTag[] = [
+  { tag: "cbt", kind: "act", fallback: ["ball_busting"] },
+  { tag: "femdom", kind: "act" },
+  { tag: "pain", kind: "act", fallback: ["crying"] },
+  { tag: "humiliation", kind: "act", fallback: ["bondage"] },
+  { tag: "spanking", kind: "act" },
+  { tag: "ball_busting", kind: "act" },
+];
+
+const SUNNA_ASSEMBLE_ACTS: AssembleTag[] = [
+  { tag: "trap", kind: "act" },
+  { tag: "chastity_cage", kind: "act" },
+  { tag: "interracial", kind: "act", fallback: ["dark-skinned_male"] },
+  { tag: "crossdressing", kind: "act" },
+  { tag: "feminization", kind: "act" },
+];
 
 function packMoodAssets(
   folder: string,
@@ -98,6 +116,10 @@ export const HU_TAO_PACK: MistressPack = {
     focusTags: ["1girl", "foot_focus", "solo"],
     secondaryBooruIds: [],
     cumplayBiasTags: [],
+    assemble: withAssembleActs(
+      { likedWeight: 40, dislikedWeight: 15, ownWeight: 45 },
+      [],
+    ),
   },
   play: {
     summaryRu: "База: дрочка руками + онахол",
@@ -180,6 +202,10 @@ export const FURINA_PACK: MistressPack = {
     ],
     secondaryBooruIds: ["censored", "blacked"],
     cumplayBiasTags: ["cum_in_mouth", "bukkake", "gokkun"],
+    assemble: withAssembleActs(
+      { likedWeight: 30, dislikedWeight: 25, ownWeight: 45 },
+      FURINA_ASSEMBLE_ACTS,
+    ),
   },
   play: {
     summaryRu: "CBT + prone (бёдра) · мало hand-stroke",
@@ -269,6 +295,10 @@ export const SUNNA_PACK: MistressPack = {
     ],
     secondaryBooruIds: ["censored"],
     cumplayBiasTags: ["cum_in_mouth", "facial", "swallowing"],
+    assemble: withAssembleActs(
+      { likedWeight: 20, dislikedWeight: 30, ownWeight: 50 },
+      SUNNA_ASSEMBLE_ACTS,
+    ),
   },
   play: {
     summaryRu: "Vibe-first · oral / клетка / plapping · без hand-stroke",
@@ -356,6 +386,10 @@ export const SPARKLE_PACK: MistressPack = {
     ],
     secondaryBooruIds: ["censored", "blacked"],
     cumplayBiasTags: ["cum_in_ass", "anal", "bukkake"],
+    assemble: withAssembleActs(
+      { likedWeight: 10, dislikedWeight: 35, ownWeight: 55 },
+      [],
+    ),
   },
   play: {
     summaryRu: "Анал в клетке, phantom stroke, глюки",

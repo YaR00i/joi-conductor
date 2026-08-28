@@ -1,6 +1,10 @@
 import { useState } from "react";
+import type { NavId } from "../components/SideNav";
+import { PlayHubChrome } from "../components/HubChrome";
 import { getActiveSaveSlot } from "../lib/saveSlots";
 import { DoodleGame } from "./doodle/DoodleGame";
+import { FarmGame } from "./farm/FarmGame";
+import { MemoryGame } from "./memory/MemoryGame";
 import { PuzzleGame } from "./puzzle/PuzzleGame";
 import { PuzzleTaskEditor } from "./puzzle/PuzzleTaskEditor";
 import { RunnerGame } from "./runner/RunnerGame";
@@ -10,13 +14,27 @@ interface Props {
   /** Deduct a wager from the wallet (no-op when unaffordable). */
   onSpend?: (cinders: number) => void;
   walletBalance?: number;
+  onNavigate?: (id: NavId) => void;
 }
 
-type View = "catalog" | "puzzle" | "tasks" | "runner" | "doodle";
+type View = "catalog" | "puzzle" | "tasks" | "runner" | "doodle" | "memory" | "farm";
 
-export function MinigamesPage({ onReward, onSpend, walletBalance }: Props) {
+export function MinigamesPage({
+  onReward,
+  onSpend,
+  walletBalance,
+  onNavigate,
+}: Props) {
   const [view, setView] = useState<View>("catalog");
   const isSandbox = getActiveSaveSlot() === "sandbox";
+
+  if (view === "memory") {
+    return (
+      <div className="page page--minigames">
+        <MemoryGame onReward={onReward} onExit={() => setView("catalog")} />
+      </div>
+    );
+  }
 
   if (view === "puzzle") {
     return (
@@ -44,6 +62,13 @@ export function MinigamesPage({ onReward, onSpend, walletBalance }: Props) {
       </div>
     );
   }
+  if (view === "farm") {
+    return (
+      <div className="page page--minigames">
+        <FarmGame onReward={onReward} onExit={() => setView("catalog")} />
+      </div>
+    );
+  }
   if (view === "tasks" && isSandbox) {
     return (
       <div className="page page--minigames">
@@ -54,12 +79,18 @@ export function MinigamesPage({ onReward, onSpend, walletBalance }: Props) {
 
   return (
     <div className="page page--minigames">
-      <header className="page-header">
-        <div>
-          <h1>Мини-игры</h1>
-          <p className="muted">Простые игры на Угольки. Больше риска — больше награда.</p>
-        </div>
-      </header>
+      {onNavigate ? (
+        <PlayHubChrome active="minigames" onChange={onNavigate} />
+      ) : (
+        <header className="page-header">
+          <div>
+            <h1>Мини-игры</h1>
+          </div>
+        </header>
+      )}
+      <p className="muted">
+        Простые игры на Угольки. Больше риска — больше награда.
+      </p>
 
       <div className="minigames-grid">
         <button
@@ -99,10 +130,40 @@ export function MinigamesPage({ onReward, onSpend, walletBalance }: Props) {
           <div className="minigame-card__icon" aria-hidden>🦘</div>
           <div className="minigame-card__title">Прыжки уголька</div>
           <div className="minigame-card__desc muted">
-            Дудл-джамп: уголёк скачет сам, ты ведёшь его по платформам. Пружины
-            подбрасывают выше, хрупкий камень осыпается, а огненные платформы
-            дают задания: успех — Угольки и рывок, провал — штраф, туман и удар
-            стимула. Упал — подъём окончен.
+            Дудл-джамп: уголёк скачет сам, ты ведёшь его по платформам. Пружины,
+            лёд, мигающие тени и сгустки холода — раскалывай их прыжком сверху.
+            Копи жар и обналичивай на очагах: упал горячим — расплата стимулом.
+          </div>
+          <div className="minigame-card__cta">Играть →</div>
+        </button>
+
+        <button
+          type="button"
+          className="minigame-card"
+          onClick={() => setView("memory")}
+        >
+          <div className="minigame-card__icon" aria-hidden>🎴</div>
+          <div className="minigame-card__title">Пары на память</div>
+          <div className="minigame-card__desc muted">
+            Карточные пары из избранного. Серии подряд поднимают множитель
+            до ×2, промахи жгут Угольки, некоторые пары прячут задание —
+            выполни для бонуса или плати штраф. Найденная пара показывает
+            себя целиком в панели награды.
+          </div>
+          <div className="minigame-card__cta">Играть →</div>
+        </button>
+
+        <button
+          type="button"
+          className="minigame-card"
+          onClick={() => setView("farm")}
+        >
+          <div className="minigame-card__icon" aria-hidden>🍆</div>
+          <div className="minigame-card__title">Пошлая ферма</div>
+          <div className="minigame-card__desc muted">
+            Весёлая ферма на таймере: сажай пошлые культуры, поливай жаждущие
+            грядки и собирай урожай, пока он не обиделся. Хозяйка заходит с
+            проверкой: чисто — бонус, бардак — наказание заданием.
           </div>
           <div className="minigame-card__cta">Играть →</div>
         </button>

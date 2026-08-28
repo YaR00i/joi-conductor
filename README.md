@@ -3,16 +3,21 @@
 Личный дирижёр JOI-сессий: функции × BPM-паттерны × finish/cumplay.  
 Голос Ху Тао (templates / local LLM). 3D-аватар — Phase 3.
 
-**Ember** — встроенная воксельная игра и редактор: арены в духе Vampire Survivors, JRPG-хаб и Unity-подобный пайплайн контента на Three.js.
+**Ember** — цветастая top-down party JRPG с пошаговой стихийной боёвкой, воксельными зонами, спутниками и отношениями. Целевая игра переезжает на Godot 4; JOI Conductor пока остаётся владельцем общего контента и legacy-инструментов.
 
 ## Docs
 
 - [Правила для AI-агентов](AGENTS.md)
+- [Оболочка: сайдбар и хабы](docs/HUB.md)
+- [Додзинси / Контент (nhentai)](docs/DOUJIN.md)
 - [V1 Spec (Phase 1 — механика)](docs/V1_SPEC.md) ✅
 - [V2 Spec (Phase 2 — voice + presets)](docs/V2_SPEC.md) ✅
-- [Ember Anomaly (игра — vertical slice + editor)](docs/EMBER_ANOMALY.md)
-- [Ember AI handoff (архитектура, решения и ближайший план)](docs/EMBER_AI_HANDOFF.md)
-- [План стабилизации и реструктуризации Ember](docs/EMBER_RESTRUCTURE_PLAN.md)
+- [Ember JRPG — единый Game Design Document](docs/EMBER_JRPG_DESIGN.md)
+- [Исследование референсов и границы заимствования](docs/EMBER_JRPG_REFERENCES.md)
+- [Ember AI handoff — действующие технические контракты](docs/EMBER_AI_HANDOFF.md)
+- [Стиль персонажей Ember](docs/EMBER_CHARACTER_STYLE.md)
+- [Пайплайн воксельных ботов](docs/EMBER_VOXEL_BOT.md)
+- [Legacy-реструктуризация JOI/Three — maintenance only](docs/EMBER_RESTRUCTURE_PLAN.md)
 - [Hu Tao bible notes](docs/character/hu-tao.md)
 - [Игрушки и механика](docs/TOYS_MECHANICS.md)
 

@@ -8,6 +8,27 @@ import { functions, patterns } from "../lib/catalog";
 import type { ContentUnlockLists } from "../lib/contentUnlocks";
 import { GOAL_LABELS } from "../lib/labels";
 import type { MediaSettings } from "../lib/media";
+import {
+  DEFAULT_BLOCKLIST,
+  formatBlacklistText,
+  loadSandboxBlacklist,
+  parseBlacklistText,
+  resetSandboxBlacklist,
+  saveSandboxBlacklist,
+} from "../lib/doujin/safety";
+import {
+  DEFAULT_DOUJIN_RECS,
+  loadDoujinSettings,
+  saveDoujinSettings,
+} from "../lib/doujin/settings";
+import type {
+  DoujinCategoryFilter,
+  DoujinLanguageFilter,
+  DoujinMinFavorites,
+  DoujinPagesBand,
+  DoujinRecsPrefs,
+  DoujinSearchSort,
+} from "../lib/doujin/types";
 import { getActiveMistress } from "../lib/mistress";
 import {
   applyProgressBackup,
@@ -83,6 +104,17 @@ export function SettingsPage({
   );
   const [backupBusy, setBackupBusy] = useState(false);
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
+  const [doujinKey, setDoujinKey] = useState(
+    () => loadDoujinSettings().apiKey,
+  );
+  const [doujinRecs, setDoujinRecs] = useState<DoujinRecsPrefs>(
+    () => loadDoujinSettings().recs,
+  );
+  const [doujinKeyStatus, setDoujinKeyStatus] = useState<string | null>(null);
+  const [blacklistText, setBlacklistText] = useState(() =>
+    formatBlacklistText(loadSandboxBlacklist() ?? [...DEFAULT_BLOCKLIST]),
+  );
+  const [blacklistStatus, setBlacklistStatus] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   function handleSlot(to: SaveSlotId) {
@@ -192,7 +224,7 @@ export function SettingsPage({
           { id: "profile", label: "Профиль", hint: "Слоты и бэкапы" },
           { id: "brain", label: "ИИ ресурсы", hint: "LLM · TTS веса · что говорит" },
           { id: "voice", label: "Голос", hint: "озвучка · как звучит" },
-          { id: "media", label: "Медиа", hint: "Ключи Gelbooru" },
+          { id: "media", label: "Медиа", hint: "Gelbooru · nhentai" },
           { id: "gameplay", label: "Геймплей", hint: "Рулетка, игрушка, CBT" },
           { id: "debug", label: "Отладка", hint: "Очередь блоков" },
         ] satisfies SettingsTab[]}
@@ -418,6 +450,220 @@ export function SettingsPage({
               <span className="voice-status">{mediaSaveStatus}</span>
             ) : null}
           </div>
+        </SettingsSection>
+        <SettingsSection
+          id="nhentai"
+          title="nhentai · ключ и рекомендации"
+          sub="API v2 для раздела Контент (источник nhentai). Ключ из аккаунта nhentai.net, только локально. Рекомендации по умолчанию — english."
+        >
+          <Field
+            label="API Key"
+            hint="Account settings → API key. Заголовок Authorization: Key …, в URL не попадает"
+          >
+            <input
+              type="password"
+              value={doujinKey}
+              onChange={(e) => setDoujinKey(e.target.value)}
+              placeholder="nhentai api key"
+              autoComplete="off"
+            />
+          </Field>
+          <p className="card__sub">
+            Документация:{" "}
+            <a
+              href="https://nhentai.net/api/v2/docs"
+              target="_blank"
+              rel="noreferrer"
+            >
+              nhentai.net/api/v2/docs
+            </a>
+            . User-Agent: JOI-Conductor/0.1.
+          </p>
+          <Field
+            label="Рекомендации · язык"
+            hint="По умолчанию english. Режет и поиск вкуса, и related."
+          >
+            <select
+              value={doujinRecs.language}
+              onChange={(e) =>
+                setDoujinRecs({
+                  ...doujinRecs,
+                  language: e.target.value as DoujinLanguageFilter,
+                })
+              }
+            >
+              <option value="english">english</option>
+              <option value="japanese">japanese</option>
+              <option value="chinese">chinese</option>
+              <option value="all">все языки</option>
+            </select>
+          </Field>
+          <Field
+            label="Рекомендации · сорт"
+            hint="Как ранжировать подборку из тегов избранного"
+          >
+            <select
+              value={doujinRecs.sort}
+              onChange={(e) =>
+                setDoujinRecs({
+                  ...doujinRecs,
+                  sort: e.target.value as DoujinSearchSort,
+                })
+              }
+            >
+              <option value="popular">популярные</option>
+              <option value="date">новые</option>
+              <option value="popular-week">неделя</option>
+              <option value="popular-today">сегодня</option>
+              <option value="popular-month">месяц</option>
+            </select>
+          </Field>
+          <Field
+            label="Рекомендации · категория"
+            hint="Пустое «все» — без category: в запросе"
+          >
+            <select
+              value={doujinRecs.category}
+              onChange={(e) =>
+                setDoujinRecs({
+                  ...doujinRecs,
+                  category: e.target.value as DoujinCategoryFilter,
+                })
+              }
+            >
+              <option value="all">все</option>
+              <option value="doujinshi">doujinshi</option>
+              <option value="manga">manga</option>
+              <option value="artistcg">artistcg</option>
+              <option value="gamecg">gamecg</option>
+              <option value="imageset">imageset</option>
+              <option value="western">western</option>
+              <option value="non-h">non-h</option>
+              <option value="misc">misc</option>
+            </select>
+          </Field>
+          <Field
+            label="Рекомендации · страницы"
+            hint="Длина работы в подборке"
+          >
+            <select
+              value={doujinRecs.pagesBand}
+              onChange={(e) =>
+                setDoujinRecs({
+                  ...doujinRecs,
+                  pagesBand: e.target.value as DoujinPagesBand,
+                })
+              }
+            >
+              <option value="all">любые</option>
+              <option value="short">до 20</option>
+              <option value="mid">20–80</option>
+              <option value="long">80+</option>
+            </select>
+          </Field>
+          <Field
+            label="Рекомендации · популярность"
+            hint="Минимум закладок на сайте nhentai"
+          >
+            <select
+              value={doujinRecs.minFavorites}
+              onChange={(e) =>
+                setDoujinRecs({
+                  ...doujinRecs,
+                  minFavorites: e.target.value as DoujinMinFavorites,
+                })
+              }
+            >
+              <option value="all">любая</option>
+              <option value="100">≥100</option>
+              <option value="500">≥500</option>
+              <option value="1000">≥1000</option>
+            </select>
+          </Field>
+          <div className="today__actions">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => {
+                const saved = saveDoujinSettings({
+                  apiKey: doujinKey,
+                  recs: doujinRecs,
+                });
+                setDoujinKey(saved.apiKey);
+                setDoujinRecs(saved.recs);
+                setDoujinKeyStatus("Сохранено");
+              }}
+            >
+              Сохранить
+            </button>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => {
+                const saved = saveDoujinSettings({
+                  apiKey: doujinKey,
+                  recs: { ...DEFAULT_DOUJIN_RECS },
+                });
+                setDoujinKey(saved.apiKey);
+                setDoujinRecs(saved.recs);
+                setDoujinKeyStatus("Рекомендации сброшены");
+              }}
+            >
+              Сбросить рекомендации
+            </button>
+            {doujinKeyStatus ? (
+              <span className="voice-status">{doujinKeyStatus}</span>
+            ) : null}
+          </div>
+          {activeSlot === "sandbox" ? (
+            <>
+              <Field
+                label="Blacklist (песочница)"
+                hint="Весь фильтр nhentai в разделе Контент. Один тег на строку. Только в Песочнице; в Живом снова дефолт."
+              >
+                <textarea
+                  value={blacklistText}
+                  onChange={(e) => setBlacklistText(e.target.value)}
+                  spellCheck={false}
+                  rows={8}
+                />
+              </Field>
+              <div className="today__actions">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => {
+                    saveSandboxBlacklist(parseBlacklistText(blacklistText));
+                    setBlacklistText(
+                      formatBlacklistText(loadSandboxBlacklist() ?? []),
+                    );
+                    setBlacklistStatus("Blacklist сохранён");
+                  }}
+                >
+                  Сохранить blacklist
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => {
+                    resetSandboxBlacklist();
+                    setBlacklistText(formatBlacklistText(DEFAULT_BLOCKLIST));
+                    setBlacklistStatus("Сброшено к дефолту");
+                  }}
+                >
+                  Сбросить к дефолту
+                </button>
+                {blacklistStatus ? (
+                  <span className="voice-status">{blacklistStatus}</span>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <p className="card__sub">
+              Фильтр тегов в Живом слоте зашит (lolicon / shota / …). Редактор
+              blacklist — только в Песочнице.
+            </p>
+          )}
         </SettingsSection>
         </div>
 

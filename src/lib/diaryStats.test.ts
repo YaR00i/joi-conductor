@@ -83,4 +83,29 @@ describe("diaryStats abort honesty", () => {
   it("formats null abort pct as dash", () => {
     expect(formatAbortPct(null)).toBe("—");
   });
+
+  it("buckets reading runs as Чтение instead of stroke", () => {
+    const stats = buildDiaryStats(
+      [
+        entry({
+          createdAt: "2026-07-20T12:00:00.000Z",
+          ended: "complete",
+          mode: "stroke",
+          modeNameRu: "Дрочка",
+        }),
+        entry({
+          createdAt: "2026-07-21T12:00:00.000Z",
+          ended: "complete",
+          source: "reading",
+          mode: "stroke",
+          modeNameRu: "Чтение",
+        }),
+      ],
+      "all",
+    );
+    const ids = stats.byMode.map((row) => row.id);
+    expect(ids).toContain("reading");
+    expect(stats.byMode.find((row) => row.id === "stroke")?.count).toBe(1);
+    expect(stats.byMode.find((row) => row.id === "reading")?.label).toBe("Чтение");
+  });
 });

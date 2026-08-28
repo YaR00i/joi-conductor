@@ -4,6 +4,7 @@
  */
 
 import type { NavId } from "../components/SideNav";
+import { isProgressNav } from "./hubNav";
 
 export const SECTION_BRIEFINGS_STORAGE_KEY = "joi-section-briefings-v1";
 
@@ -12,7 +13,13 @@ export type SectionBriefingStatus = "pending" | "completed" | "dismissed";
 /** Sections that get a first-visit briefing. */
 export type BriefableNavId = Exclude<
   NavId,
-  "ember" | "ember_editor" | "minigames"
+  | "ember"
+  | "ember_editor"
+  | "minigames"
+  | "stats"
+  | "achievements"
+  | "contract_journal"
+  | "favorites"
 >;
 
 export type SectionBriefingCta = {
@@ -41,9 +48,7 @@ export const BRIEFABLE_NAV_IDS: readonly BriefableNavId[] = [
   "shop",
   "contracts",
   "diary",
-  "stats",
-  "achievements",
-  "favorites",
+  "doujin",
   "settings",
 ] as const;
 
@@ -89,7 +94,7 @@ export const SECTION_BRIEFINGS: ReadonlyArray<SectionBriefingCopy> = [
       "Трать угольки на пакеты тегов, игрушки и штуки у Госпожи. Полка избранного подпитывает предложения — лайки с сессий тоже считаются.",
     hintRu: "Не хватает угольков — сессии и контракты их приносят.",
     ctas: [
-      { labelRu: "К избранному", nav: "favorites" },
+      { labelRu: "К полке", nav: "favorites" },
       { labelRu: "К рулетке", nav: "roulette", primary: true },
     ],
   },
@@ -106,10 +111,10 @@ export const SECTION_BRIEFINGS: ReadonlyArray<SectionBriefingCopy> = [
   },
   {
     id: "diary",
-    eyebrowRu: "Раздел · Дневник",
+    eyebrowRu: "Раздел · Прогресс",
     titleRu: "Следы вечеров",
     leadRu:
-      "Записи завершённых сессий: финал, настроение, сувенир. Можно пересмотреть план и снова бросить его на Рулетку.",
+      "Дневник, статистика и достижения — вкладки одного раздела. Записи сессий, цифры за период и ступени за угольки.",
     hintRu: "Пусто? Сначала проведи сессию — запись появится сама.",
     ctas: [
       { labelRu: "К рулетке", nav: "roulette", primary: true },
@@ -117,38 +122,15 @@ export const SECTION_BRIEFINGS: ReadonlyArray<SectionBriefingCopy> = [
     ],
   },
   {
-    id: "stats",
-    eyebrowRu: "Раздел · Статистика",
-    titleRu: "Цифры по следам",
+    id: "doujin",
+    eyebrowRu: "Раздел · Контент",
+    titleRu: "Одна полка, два источника",
     leadRu:
-      "Сводка по дневнику: сколько сессий, минут, эджей и срывов за выбранный период. Переключай диапазон сверху.",
-    hintRu: "Данные берутся из Дневника — без записей график пустой.",
+      "В шапке переключатель nhentai / Gelbooru, вкладки общие. Gelbooru — стена постов (новинки, поиск, рекомендации, локальная полка) и лайтбокс; сердечко пишет в IndexedDB полки, которая кормит сессию, рулетку и магазин. На карточках закладка кладёт пост в локальные списки (свои очереди и автоочередь госпожи из тегов полки). nhentai — сетка томов, ридер и избранное аккаунта; в сессию не идёт. Списки nhentai — очереди и прогон. Ключи API — в Настройках → Медиа.",
+    hintRu: "Песочница: blacklist тегов nhentai правится в Настройках. В Живом слоте фильтр зашит.",
     ctas: [
-      { labelRu: "К дневнику", nav: "diary", primary: true },
-    ],
-  },
-  {
-    id: "achievements",
-    eyebrowRu: "Раздел · Достижения",
-    titleRu: "Ступени и угольки",
-    leadRu:
-      "Наборы ачивок копятся от сессий, контрактов и привычек. Уровни дают угольки и иногда открывают контент.",
-    hintRu: "Кнопка действия у ачивки подскажет, куда идти дальше.",
-    ctas: [
-      { labelRu: "К рулетке", nav: "roulette", primary: true },
+      { labelRu: "К настройкам", nav: "settings", primary: true },
       { labelRu: "В магазин", nav: "shop" },
-    ],
-  },
-  {
-    id: "favorites",
-    eyebrowRu: "Раздел · Избранное",
-    titleRu: "Полка вкуса",
-    leadRu:
-      "Лайкнутое медиа и теги. Типы тегов и паспорт вкуса кормят Магазин и ставки на Рулетке.",
-    hintRu: "Пустая полка — лайкай во время сессий или подгружай избранное в Магазине.",
-    ctas: [
-      { labelRu: "В магазин", nav: "shop", primary: true },
-      { labelRu: "К рулетке", nav: "roulette" },
     ],
   },
   {
@@ -164,6 +146,13 @@ export const SECTION_BRIEFINGS: ReadonlyArray<SectionBriefingCopy> = [
 
 export function isBriefableNav(id: NavId): id is BriefableNavId {
   return (BRIEFABLE_NAV_IDS as readonly string[]).includes(id);
+}
+
+/** First-visit overlay for a route: progress tabs share diary; old Избранное shares Content. */
+export function briefingNavFor(id: NavId): BriefableNavId | null {
+  if (isProgressNav(id)) return "diary";
+  if (id === "favorites") return "doujin";
+  return isBriefableNav(id) ? id : null;
 }
 
 export function defaultSectionBriefingsState(): SectionBriefingsState {

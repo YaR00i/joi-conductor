@@ -10,12 +10,18 @@ import {
 } from "../components/ember/EmberShopPanel";
 import { ScenePlayer } from "../components/ember/ScenePlayer";
 import { EmberSavePanel } from "../components/ember/EmberSavePanel";
+import { EmberCameraRigFields } from "../components/ember/editor/EmberCameraRigFields";
+import { PlayHubChrome } from "../components/HubChrome";
+import type { NavId } from "../components/SideNav";
+import type { EmberMapCamera, EmberUserCameraPreset } from "../game/content/types";
 import type {
   EmberBridgeEvent,
   EmberGameApi,
   EmberLootOption,
 } from "../game/bridge/events";
-import { loadEmberPack } from "../game/content/loadPack";
+import { loadEmberPack, upsertCameraPresets } from "../game/content/loadPack";
+import { writeEmberJson } from "../game/content/io";
+import { camerasFileFromPresets } from "../game/content/cameraPresets";
 import { resolveMapPlayProfile } from "../game/content/playProfile";
 import {
   createLocalStorageSaveBackend,
@@ -34,6 +40,7 @@ import { requestPlayPointerLock } from "../game/three/playPointer";
 type Props = {
   onReward: (cinders: number) => void;
   onOpenEditor: () => void;
+  onNavigate?: (id: NavId) => void;
 };
 
 type LootModal = {
@@ -71,7 +78,7 @@ function toggleEmberPlayFullscreen(): void {
   void document.exitFullscreen?.();
 }
 
-export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
+export function EmberPlayPage({ onReward, onOpenEditor, onNavigate }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<EmberGameApi | null>(null);
   const [pack, setPack] = useState<EmberPack | null>(null);
@@ -99,6 +106,7 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
   const [sceneId, setSceneId] = useState<string | null>(null);
   const [playDialogueId, setPlayDialogueId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [playCamera, setPlayCamera] = useState<EmberMapCamera | undefined>();
   const [saveDebugOpen, setSaveDebugOpen] = useState(false);
   const [relockAtMs, setRelockAtMs] = useState(0);
   const [nowMs, setNowMs] = useState(0);
@@ -106,10 +114,12 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
   const engineRequestRef = useRef(0);
   const startingRef = useRef(false);
   const saveBackend = useMemo(() => createLocalStorageSaveBackend(), []);
+  const pendingPlayRemountPackRef = useRef<EmberPack | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
     setError(null);
+    const remountPlay = apiRef.current != null || startingRef.current;
     try {
       const { pack: p, issues: iss } = await loadEmberPack();
       setPack(p);
@@ -118,12 +128,32 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
         if (prev && p.stages[prev]) return prev;
         return p.meta.defaultStageId;
       });
+      if (remountPlay) pendingPlayRemountPackRef.current = p;
     } catch (err) {
       setError(err instanceof Error ? err.message : "load failed");
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const persistPlayCameraPresets = useCallback(
+    async (next: Record<string, EmberUserCameraPreset>, msg: string) => {
+      if (!pack) return;
+      const res = await writeEmberJson(
+        "cameras/registry.json",
+        camerasFileFromPresets(next),
+      );
+      if (!res.ok) {
+        setToast(res.error || "Не удалось сохранить пресеты камеры");
+        window.setTimeout(() => setToast(null), 1800);
+        return;
+      }
+      setPack(upsertCameraPresets(pack, next));
+      setToast(msg);
+      window.setTimeout(() => setToast(null), 1800);
+    },
+    [pack],
+  );
 
   useEffect(() => {
     void reload();
@@ -281,74 +311,94 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
     [stopGame, persistExplore],
   );
 
-  const start = async () => {
-    const host = hostRef.current;
-    if (!pack || !host || startingRef.current) return;
-    startingRef.current = true;
-    const shell = host.parentElement;
-    requestPlayPointerLock(shell instanceof HTMLElement ? shell : host);
-    stopGame();
-    const requestId = engineRequestRef.current;
-    setResult(null);
-    setSceneId(null);
-    setPlayDialogueId(null);
-    rewardedRef.current = false;
-    setEngineLoading(true);
-    setLoadProgress({ ratio: 0.04, labelRu: "Движок…" });
-    setError(null);
-    try {
-      if (
-        requestId !== engineRequestRef.current ||
-        !hostRef.current
-      ) {
-        return;
+  const startWithPack = useCallback(
+    async (nextPack: EmberPack) => {
+      const host = hostRef.current;
+      if (!nextPack || !host) return;
+      const shell = host.parentElement;
+      requestPlayPointerLock(shell instanceof HTMLElement ? shell : host);
+      stopGame();
+      startingRef.current = true;
+      const requestId = engineRequestRef.current;
+      setResult(null);
+      setSceneId(null);
+      setPlayDialogueId(null);
+      setPlayCamera(undefined);
+      rewardedRef.current = false;
+      setEngineLoading(true);
+      setLoadProgress({ ratio: 0.04, labelRu: "Движок…" });
+      setError(null);
+      try {
+        if (
+          requestId !== engineRequestRef.current ||
+          !hostRef.current
+        ) {
+          return;
+        }
+        const stageIdToStart =
+          stageId && nextPack.stages[stageId]
+            ? stageId
+            : nextPack.meta.defaultStageId;
+        const startStage = nextPack.stages[stageIdToStart];
+        const startMap = startStage ? nextPack.maps[startStage.mapId] : undefined;
+        const exploreRun =
+          startMap != null && resolveMapPlayProfile(startMap) === "explore";
+        const exploreSave = exploreRun
+          ? readExploreSave(
+              saveBackend,
+              nextPack.meta.id,
+              getActiveExploreSaveSlot(saveBackend, nextPack.meta.id),
+            )
+          : null;
+        const api = createEmberThreeGame({
+          parent: hostRef.current,
+          pack: nextPack,
+          stageId: stageIdToStart,
+          onBridge,
+          shortMode: exploreRun ? false : shortMode,
+          exploreSave,
+        });
+        apiRef.current = api;
+        api.lockLook();
+        await api.ready;
+        if (
+          requestId !== engineRequestRef.current ||
+          apiRef.current !== api
+        ) {
+          api.destroy();
+          return;
+        }
+        api.lockLook();
+        setRunning(true);
+      } catch (err) {
+        if (requestId !== engineRequestRef.current) return;
+        setError(
+          err instanceof Error
+            ? `Не удалось загрузить движок: ${err.message}`
+            : "Не удалось загрузить движок",
+        );
+      } finally {
+        if (requestId === engineRequestRef.current) {
+          startingRef.current = false;
+          setEngineLoading(false);
+        }
       }
-      const stageIdToStart = stageId && pack.stages[stageId]
-        ? stageId
-        : pack.meta.defaultStageId;
-      const startStage = pack.stages[stageIdToStart];
-      const startMap = startStage ? pack.maps[startStage.mapId] : undefined;
-      const exploreRun =
-        startMap != null && resolveMapPlayProfile(startMap) === "explore";
-      const exploreSave = exploreRun
-        ? readExploreSave(
-            saveBackend,
-            pack.meta.id,
-            getActiveExploreSaveSlot(saveBackend, pack.meta.id),
-          )
-        : null;
-      const api = createEmberThreeGame({
-        parent: hostRef.current,
-        pack,
-        stageId: stageIdToStart,
-        onBridge,
-        shortMode: exploreRun ? false : shortMode,
-        exploreSave,
-      });
-      apiRef.current = api;
-      api.lockLook();
-      await api.ready;
-      if (
-        requestId !== engineRequestRef.current ||
-        apiRef.current !== api
-      ) {
-        api.destroy();
-        return;
-      }
-      api.lockLook();
-      setRunning(true);
-    } catch (err) {
-      if (requestId !== engineRequestRef.current) return;
-      setError(
-        err instanceof Error
-          ? `Не удалось загрузить движок: ${err.message}`
-          : "Не удалось загрузить движок",
-      );
-    } finally {
-      startingRef.current = false;
-      if (requestId === engineRequestRef.current) setEngineLoading(false);
-    }
+    },
+    [onBridge, saveBackend, shortMode, stageId, stopGame],
+  );
+
+  const start = () => {
+    if (!pack) return;
+    void startWithPack(pack);
   };
+
+  useEffect(() => {
+    const next = pendingPlayRemountPackRef.current;
+    if (!next || loading) return;
+    pendingPlayRemountPackRef.current = null;
+    persistExplore("quit");
+    void startWithPack(next);
+  }, [pack, loading, persistExplore, startWithPack]);
 
   const continuePlay = () => {
     if (performance.now() < relockAtMs) return;
@@ -411,6 +461,9 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
 
   return (
     <div className="page page--ember">
+      {onNavigate ? (
+        <PlayHubChrome active="ember" onChange={onNavigate} tight />
+      ) : null}
       <nav className="ember-play-bar" aria-label="Ember Anomaly">
         <div
           className="ember-play-bar__brand"
@@ -670,6 +723,22 @@ export function EmberPlayPage({ onReward, onOpenEditor }: Props) {
                 Редактор
               </button>
               <p className="muted ember-play__menu-hint">F11 — на весь экран</p>
+              {selectedMap ? (
+                <div className="ember-play__menu-camera">
+                  <p className="ember-play__kicker muted">Камера</p>
+                  <EmberCameraRigFields
+                    camera={playCamera ?? selectedMap.camera}
+                    tileSize={selectedMap.tileSize}
+                    mapId={selectedMap.id}
+                    presets={pack?.cameraPresets ?? {}}
+                    onChange={(camera) => {
+                      setPlayCamera(camera);
+                      apiRef.current?.applyCameraSettings(camera);
+                    }}
+                    onPresetsPersist={persistPlayCameraPresets}
+                  />
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}

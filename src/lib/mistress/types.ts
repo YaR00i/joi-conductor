@@ -57,12 +57,31 @@ export type MistressAssets = {
   emojiBase?: string;
 };
 
+export type AssembleTagKind = "body" | "act";
+
+export type AssembleTag = {
+  tag: string;
+  kind: AssembleTagKind;
+  /** Spare synonyms of this slot — never AND'd into the same query. */
+  cluster?: string;
+  fallback?: string[];
+};
+
+export type MistressAssemblePreset = {
+  likedWeight: number;
+  dislikedWeight: number;
+  ownWeight: number;
+  tags: AssembleTag[];
+};
+
 export type MistressMediaProfile = {
   primaryDefaultTags: string;
   focusTags: string[];
   /** Opt-in Gelbooru bias packs (доп. теги); no second host yet. */
   secondaryBooruIds: Array<"censored" | "blacked">;
   cumplayBiasTags: string[];
+  /** Auto-queue «Выбор {имя}» — quotas and her tags. */
+  assemble: MistressAssemblePreset;
 };
 
 export type MistressPlayBias = {

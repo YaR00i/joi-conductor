@@ -1,6 +1,6 @@
 # JOI Conductor — правила для AI-агентов
 
-Этот файл обязателен для Codex, Cursor, Grok и любых других агентов, меняющих проект. Для Ember дополнительно читать `docs/EMBER_AI_HANDOFF.md`; текущая декомпозиция описана в `docs/EMBER_RESTRUCTURE_PLAN.md`. Старая пометка «Ember не трогаем» в `docs/IMPROVEMENTS.md` снята: Ember активно разрабатывается, handoff имеет приоритет.
+Этот файл обязателен для Codex, Cursor, Grok и любых других агентов, меняющих проект. Для Ember дополнительно читать `docs/EMBER_AI_HANDOFF.md`; продуктовый vision находится в `docs/EMBER_JRPG_DESIGN.md`. Оболочка приложения (сайдбар, хабы Прогресс / Контент / Мини-игры) — `docs/HUB.md`. `docs/EMBER_RESTRUCTURE_PLAN.md` читать только при обслуживании JOI/Three editor или legacy-runtime: после выбора Godot это maintenance-план, а не дорожная карта игры.
 
 ## Главный принцип
 
@@ -32,13 +32,15 @@ Legacy-монолиты: `styles.css`, `VoxelSculptPanel.tsx`, `MapEditorPanel.t
 
 Источник правды — baked height-surface grid (`enemyCrowdOpenField.ts`, `navigationSurfaceElevAtWorld`), а не плоские этажи и не спецмаршруты для отдельных лестниц. Подъём не выше `MAX_AUTO_STEP_VOXELS = 4`; игрок и враг видят одну физическую поверхность. Не сериализовать flow в JSON карты, не восстанавливать connector-chain / route hashing / «администраторский» коридор, не ставить локальный `scale: 1.04` вместо общего seam bleed `0.05`.
 
-## Реструктуризация
+## Legacy-реструктуризация JOI/Three
 
-Порядок обязателен: guard/smoke (волна 0) → декомпозиция `mapUtils` → CSS ownership → controllers редакторов → façade `EmberThreeWorld` последним. Crowd/flow не выносить до отдельного benchmark. Не начинать большой rewrite и не заводить вторую систему рядом со старой.
+Если задача явно относится к legacy JOI/Three, порядок обязателен: guard/smoke (волна 0) → декомпозиция `mapUtils` → CSS ownership → controllers редакторов → façade `EmberThreeWorld` последним. Crowd/flow не выносить до отдельного benchmark. Не начинать большой rewrite и не заводить вторую систему рядом со старой. Новые продуктовые системы проектируются для Godot и не добавляются в Three.
 
 ## Вертикальный контракт Ember
 
 Изменение данных считается законченным только по цепочке: schema/types → normalization/validation → editor → preview → runtime → serialization → targeted tests → документация.
+
+Для целевого Godot runtime действует editor-first правило: новая механика не принимается без понятного Inspector/viewport authoring flow, Undo/Redo, save/reopen и ручного acceptance-сценария. Godot Asset Store/addons разрешены по реестру `../ember-godot/docs/EMBER_ADDONS.md`: проверять версию, лицензию, support status, owner данных и удаление; не заводить через addon второй gameplay/schema owner.
 
 - Координаты данных: X/Y — карта, Z — высота; Three.js: X/Z — земля, Y — вверх. Используй готовые преобразования.
 - Height/collision/pathfinding игрока и AI должны опираться на одну физическую поверхность.
@@ -61,7 +63,7 @@ Legacy-монолиты: `styles.css`, `VoxelSculptPanel.tsx`, `MapEditorPanel.t
 3. Делать один ограниченный вертикальный срез. Не совмещать рефакторинг с новой механикой без необходимости.
 4. Сначала targeted tests, затем `npm test`, `npx tsc --noEmit`, `npx vite build` / `npm run build`. Ошибка `tsc` — регрессия.
 5. Визуальные изменения проверять в реальном editor/play. Для lifecycle — несколько mount/unmount или Reload.
-6. Обновлять `docs/EMBER_AI_HANDOFF.md` при изменении контракта и `docs/EMBER_RESTRUCTURE_PLAN.md` при завершении волны.
+6. Обновлять `docs/EMBER_AI_HANDOFF.md` при изменении технического контракта Ember. Оболочку JOI (пункты меню, вкладки хабов) фиксировать в `docs/HUB.md`. `docs/EMBER_RESTRUCTURE_PLAN.md` обновлять только при выполнении его legacy maintenance-волн; продуктовые решения Ember фиксировать в `docs/EMBER_JRPG_DESIGN.md`.
 
 ## Защищённые текущие работы
 
@@ -70,5 +72,6 @@ Legacy-монолиты: `styles.css`, `VoxelSculptPanel.tsx`, `MapEditorPanel.t
 - Не продолжать и не мержить закрытые PR персонажа auburn: #5 (`vox_chr_auburn` / chibi_32) и #6 (цельная фигурка).
 - Не применять `git reset`, `checkout --`, массовое удаление или форматирование всего репозитория.
 - Не затирать волны Grok voxel-ботов: их PR в `main` — ожидаемый параллельный поток. Мержить эти PR только после явного «всё ок» / «можно мержить» (skill `merge-voxel-bot-prs`).
+- Point-shadow atlas (§9.1) заморожен: не расширять K, не чинить умбры фонарей новым bake в Three. Fill не резать. Богатый ночной свет — sibling `ember-godot` (Godot 4 Forward+, тот же `content/ember`), не второй renderer в этом репо.
 
 Если запрос противоречит этому файлу, явная последняя команда пользователя имеет приоритет. Зафиксируй исключение в итоговом сообщении.

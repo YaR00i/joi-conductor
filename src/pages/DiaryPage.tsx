@@ -25,6 +25,8 @@ import {
   resolveDiaryMistressPack,
   type DiaryEntry,
 } from "../lib/sessionDiary";
+import type { NavId } from "../components/SideNav";
+import { ProgressHubChrome } from "../components/HubChrome";
 import { playUiClick, playUiConfirm, playUiNav, primeUiAudio } from "../lib/uiSound";
 
 function diaryLeafThemeStyle(entry: DiaryEntry | null): CSSProperties {
@@ -37,6 +39,7 @@ type Props = {
   revision?: number;
   /** Seed Roulette with this entry's plan (session-replay lite). */
   onRepeatPlan?: (entry: DiaryEntry) => void;
+  onNavigate?: (id: NavId) => void;
 };
 
 type FlipDir = "next" | "prev";
@@ -86,7 +89,7 @@ function lastWrittenSpreadIndex(spreads: SpreadPair[]): number {
   return 0;
 }
 
-export function DiaryPage({ revision = 0, onRepeatPlan }: Props) {
+export function DiaryPage({ revision = 0, onRepeatPlan, onNavigate }: Props) {
   const [entries, setEntries] = useState<DiaryEntry[]>(() => loadDiaryEntries());
   const spreads = useMemo(() => buildSpreads(entries), [entries]);
   const maxSpread = Math.max(0, spreads.length - 1);
@@ -447,13 +450,17 @@ export function DiaryPage({ revision = 0, onRepeatPlan }: Props) {
 
   return (
     <div className="diary-page page--diary">
-      <header className="diary-page__head">
-        <div>
-          <p className="diary-page__eyebrow">Личный журнал</p>
-          <h1 className="diary-page__title">Дневник</h1>
-          <p className="diary-page__sub">{sub}</p>
-        </div>
-      </header>
+      {onNavigate ? (
+        <ProgressHubChrome active="diary" onChange={onNavigate} />
+      ) : (
+        <header className="diary-page__head">
+          <div>
+            <p className="diary-page__eyebrow">Личный журнал</p>
+            <h1 className="diary-page__title">Дневник</h1>
+          </div>
+        </header>
+      )}
+      <p className="diary-page__sub">{sub}</p>
 
       <div className="diary-stage" aria-label="Дневник сессий">
         <div

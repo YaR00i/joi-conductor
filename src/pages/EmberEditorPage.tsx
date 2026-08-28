@@ -16,6 +16,8 @@ import type {
   LibNavigateTab,
 } from "../components/ember/editor/ArtsEditorPanel";
 import { EmberSavePanel } from "../components/ember/EmberSavePanel";
+import { PlayHubChrome } from "../components/HubChrome";
+import type { NavId } from "../components/SideNav";
 import {
   clearAllLocalOverrides,
   clearLocalOverride,
@@ -37,6 +39,7 @@ import {
   upsertScene,
   upsertStage,
 } from "../game/content/loadPack";
+import { parseEmberVoxelEditorDeepLink } from "../game/content/emberEditorDeepLink";
 import {
   createBlankEmberMap,
   createStageForMap,
@@ -119,6 +122,7 @@ const TOAST_WARN_MS = 4200;
 type Props = {
   onBackToPlay: () => void;
   onGrantCinders: (n: number) => void;
+  onNavigate?: (id: NavId) => void;
 };
 
 const NAV_GROUPS: Array<{
@@ -263,10 +267,20 @@ class EditorPanelBoundary extends Component<
   }
 }
 
-export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
+export function EmberEditorPage({
+  onBackToPlay,
+  onGrantCinders,
+  onNavigate,
+}: Props) {
+  const voxelDeepLink = useMemo(
+    () => parseEmberVoxelEditorDeepLink(window.location.search),
+    [],
+  );
   const [pack, setPack] = useState<EmberPack | null>(null);
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
-  const [tab, setTab] = useState<Tab>("maps");
+  const [tab, setTab] = useState<Tab>(() =>
+    voxelDeepLink ? "voxels" : "maps",
+  );
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [toasts, setToasts] = useState<EditorToast[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -279,7 +293,9 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
   const [activeMapId, setActiveMapId] = useState<string | null>(null);
   const [spriteFocusId, setSpriteFocusId] = useState<string | null>(null);
   const [tileFocusId, setTileFocusId] = useState<number | null>(null);
-  const [voxelFocusId, setVoxelFocusId] = useState<string | null>(null);
+  const [voxelFocusId, setVoxelFocusId] = useState<string | null>(
+    voxelDeepLink?.modelId ?? null,
+  );
   const [createMapOpen, setCreateMapOpen] = useState(false);
   const [createMapName, setCreateMapName] = useState("Новая карта");
   const [createMapW, setCreateMapW] = useState(24);
@@ -720,6 +736,9 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
 
   return (
     <div className="page page--ember-editor">
+      {onNavigate ? (
+        <PlayHubChrome active="ember_editor" onChange={onNavigate} tight />
+      ) : null}
       <nav
         ref={menubarRef}
         className="ember-menubar"
@@ -1098,6 +1117,8 @@ export function EmberEditorPage({ onBackToPlay, onGrantCinders }: Props) {
                     lookPresets: pack.lookPresets ?? {},
                   }}
                   modelId={voxelFocusId}
+                  initialWorkspaceMode={voxelDeepLink?.workspace}
+                  initialTool={voxelDeepLink?.tool}
                   onActiveModelChange={setVoxelFocusId}
                   onPackChange={(next) => {
                     setPack(next);

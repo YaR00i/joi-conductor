@@ -8,6 +8,7 @@ import {
   SECTION_BRIEFINGS,
   SECTION_BRIEFINGS_STORAGE_KEY,
   defaultSectionBriefingsState,
+  briefingNavFor,
   isBriefableNav,
   loadSectionBriefingsState,
   markSectionBriefingCompleted,
@@ -40,6 +41,23 @@ describe("sectionBriefings", () => {
     expect(BRIEFABLE_NAV_IDS).not.toContain("ember_editor");
   });
 
+  it("folds diary/stats/achievements into one progress briefing", () => {
+    expect(isBriefableNav("stats")).toBe(false);
+    expect(isBriefableNav("achievements")).toBe(false);
+    expect(briefingNavFor("stats")).toBe("diary");
+    expect(briefingNavFor("achievements")).toBe("diary");
+    expect(briefingNavFor("contract_journal")).toBe("diary");
+    expect(briefingNavFor("ember")).toBeNull();
+    expect(sectionBriefingCopy("diary").eyebrowRu).toContain("Прогресс");
+  });
+
+  it("folds favorites into the Content briefing", () => {
+    expect(isBriefableNav("favorites")).toBe(false);
+    expect(briefingNavFor("favorites")).toBe("doujin");
+    expect(briefingNavFor("doujin")).toBe("doujin");
+    expect(sectionBriefingCopy("doujin").eyebrowRu).toContain("Контент");
+  });
+
   it("hides after completed or dismissed", () => {
     markSectionBriefingCompleted("shop");
     expect(shouldShowSectionBriefing("shop")).toBe(false);
@@ -50,15 +68,15 @@ describe("sectionBriefings", () => {
   });
 
   it("reopenAll clears dismissals", () => {
-    markSectionBriefingDismissed("stats");
+    markSectionBriefingDismissed("diary");
     reopenAllSectionBriefings();
-    expect(shouldShowSectionBriefing("stats")).toBe(true);
+    expect(shouldShowSectionBriefing("diary")).toBe(true);
   });
 
   it("reopenSection resets one id", () => {
-    markSectionBriefingCompleted("favorites");
-    reopenSectionBriefing("favorites");
-    expect(shouldShowSectionBriefing("favorites")).toBe(true);
+    markSectionBriefingCompleted("doujin");
+    reopenSectionBriefing("doujin");
+    expect(shouldShowSectionBriefing("doujin")).toBe(true);
   });
 
   it("tolerates corrupt JSON", () => {
