@@ -2352,20 +2352,6 @@ body:has(.app-frame--fullscreen) .gelbooru-hub__recs-overlay {
   background: linear-gradient(270deg, rgba(0, 0, 0, 0.42), transparent);
 }
 
-.doujin-reader__toggle {
-  position: absolute;
-  left: 4.6rem;
-  right: 4.6rem;
-  top: 0;
-  bottom: 0;
-  z-index: 1;
-  width: auto;
-  cursor: default;
-  background: transparent;
-  border: 0;
-  appearance: none;
-}
-
 .page--doujin .doujin-reader__edge:disabled {
   opacity: 0.2;
 }
@@ -2489,6 +2475,30 @@ body:has(.app-frame--fullscreen) .gelbooru-hub__recs-overlay {
   pointer-events: auto;
 }
 
+.doujin-run-fab .fab__count {
+  position: absolute;
+  top: -0.28rem;
+  right: -0.32rem;
+  z-index: 1;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #12080c;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.doujin-run-fab .fab__count.is-zero {
+  opacity: 0.55;
+}
+
 .fab.fab--ask {
   background: #3a2a12;
   border-color: rgba(255, 196, 90, 0.45);
@@ -2501,6 +2511,13 @@ body:has(.app-frame--fullscreen) .gelbooru-hub__recs-overlay {
   gap: 0.2rem;
   color: rgba(255, 255, 255, 0.8);
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+}
+
+.doujin-run-fab__counts {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .doujin-reader__task-card {
@@ -2539,6 +2556,7 @@ body:has(.app-frame--fullscreen) .gelbooru-hub__recs-overlay {
   z-index: 12;
   display: grid;
   place-items: center;
+  padding: 1.2rem;
   background: rgba(4, 2, 3, 0.62);
 }
 
@@ -2597,30 +2615,116 @@ body:has(.app-frame--fullscreen) .gelbooru-hub__recs-overlay {
 }
 
 .doujin-run-overlay__card {
-  width: min(22rem, calc(100% - 2rem));
+  width: min(28rem, 100%);
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
-  padding: 1.1rem 1.15rem;
-  border-radius: 14px;
+  gap: 0.85rem;
+  padding: 1.15rem 1.2rem 1.2rem;
+  border-radius: 18px;
   border: 1px solid var(--line);
-  background: var(--bg1);
+  background: var(--bg2);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.45);
+}
+
+.doujin-run-overlay__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.doujin-run-overlay__head .doujin-chrome__kicker {
+  margin: 0;
 }
 
 .doujin-run-overlay__card h2 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1.08rem;
+  line-height: 1.3;
+  font-weight: 700;
 }
 
-.doujin-run-overlay__plays {
+.doujin-run-overlay__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.doujin-run-overlay__plays,
+.doujin-run-overlay__stack,
+.doujin-run-overlay__actions {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  max-height: 14rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.doujin-run-overlay__plays {
+  grid-template-columns: 1fr 1fr;
+  max-height: min(52vh, 22rem);
   overflow: auto;
+  padding-right: 0.15rem;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 55%, transparent) transparent;
+}
+
+.doujin-run-overlay__plays--lists {
+  grid-template-columns: 1fr;
+}
+
+.doujin-run-overlay__stack,
+.doujin-run-overlay__actions {
+  grid-template-columns: 1fr;
+}
+
+.doujin-run-overlay__actions {
+  grid-template-columns: 1fr 1fr;
+}
+
+.doujin-run-overlay__plays li {
+  margin: 0;
+  min-width: 0;
+}
+
+.page--doujin .doujin-run-overlay__choice {
+  width: 100%;
+  min-height: 2.55rem;
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--bg1);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  transform: none;
+}
+
+.page--doujin .doujin-run-overlay__choice:hover:not(:disabled) {
+  transform: none;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+}
+
+.page--doujin .doujin-run-overlay__choice.is-primary {
+  border: 0;
+  background: var(--accent);
+  color: #1a0d08;
+}
+
+.page--doujin .doujin-run-overlay__choice.is-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  background: var(--accent);
+}
+
+.doujin-reader:not(.is-chrome) .doujin-run-fab,
+.doujin-reader:not(.is-chrome) .doujin-reader__task-card {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .doujin-lists__cache {
@@ -3397,6 +3501,10 @@ body:has(.app-frame--fullscreen) .gelbooru-hub__recs-overlay {
 
 .doujin-lists__brand-meta span:nth-child(odd) {
   color: color-mix(in srgb, var(--accent) 72%, var(--muted));
+}
+
+.doujin-lists__play-stats {
+  font-variant-numeric: tabular-nums;
 }
 
 .doujin-lists--detail .doujin-lists__split,
@@ -4379,6 +4487,44 @@ body:has(.app-frame--fullscreen) .gelbooru-hub__recs-overlay {
 .page--doujin .doujin-lists__go:hover:not(:disabled),
 .page--doujin .doujin-lists__preview-actions .btn-ghost:hover:not(:disabled) {
   transform: none;
+}
+
+.page--doujin .doujin-lists__fav {
+  display: grid;
+  place-items: center;
+  width: 2.05rem;
+  height: 2.05rem;
+  min-width: 2.05rem;
+  min-height: 2.05rem;
+  margin: 0;
+  padding: 0;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--bg1);
+  color: var(--text);
+  transform: none;
+}
+
+.page--doujin .doujin-lists__fav svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  display: block;
+}
+
+.page--doujin .doujin-lists__fav.is-on {
+  color: var(--accent);
+  border-color: rgba(255, 138, 74, 0.5);
+  background: rgba(255, 138, 74, 0.16);
+}
+
+.page--doujin .doujin-lists__fav:hover:not(:disabled) {
+  transform: none;
+  filter: brightness(1.06);
+}
+
+.page--doujin .doujin-lists__fav:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .doujin-lists__pages .doujin-detail__thumbs {

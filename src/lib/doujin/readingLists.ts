@@ -1,5 +1,12 @@
 import { feedTakeCounts } from "../feedTake";
 import { displayTitle, parseTags } from "./normalize";
+import {
+  addReadingListPlayStats,
+  EMPTY_READING_LIST_PLAY_STATS,
+  parseReadingListPlayStats,
+  readingPlayStatsHasAny,
+  type ReadingListPlayStats,
+} from "./readingListPlayStats";
 import type {
   DoujinCard,
   DoujinGallery,
@@ -56,6 +63,22 @@ export function cardToListItem(card: DoujinCard): DoujinReadingListItem {
     uploadedAt: card.uploadedAt,
     numFavorites: card.numFavorites,
     pagePreviews: previews.length > 0 ? previews : undefined,
+  };
+}
+
+export function listItemToCard(item: DoujinReadingListItem): DoujinCard {
+  return {
+    id: item.galleryId,
+    mediaId: item.mediaId,
+    title: item.title,
+    numPages: item.numPages,
+    coverUrl: item.coverUrl,
+    thumbnailUrl: item.coverUrl,
+    tags: item.tags ?? [],
+    language: item.language,
+    languages: item.languages,
+    uploadedAt: item.uploadedAt,
+    numFavorites: item.numFavorites,
   };
 }
 
@@ -210,6 +233,7 @@ function parseList(raw: unknown): DoujinReadingList | null {
     items,
     origin,
     note: clipReadingListNote(str(o.note) || str(o.description)),
+    playStats: parseReadingListPlayStats(o.playStats),
   };
 }
 
@@ -303,6 +327,20 @@ export async function createReadingList(
     items,
     origin: opts?.origin === "mistress" ? "mistress" : "user",
     note: clipReadingListNote(opts?.note ?? ""),
+    playStats: EMPTY_READING_LIST_PLAY_STATS,
+  });
+}
+
+export async function bumpReadingListPlayStats(
+  listId: string,
+  delta: ReadingListPlayStats,
+): Promise<DoujinReadingList | undefined> {
+  const existing = await getReadingList(listId);
+  if (!existing) return undefined;
+  if (!readingPlayStatsHasAny(delta)) return existing;
+  return putList({
+    ...existing,
+    playStats: addReadingListPlayStats(existing.playStats, delta),
   });
 }
 

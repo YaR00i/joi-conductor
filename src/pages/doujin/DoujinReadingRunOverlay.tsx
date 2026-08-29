@@ -1,6 +1,8 @@
+import type { ReactNode } from "react";
 import { cumplayOptions } from "../../lib/catalog";
 import type {
   MistressSurveyPick,
+  ReadingRunOverlay,
   ReadingRunState,
 } from "../../lib/doujin/readingRun";
 import type { ReadingRunListOption } from "./DoujinReadingRunHud";
@@ -32,6 +34,73 @@ function outcomeRu(outcome: "cum" | "ruin" | "deny"): string {
   }
 }
 
+function cumplayHint(reason: Extract<ReadingRunOverlay, { kind: "cumplay" }>["reason"]): string {
+  switch (reason) {
+    case "self":
+      return "Как распорядиться.";
+    case "permission":
+      return "Камплей по разрешению.";
+    case "unauthorized":
+      return "Без разрешения. Отметь камплей.";
+    default: {
+      const _never: never = reason;
+      return _never;
+    }
+  }
+}
+
+function OverlayChoice({
+  children,
+  onClick,
+  primary = false,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  primary?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={
+        "doujin-run-overlay__choice" + (primary ? " is-primary" : "")
+      }
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+function OverlayShell({
+  kicker,
+  title,
+  hint,
+  children,
+}: {
+  kicker: string;
+  title: string;
+  hint: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className="doujin-run-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="doujin-run-overlay-title"
+    >
+      <div className="doujin-run-overlay__card">
+        <header className="doujin-run-overlay__head">
+          <span className="doujin-chrome__kicker">{kicker}</span>
+          <h2 id="doujin-run-overlay-title">{title}</h2>
+        </header>
+        <p className="doujin-run-overlay__hint">{hint}</p>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function DoujinReadingRunOverlay({
   run,
   otherLists,
@@ -44,125 +113,99 @@ export function DoujinReadingRunOverlay({
   onClose,
 }: Props) {
   const overlay = run.overlay;
-  if (overlay.kind === "none") return null;
-
-  const plays = cumplayOptions.filter((row) => row.enabled);
-
-  return (
-    <div className="doujin-run-overlay" role="dialog">
-      <div className="doujin-run-overlay__card">
-        {overlay.kind === "permission" ? (
-          <>
-            <h2>Разрешение</h2>
-            <p className="muted">Рулетка как в сессии: кончить, руина или отказ.</p>
-            <button type="button" className="btn-primary" onClick={onSpinPermission}>
+  switch (overlay.kind) {
+    case "none":
+      return null;
+    case "permission":
+      return (
+        <OverlayShell
+          kicker="прогон"
+          title="Разрешение"
+          hint="Рулетка как в сессии: кончить, руина или отказ."
+        >
+          <div className="doujin-run-overlay__actions">
+            <OverlayChoice onClick={onClose}>Позже</OverlayChoice>
+            <OverlayChoice primary onClick={onSpinPermission}>
               Крутить
-            </button>
-            <button type="button" className="btn-ghost" onClick={onClose}>
-              Позже
-            </button>
-          </>
-        ) : null}
-
-        {overlay.kind === "cumplay" ? (
-          <>
-            <h2>{outcomeRu(overlay.outcome)}</h2>
-            <p className="muted">
-              {overlay.reason === "self"
-                ? "Как распорядиться."
-                : overlay.reason === "permission"
-                  ? "Камплей по разрешению."
-                  : "Без разрешения. Отметь камплей."}
-            </p>
-            <ul className="doujin-run-overlay__plays">
-              {plays.map((play) => (
-                <li key={play.id}>
-                  <button
-                    type="button"
-                    className="btn-ghost"
-                    onClick={() => onCumplay(play.id)}
-                  >
-                    {play.nameRu}
-                  </button>
+            </OverlayChoice>
+          </div>
+        </OverlayShell>
+      );
+    case "cumplay": {
+      const plays = cumplayOptions.filter((row) => row.enabled);
+      return (
+        <OverlayShell
+          kicker="камплей"
+          title={outcomeRu(overlay.outcome)}
+          hint={cumplayHint(overlay.reason)}
+        >
+          <ul className="doujin-run-overlay__plays">
+            {plays.map((play) => (
+              <li key={play.id}>
+                <OverlayChoice onClick={() => onCumplay(play.id)}>
+                  {play.nameRu}
+                </OverlayChoice>
+              </li>
+            ))}
+          </ul>
+        </OverlayShell>
+      );
+    }
+    case "survey":
+      return (
+        <OverlayShell
+          kicker="прогон"
+          title="Неужто не понравилось?"
+          hint="Очередь кончилась, а ты так и не кончил. Докину в этот список."
+        >
+          <div className="doujin-run-overlay__stack">
+            <OverlayChoice primary onClick={() => onSurvey("loved")}>
+              Дай любимые теги
+            </OverlayChoice>
+            <OverlayChoice onClick={() => onSurvey("rare")}>
+              Реже / жёстче
+            </OverlayChoice>
+            <OverlayChoice onClick={() => onSurvey("stop")}>
+              Хватит
+            </OverlayChoice>
+          </div>
+        </OverlayShell>
+      );
+    case "selfEnd":
+      return (
+        <OverlayShell
+          kicker="прогон"
+          title="Полка кончилась"
+          hint="Коллекцию не трогаю. Другая очередь?"
+        >
+          {otherLists.length > 0 ? (
+            <ul className="doujin-run-overlay__plays doujin-run-overlay__plays--lists">
+              {otherLists.map((list) => (
+                <li key={list.id}>
+                  <OverlayChoice onClick={() => onPickList(list.id)}>
+                    {list.name} · {list.count}
+                  </OverlayChoice>
                 </li>
               ))}
             </ul>
-          </>
-        ) : null}
-
-        {overlay.kind === "survey" ? (
-          <>
-            <h2>Неужто не понравилось?</h2>
-            <p className="muted">
-              Очередь кончилась, а ты так и не кончил. Докину в этот список.
-            </p>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => onSurvey("loved")}
-            >
-              Дай любимые теги
-            </button>
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() => onSurvey("rare")}
-            >
-              Реже / жёстче
-            </button>
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() => onSurvey("stop")}
-            >
-              Хватит
-            </button>
-          </>
-        ) : null}
-
-        {overlay.kind === "selfEnd" ? (
-          <>
-            <h2>Полка кончилась</h2>
-            <p className="muted">Коллекцию не трогаю. Другая очередь?</p>
-            {otherLists.length > 0 ? (
-              <ul className="doujin-run-overlay__plays">
-                {otherLists.map((list) => (
-                  <li key={list.id}>
-                    <button
-                      type="button"
-                      className="btn-ghost"
-                      onClick={() => onPickList(list.id)}
-                    >
-                      {list.name} · {list.count}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <>
-                <p className="muted">Других своих списков нет.</p>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={onAssembleAuto}
-                >
-                  Собрать автоочередь
-                </button>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={onAssembleSelf}
-                >
-                  Составлю сам
-                </button>
-              </>
-            )}
-            <button type="button" className="btn-ghost" onClick={onClose}>
-              Закрыть
-            </button>
-          </>
-        ) : null}
-      </div>
-    </div>
-  );
+          ) : (
+            <div className="doujin-run-overlay__stack">
+              <OverlayChoice primary onClick={onAssembleAuto}>
+                Собрать автоочередь
+              </OverlayChoice>
+              <OverlayChoice onClick={onAssembleSelf}>
+                Составлю сам
+              </OverlayChoice>
+            </div>
+          )}
+          <div className="doujin-run-overlay__stack">
+            <OverlayChoice onClick={onClose}>Закрыть</OverlayChoice>
+          </div>
+        </OverlayShell>
+      );
+    default: {
+      const _never: never = overlay;
+      return _never;
+    }
+  }
 }

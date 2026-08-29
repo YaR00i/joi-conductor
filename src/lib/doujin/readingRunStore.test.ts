@@ -54,6 +54,29 @@ describe("reading run store", () => {
     expect(run?.activeTask?.galleryId).toBe("7");
   });
 
+  it("coerces a legacy cum into orgasmsDone", () => {
+    const base = createReadingRun({
+      listId: "l1",
+      listName: "Вечер",
+      listTotal: 3,
+      origin: "user",
+      moodScore: 0,
+      now: 1,
+      rng: () => 0,
+    });
+    const { orgasmsDone: _drop, ...legacy } = base;
+    localStorage.setItem(
+      "joi-doujin-reading-run-v1",
+      JSON.stringify({ ...legacy, hadOrgasm: true, finaleOutcome: "cum" }),
+    );
+    expect(loadReadingRun()?.orgasmsDone).toBe(1);
+    localStorage.setItem(
+      "joi-doujin-reading-run-v1",
+      JSON.stringify({ ...legacy, hadOrgasm: true, finaleOutcome: "ruin" }),
+    );
+    expect(loadReadingRun()?.orgasmsDone).toBe(0);
+  });
+
   it("does not clear a gelbooru run when nhentai saves null", () => {
     const gb = createReadingRun({
       listId: "g1",

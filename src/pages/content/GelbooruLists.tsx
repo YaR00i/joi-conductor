@@ -13,6 +13,11 @@ import {
   gelbooruListUnsavedItems,
   type GelbooruPlayList,
 } from "../../lib/gelbooruLists";
+import {
+  EMPTY_READING_LIST_PLAY_STATS,
+  formatReadingPlayStats,
+  readingPlayStatsCaption,
+} from "../../lib/doujin/readingListPlayStats";
 import { masonryPreviewSrc, type MediaItem } from "../../lib/media";
 import { isMediaCached } from "../../lib/mediaPreload";
 import { listDownloadJobId } from "../../lib/favoriteSaveQueue";
@@ -361,6 +366,12 @@ export function GelbooruLists({
                   ? "её очередь"
                   : "своя очередь"}
               </span>
+              <span aria-hidden>·</span>
+              <span className="doujin-lists__play-stats">
+                {formatReadingPlayStats(
+                  open.playStats ?? EMPTY_READING_LIST_PLAY_STATS,
+                )}
+              </span>
             </p>
           </div>
           <button
@@ -676,6 +687,7 @@ export function GelbooruLists({
         {lists.map((list, index) => {
           const resumeAt = gelbooruListResumeIndex(list);
           const canResume = gelbooruListCanResume(list);
+          const playStatsLine = readingPlayStatsCaption(list.playStats);
           const cacheState = gelbooruListTileCacheState(
             list,
             savedIds,
@@ -714,6 +726,7 @@ export function GelbooruLists({
                   {postsLabel(list.items.length)}
                   {gelbooruListOrigin(list) === "mistress" ? " · её" : ""}
                   {canResume ? ` · с ${resumeAt + 1}` : ""}
+                  {playStatsLine ? ` · ${playStatsLine}` : ""}
                 </span>
               </div>
             </li>

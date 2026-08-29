@@ -83,6 +83,41 @@ export function mediaZoomLabel(zoom: number): string {
   return `${Math.round(zoom * 100)}%`;
 }
 
+export type OverflowScrollBox = {
+  scrollLeft: number;
+  scrollTop: number;
+  clientWidth: number;
+  clientHeight: number;
+  scrollWidth: number;
+  scrollHeight: number;
+};
+
+/** One arrow-key nudge inside a zoomed overflow stage. */
+export function mediaArrowPanStep(extent: number): number {
+  const raw = Math.round(Math.max(0, extent) * 0.1);
+  return Math.min(64, Math.max(32, raw));
+}
+
+/** Next scroll position, or null if this axis cannot move. */
+export function nudgeOverflowScroll(
+  box: OverflowScrollBox,
+  dx: number,
+  dy: number,
+): { left: number; top: number } | null {
+  const maxX = Math.max(0, box.scrollWidth - box.clientWidth);
+  const maxY = Math.max(0, box.scrollHeight - box.clientHeight);
+  if (maxX <= 1 && maxY <= 1) return null;
+  const left = Math.min(maxX, Math.max(0, box.scrollLeft + dx));
+  const top = Math.min(maxY, Math.max(0, box.scrollTop + dy));
+  if (
+    Math.abs(left - box.scrollLeft) < 0.5 &&
+    Math.abs(top - box.scrollTop) < 0.5
+  ) {
+    return null;
+  }
+  return { left, top };
+}
+
 export type MediaPan = { x: number; y: number };
 
 /** True when the painted size no longer fits the 100% box. */

@@ -6,8 +6,10 @@ import {
   DEFAULT_READING_LIST_NAME,
   listedGalleryIds,
   listCanResume,
+  listItemToCard,
   listResumeIndex,
   listReadingLists,
+  bumpReadingListPlayStats,
   moveListItem,
   parseReadingListsJson,
   READING_LISTS_KEY,
@@ -72,6 +74,14 @@ describe("cardToListItem", () => {
       "https://t.example/2t.jpg",
     ]);
   });
+
+  it("round-trips a list row back to a card for account favorite", () => {
+    const item = cardToListItem(card);
+    const back = listItemToCard(item);
+    expect(back.id).toBe(42);
+    expect(back.title.pretty).toBe("Hello");
+    expect(back.tags.map((tag) => tag.name)).toEqual(["sole female", "mishima"]);
+  });
 });
 
 describe("listedGalleryIds", () => {
@@ -122,6 +132,7 @@ describe("parseReadingListsJson", () => {
     expect(lists[0]?.items[0]?.pagePreviews).toEqual(["https://t.example/1.jpg"]);
     expect(lists[0]?.origin).toBe("user");
     expect(lists[0]?.note).toBe("");
+    expect(lists[0]?.playStats).toEqual({ edges: 0, ruins: 0, orgasms: 0 });
   });
 
   it("reads a note and legacy description", () => {
@@ -216,6 +227,24 @@ describe("createReadingList", () => {
     expect(JSON.parse(mem.get(READING_LISTS_KEY) ?? "[]")).toHaveLength(1);
     const all = await listReadingLists();
     expect(all[0]?.id).toBe(created.id);
+  });
+
+  it("accumulates play stats on the queue", async () => {
+    stubStorage();
+    const created = await createReadingList("Ночное");
+    expect(created.playStats).toEqual({ edges: 0, ruins: 0, orgasms: 0 });
+    const bumped = await bumpReadingListPlayStats(created.id, {
+      edges: 2,
+      ruins: 1,
+      orgasms: 1,
+    });
+    expect(bumped?.playStats).toEqual({ edges: 2, ruins: 1, orgasms: 1 });
+    const again = await bumpReadingListPlayStats(created.id, {
+      edges: 1,
+      ruins: 0,
+      orgasms: 0,
+    });
+    expect(again?.playStats).toEqual({ edges: 3, ruins: 1, orgasms: 1 });
   });
 
   it("falls back to the default name", async () => {

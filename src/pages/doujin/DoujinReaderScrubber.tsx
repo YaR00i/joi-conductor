@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { proxiedImageUrl } from "../../lib/doujin/cdn";
 import type { DoujinPage } from "../../lib/doujin/types";
-import { clampScrubPreviewLeft, pageIndexFromScrub } from "./readerScrub";
+import { clampScrubPreviewLeft, pageIndexFromScrub, scrubThumbRatio } from "./readerScrub";
 
 const PREVIEW_W = 90;
 
@@ -18,7 +18,7 @@ export function DoujinReaderScrubber({ pages, index, onJump }: Props) {
   const [previewLeft, setPreviewLeft] = useState(0);
   const total = Math.max(1, pages.length);
   const current = Math.min(total - 1, Math.max(0, index));
-  const fill = ((current + 1) / total) * 100;
+  const fill = scrubThumbRatio(current, total) * 100;
   const shown = hover ?? current;
   const page = pages[shown];
   const previewSrc = page

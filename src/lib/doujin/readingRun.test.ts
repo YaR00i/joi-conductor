@@ -14,6 +14,7 @@ import {
   readingRunHasProgress,
   reportCum,
   reportEdge,
+  reportRuin,
   resolvePermission,
   skipActiveTask,
 } from "./readingRun";
@@ -145,6 +146,23 @@ describe("permission roulette", () => {
     expect(denied.state.hadOrgasm).toBe(false);
     expect(denied.state.status).toBe("running");
   });
+
+  it("permission cum and ruin increment their own counters", () => {
+    const open = { ...run(), overlay: { kind: "permission" as const } };
+    const allowed = resolvePermission(open, 2_000, () => 0);
+    expect(allowed.state.finaleOutcome).toBe("cum");
+    expect(allowed.state.orgasmsDone).toBe(1);
+    expect(allowed.state.ruinsDone).toBe(0);
+    const odds = readingFinaleOdds({ ...open, moodScore: -2 });
+    const ruined = resolvePermission(
+      { ...open, moodScore: -2 },
+      2_000,
+      () => odds.pCum + odds.pRuin / 2,
+    );
+    expect(ruined.state.finaleOutcome).toBe("ruin");
+    expect(ruined.state.ruinsDone).toBe(1);
+    expect(ruined.state.orgasmsDone).toBe(0);
+  });
 });
 
 describe("list end", () => {
@@ -179,8 +197,13 @@ describe("self-report C", () => {
     expect(closed.overlay.kind).toBe("none");
   });
 
-  it("edge is a counter only", () => {
+  it("edge, ruin, and cum are live counters", () => {
     expect(reportEdge(run()).state.edgesDone).toBe(1);
+    const ruined = reportRuin(run());
+    expect(ruined.state.ruinsDone).toBe(1);
+    expect(ruined.state.orgasmsDone).toBe(0);
+    const twice = reportCum(reportCum(run({ mode: "self", origin: "user" })).state);
+    expect(twice.state.orgasmsDone).toBe(2);
   });
 });
 
@@ -257,5 +280,6 @@ describe("readingRunHasProgress", () => {
     expect(readingRunHasProgress(run({ pagesShown: 2 }))).toBe(true);
     expect(readingRunHasProgress(run({ pagesContent: 1 }))).toBe(true);
     expect(readingRunHasProgress(run({ edgesDone: 1 }))).toBe(true);
+    expect(readingRunHasProgress(run({ orgasmsDone: 1 }))).toBe(true);
   });
 });

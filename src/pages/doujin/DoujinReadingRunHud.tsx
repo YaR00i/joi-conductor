@@ -1,5 +1,6 @@
 import { moodFromScore } from "../../lib/moodEngine";
 import { getActiveMoodLines } from "../../lib/voice/moodLines";
+import { formatReadingPlayStats } from "../../lib/doujin/readingListPlayStats";
 import {
   canAskPermission,
   readingRunElapsedSec,
@@ -89,11 +90,18 @@ export function DoujinReadingRunHud({
         <button
           type="button"
           className="fab fab--hand"
-          title="Эдж"
+          title={`Эдж · ${run.edgesDone}`}
           disabled={!live}
           onClick={onEdge}
         >
           <span className="fab__glyph">✦</span>
+          <span
+            className={
+              "fab__count" + (run.edgesDone === 0 ? " is-zero" : "")
+            }
+          >
+            {run.edgesDone}
+          </span>
           <span className="fab__tag">
             <span className="fab__letter">E</span>
             <span className="fab__rest">dge</span>
@@ -102,11 +110,18 @@ export function DoujinReadingRunHud({
         <button
           type="button"
           className="fab fab--ruin"
-          title="Руина"
+          title={`Руина · ${run.ruinsDone}`}
           disabled={!live}
           onClick={onRuin}
         >
           <span className="fab__glyph">◆</span>
+          <span
+            className={
+              "fab__count" + (run.ruinsDone === 0 ? " is-zero" : "")
+            }
+          >
+            {run.ruinsDone}
+          </span>
           <span className="fab__tag">
             <span className="fab__letter">R</span>
             <span className="fab__rest">uin</span>
@@ -116,14 +131,21 @@ export function DoujinReadingRunHud({
           type="button"
           className="fab fab--cum"
           title={
-            run.mode === "self"
+            (run.mode === "self"
               ? "Кончил"
-              : "Кончил без разрешения"
+              : "Кончил без разрешения") + ` · ${run.orgasmsDone}`
           }
           disabled={!live}
           onClick={onCum}
         >
           <span className="fab__glyph">●</span>
+          <span
+            className={
+              "fab__count" + (run.orgasmsDone === 0 ? " is-zero" : "")
+            }
+          >
+            {run.orgasmsDone}
+          </span>
           <span className="fab__tag">
             <span className="fab__letter">C</span>
             <span className="fab__rest">um</span>
@@ -146,6 +168,13 @@ export function DoujinReadingRunHud({
         ) : null}
         <div className="doujin-run-fab__meta">
           <div className="session__bpm-label">{formatElapsed(elapsed)}</div>
+          <div className="doujin-run-fab__counts">
+            {formatReadingPlayStats({
+              edges: run.edgesDone,
+              ruins: run.ruinsDone,
+              orgasms: run.orgasmsDone,
+            })}
+          </div>
           <div className="session__status-mini">
             {paused ? "Пауза" : run.status === "ended" ? "Конец" : "Идёт"}
           </div>

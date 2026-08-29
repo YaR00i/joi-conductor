@@ -99,6 +99,7 @@ export function buildReadingDiaryEntry(opts: {
       pagesContent: run.pagesContent,
       strokesDone: run.strokesDone,
       slapsDone: run.slapsDone,
+      orgasmsDone: run.orgasmsDone,
     },
   };
 }

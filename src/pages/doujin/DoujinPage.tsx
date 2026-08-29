@@ -31,10 +31,12 @@ import {
 } from "../../lib/doujin/library";
 import {
   addManyToReadingList,
+  bumpReadingListPlayStats,
   createReadingList,
   deleteReadingList,
   listedGalleryIds,
   listCanResume,
+  listItemToCard,
   listOrigin,
   listResumeIndex,
   listReadingLists,
@@ -70,6 +72,10 @@ import {
   type TasteSyncStatus,
 } from "../../lib/doujin/tasteSync";
 import { effectiveBlacklist } from "../../lib/doujin/safety";
+import {
+  readingPlayStatsDelta,
+  readingPlayStatsHasAny,
+} from "../../lib/doujin/readingListPlayStats";
 import {
   applyCumplayChoice,
   applyMistressSurvey,
@@ -351,6 +357,16 @@ export function DoujinPage({
   }, [run]);
 
   function applyRunPatch(patch: ReadingRunPatch) {
+    const prev = runRef.current;
+    if (prev) {
+      const delta = readingPlayStatsDelta(prev, patch.state);
+      if (readingPlayStatsHasAny(delta)) {
+        void bumpReadingListPlayStats(prev.listId, delta).then(() => {
+          void refreshLists();
+        });
+      }
+    }
+    runRef.current = patch.state;
     setRun(patch.state);
     if (patch.moodDelta) {
       applyControlMoodDelta(getActiveMistress().id, patch.moodDelta);
@@ -1077,16 +1093,32 @@ export function DoujinPage({
                 }))}
                 onPause={() => setRun(pauseReadingRun(run, Date.now()))}
                 onResume={() => setRun(resumeReadingRun(run, Date.now()))}
-                onEdge={() => applyRunPatch(reportEdge(run))}
-                onRuin={() => applyRunPatch(reportRuin(run))}
-                onCum={() => applyRunPatch(reportCum(run))}
+                onEdge={() => {
+                  const live = runRef.current;
+                  if (live) applyRunPatch(reportEdge(live));
+                }}
+                onRuin={() => {
+                  const live = runRef.current;
+                  if (live) applyRunPatch(reportRuin(live));
+                }}
+                onCum={() => {
+                  const live = runRef.current;
+                  if (live) applyRunPatch(reportCum(live));
+                }}
                 onPermission={() => setRun(openPermission(run))}
-                onSpinPermission={() =>
-                  applyRunPatch(resolvePermission(run, Date.now()))
-                }
+                onSpinPermission={() => {
+                  const live = runRef.current;
+                  if (live) applyRunPatch(resolvePermission(live, Date.now()));
+                }}
                 onCumplay={(id) => setRun(applyCumplayChoice(run, id))}
-                onTaskDone={() => applyRunPatch(completeActiveTask(run))}
-                onTaskSkip={() => applyRunPatch(skipActiveTask(run))}
+                onTaskDone={() => {
+                  const live = runRef.current;
+                  if (live) applyRunPatch(completeActiveTask(live));
+                }}
+                onTaskSkip={() => {
+                  const live = runRef.current;
+                  if (live) applyRunPatch(skipActiveTask(live));
+                }}
                 onSurvey={(pick) => {
                   const patch = applyMistressSurvey(run, pick);
                   applyRunPatch(patch);
@@ -1361,6 +1393,9 @@ export function DoujinPage({
               assembleBusy={assembleBusy}
               cacheProgress={cacheProgress}
               keyed={keyed}
+              savedIds={savedIds}
+              favBusyIds={favSave.busyIds}
+              onToggleSave={(item) => void toggleSave(listItemToCard(item))}
               onDownloadList={(listId) => {
                 const list = lists.find((row) => row.id === listId);
                 if (

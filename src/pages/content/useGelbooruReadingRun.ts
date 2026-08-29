@@ -26,8 +26,13 @@ import {
   loadReadingRunForSource,
   saveReadingRunForSource,
 } from "../../lib/doujin/readingRunStore";
+import {
+  readingPlayStatsDelta,
+  readingPlayStatsHasAny,
+} from "../../lib/doujin/readingListPlayStats";
 import { assembleGelbooruMistressList } from "../../lib/gelbooruListBuild";
 import {
+  bumpGelbooruListPlayStats,
   gelbooruListCanResume,
   gelbooruListItemLabel,
   gelbooruListOrigin,
@@ -87,6 +92,15 @@ export function useGelbooruReadingRun({
   }, [run]);
 
   function applyRunPatch(patch: ReadingRunPatch) {
+    const prev = runRef.current;
+    if (prev) {
+      const delta = readingPlayStatsDelta(prev, patch.state);
+      if (readingPlayStatsHasAny(delta)) {
+        void bumpGelbooruListPlayStats(prev.listId, delta).then(() => {
+          void onRefreshLists();
+        });
+      }
+    }
     runRef.current = patch.state;
     setRun(patch.state);
     if (patch.moodDelta) {
@@ -258,15 +272,32 @@ export function useGelbooruReadingRun({
     ? {
         onPause: () => setRun(pauseReadingRun(run, Date.now())),
         onResume: () => setRun(resumeReadingRun(run, Date.now())),
-        onEdge: () => applyRunPatch(reportEdge(run)),
-        onRuin: () => applyRunPatch(reportRuin(run)),
-        onCum: () => applyRunPatch(reportCum(run)),
+        onEdge: () => {
+          const live = runRef.current;
+          if (live) applyRunPatch(reportEdge(live));
+        },
+        onRuin: () => {
+          const live = runRef.current;
+          if (live) applyRunPatch(reportRuin(live));
+        },
+        onCum: () => {
+          const live = runRef.current;
+          if (live) applyRunPatch(reportCum(live));
+        },
         onPermission: () => setRun(openPermission(run)),
-        onSpinPermission: () =>
-          applyRunPatch(resolvePermission(run, Date.now())),
+        onSpinPermission: () => {
+          const live = runRef.current;
+          if (live) applyRunPatch(resolvePermission(live, Date.now()));
+        },
         onCumplay: (id: string) => setRun(applyCumplayChoice(run, id)),
-        onTaskDone: () => applyRunPatch(completeActiveTask(run)),
-        onTaskSkip: () => applyRunPatch(skipActiveTask(run)),
+        onTaskDone: () => {
+          const live = runRef.current;
+          if (live) applyRunPatch(completeActiveTask(live));
+        },
+        onTaskSkip: () => {
+          const live = runRef.current;
+          if (live) applyRunPatch(skipActiveTask(live));
+        },
         onSurvey: (pick: "loved" | "rare" | "stop") => {
           const patch = applyMistressSurvey(run, pick);
           applyRunPatch(patch);

@@ -17,6 +17,8 @@ describe("buildReadingDiaryEntry", () => {
       run: {
         ...run,
         edgesDone: 3,
+        ruinsDone: 1,
+        orgasmsDone: 2,
         strokesDone: 40,
         pagesShown: 12,
         pagesContent: 9,
@@ -36,6 +38,7 @@ describe("buildReadingDiaryEntry", () => {
     expect(entry.source).toBe("reading");
     expect(entry.modeNameRu).toBe("Чтение");
     expect(entry.edgesDone).toBe(3);
+    expect(entry.reading?.orgasmsDone).toBe(2);
     expect(entry.finaleOutcome).toBe("deny");
     expect(entry.reading?.pagesContent).toBe(9);
     expect(entry.reading?.origin).toBe("mistress");

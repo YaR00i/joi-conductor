@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type MouseEvent,
   type ReactNode,
 } from "react";
 import { proxiedImageUrl } from "../../lib/doujin/cdn";
@@ -16,7 +17,9 @@ import {
   fitMediaScale,
   MEDIA_ZOOM_MAX,
   MEDIA_ZOOM_MIN,
+  mediaArrowPanStep,
   mediaZoomLabel,
+  nudgeOverflowScroll,
   stepMediaZoom,
 } from "../../lib/mediaFitZoom";
 
@@ -83,6 +86,23 @@ export function DoujinReader({
     setZoom((z) => stepMediaZoom(z, dir));
   }, []);
 
+  const panZoomed = useCallback(
+    (dx: number, dy: number, smooth: boolean): boolean => {
+      if (zoom <= MEDIA_ZOOM_MIN) return false;
+      const stage = stageRef.current;
+      if (!stage) return false;
+      const next = nudgeOverflowScroll(stage, dx, dy);
+      if (!next) return false;
+      stage.scrollTo({
+        left: next.left,
+        top: next.top,
+        behavior: smooth ? "smooth" : "auto",
+      });
+      return true;
+    },
+    [zoom],
+  );
+
   const measureFit = useCallback(() => {
     const stage = stageRef.current;
     const img = imgRef.current;
@@ -128,15 +148,31 @@ export function DoujinReader({
         onBack();
         return;
       }
-      if (!typing && (e.key === "+" || e.key === "=")) {
+      if (typing) return;
+      if (e.key === "+" || e.key === "=") {
         e.preventDefault();
         bumpZoom(1);
         return;
       }
-      if (!typing && (e.key === "-" || e.key === "_")) {
+      if (e.key === "-" || e.key === "_") {
         e.preventDefault();
         bumpZoom(-1);
         return;
+      }
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const stage = stageRef.current;
+        const step = mediaArrowPanStep(stage?.clientHeight ?? 0);
+        panZoomed(0, e.key === "ArrowDown" ? step : -step, !e.repeat);
+        return;
+      }
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        const stage = stageRef.current;
+        const step = mediaArrowPanStep(stage?.clientWidth ?? 0);
+        if (panZoomed(e.key === "ArrowRight" ? step : -step, 0, !e.repeat)) {
+          e.preventDefault();
+          return;
+        }
       }
       if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") {
         e.preventDefault();
@@ -150,7 +186,7 @@ export function DoujinReader({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [bumpZoom, chrome, go, onBack]);
+  }, [bumpZoom, chrome, go, onBack, panZoomed]);
 
   useEffect(() => {
     onPage(index);
@@ -188,6 +224,9 @@ export function DoujinReader({
 
   useEffect(() => {
     setNatural({ w: 0, h: 0 });
+    const stage = stageRef.current;
+    if (!stage) return;
+    stage.scrollTo(0, 0);
   }, [src]);
 
   useEffect(() => {
@@ -224,6 +263,13 @@ export function DoujinReader({
   const fitted = fittedMediaSize(natural.w, natural.h, fit, zoom);
   const imgW = fitted?.w;
   const imgH = fitted?.h;
+
+  function onStageClick(e: MouseEvent<HTMLDivElement>) {
+    const el = e.target;
+    if (!(el instanceof Element)) return;
+    if (el.closest(".doujin-reader__edge")) return;
+    setChrome((on) => !on);
+  }
 
   function jump(raw: string) {
     const n = Number(raw);
@@ -321,7 +367,11 @@ export function DoujinReader({
         </div>
       </header>
 
-      <div ref={stageRef} className="doujin-reader__stage">
+      <div
+        ref={stageRef}
+        className="doujin-reader__stage"
+        onClick={onStageClick}
+      >
         {src ? (
           <img
             ref={imgRef}
@@ -348,12 +398,6 @@ export function DoujinReader({
         >
           {prevWork ? <SkipIcon dir="prev" /> : <ChevronIcon dir="prev" />}
         </button>
-        {zoom <= 1 ? (
-          <div
-            className="doujin-reader__toggle"
-            onClick={() => setChrome((v) => !v)}
-          />
-        ) : null}
         <button
           type="button"
           className="doujin-reader__edge doujin-reader__edge--next"

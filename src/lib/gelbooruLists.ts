@@ -1,4 +1,11 @@
 import { moveListItem, newReadingListId } from "./doujin/readingLists";
+import {
+  addReadingListPlayStats,
+  EMPTY_READING_LIST_PLAY_STATS,
+  parseReadingListPlayStats,
+  readingPlayStatsHasAny,
+  type ReadingListPlayStats,
+} from "./doujin/readingListPlayStats";
 import { feedTakeCounts } from "./feedTake";
 import {
   masonryPreviewSrc,
@@ -25,6 +32,8 @@ export type GelbooruPlayList = {
   /** User text + auto-queue pull log. */
   note: string;
   items: GelbooruListItem[];
+  /** Lifetime E/R/C from reading runs on this queue. Missing on older lists. */
+  playStats?: ReadingListPlayStats;
 };
 
 export function itemToGelbooruListItem(
@@ -193,6 +202,7 @@ function parseList(raw: unknown): GelbooruPlayList | null {
     origin: str(o.origin) === "mistress" ? "mistress" : "user",
     note: clipGelbooruListNote(str(o.note) || str(o.description)),
     items,
+    playStats: parseReadingListPlayStats(o.playStats),
   };
 }
 
@@ -256,6 +266,20 @@ export async function createGelbooruList(
     origin: opts?.origin === "mistress" ? "mistress" : "user",
     note: clipGelbooruListNote(opts?.note ?? ""),
     items: opts?.items ?? [],
+    playStats: EMPTY_READING_LIST_PLAY_STATS,
+  });
+}
+
+export async function bumpGelbooruListPlayStats(
+  listId: string,
+  delta: ReadingListPlayStats,
+): Promise<GelbooruPlayList | undefined> {
+  const existing = await getGelbooruList(listId);
+  if (!existing) return undefined;
+  if (!readingPlayStatsHasAny(delta)) return existing;
+  return putList({
+    ...existing,
+    playStats: addReadingListPlayStats(existing.playStats, delta),
   });
 }
 

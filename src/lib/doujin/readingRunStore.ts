@@ -53,7 +53,15 @@ function normalizeReadingRun(raw: unknown): ReadingRunState | null {
     finishedGalleryIds: finished,
     galleries,
     activeTask,
+    orgasmsDone: coerceOrgasmsDone(rec),
   };
+}
+
+function coerceOrgasmsDone(rec: Record<string, unknown>): number {
+  if (typeof rec.orgasmsDone === "number" && Number.isFinite(rec.orgasmsDone)) {
+    return Math.max(0, Math.floor(rec.orgasmsDone));
+  }
+  return rec.hadOrgasm === true && rec.finaleOutcome === "cum" ? 1 : 0;
 }
 
 export function loadReadingRun(): ReadingRunState | null {

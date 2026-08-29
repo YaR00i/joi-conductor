@@ -67,6 +67,7 @@ export type ReadingRunState = {
   pCumBias: number;
   edgesDone: number;
   ruinsDone: number;
+  orgasmsDone: number;
   strokesDone: number;
   slapsDone: number;
   skipCount: number;
@@ -134,6 +135,7 @@ export function createReadingRun(opts: {
     pCumBias: 0,
     edgesDone: 0,
     ruinsDone: 0,
+    orgasmsDone: 0,
     strokesDone: 0,
     slapsDone: 0,
     skipCount: 0,
@@ -383,6 +385,7 @@ export function reportCum(state: ReadingRunState): ReadingRunPatch {
   if (state.mode === "self") {
     return patch({
       ...state,
+      orgasmsDone: state.orgasmsDone + 1,
       hadOrgasm: true,
       finaleOutcome: "cum",
       overlay: { kind: "cumplay", reason: "self", outcome: "cum" },
@@ -392,6 +395,7 @@ export function reportCum(state: ReadingRunState): ReadingRunPatch {
     {
       ...state,
       unauthorizedCum: true,
+      orgasmsDone: state.orgasmsDone + 1,
       hadOrgasm: true,
       finaleOutcome: "cum",
       pCumBias: state.pCumBias - 0.25,
@@ -494,15 +498,29 @@ export function resolvePermission(
       early,
     );
   }
-  return patch(
-    {
+  if (outcome === "ruin") {
+    return patch({
       ...state,
+      ruinsDone: state.ruinsDone + 1,
       hadOrgasm: true,
-      finaleOutcome: outcome,
-      overlay: { kind: "cumplay", reason: "permission", outcome },
-    },
-    outcome === "cum" ? 1 : 0,
-  );
+      finaleOutcome: "ruin",
+      overlay: { kind: "cumplay", reason: "permission", outcome: "ruin" },
+    });
+  }
+  if (outcome === "cum") {
+    return patch(
+      {
+        ...state,
+        orgasmsDone: state.orgasmsDone + 1,
+        hadOrgasm: true,
+        finaleOutcome: "cum",
+        overlay: { kind: "cumplay", reason: "permission", outcome: "cum" },
+      },
+      1,
+    );
+  }
+  const _never: never = outcome;
+  return _never;
 }
 
 export function applyCumplayChoice(
@@ -578,7 +596,12 @@ export function readingRunHasProgress(state: ReadingRunState): boolean {
   if (state.pagesContent > 0) return true;
   if (state.galleries.length > 1) return true;
   if (state.finishedGalleryIds.length > 0) return true;
-  if (state.edgesDone > 0 || state.ruinsDone > 0 || state.hadOrgasm) {
+  if (
+    state.edgesDone > 0 ||
+    state.ruinsDone > 0 ||
+    state.orgasmsDone > 0 ||
+    state.hadOrgasm
+  ) {
     return true;
   }
   if (state.activeTask) return true;

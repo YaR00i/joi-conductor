@@ -5,9 +5,18 @@ export function pageIndexFromScrub(
   total: number,
 ): number {
   const n = Math.max(1, Math.floor(total));
+  if (n <= 1) return 0;
   if (!(trackWidth > 0)) return 0;
-  const t = (clientX - trackLeft) / trackWidth;
-  return Math.min(n - 1, Math.max(0, Math.floor(t * n)));
+  const t = Math.min(1, Math.max(0, (clientX - trackLeft) / trackWidth));
+  return Math.min(n - 1, Math.max(0, Math.round(t * (n - 1))));
+}
+
+/** 0 on page 1, 1 on the last page. 0-based `index`. */
+export function scrubThumbRatio(index: number, total: number): number {
+  const n = Math.max(1, Math.floor(total));
+  const i = Math.min(n - 1, Math.max(0, index));
+  if (n <= 1) return 0;
+  return i / (n - 1);
 }
 
 export function clampScrubPreviewLeft(

@@ -6,6 +6,7 @@ import {
 import type { MediaItem } from "./media";
 import {
   addToGelbooruList,
+  bumpGelbooruListPlayStats,
   createGelbooruList,
   DEFAULT_GELBOORU_LIST_NAME,
   gelbooruFeedItemIndex,
@@ -77,6 +78,17 @@ describe("gelbooru lists CRUD", () => {
     expect(list.name).toBe(DEFAULT_GELBOORU_LIST_NAME);
   });
 
+  it("accumulates play stats on the queue", async () => {
+    const list = await createGelbooruList("Ночное");
+    expect(list.playStats).toEqual({ edges: 0, ruins: 0, orgasms: 0 });
+    const bumped = await bumpGelbooruListPlayStats(list.id, {
+      edges: 1,
+      ruins: 0,
+      orgasms: 2,
+    });
+    expect(bumped?.playStats).toEqual({ edges: 1, ruins: 0, orgasms: 2 });
+  });
+
   it("stores a note and reads legacy description", async () => {
     const list = await createGelbooruList("Ночное", { note: "руками" });
     expect(list.note).toBe("руками");
@@ -98,6 +110,21 @@ describe("gelbooru lists CRUD", () => {
         ]),
       )[0]?.note,
     ).toBe("из description");
+    expect(
+      parseGelbooruListsJson(
+        JSON.stringify([
+          {
+            id: "legacy",
+            name: "Старый",
+            createdAt: 1,
+            updatedAt: 1,
+            cursorIndex: 0,
+            origin: "user",
+            items: [],
+          },
+        ]),
+      )[0]?.playStats,
+    ).toEqual({ edges: 0, ruins: 0, orgasms: 0 });
   });
 
   it("ignores junk JSON", () => {

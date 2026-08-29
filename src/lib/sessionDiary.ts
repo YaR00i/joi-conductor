@@ -119,6 +119,7 @@ export type DiaryEntry = {
     pagesContent: number;
     strokesDone: number;
     slapsDone: number;
+    orgasmsDone?: number;
   };
 };
 

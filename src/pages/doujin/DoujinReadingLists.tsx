@@ -15,8 +15,13 @@ import {
   listOrigin,
   listResumeIndex,
 } from "../../lib/doujin/readingLists";
+import {
+  EMPTY_READING_LIST_PLAY_STATS,
+  formatReadingPlayStats,
+  readingPlayStatsCaption,
+} from "../../lib/doujin/readingListPlayStats";
 import { READING_QUEUE_SIZES } from "../../lib/doujin/readingRunBuild";
-import type { DoujinReadingList } from "../../lib/doujin/types";
+import type { DoujinReadingList, DoujinReadingListItem } from "../../lib/doujin/types";
 import { getActiveMistress, subscribeActiveMistress } from "../../lib/mistress";
 import { moodFromScore } from "../../lib/moodEngine";
 import {
@@ -54,6 +59,9 @@ type Props = {
   onDownloadList?: (listId: string) => void;
   onTag: (query: string) => void;
   onEnrichItem?: (listId: string, galleryId: number) => void | Promise<void>;
+  savedIds?: ReadonlySet<number>;
+  favBusyIds?: ReadonlySet<string>;
+  onToggleSave?: (item: DoujinReadingListItem) => void;
 };
 
 function nextListName(lists: DoujinReadingList[]): string {
@@ -124,6 +132,9 @@ export function DoujinReadingLists({
   onDownloadList,
   onTag,
   onEnrichItem,
+  savedIds,
+  favBusyIds,
+  onToggleSave,
 }: Props) {
   const open = lists.find((list) => list.id === openListId) ?? null;
   const [rename, setRename] = useState<string | null>(null);
@@ -317,6 +328,12 @@ export function DoujinReadingLists({
                   <span>с {resume + 1}</span>
                 </>
               ) : null}
+              <span aria-hidden>·</span>
+              <span className="doujin-lists__play-stats">
+                {formatReadingPlayStats(
+                  open.playStats ?? EMPTY_READING_LIST_PLAY_STATS,
+                )}
+              </span>
             </p>
           </div>
           <button
@@ -472,8 +489,14 @@ export function DoujinReadingLists({
                   proxiedImageUrl(selected.coverUrl)
                 }
                 enriching={enriching}
+                saved={savedIds?.has(selected.galleryId) === true}
+                saveBusy={favBusyIds?.has(String(selected.galleryId)) === true}
+                canSave={keyed}
                 onRead={(pageIndex) => onPlay(open.id, selectedIndex, pageIndex)}
                 onTag={onTag}
+                onToggleSave={
+                  onToggleSave ? () => onToggleSave(selected) : undefined
+                }
               />
             ) : null}
           </div>
@@ -623,6 +646,7 @@ export function DoujinReadingLists({
         {lists.map((list, index) => {
           const resumeAt = listResumeIndex(list);
           const canResume = listCanResume(list, pageProgress);
+          const playStatsLine = readingPlayStatsCaption(list.playStats);
           const cacheState: ListTileCacheState =
             cacheProgress?.listId === list.id &&
             cacheProgress.status === "running"
@@ -671,6 +695,7 @@ export function DoujinReadingLists({
                   {worksLabel(list.items.length)}
                   {listOrigin(list) === "mistress" ? " · её" : ""}
                   {canResume ? ` · с ${resumeAt + 1}` : ""}
+                  {playStatsLine ? ` · ${playStatsLine}` : ""}
                 </span>
               </div>
             </li>

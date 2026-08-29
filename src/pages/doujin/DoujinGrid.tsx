@@ -193,7 +193,7 @@ function DoujinCardCover({ src }: { src: string }) {
   );
 }
 
-function HeartIcon({ filled }: { filled: boolean }) {
+export function HeartIcon({ filled }: { filled: boolean }) {
   return (
     <svg viewBox="0 0 16 16" aria-hidden>
       <path

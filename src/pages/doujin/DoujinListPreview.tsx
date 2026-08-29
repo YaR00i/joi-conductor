@@ -6,14 +6,18 @@ import {
 import { tagToQueryTerm } from "../../lib/doujin/query";
 import { listItemHasTags, listItemLabel } from "../../lib/doujin/readingLists";
 import type { DoujinReadingListItem, DoujinTag } from "../../lib/doujin/types";
-import { DoujinLangBadges } from "./DoujinGrid";
+import { DoujinLangBadges, HeartIcon } from "./DoujinGrid";
 
 type Props = {
   item: DoujinReadingListItem;
   coverSrc?: string;
   enriching?: boolean;
+  saved?: boolean;
+  saveBusy?: boolean;
+  canSave?: boolean;
   onRead: (pageIndex?: number) => void;
   onTag: (query: string) => void;
+  onToggleSave?: () => void;
 };
 
 const THUMB_CAP = 24;
@@ -22,8 +26,12 @@ export function DoujinListPreview({
   item,
   coverSrc,
   enriching = false,
+  saved = false,
+  saveBusy = false,
+  canSave = false,
   onRead,
   onTag,
+  onToggleSave,
 }: Props) {
   const pretty = listItemLabel(item);
   const english =
@@ -123,6 +131,27 @@ export function DoujinListPreview({
           <button type="button" className="doujin-lists__go" onClick={() => onRead()}>
             Читать
           </button>
+          {onToggleSave ? (
+            <button
+              type="button"
+              className={"doujin-lists__fav" + (saved ? " is-on" : "")}
+              disabled={saveBusy || !canSave}
+              aria-pressed={saved}
+              title={
+                !canSave
+                  ? "Нужен ключ API"
+                  : saved
+                    ? "Убрать из избранного на сайте"
+                    : "В избранное аккаунта nhentai"
+              }
+              aria-label={
+                saved ? "Убрать из избранного" : "В избранное"
+              }
+              onClick={onToggleSave}
+            >
+              <HeartIcon filled={saved} />
+            </button>
+          ) : null}
         </div>
         </div>
       </div>

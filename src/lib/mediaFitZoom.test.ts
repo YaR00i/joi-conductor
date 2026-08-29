@@ -10,9 +10,11 @@ import {
   mediaPaintOverflows,
   mediaPaintPosition,
   mediaPanExtents,
+  mediaArrowPanStep,
   mediaZoomLabel,
   MEDIA_ZOOM_MAX,
   MEDIA_ZOOM_MIN,
+  nudgeOverflowScroll,
   panAfterZoom,
   stepMediaZoom,
 } from "./mediaFitZoom";
@@ -78,6 +80,22 @@ describe("mediaFitZoom", () => {
       left: -100,
       top: -50,
     });
+  });
+
+  it("nudges a zoomed overflow stage and stops at the edge", () => {
+    const box = {
+      scrollLeft: 0,
+      scrollTop: 40,
+      clientWidth: 400,
+      clientHeight: 500,
+      scrollWidth: 400,
+      scrollHeight: 1400,
+    };
+    expect(nudgeOverflowScroll(box, 0, 200)).toEqual({ left: 0, top: 240 });
+    expect(nudgeOverflowScroll({ ...box, scrollTop: 900 }, 0, 200)).toBeNull();
+    expect(nudgeOverflowScroll({ ...box, scrollHeight: 500 }, 0, 200)).toBeNull();
+    expect(mediaArrowPanStep(500)).toBe(50);
+    expect(mediaArrowPanStep(1200)).toBe(64);
   });
 
   it("keeps the cursor point stable when zooming", () => {

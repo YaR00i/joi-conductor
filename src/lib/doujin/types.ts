@@ -1,3 +1,5 @@
+import type { ReadingListPlayStats } from "./readingListPlayStats";
+
 export type DoujinTagType =
   | "tag"
   | "artist"
@@ -166,6 +168,8 @@ export type DoujinReadingList = {
   origin?: DoujinReadingListOrigin;
   /** User text. Missing on older lists. */
   note?: string;
+  /** Lifetime E/R/C from reading runs on this queue. Missing on older lists. */
+  playStats?: ReadingListPlayStats;
 };
 
 export type DoujinPlaylistNav = {
