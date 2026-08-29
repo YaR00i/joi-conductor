@@ -38,6 +38,7 @@ import {
   DEFAULT_MEDIA_SETTINGS,
   fetchGelbooru,
   filterMediaByKinds,
+  hydrateGelbooruNativeTypes,
   loadMediaSettings,
   type MediaItem,
 } from "../../lib/media";
@@ -171,6 +172,10 @@ export function GelbooruHub({
     if (tab === "recs") {
       const rows = await listFavoriteMetadata();
       const liked = buildFavoriteTasteProfile(rows).liked;
+      void hydrateGelbooruNativeTypes(
+        liked.map((row) => row.tag),
+        { autocompleteFallback: false },
+      );
       const query = gelbooruRecsQuery(liked, recsTick, fallback);
       setRecsHint(
         liked.length > 0

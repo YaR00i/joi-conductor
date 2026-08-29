@@ -6,15 +6,18 @@ import {
   toggleTagInQuery,
 } from "../lib/contentUnlocks";
 import {
+  gelbooruCategoryClassName,
+  gelbooruChipCategory,
+  getNativeTagType,
   getTagType,
   groupTagsByType,
-  loadTagTypeMap,
   setTagType,
+  tagTypeSectionClass,
   type TagTypeId,
-  type TagTypeMap,
 } from "../lib/tagTypes";
 import { playUiClick, playUiToggle, primeUiAudio } from "../lib/uiSound";
 import { TagTypePickerModal } from "./TagTypePickerModal";
+import { useTagTypeCatalog } from "./useTagTypeCatalog";
 
 const CHIP_LIMIT = 64;
 
@@ -35,7 +38,6 @@ export function TagLibraryPanel({
 }: TagLibraryPanelProps) {
   const [search, setSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
-  const [typeMap, setTypeMap] = useState<TagTypeMap>(() => loadTagTypeMap());
   const [editTag, setEditTag] = useState<string | null>(null);
 
   const library = useMemo(() => listOwnedLibraryTags(unlocks), [unlocks]);
@@ -51,9 +53,15 @@ export function TagLibraryPanel({
   }, [library, search]);
 
   const visible = showAll ? filtered : filtered.slice(0, CHIP_LIMIT);
+  const hydrateTags = useMemo(
+    () => library.slice(0, CHIP_LIMIT).map((row) => row.tag),
+    [library],
+  );
+  const { typeMap, nativeMap, setTypeMap } = useTagTypeCatalog(hydrateTags);
+
   const groups = useMemo(
-    () => groupTagsByType(visible, typeMap),
-    [visible, typeMap],
+    () => groupTagsByType(visible, typeMap, nativeMap),
+    [visible, typeMap, nativeMap],
   );
 
   function onToggle(tag: string) {
@@ -74,7 +82,7 @@ export function TagLibraryPanel({
       <div className="hub-media__head">
         <span className="hub-media__title">Моя библиотека</span>
         <span className="hub-media__sub">
-          Купленные теги по типам · клик = в запрос · наведи ⚙ = тип
+          Купленные теги по типам Gelbooru · клик = в запрос · ⚙ = фавориты / отдел
           {library.length > 0 ? ` · ${library.length}` : ""}
         </span>
       </div>
@@ -115,7 +123,7 @@ export function TagLibraryPanel({
           ) : (
             <div className="hub-media-library__groups">
               {groups.map((group) => (
-                <section key={group.type} className="tag-type-section">
+                <section key={group.type} className={`tag-type-section ${tagTypeSectionClass(group.type)}`}>
                   <header className="tag-type-section__head">
                     <h3 className="tag-type-section__title">
                       {group.meta.nameRu}
@@ -139,10 +147,13 @@ export function TagLibraryPanel({
                             : item.source === "character"
                               ? "◆"
                               : "•";
+                      const gbClass = gelbooruCategoryClassName(
+                        gelbooruChipCategory(item.tag, typeMap, nativeMap),
+                      );
                       return (
                         <span
                           key={item.tag}
-                          className={`fav-tag fav-tag--with-gear${
+                          className={`fav-tag fav-tag--with-gear ${gbClass}${
                             active ? " is-active" : ""
                           }`}
                         >
@@ -201,7 +212,8 @@ export function TagLibraryPanel({
       {editTag ? (
         <TagTypePickerModal
           tag={editTag}
-          initialType={getTagType(editTag, typeMap)}
+          initialType={getTagType(editTag, typeMap, nativeMap)}
+          nativeType={getNativeTagType(editTag, nativeMap)}
           titleRu="Сменить тип тега"
           confirmRu="Сохранить"
           onCancel={() => setEditTag(null)}

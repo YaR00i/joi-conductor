@@ -10,6 +10,7 @@ import { MediaKindFilter } from "../components/MediaKindFilter";
 import type { NavId } from "../components/SideNav";
 import { TastePassportPanel } from "../components/TastePassportPanel";
 import { TagTypePickerModal } from "../components/TagTypePickerModal";
+import { useTagTypeCatalog } from "../components/useTagTypeCatalog";
 import { gelbooruQueryFromFavoriteFilters } from "../lib/contentHub";
 import {
   tagPurchaseStatus,
@@ -37,13 +38,13 @@ import {
 } from "../lib/lightboxPrefetch";
 import { setShopFocusTag } from "../lib/shopFocus";
 import {
+  getNativeTagType,
   getTagType,
   groupTagsByType,
-  loadTagTypeMap,
   setTagType,
   setTagTypesBulk,
+  tagTypeSectionClass,
   type TagTypeId,
-  type TagTypeMap,
 } from "../lib/tagTypes";
 import {
   buildTastePassportView,
@@ -106,6 +107,28 @@ function SearchIcon() {
         fill="none"
         stroke="currentColor"
         strokeWidth="1.45"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function FilterClearIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden>
+      <path
+        d="M2.5 3.2h11L9.4 8.5v4.3L6.6 14V8.5z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.45"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <path
+        d="M12.8 3.4 3.4 12.8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.55"
         strokeLinecap="round"
       />
     </svg>
@@ -177,9 +200,6 @@ export function FavoritesPage({
   const [tagsExpanded, setTagsExpanded] = useState(false);
   const [editTag, setEditTag] = useState<string | null>(null);
   const [bulkTypeOpen, setBulkTypeOpen] = useState(false);
-  const [tagTypeMap, setTagTypeMap] = useState<TagTypeMap>(() =>
-    loadTagTypeMap(),
-  );
   const viewerVideoRef = useRef<HTMLVideoElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const wantNextRef = useRef(false);
@@ -226,16 +246,22 @@ export function FavoritesPage({
     return filteredTagStats.slice(0, TAG_CHIP_LIMIT);
   }, [filteredTagStats, showAllTags, search]);
 
-  const tagGroups = useMemo(
-    () => groupTagsByType(visibleTags, tagTypeMap),
-    [visibleTags, tagTypeMap],
-  );
+  const hydrateTags = useMemo(() => {
+    if (!tagsExpanded) return [];
+    const selected = selectedTags.map((tag) => tag.trim()).filter(Boolean);
+    const selectedSet = new Set(selected.map((tag) => tag.toLowerCase()));
+    const rest = tagStats
+      .map((row) => row.tag)
+      .filter((tag) => !selectedSet.has(tag.toLowerCase()));
+    return [...selected, ...rest].slice(0, 120);
+  }, [tagsExpanded, selectedTags, tagStats]);
+  const { typeMap: tagTypeMap, nativeMap, setTypeMap: setTagTypeMap } =
+    useTagTypeCatalog(hydrateTags);
 
-  useEffect(() => {
-    const onFocus = () => setTagTypeMap(loadTagTypeMap());
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, []);
+  const tagGroups = useMemo(
+    () => groupTagsByType(visibleTags, tagTypeMap, nativeMap),
+    [visibleTags, tagTypeMap, nativeMap],
+  );
 
   const matchedMetadata = useMemo(
     () =>
@@ -740,7 +766,7 @@ export function FavoritesPage({
                 <p className="favorites-page__tags-empty">Нет тегов по запросу.</p>
               ) : null}
               {tagGroups.map((group) => (
-                <section key={group.type} className="tag-type-section">
+                <section key={group.type} className={`tag-type-section ${tagTypeSectionClass(group.type)}`}>
                   <header className="tag-type-section__head">
                     <h3 className="tag-type-section__title">{group.meta.nameRu}</h3>
                     <p className="tag-type-section__desc">
@@ -763,6 +789,8 @@ export function FavoritesPage({
                           count={count}
                           active={active}
                           purchase={tagPurchaseStatus(tag, unlocks)}
+                          typeMap={tagTypeMap}
+                          nativeMap={nativeMap}
                           onToggle={() => toggleTag(tag)}
                           onEdit={() => {
                             void primeUiAudio();
@@ -934,26 +962,44 @@ export function FavoritesPage({
       )}
 
       {selectedTags.length > 0 && !viewer ? (
-        <button
-          type="button"
-          className="favorites-page__bulk-type"
-          onClick={() => {
-            void primeUiAudio();
-            playUiClick();
-            setBulkTypeOpen(true);
-          }}
-        >
-          Настроить выбранные
-          <span className="favorites-page__bulk-type-n">
-            {selectedTags.length}
-          </span>
-        </button>
+        <div className="favorites-page__bulk-bar">
+          <button
+            type="button"
+            className="favorites-page__bulk-clear"
+            title="Сбросить фильтр"
+            aria-label="Сбросить фильтр"
+            onClick={() => {
+              void primeUiAudio();
+              playUiClick();
+              setSelectedTags([]);
+              setSearch("");
+              setKindFilter("all");
+            }}
+          >
+            <FilterClearIcon />
+          </button>
+          <button
+            type="button"
+            className="favorites-page__bulk-type"
+            onClick={() => {
+              void primeUiAudio();
+              playUiClick();
+              setBulkTypeOpen(true);
+            }}
+          >
+            Настроить выбранные
+            <span className="favorites-page__bulk-type-n">
+              {selectedTags.length}
+            </span>
+          </button>
+        </div>
       ) : null}
 
       {editTag ? (
         <TagTypePickerModal
           tag={editTag}
-          initialType={getTagType(editTag, tagTypeMap)}
+          initialType={getTagType(editTag, tagTypeMap, nativeMap)}
+          nativeType={getNativeTagType(editTag, nativeMap)}
           titleRu="Настройки тега"
           confirmRu="Сохранить"
           onCancel={() => setEditTag(null)}
@@ -975,7 +1021,8 @@ export function FavoritesPage({
                   selectedTags.length - 8
                 }`
           }
-          initialType={getTagType(selectedTags[0]!, tagTypeMap)}
+          initialType={getTagType(selectedTags[0]!, tagTypeMap, nativeMap)}
+          nativeType={getNativeTagType(selectedTags[0]!, nativeMap)}
           titleRu="Тип для выбранных"
           confirmRu="Применить ко всем"
           onCancel={() => setBulkTypeOpen(false)}

@@ -3,6 +3,7 @@ import type { NavId } from "../components/SideNav";
 import { MistressImg } from "../components/MistressImg";
 import { TagTypePickerModal } from "../components/TagTypePickerModal";
 import { TypewriterText } from "../components/TypewriterText";
+import { useTagTypeCatalog } from "../components/useTagTypeCatalog";
 import { getActiveMistress } from "../lib/mistress";
 import {
   shopClickLine,
@@ -21,12 +22,12 @@ import {
 import {
   getTagType,
   groupTagsByType,
-  loadTagTypeMap,
   setTagType,
   TAG_TYPE_META,
   tagTypeMeta,
+  tagTypeSectionClass,
+  getNativeTagType,
   type TagTypeId,
-  type TagTypeMap,
 } from "../lib/tagTypes";
 import { playUiNav, primeUiAudio } from "../lib/uiSound";
 import {
@@ -265,7 +266,6 @@ export function ShopPage({
   const [hasMore, setHasMore] = useState(favoritesHasMore);
   const [search, setSearch] = useState("");
   const [showOwned, setShowOwned] = useState(false);
-  const [typeMap, setTypeMap] = useState<TagTypeMap>(() => loadTagTypeMap());
   const [line, setLine] = useState(() => shopGreetLine());
   const [bubbleKey, setBubbleKey] = useState(0);
   const [pendingTagBuy, setPendingTagBuy] = useState<ShopItem | null>(null);
@@ -316,6 +316,12 @@ export function ShopPage({
     () => wallet.shopOfferTags.map((offer) => dynamicTagShopItem(offer)),
     [wallet.shopOfferTags],
   );
+  const shopHydrateTags = useMemo(
+    () => fetishOffers.slice(0, 120).map((item) => item.payload),
+    [fetishOffers],
+  );
+  const { typeMap, nativeMap, refresh } =
+    useTagTypeCatalog(shopHydrateTags);
 
   const offerCountByTag = useMemo(() => {
     const map = new Map<string, number>();
@@ -353,8 +359,8 @@ export function ShopPage({
       tag: item.payload,
       item,
     }));
-    return groupTagsByType(rows, typeMap);
-  }, [filteredFetishOffers, typeMap]);
+    return groupTagsByType(rows, typeMap, nativeMap);
+  }, [filteredFetishOffers, typeMap, nativeMap]);
 
   const premiumUnownedCount = useMemo(
     () =>
@@ -428,7 +434,7 @@ export function ShopPage({
       const ok = onPurchase(item.id);
       if (ok) {
         speak(shopPurchaseLine(item));
-        setTypeMap(loadTagTypeMap());
+        refresh();
       } else {
         const fresh = resolveShopItem(wallet, item.id);
         const reason =
@@ -472,7 +478,7 @@ export function ShopPage({
       setPendingTagBuy(null);
       if (!item) return;
       setTagType(item.payload, type);
-      setTypeMap(loadTagTypeMap());
+      refresh();
       completePurchase(item);
     },
     [completePurchase, pendingTagBuy],
@@ -676,7 +682,7 @@ export function ShopPage({
                     {fetishGroups.map((group) => (
                       <section
                         key={group.type}
-                        className="shop-page__group tag-type-section"
+                        className={`shop-page__group tag-type-section ${tagTypeSectionClass(group.type)}`}
                       >
                         <header className="tag-type-section__head">
                           <h3 className="tag-type-section__title">
@@ -702,7 +708,7 @@ export function ShopPage({
                               )}
                               typeHint={
                                 tagTypeMeta(
-                                  getTagType(item.payload, typeMap),
+                                  getTagType(item.payload, typeMap, nativeMap),
                                 ).nameRu
                               }
                             />
@@ -819,7 +825,12 @@ export function ShopPage({
         <TagTypePickerModal
           tag={pendingTagBuy.payload}
           labelRu={pendingTagBuy.nameRu}
-          initialType={getTagType(pendingTagBuy.payload)}
+          initialType={getTagType(
+            pendingTagBuy.payload,
+            typeMap,
+            nativeMap,
+          )}
+          nativeType={getNativeTagType(pendingTagBuy.payload, nativeMap)}
           titleRu="Куда положить тег?"
           confirmRu="Купить"
           onCancel={() => setPendingTagBuy(null)}

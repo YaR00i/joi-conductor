@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { TAG_TYPE_META, type TagTypeId } from "../lib/tagTypes";
+import {
+  TAG_TYPE_META,
+  tagTypeMeta,
+  type TagTypeId,
+} from "../lib/tagTypes";
 import { playUiClick, playUiConfirm, primeUiAudio } from "../lib/uiSound";
 
 type Props = {
@@ -8,6 +12,8 @@ type Props = {
   /** Extra line under the title (e.g. list of tags for bulk edit). */
   detailRu?: string;
   initialType: TagTypeId;
+  /** Gelbooru department — shown so unpinning lands in the right section. */
+  nativeType?: TagTypeId | null;
   titleRu?: string;
   confirmRu?: string;
   onConfirm: (type: TagTypeId) => void;
@@ -19,6 +25,7 @@ export function TagTypePickerModal({
   labelRu,
   detailRu,
   initialType,
+  nativeType = null,
   titleRu = "Тип тега",
   confirmRu = "Сохранить",
   onConfirm,
@@ -42,6 +49,14 @@ export function TagTypePickerModal({
           <p className="tag-type-modal__eyebrow">{titleRu}</p>
           <h2 className="tag-type-modal__title">{labelRu || tag}</h2>
           <p className="tag-type-modal__tag">{detailRu || tag}</p>
+          {nativeType ? (
+            <p className="tag-type-modal__native">
+              Gelbooru: {tagTypeMeta(nativeType).nameRu}
+              {initialType === "fetish"
+                ? " — сюда вернётся, если убрать из фаворитов"
+                : ""}
+            </p>
+          ) : null}
         </header>
 
         <div className="tag-type-modal__list" role="listbox" aria-label="Типы">

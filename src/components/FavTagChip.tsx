@@ -1,4 +1,10 @@
 import type { TagPurchaseStatus } from "../lib/contentUnlocks";
+import {
+  gelbooruCategoryClassName,
+  gelbooruChipCategory,
+  type GelbooruNativeMap,
+  type TagTypeMap,
+} from "../lib/tagTypes";
 
 type Props = {
   tag: string;
@@ -8,6 +14,8 @@ type Props = {
   onToggle: () => void;
   onEdit: () => void;
   onBuy?: () => void;
+  typeMap?: TagTypeMap;
+  nativeMap?: GelbooruNativeMap;
 };
 
 export function FavTagChip({
@@ -18,13 +26,20 @@ export function FavTagChip({
   onToggle,
   onEdit,
   onBuy,
+  typeMap,
+  nativeMap,
 }: Props) {
   const locked = purchase === "locked";
   const unlocked = purchase === "unlocked";
+  const gbClass = gelbooruCategoryClassName(
+    typeMap && nativeMap
+      ? gelbooruChipCategory(tag, typeMap, nativeMap)
+      : gelbooruChipCategory(tag),
+  );
 
   return (
     <span
-      className={`fav-tag fav-tag--with-gear${active ? " is-active" : ""}${
+      className={`fav-tag fav-tag--with-gear ${gbClass}${active ? " is-active" : ""}${
         locked ? " fav-tag--locked" : ""
       }${unlocked ? " fav-tag--bought" : ""}`}
     >

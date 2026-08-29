@@ -1,9 +1,12 @@
 /** Minimal in-memory localStorage for node unit tests. */
 
+import { resetTagTypeCaches } from "../lib/tagTypes";
+
 const store = new Map<string, string>();
 
 export function resetLocalStorage(): void {
   store.clear();
+  resetTagTypeCaches();
 }
 
 export function installLocalStorageMock(): void {

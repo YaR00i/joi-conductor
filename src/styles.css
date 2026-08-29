@@ -1100,11 +1100,48 @@ button:focus-visible {
   color: var(--muted);
 }
 
-.favorites-page__bulk-type {
+.favorites-page__bulk-bar {
   position: fixed;
   right: 1.15rem;
   bottom: 1.15rem;
   z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.favorites-page__bulk-clear {
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  aspect-ratio: 1;
+  width: auto;
+  min-width: 2.5rem;
+  margin: 0;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--ember-panel);
+  color: var(--soft);
+  cursor: pointer;
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.favorites-page__bulk-clear:hover {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.favorites-page__bulk-clear svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  display: block;
+}
+
+.favorites-page__bulk-type {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -1309,6 +1346,38 @@ button:focus-visible {
 .fav-tag--more {
   border-style: dashed;
   opacity: 0.85;
+}
+
+/* Gelbooru site groups — same palette as the website tag colors. */
+.gb-tag--general {
+  color: #8eb4d8;
+}
+.fav-tag.gb-tag--general {
+  border-color: color-mix(in srgb, #8eb4d8 45%, transparent);
+}
+.gb-tag--artist {
+  color: #e07070;
+}
+.fav-tag.gb-tag--artist {
+  border-color: color-mix(in srgb, #e07070 45%, transparent);
+}
+.gb-tag--copyright {
+  color: #d090d0;
+}
+.fav-tag.gb-tag--copyright {
+  border-color: color-mix(in srgb, #d090d0 45%, transparent);
+}
+.gb-tag--character {
+  color: #6ec86e;
+}
+.fav-tag.gb-tag--character {
+  border-color: color-mix(in srgb, #6ec86e 45%, transparent);
+}
+.gb-tag--metadata {
+  color: #e0a040;
+}
+.fav-tag.gb-tag--metadata {
+  border-color: color-mix(in srgb, #e0a040 45%, transparent);
 }
 
 .favorites-page__kind {
@@ -10108,6 +10177,25 @@ html[data-mistress="sunna"] .session__speech-face-img {
   line-height: 1.35;
 }
 
+.tag-type-section--favorite .tag-type-section__title {
+  color: #e8c36a;
+}
+.tag-type-section--artist .tag-type-section__title {
+  color: #e07070;
+}
+.tag-type-section--character .tag-type-section__title {
+  color: #6ec86e;
+}
+.tag-type-section--copyright .tag-type-section__title {
+  color: #d090d0;
+}
+.tag-type-section--metadata .tag-type-section__title {
+  color: #e0a040;
+}
+.tag-type-section--general .tag-type-section__title {
+  color: #8eb4d8;
+}
+
 .favorites-page__tag-groups,
 .hub-media-library__groups {
   display: flex;
@@ -10181,6 +10269,13 @@ html[data-mistress="sunna"] .session__speech-face-img {
   font-family: ui-monospace, Consolas, monospace;
   font-size: 0.78rem;
   color: rgba(200, 170, 140, 0.8);
+}
+
+.tag-type-modal__native {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: rgba(200, 170, 140, 0.72);
 }
 
 .tag-type-modal__list {

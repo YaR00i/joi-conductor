@@ -2,17 +2,18 @@ import { useMemo, useState } from "react";
 import type { ContentUnlockLists } from "../lib/contentUnlocks";
 import { listOwnedLibraryTags } from "../lib/contentUnlocks";
 import {
+  getNativeTagType,
   getTagType,
   groupTagsByType,
-  loadTagTypeMap,
   setTagType,
   TAG_TYPE_META,
+  tagTypeSectionClass,
   type TagTypeId,
-  type TagTypeMap,
 } from "../lib/tagTypes";
 import { playUiClick, primeUiAudio } from "../lib/uiSound";
 import { SettingsSection } from "./SettingsSection";
 import { TagTypePickerModal } from "./TagTypePickerModal";
+import { useTagTypeCatalog } from "./useTagTypeCatalog";
 
 type Props = {
   unlocks: ContentUnlockLists;
@@ -22,19 +23,19 @@ type Props = {
 
 /** Settings: reclassify owned library tags by type. */
 export function TagTypesSettingsPanel({ unlocks, embedded = false }: Props) {
-  const [typeMap, setTypeMap] = useState<TagTypeMap>(() => loadTagTypeMap());
   const [editTag, setEditTag] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
 
   const library = useMemo(() => listOwnedLibraryTags(unlocks), [unlocks]);
+  const { typeMap, nativeMap, setTypeMap } = useTagTypeCatalog([]);
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return library;
     return library.filter((t) => t.tag.toLowerCase().includes(q));
   }, [library, filter]);
   const groups = useMemo(
-    () => groupTagsByType(filtered, typeMap),
-    [filtered, typeMap],
+    () => groupTagsByType(filtered, typeMap, nativeMap),
+    [filtered, typeMap, nativeMap],
   );
 
   const body = (
@@ -54,7 +55,7 @@ export function TagTypesSettingsPanel({ unlocks, embedded = false }: Props) {
         <p className="brain-panel__hint">Пока нет купленных / открытых тегов.</p>
       ) : (
         groups.map((group) => (
-          <section key={group.type}>
+          <section key={group.type} className={tagTypeSectionClass(group.type)}>
             <h3 className="brain-panel__h">{group.meta.nameRu}</h3>
             <p className="brain-panel__hint">{group.meta.descriptionRu}</p>
             {group.items.length === 0 ? (
@@ -67,13 +68,13 @@ export function TagTypesSettingsPanel({ unlocks, embedded = false }: Props) {
                       <span className="brain-row__name">{item.tag}</span>
                       <span className="brain-row__meta">
                         {TAG_TYPE_META.find(
-                          (m) => m.id === getTagType(item.tag, typeMap),
+                          (m) => m.id === getTagType(item.tag, typeMap, nativeMap),
                         )?.nameRu ?? ""}
                       </span>
                     </div>
                     <div className="brain-row__acts">
                       <select
-                        value={getTagType(item.tag, typeMap)}
+                        value={getTagType(item.tag, typeMap, nativeMap)}
                         aria-label={`Тип для ${item.tag}`}
                         onChange={(e) => {
                           void primeUiAudio();
@@ -111,7 +112,8 @@ export function TagTypesSettingsPanel({ unlocks, embedded = false }: Props) {
       {editTag ? (
         <TagTypePickerModal
           tag={editTag}
-          initialType={getTagType(editTag, typeMap)}
+          initialType={getTagType(editTag, typeMap, nativeMap)}
+          nativeType={getNativeTagType(editTag, nativeMap)}
           titleRu="Сменить тип тега"
           onCancel={() => setEditTag(null)}
           onConfirm={(type) => {
@@ -131,7 +133,7 @@ export function TagTypesSettingsPanel({ unlocks, embedded = false }: Props) {
       title="Типы тегов"
       wide
       defaultOpen={false}
-      sub="Категории для библиотеки на Рулетке и фильтров в Избранном. При покупке в магазине тип выбирается сразу — здесь можно поправить."
+      sub="Категории как на Gelbooru (артист / персонаж / лор / мета) плюс фавориты. Тип подтягивается с сайта; фаворит можно снять — тег вернётся в свой отдел."
     >
       {body}
     </SettingsSection>

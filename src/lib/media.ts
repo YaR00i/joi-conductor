@@ -1,4 +1,8 @@
 import { snapMediaQueueSize } from "./mediaQueue";
+import {
+  loadGelbooruNativeMap,
+  rememberGelbooruNativeTypes,
+} from "./tagTypes";
 
 export type MediaKind = "image" | "video" | "gif";
 
@@ -256,6 +260,20 @@ interface GelbooruPost {
 const GELBOORU_MAX_REQ = 10;
 const GELBOORU_WINDOW_MS = 1000;
 const gelbooruRequestTimes: number[] = [];
+/** Autocomplete / search bump this so background tag-index waits. */
+let gelbooruInteractiveUntil = 0;
+
+function markGelbooruInteractive(): void {
+  gelbooruInteractiveUntil = Date.now() + 900;
+}
+
+async function waitIfGelbooruInteractive(): Promise<void> {
+  for (;;) {
+    const wait = gelbooruInteractiveUntil - Date.now();
+    if (wait <= 0) return;
+    await sleep(Math.min(wait, 80));
+  }
+}
 
 /** Slow / blocked Gelbooru (no VPN): abort and retry a few times. */
 const GELBOORU_FETCH_TIMEOUT_MS = 12_000;
@@ -367,6 +385,7 @@ export async function fetchGelbooruTagAutocomplete(
   const q = term.trim().toLowerCase();
   if (q.length < 1) return [];
 
+  markGelbooruInteractive();
   await awaitGelbooruSlot();
 
   const params = new URLSearchParams({
@@ -415,7 +434,161 @@ export async function fetchGelbooruTagAutocomplete(
       category: typeof r.category === "string" ? r.category : undefined,
     });
   }
+  if (out.length > 0) {
+    rememberGelbooruNativeTypes(
+      out.map((row) => ({ tag: row.value, category: row.category })),
+    );
+  }
   return out;
+}
+
+const GELBOORU_TAG_INDEX_BATCH = 40;
+const GELBOORU_TAG_INDEX_MAX_BATCHES = 3;
+const GELBOORU_TAG_AUTOCOMPLETE_HYDRATE_CAP = 24;
+
+type GelbooruTagIndexRow = {
+  name?: string;
+  type?: number | string;
+};
+
+export function normalizeGelbooruTagIndex(
+  data: unknown,
+): Array<{ tag: string; category: unknown }> {
+  let rows: GelbooruTagIndexRow[] = [];
+  if (Array.isArray(data)) {
+    rows = data as GelbooruTagIndexRow[];
+  } else if (data && typeof data === "object") {
+    const tag = (data as { tag?: GelbooruTagIndexRow | GelbooruTagIndexRow[] })
+      .tag;
+    if (Array.isArray(tag)) rows = tag;
+    else if (tag && typeof tag === "object") rows = [tag];
+  }
+  const out: Array<{ tag: string; category: unknown }> = [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const name = typeof row.name === "string" ? row.name.trim() : "";
+    if (!name) continue;
+    out.push({ tag: name, category: row.type });
+  }
+  return out;
+}
+
+function isHydrateableBooruTag(tag: string): boolean {
+  if (!tag) return false;
+  if (tag.startsWith("-")) return false;
+  if (tag.includes(":")) return false;
+  return true;
+}
+
+async function fetchGelbooruTagIndexBatch(
+  names: string[],
+  credentials: { userId: string; apiKey: string },
+): Promise<Array<{ tag: string; category: unknown }>> {
+  if (names.length === 0) return [];
+  await waitIfGelbooruInteractive();
+  await awaitGelbooruSlot();
+  const params = new URLSearchParams({
+    page: "dapi",
+    s: "tag",
+    q: "index",
+    json: "1",
+    names: names.join(" "),
+    user_id: credentials.userId,
+    api_key: credentials.apiKey,
+  });
+  const res = await fetchGelbooruResilient(
+    `/api/gelbooru?${params.toString()}`,
+  );
+  if (!res.ok) {
+    throw new Error(`Gelbooru tag index HTTP ${res.status}`);
+  }
+  return normalizeGelbooruTagIndex(await res.json());
+}
+
+async function fetchGelbooruTagCategoriesViaAutocomplete(
+  names: string[],
+): Promise<Array<{ tag: string; category: unknown }>> {
+  const out: Array<{ tag: string; category: unknown }> = [];
+  for (const name of names) {
+    const rows = await fetchGelbooruTagAutocomplete(name, 8);
+    const hit = rows.find((row) => row.value.toLowerCase() === name);
+    if (hit?.category) out.push({ tag: hit.value, category: hit.category });
+  }
+  return out;
+}
+
+/**
+ * Resolve Gelbooru site groups for tags not yet in the native map.
+ * Prefers dapi `names=` when API keys exist. Autocomplete fallback is opt-in —
+ * it shares the Gelbooru rate limit with search and freezes the tag field.
+ */
+let hydrateChain: Promise<boolean> = Promise.resolve(false);
+
+export async function hydrateGelbooruNativeTypes(
+  tags: readonly string[],
+  opts?: { autocompleteFallback?: boolean },
+): Promise<boolean> {
+  const run = hydrateChain.then(
+    () => hydrateGelbooruNativeTypesNow(tags, opts),
+    () => hydrateGelbooruNativeTypesNow(tags, opts),
+  );
+  hydrateChain = run.then(
+    () => false,
+    () => false,
+  );
+  return run;
+}
+
+async function hydrateGelbooruNativeTypesNow(
+  tags: readonly string[],
+  opts?: { autocompleteFallback?: boolean },
+): Promise<boolean> {
+  const native = loadGelbooruNativeMap();
+  const missing: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of tags) {
+    const tag = raw.trim().toLowerCase();
+    if (!isHydrateableBooruTag(tag) || seen.has(tag) || native[tag]) continue;
+    seen.add(tag);
+    missing.push(tag);
+  }
+  if (missing.length === 0) return false;
+
+  const settings = loadMediaSettings();
+  const userId = settings.gelbooruUserId.trim();
+  const apiKey = settings.gelbooruApiKey.trim();
+  const hits: Array<{ tag: string; category: unknown }> = [];
+  const batchLimit = GELBOORU_TAG_INDEX_BATCH * GELBOORU_TAG_INDEX_MAX_BATCHES;
+  const queued = missing.slice(0, batchLimit);
+
+  if (userId && apiKey) {
+    try {
+      for (let i = 0; i < queued.length; i += GELBOORU_TAG_INDEX_BATCH) {
+        if (i > 0) {
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, 0);
+          });
+        }
+        const batch = queued.slice(i, i + GELBOORU_TAG_INDEX_BATCH);
+        hits.push(
+          ...(await fetchGelbooruTagIndexBatch(batch, { userId, apiKey })),
+        );
+      }
+    } catch {
+      hits.length = 0;
+    }
+  }
+
+  if (hits.length === 0 && opts?.autocompleteFallback === true) {
+    hits.push(
+      ...(await fetchGelbooruTagCategoriesViaAutocomplete(
+        queued.slice(0, GELBOORU_TAG_AUTOCOMPLETE_HYDRATE_CAP),
+      )),
+    );
+  }
+
+  if (hits.length === 0) return false;
+  return rememberGelbooruNativeTypes(hits);
 }
 
 /** Fetch posts via Vite proxy. Requires api_key + user_id on every query. */
@@ -435,6 +608,7 @@ export async function fetchGelbooru(
   }
 
   // One page is enough for ≤100 posts; still rate-limit for double-clicks / future paging.
+  markGelbooruInteractive();
   await awaitGelbooruSlot();
 
   const params = new URLSearchParams({

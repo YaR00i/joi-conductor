@@ -16,6 +16,10 @@ import {
   type GelbooruTagSuggest,
 } from "../lib/media";
 import {
+  gelbooruCategoryClassName,
+  parseGelbooruTagCategory,
+} from "../lib/tagTypes";
+import {
   collectFavoriteTagStats,
   listFavoriteRecords,
 } from "../lib/mediaFavorites";
@@ -383,7 +387,9 @@ export function BooruTagInput({
       />
       {open && rows.length > 0 ? (
         <ul id={listId} className="booru-tag-input__list" role="listbox">
-          {rows.map((row, i) => (
+          {rows.map((row, i) => {
+            const gbCat = parseGelbooruTagCategory(row.category);
+            return (
             <li key={row.key} role="option" aria-selected={i === active}>
               <button
                 type="button"
@@ -394,7 +400,13 @@ export function BooruTagInput({
                 }}
                 onMouseEnter={() => setActive(i)}
               >
-                <span className="booru-tag-input__name">{row.label}</span>
+                <span
+                  className={`booru-tag-input__name${
+                    gbCat ? ` ${gelbooruCategoryClassName(gbCat)}` : ""
+                  }`}
+                >
+                  {row.label}
+                </span>
                 <span className="booru-tag-input__meta">
                   {row.fromFavorites ? (
                     <span className="booru-tag-input__fav" title="Из избранного">
@@ -427,7 +439,8 @@ export function BooruTagInput({
                 </span>
               </button>
             </li>
-          ))}
+            );
+          })}
           {loading ? (
             <li className="booru-tag-input__status">Gelbooru…</li>
           ) : null}

@@ -27,6 +27,7 @@ import { mediaTypeEntry } from "./mediaTypeFilter";
 import {
   DEFAULT_MEDIA_SETTINGS,
   fetchGelbooru,
+  hydrateGelbooruNativeTypes,
   loadMediaSettings,
   shuffleMediaItems,
   type MediaItem,
@@ -61,6 +62,13 @@ export async function assembleGelbooruMistressList(
   };
   const rows = await listFavoriteMetadata();
   const taste = buildFavoriteTasteProfile(rows);
+  await hydrateGelbooruNativeTypes(
+    [
+      ...taste.liked.map((row) => row.tag),
+      ...taste.disliked.map((row) => row.tag),
+    ],
+    { autocompleteFallback: false },
+  );
   const liked = tasteTags(taste.liked);
   const disliked = tasteTags(taste.disliked);
   const quotas = assembleQuotas(want, pack.media.assemble);
