@@ -52,7 +52,7 @@
 
 Сайдбар подсвечен при `doujin` и при старом `favorites` (глубокая ссылка на полку Gelbooru). Клик по пункту всегда ведёт в `doujin`.
 
-Ветки: [DOUJIN.md](DOUJIN.md) (nhentai, ридер, прогон). Gelbooru — та же оболочка, локальная полка `mediaFavorites` кормит сессию и магазин.
+Ветки: [DOUJIN.md](DOUJIN.md) (nhentai, ридер, прогон). Gelbooru — та же оболочка, локальная полка `mediaFavorites` кормит сессию и магазин. Несохранённое видео в плеере идёт через `/api/media-proxy` с параллельными Range; сохранённое играет локальным blob. Превью в Electron — с CDN.
 
 ### Мини-игры
 
@@ -68,7 +68,7 @@
 
 На каталоге игр шапка обычная; в Аномалии и редакторе — `tight`, поверх своих тулбаров. Пока запущена конкретная мини-игра (пазл, раннер, …), шапка хаба скрыта — выход в каталог возвращает вкладки.
 
-Play для человека: **Мини-игры → Аномалия** → стадия → Начать. Редактор: **Мини-игры → Ember Editor**. Headless CLI/MCP не ходят через сайдбар — см. [EMBER_AI_HANDOFF.md](EMBER_AI_HANDOFF.md) §2.1.
+Play для человека в JOI: **Мини-игры → Аномалия** → стадия → Начать. Редактор: **Мини-игры → Ember Editor**. Это **frozen Three-shell**: новый play и authoring карт — Godot (`ember-godot`). Headless CLI/MCP не ходят через сайдбар — см. [EMBER_AI_HANDOFF.md](EMBER_AI_HANDOFF.md) §2.1.
 
 ## First-visit briefing
 

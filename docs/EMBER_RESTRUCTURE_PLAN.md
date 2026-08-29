@@ -1,6 +1,8 @@
 # Ember JOI/Three — legacy-план стабилизации и реструктуризации
 
-Статус с 28 августа 2026 года: **maintenance only / пауза после выбора Godot 4**. Этот документ не является продуктовой дорожной картой Ember и не требует последовательного исполнения всех волн. Его применять только для ограниченной поддержки JOI/Three editor и legacy-runtime. Целевой дизайн описан в [`EMBER_JRPG_DESIGN.md`](EMBER_JRPG_DESIGN.md), миграция — в `../../ember-godot/MIGRATION_TEST_PLAN.md`, действующие общие правила — в [`AGENTS.md`](../AGENTS.md).
+Статус с **29 августа 2026**: **пауза**. Ember через Three.js не развиваем; фокус — Godot (`../../ember-godot`) и постепенная миграция. Этот файл — архив ownership монолитов, **не backlog**. Волны 0–4 не начинать и не продолжать без явной команды снять паузу.
+
+Целевой дизайн: [`EMBER_JRPG_DESIGN.md`](EMBER_JRPG_DESIGN.md). Миграция: `../../ember-godot/MIGRATION_TEST_PLAN.md`. Правила: [`AGENTS.md`](../AGENTS.md).
 
 ## 1. Зачем это делаем
 

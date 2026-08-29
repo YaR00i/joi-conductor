@@ -152,6 +152,16 @@ describe("buildRecommendSearchQuery", () => {
     expect(q).toContain("artist:");
     expect(q).toContain("muk");
   });
+
+  it("pairs a starred circle into the recs query", () => {
+    const q = buildRecommendSearchQuery(
+      [{ type: "parody", name: "genshin impact", count: 2 }],
+      [],
+      [{ type: "group", name: "furaipan daimaou" }],
+    );
+    expect(q).toContain("group:");
+    expect(q).toContain("furaipan daimaou");
+  });
 });
 
 describe("recommend plans", () => {
@@ -345,6 +355,17 @@ describe("toggleLovedTag", () => {
     );
     expect(tasteWeight(4, false)).toBe(4);
     expect(tasteWeight(4, true)).toBe(4 * 5 + 15);
+  });
+
+  it("allows starring a circle and ignores language tags", () => {
+    const circled = toggleLovedTag([], {
+      type: "group",
+      name: "Furaipan Daimaou",
+    });
+    expect(circled).toEqual([{ type: "group", name: "furaipan daimaou" }]);
+    expect(
+      toggleLovedTag([], { type: "language", name: "english" }),
+    ).toEqual([]);
   });
 });
 

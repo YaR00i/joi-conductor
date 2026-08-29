@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createFavoriteSaveQueue,
   favoriteSaveItemDetail,
+  favoriteSaveItemFill,
+  favoriteSaveItemPhaseLabel,
   favoriteSaveItemPhaseRu,
+  favoriteSaveJobExclusive,
+  favoriteSaveLiveBarWidth,
   favoriteSaveListsRu,
   formatFavoriteSaveItemLabel,
   formatFavoriteSaveToast,
@@ -169,6 +173,29 @@ describe("favoriteSaveItem copy", () => {
       }),
     ).toBe("качаю в кэш");
   });
+
+  it("shows byte download percent instead of a fake bar", () => {
+    const loading = {
+      id: "v",
+      order: 1,
+      kind: "save" as const,
+      label: "#1 · видео · 1",
+      detail: "1girl",
+      phase: "loading" as const,
+      errorDetail: null,
+      groupId: null,
+      groupLabel: null,
+      percent: 45,
+      loadedBytes: 18 * 1024 * 1024,
+      totalBytes: 40 * 1024 * 1024,
+    };
+    expect(favoriteSaveItemFill(loading)).toBe(45);
+    expect(favoriteSaveItemPhaseLabel(loading)).toBe("45%");
+    expect(favoriteSaveItemDetail(loading)).toBe(
+      "45% · 18.0 МБ / 40.0 МБ · пишу на полку · 1girl",
+    );
+    expect(favoriteSaveLiveBarWidth([loading], 0, 1)).toBe(45);
+  });
 });
 
 describe("groupFavoriteSaveItems", () => {
@@ -216,12 +243,16 @@ describe("groupFavoriteSaveItems", () => {
 });
 
 describe("createFavoriteSaveQueue", () => {
-  it("runs jobs one after another and keeps later clicks", async () => {
+  it("runs two file jobs at once and keeps later clicks", async () => {
     const order: string[] = [];
     const started: string[] = [];
     let releaseA!: () => void;
+    let releaseB!: () => void;
     const gateA = new Promise<void>((resolve) => {
       releaseA = resolve;
+    });
+    const gateB = new Promise<void>((resolve) => {
+      releaseB = resolve;
     });
     const q = createFavoriteSaveQueue({ doneHoldMs: 60_000 });
 
@@ -243,6 +274,7 @@ describe("createFavoriteSaveQueue", () => {
       publicId: "22",
       run: async () => {
         started.push("b");
+        await gateB;
         order.push("b");
       },
     });
@@ -258,23 +290,24 @@ describe("createFavoriteSaveQueue", () => {
     });
 
     await Promise.resolve();
-    expect(started).toEqual(["a"]);
-    expect(q.isBusy("b")).toBe(true);
+    expect(started).toEqual(["a", "b"]);
     expect(q.isBusy("c")).toBe(true);
     expect(q.snapshot().toast).toEqual({
       status: "live",
       kicker: "Очередь",
-      text: "Сохранение 1 / 3",
+      text: "Сохранение 2 / 3",
     });
     expect(q.snapshot().items.map((row) => [row.label, row.phase])).toEqual([
       ["#1 · фото · 11", "loading"],
-      ["#2 · видео · 22", "queued"],
+      ["#2 · видео · 22", "loading"],
       ["#3 · gif · 33", "queued"],
     ]);
 
     releaseA();
+    releaseB();
     await q.flush();
-    expect(order).toEqual(["a", "b", "c"]);
+    expect(order).toHaveLength(3);
+    expect(order).toEqual(expect.arrayContaining(["a", "b", "c"]));
     expect(q.snapshot().toast).toEqual({
       status: "done",
       kicker: "Готово",
@@ -283,6 +316,74 @@ describe("createFavoriteSaveQueue", () => {
     expect(q.isBusy("a")).toBe(false);
     expect(q.snapshot().items.every((row) => row.phase === "ready")).toBe(true);
     expect(q.snapshot().hold?.durationMs).toBe(60_000);
+  });
+
+  it("keeps gallery and remove jobs exclusive with file downloads", async () => {
+    const started: string[] = [];
+    let releaseGallery!: () => void;
+    const gateGallery = new Promise<void>((resolve) => {
+      releaseGallery = resolve;
+    });
+    const q = createFavoriteSaveQueue({ doneHoldMs: 60_000 });
+    q.enqueue({
+      id: "g",
+      kind: "save",
+      mediaKind: "gallery",
+      publicId: "177013",
+      run: async () => {
+        started.push("gallery");
+        await gateGallery;
+      },
+    });
+    q.enqueue({
+      id: "img",
+      kind: "save",
+      mediaKind: "image",
+      publicId: "11",
+      run: async () => {
+        started.push("image");
+      },
+    });
+    await Promise.resolve();
+    expect(started).toEqual(["gallery"]);
+    expect(favoriteSaveJobExclusive({
+      id: "g",
+      kind: "save",
+      mediaKind: "gallery",
+      run: async () => undefined,
+    })).toBe(true);
+    releaseGallery();
+    await q.flush();
+    expect(started).toEqual(["gallery", "image"]);
+  });
+
+  it("records live download percent from the job reporter", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const q = createFavoriteSaveQueue({ doneHoldMs: 60_000 });
+    q.enqueue({
+      id: "v",
+      kind: "save",
+      mediaKind: "video",
+      publicId: "14233292",
+      run: async (report) => {
+        report({
+          percent: 41,
+          loadedBytes: 10 * 1024 * 1024,
+          totalBytes: 25 * 1024 * 1024,
+        });
+        await gate;
+      },
+    });
+    await Promise.resolve();
+    const row = q.snapshot().items[0];
+    expect(row?.percent).toBe(41);
+    expect(row?.loadedBytes).toBe(10 * 1024 * 1024);
+    expect(favoriteSaveItemPhaseLabel(row!)).toBe("41%");
+    release();
+    await q.flush();
   });
 
   it("ignores a second click on the same id while it is queued", async () => {
@@ -327,7 +428,7 @@ describe("createFavoriteSaveQueue", () => {
     expect(q.snapshot().toast).toEqual({
       status: "live",
       kicker: "Кэш",
-      text: "2 списка · 1 / 3",
+      text: "2 списка · 2 / 3",
     });
     expect(q.snapshot().items.map((row) => row.groupId)).toEqual([
       "l1",

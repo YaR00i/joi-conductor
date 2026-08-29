@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   BookmarkIcon,
+  CardSelectButton,
   FavLightbox,
   HeartIcon,
 } from "../../components/FavLightbox";
@@ -28,6 +29,8 @@ type Props = {
   onLoadMore: () => void;
   onToggleSave: (item: MediaItem) => void;
   onOpenLists?: (item: MediaItem) => void;
+  selectedIds?: ReadonlySet<string>;
+  onToggleSelect?: (item: MediaItem) => void;
   onViewIndex?: (index: number) => void;
   onRequestClose?: (close: () => void) => void;
   onHitEnd?: () => void;
@@ -45,6 +48,8 @@ export function GelbooruFeed({
   onLoadMore,
   onToggleSave,
   onOpenLists,
+  selectedIds,
+  onToggleSelect,
   onViewIndex,
   onRequestClose,
   onHitEnd,
@@ -203,13 +208,15 @@ export function GelbooruFeed({
               const saved = savedIds.has(item.id);
               const listed = Boolean(listedIds?.has(item.id));
               const picked = highlightId === item.id;
+              const chosen = Boolean(selectedIds?.has(item.id));
               return (
                 <article
                   key={item.id}
                   className={
                     "fav-masonry__card" +
                     (enterI != null ? " is-enter" : "") +
-                    (picked ? " is-picked" : "")
+                    (picked ? " is-picked" : "") +
+                    (chosen ? " is-selected" : "")
                   }
                   style={
                     enterI != null
@@ -227,8 +234,16 @@ export function GelbooruFeed({
                     <FavMasonryMedia item={item} />
                     <span className="fav-masonry__glow" aria-hidden />
                   </button>
-                  {onOpenLists ? (
+                  {onOpenLists || onToggleSelect ? (
                     <div className="doujin-card__actions">
+                      {onToggleSelect ? (
+                        <CardSelectButton
+                          selected={chosen}
+                          onClick={() => onToggleSelect(item)}
+                        />
+                      ) : null}
+                      {onOpenLists ? (
+                        <>
                       <button
                         type="button"
                         className={"doujin-card__list" + (listed ? " is-on" : "")}
@@ -254,6 +269,8 @@ export function GelbooruFeed({
                       >
                         <HeartIcon filled={saved} />
                       </button>
+                        </>
+                      ) : null}
                     </div>
                   ) : null}
                   <div className="fav-masonry__bar">

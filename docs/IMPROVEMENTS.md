@@ -1,6 +1,6 @@
 # План улучшений
 
-Живой бэклог после волны 1. Ember **в работе**: продуктовый vision — `docs/EMBER_JRPG_DESIGN.md`, технический контракт — `docs/EMBER_AI_HANDOFF.md`. `docs/EMBER_RESTRUCTURE_PLAN.md` оставлен только для ограниченного обслуживания JOI/Three legacy. Мини-игры не трогать, пока явно не скажешь иначе.
+Живой бэклог после волны 1. **Ember в работе в Godot** (`ember-godot`): vision — `docs/EMBER_JRPG_DESIGN.md`, контракт и миграция — `docs/EMBER_AI_HANDOFF.md` §9.2. **JOI/Three play и реструктуризация на паузе** (`docs/EMBER_RESTRUCTURE_PLAN.md` не исполнять). Мини-игры не трогать, пока явно не скажешь иначе.
 
 Источник: рабочий список «На улучшения» + сверка с кодом (август 2026).
 

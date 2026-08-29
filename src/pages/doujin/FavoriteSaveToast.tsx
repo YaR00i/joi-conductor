@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   favoriteSaveItemDetail,
   favoriteSaveItemFill,
-  favoriteSaveItemPhaseRu,
+  favoriteSaveItemPhaseLabel,
+  favoriteSaveLiveBarWidth,
   groupFavoriteSaveItems,
   useFavoriteSaveQueue,
   type FavoriteSaveHold,
@@ -89,9 +90,21 @@ export function FavoriteSaveToast({
   const doneCount = ready + failed;
   const livePct =
     toast.status === "live"
-      ? Math.max(8, Math.round((doneCount / total) * 100))
+      ? Math.max(4, favoriteSaveLiveBarWidth(items, doneCount, total))
       : 100;
-  const stats = `${doneCount}/${total}${failed > 0 ? ` · ⚠${failed}` : ""}`;
+  const loading = items.find((row) => row.phase === "loading");
+  const livePercent =
+    toast.status === "live" && loading?.percent != null
+      ? Math.round(loading.percent)
+      : null;
+  const stats =
+    `${doneCount}/${total}` +
+    (livePercent != null ? ` · ${livePercent}%` : "") +
+    (failed > 0 ? ` · ⚠${failed}` : "");
+  const headText =
+    livePercent != null
+      ? `${toast.text.replace(/[.…]+$/, "")} · ${livePercent}%`
+      : toast.text;
 
   return (
     <div
@@ -117,7 +130,7 @@ export function FavoriteSaveToast({
       >
         <span className="doujin-toast__copy">
           <span className="doujin-toast__kicker">{toast.kicker}</span>
-          <span className="doujin-toast__text">{toast.text}</span>
+          <span className="doujin-toast__text">{headText}</span>
         </span>
         <span className="doujin-toast__stats">{stats}</span>
         <span className="doujin-toast__chevron" aria-hidden>
@@ -173,7 +186,7 @@ export function FavoriteSaveToast({
                           {item.label}
                         </span>
                         <span className="doujin-toast__file-phase">
-                          {favoriteSaveItemPhaseRu(item.phase)}
+                          {favoriteSaveItemPhaseLabel(item)}
                         </span>
                       </div>
                       <div className="doujin-toast__file-track">

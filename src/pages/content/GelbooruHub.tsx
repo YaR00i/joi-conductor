@@ -33,7 +33,6 @@ import {
   ensureMediaCached,
   isMediaCached,
   readCachedMediaBlob,
-  waitForMediaCache,
 } from "../../lib/mediaPreload";
 import {
   DEFAULT_MEDIA_SETTINGS,
@@ -50,7 +49,9 @@ import {
 } from "../../lib/mediaTypeFilter";
 import { BookmarkIcon } from "../../components/FavLightbox";
 import { HubSearchDock } from "../../components/HubSearchDock";
+import { toggleSelectedById } from "../../lib/feedTake";
 import { FavoritesPage } from "../FavoritesPage";
+import { DoujinPager } from "../doujin/DoujinPager";
 import { GelbooruFeed } from "./GelbooruFeed";
 import { GelbooruListPicker } from "./GelbooruListPicker";
 import { GelbooruLists } from "./GelbooruLists";
@@ -60,8 +61,15 @@ import { DoujinReadingRunPrompt } from "../doujin/DoujinReadingRunPrompt";
 
 const PAGE_SIZE = 36;
 
-async function blobForFavoriteSave(item: MediaItem): Promise<Blob | null> {
-  await waitForMediaCache(item.id);
+async function blobForFavoriteSave(
+  item: MediaItem,
+  report?: (progress: {
+    percent: number | null;
+    loadedBytes?: number;
+    totalBytes?: number | null;
+  }) => void,
+): Promise<Blob | null> {
+  await ensureMediaCached(item, report);
   return readCachedMediaBlob(item.id);
 }
 
@@ -103,7 +111,9 @@ export function GelbooruHub({
     item: MediaItem;
     pool: MediaItem[] | null;
     heading?: string;
+    packExact?: boolean;
   } | null>(null);
+  const [selectedItems, setSelectedItems] = useState<MediaItem[]>([]);
   const [queueSize, setQueueSize] = useState<MediaQueueSize>(MEDIA_QUEUE_MIN);
   const [assembleBusy, setAssembleBusy] = useState(false);
   const [assembleError, setAssembleError] = useState<string | null>(null);
@@ -236,6 +246,10 @@ export function GelbooruHub({
     void loadPage(true);
   }, [tab, committed, recsTick, keyed, loadPage]);
 
+  useEffect(() => {
+    setSelectedItems([]);
+  }, [tab, committed, kindFilter, recsTick]);
+
   const onLoadMore = useCallback(() => {
     if (!hasMore || loadingRef.current) return;
     void loadPage(false);
@@ -261,10 +275,13 @@ export function GelbooruHub({
           ? `${item.tags.trim().slice(0, 72).trim()}…`
           : item.tags.trim()
         : undefined,
-      run: async () => {
+      run: async (report) => {
         try {
           if (nextOn) {
-            await addFavoriteFromItem(item, await blobForFavoriteSave(item));
+            await addFavoriteFromItem(
+              item,
+              await blobForFavoriteSave(item, report),
+            );
           } else {
             await removeFavoriteForItem(item);
           }
@@ -302,8 +319,8 @@ export function GelbooruHub({
             : item.tags.trim()
           : undefined,
         group: { id: list.id, label: list.name },
-        run: async () => {
-          await ensureMediaCached(item);
+        run: async (report) => {
+          await ensureMediaCached(item, report);
         },
       })),
     );
@@ -330,9 +347,12 @@ export function GelbooruHub({
             : item.tags.trim()
           : undefined,
         group: { id: `${list.id}:shelf`, label: `${list.name} · полка` },
-        run: async () => {
+        run: async (report) => {
           try {
-            await addFavoriteFromItem(item, await blobForFavoriteSave(item));
+            await addFavoriteFromItem(
+              item,
+              await blobForFavoriteSave(item, report),
+            );
           } catch (err) {
             setSavedIds((prev) => {
               const next = new Set(prev);
@@ -361,10 +381,31 @@ export function GelbooruHub({
     await refreshLists();
   }
 
-  function openFoundPack(pool: MediaItem[]) {
+  function openFoundPack(
+    pool: MediaItem[],
+    opts?: { heading?: string; packExact?: boolean },
+  ) {
     const first = pool[0];
     if (!first) return;
-    setListTarget({ item: first, pool, heading: "Найденное" });
+    setListTarget({
+      item: first,
+      pool,
+      heading:
+        opts?.heading ??
+        (opts?.packExact ? `${pool.length} выбранных` : "Найденное"),
+      packExact: opts?.packExact,
+    });
+  }
+
+  function packFromFeed(pool: MediaItem[], feedHeading?: string) {
+    if (selectedItems.length > 0) {
+      openFoundPack(selectedItems, {
+        packExact: true,
+        heading: `${selectedItems.length} выбранных`,
+      });
+      return;
+    }
+    openFoundPack(pool, feedHeading ? { heading: feedHeading } : undefined);
   }
 
   async function handleCreatePackedList(name: string, pack?: MediaItem[]) {
@@ -395,11 +436,22 @@ export function GelbooruHub({
     }
   }
 
+  const selectedIds = useMemo(
+    () => new Set(selectedItems.map((item) => item.id)),
+    [selectedItems],
+  );
+  const packTitle =
+    selectedItems.length > 0
+      ? `В список: ${selectedItems.length} выбранных`
+      : "В список из найденного";
+  const packDisabled =
+    selectedItems.length === 0 && items.length === 0;
   const picker = listTarget ? (
     <GelbooruListPicker
       item={listTarget.item}
       pool={listTarget.pool}
       heading={listTarget.heading}
+      packExact={listTarget.packExact}
       lists={lists}
       onClose={() => setListTarget(null)}
       onToggle={async (listId) => {
@@ -408,9 +460,14 @@ export function GelbooruHub({
       }}
       onPack={async (listId, pack) => {
         await addManyToGelbooruList(listId, pack);
+        if (listTarget.packExact) setSelectedItems([]);
         await refreshLists();
       }}
-      onCreate={(name, pack) => handleCreatePackedList(name, pack)}
+      onCreate={(name, pack) =>
+        handleCreatePackedList(name, pack).then(() => {
+          if (listTarget.packExact) setSelectedItems([]);
+        })
+      }
     />
   ) : null;
 
@@ -522,8 +579,13 @@ export function GelbooruHub({
           unlocks={unlocks}
           onFavoritesChanged={onFavoritesChanged}
           listedIds={listedIds}
+          selectedIds={selectedIds}
+          onToggleSelect={(item) =>
+            setSelectedItems((prev) => toggleSelectedById(prev, item))
+          }
+          onClearSelection={() => setSelectedItems([])}
           onOpenLists={(item) => setListTarget({ item, pool: null })}
-          onPackFound={openFoundPack}
+          onPackFound={(pool) => packFromFeed(pool, "Избранное")}
           onOpenSearch={
             onTabChange
               ? (query, kind) => {
@@ -583,10 +645,10 @@ export function GelbooruHub({
           <button
             type="button"
             className="gelbooru-hub__icon-btn is-list"
-            disabled={items.length === 0}
-            title="В список из найденного"
-            aria-label="В список из найденного"
-            onClick={() => openFoundPack(items)}
+            disabled={packDisabled}
+            title={packTitle}
+            aria-label={packTitle}
+            onClick={() => packFromFeed(items)}
           >
             <BookmarkIcon filled={false} />
           </button>
@@ -615,6 +677,16 @@ export function GelbooruHub({
                   <MediaKindFilter value={kindFilter} onChange={setKindFilter} />
                   <button
                     type="button"
+                    className="gelbooru-hub__icon-btn is-list"
+                    disabled={packDisabled}
+                    title={packTitle}
+                    aria-label={packTitle}
+                    onClick={() => packFromFeed(items)}
+                  >
+                    <BookmarkIcon filled={false} />
+                  </button>
+                  <button
+                    type="button"
                     className="gelbooru-hub__icon-btn"
                     disabled={loading}
                     title="Обновить связку"
@@ -640,8 +712,23 @@ export function GelbooruHub({
         onLoadMore={onLoadMore}
         onToggleSave={(item) => void toggleSave(item)}
         onOpenLists={(item) => setListTarget({ item, pool: null })}
+        selectedIds={selectedIds}
+        onToggleSelect={(item) =>
+          setSelectedItems((prev) => toggleSelectedById(prev, item))
+        }
         busyIds={favSave.busyIds}
       />
+      {tab === "newest" ? (
+        <DoujinPager
+          layout="tools"
+          page={1}
+          numPages={1}
+          onPage={() => undefined}
+          onPackFound={() => packFromFeed(items)}
+          packDisabled={packDisabled}
+          packTitle={packTitle}
+        />
+      ) : null}
       {picker}
     </div>
   );

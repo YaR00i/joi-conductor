@@ -11,6 +11,12 @@ export type FavoriteSaveGroup = {
   label: string;
 };
 
+export type FavoriteSaveProgress = {
+  percent: number | null;
+  loadedBytes?: number;
+  totalBytes?: number | null;
+};
+
 export type FavoriteSaveJob = {
   id: string;
   kind: FavoriteSaveKind;
@@ -18,7 +24,7 @@ export type FavoriteSaveJob = {
   publicId?: string;
   detail?: string;
   group?: FavoriteSaveGroup;
-  run: () => Promise<void>;
+  run: (report: (progress: FavoriteSaveProgress) => void) => Promise<void>;
 };
 
 export type FavoriteSaveToastState = {
@@ -37,6 +43,9 @@ export type FavoriteSaveItem = {
   errorDetail: string | null;
   groupId: string | null;
   groupLabel: string | null;
+  percent?: number | null;
+  loadedBytes?: number;
+  totalBytes?: number | null;
 };
 
 export type FavoriteSaveHold = {
@@ -88,6 +97,13 @@ export function favoriteSaveMediaKindRu(
   }
 }
 
+/** Nhentai API + unfavorite stay serial; Gelbooru file jobs may overlap. */
+export const FAVORITE_SAVE_DOWNLOAD_CONCURRENCY = 2;
+
+export function favoriteSaveJobExclusive(job: FavoriteSaveJob): boolean {
+  return job.kind === "remove" || job.mediaKind === "gallery";
+}
+
 export function formatFavoriteSaveItemLabel(input: {
   order: number;
   mediaKind: FavoriteSaveMediaKind;
@@ -116,6 +132,13 @@ export function favoriteSaveItemPhaseRu(
   }
 }
 
+export function favoriteSaveItemPhaseLabel(item: FavoriteSaveItem): string {
+  if (item.phase === "loading" && item.percent != null) {
+    return `${Math.max(0, Math.min(100, Math.round(item.percent)))}%`;
+  }
+  return favoriteSaveItemPhaseRu(item.phase);
+}
+
 export function favoriteSaveItemFill(item: FavoriteSaveItem): number {
   switch (item.phase) {
     case "ready":
@@ -123,7 +146,10 @@ export function favoriteSaveItemFill(item: FavoriteSaveItem): number {
     case "error":
       return 100;
     case "loading":
-      return 42;
+      if (item.percent != null) {
+        return Math.max(4, Math.min(99, Math.round(item.percent)));
+      }
+      return (item.loadedBytes ?? 0) > 0 ? 12 : 4;
     case "queued":
       return 0;
     default: {
@@ -133,11 +159,52 @@ export function favoriteSaveItemFill(item: FavoriteSaveItem): number {
   }
 }
 
+export function favoriteSaveLiveBarWidth(
+  items: readonly FavoriteSaveItem[],
+  doneCount: number,
+  total: number,
+): number {
+  const cap = Math.max(1, total);
+  const loading = items.find((row) => row.phase === "loading");
+  const frac =
+    loading?.percent != null
+      ? Math.max(0, Math.min(100, loading.percent)) / 100
+      : 0;
+  return Math.max(
+    0,
+    Math.min(100, Math.round(((doneCount + frac) / cap) * 100)),
+  );
+}
+
+function formatSaveBytes(n: number): string {
+  if (!Number.isFinite(n) || n < 0) return "";
+  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} МБ`;
+  if (n >= 1024) return `${Math.round(n / 1024)} КБ`;
+  return `${Math.round(n)} Б`;
+}
+
 export function favoriteSaveItemDetail(item: FavoriteSaveItem): string {
   const status = favoriteSaveItemStatusDetail(item);
   const extra = item.detail?.trim();
-  if (item.phase === "error" || !extra) return status;
-  return `${status} · ${extra}`;
+  if (item.phase === "error" || item.phase === "queued" || item.phase === "ready") {
+    if (item.phase === "error" || !extra) return status;
+    return `${status} · ${extra}`;
+  }
+  const parts: string[] = [];
+  if (item.percent != null) {
+    parts.push(`${Math.max(0, Math.min(100, Math.round(item.percent)))}%`);
+  }
+  if ((item.loadedBytes ?? 0) > 0) {
+    const loaded = formatSaveBytes(item.loadedBytes ?? 0);
+    const total =
+      item.totalBytes != null && item.totalBytes > 0
+        ? formatSaveBytes(item.totalBytes)
+        : "";
+    parts.push(total ? `${loaded} / ${total}` : loaded);
+  }
+  parts.push(status);
+  if (extra) parts.push(extra);
+  return parts.join(" · ");
 }
 
 function favoriteSaveItemStatusDetail(item: FavoriteSaveItem): string {
@@ -377,7 +444,9 @@ export function createFavoriteSaveQueue(opts?: {
   const jobs: FavoriteSaveJob[] = [];
   const items: FavoriteSaveItem[] = [];
   const busyIds = new Set<string>();
-  let runningId: string | null = null;
+  const runningIds = new Set<string>();
+  const runningExclusive = new Set<string>();
+  const inflight = new Set<Promise<void>>();
   let pumping = false;
   let disposed = false;
   let holdPaused = false;
@@ -430,7 +499,7 @@ export function createFavoriteSaveQueue(opts?: {
   function snapshot(): FavoriteSaveSnapshot {
     return {
       busyIds: new Set(busyIds),
-      pending: jobs.length + (runningId ? 1 : 0),
+      pending: jobs.length + runningIds.size,
       batch,
       ready: savedOk + removedOk + cachedOk,
       failed,
@@ -440,12 +509,19 @@ export function createFavoriteSaveQueue(opts?: {
     };
   }
 
+  function liveCurrent(): number {
+    return Math.max(
+      1,
+      savedOk + removedOk + cachedOk + failed + runningIds.size,
+    );
+  }
+
   function liveToast(kind: FavoriteSaveKind): FavoriteSaveToastState | null {
     return formatFavoriteSaveToast({
       phase: "live",
       kind,
       batch,
-      current: savedOk + removedOk + cachedOk + failed + 1,
+      current: liveCurrent(),
       savedOk,
       removedOk,
       cachedOk,
@@ -480,12 +556,20 @@ export function createFavoriteSaveQueue(opts?: {
 
   function patchItem(
     id: string,
-    patch: Partial<Pick<FavoriteSaveItem, "phase" | "errorDetail">>,
+    patch: Partial<
+      Pick<
+        FavoriteSaveItem,
+        "phase" | "errorDetail" | "percent" | "loadedBytes" | "totalBytes"
+      >
+    >,
   ): void {
     const row = items.find((item) => item.id === id);
     if (!row) return;
     if (patch.phase) row.phase = patch.phase;
     if (patch.errorDetail !== undefined) row.errorDetail = patch.errorDetail;
+    if (patch.percent !== undefined) row.percent = patch.percent;
+    if (patch.loadedBytes !== undefined) row.loadedBytes = patch.loadedBytes;
+    if (patch.totalBytes !== undefined) row.totalBytes = patch.totalBytes;
   }
 
   function scheduleHold(): void {
@@ -501,7 +585,7 @@ export function createFavoriteSaveQueue(opts?: {
     holdStartedAt = Date.now();
     holdTimer = timers.setTimeout(() => {
       holdTimer = null;
-      if (disposed || holdPaused || jobs.length > 0 || runningId) return;
+      if (disposed || holdPaused || jobs.length > 0 || runningIds.size > 0) return;
       toast = null;
       holdStartedAt = 0;
       resetBatch();
@@ -512,7 +596,7 @@ export function createFavoriteSaveQueue(opts?: {
 
   function dismissToast(): void {
     if (disposed) return;
-    if (jobs.length > 0 || runningId) return;
+    if (jobs.length > 0 || runningIds.size > 0) return;
     clearHoldState();
     toast = null;
     resetBatch();
@@ -527,45 +611,116 @@ export function createFavoriteSaveQueue(opts?: {
       clearHold();
       return;
     }
-    if (toast && toast.status !== "live" && jobs.length === 0 && !runningId) {
+    if (toast && toast.status !== "live" && jobs.length === 0 && runningIds.size === 0) {
       scheduleHold();
+    }
+  }
+
+  function canStart(job: FavoriteSaveJob): boolean {
+    if (disposed) return false;
+    if (runningExclusive.size > 0) return false;
+    if (favoriteSaveJobExclusive(job)) return runningIds.size === 0;
+    return runningIds.size < FAVORITE_SAVE_DOWNLOAD_CONCURRENCY;
+  }
+
+  async function runOne(job: FavoriteSaveJob): Promise<void> {
+    if (disposed) return;
+    let lastProgressAt = 0;
+    patchItem(job.id, {
+      phase: "loading",
+      percent: null,
+      loadedBytes: 0,
+      totalBytes: null,
+    });
+    toast = liveToast(job.kind);
+    emit();
+    try {
+      await job.run((progress) => {
+        if (disposed) return;
+        const row = items.find((item) => item.id === job.id);
+        if (!row || row.phase !== "loading") return;
+        const pct =
+          progress.percent == null
+            ? null
+            : Math.max(0, Math.min(99, Math.round(progress.percent)));
+        const loaded = progress.loadedBytes ?? row.loadedBytes ?? 0;
+        const total =
+          progress.totalBytes === undefined
+            ? (row.totalBytes ?? null)
+            : progress.totalBytes;
+        const pctChanged = row.percent !== pct;
+        const now = Date.now();
+        row.percent = pct;
+        row.loadedBytes = loaded;
+        row.totalBytes = total;
+        if (!pctChanged && now - lastProgressAt < 150) return;
+        lastProgressAt = now;
+        emit();
+      });
+      if (disposed) return;
+      if (job.kind === "save") savedOk += 1;
+      else if (job.kind === "remove") removedOk += 1;
+      else if (job.kind === "cache") cachedOk += 1;
+      else {
+        const _never: never = job.kind;
+        void _never;
+      }
+      patchItem(job.id, {
+        phase: "ready",
+        percent: 100,
+      });
+    } catch (err) {
+      if (disposed) return;
+      failed += 1;
+      lastError = errorMessage(err);
+      patchItem(job.id, { phase: "error", errorDetail: lastError });
+    } finally {
+      busyIds.delete(job.id);
+    }
+  }
+
+  function startJob(job: FavoriteSaveJob): void {
+    runningIds.add(job.id);
+    if (favoriteSaveJobExclusive(job)) runningExclusive.add(job.id);
+    let p: Promise<void>;
+    p = runOne(job).finally(() => {
+      runningIds.delete(job.id);
+      runningExclusive.delete(job.id);
+      inflight.delete(p);
+    });
+    inflight.add(p);
+  }
+
+  function fillSlots(): void {
+    while (jobs.length > 0 && !disposed) {
+      const next = jobs[0]!;
+      if (!canStart(next)) break;
+      startJob(jobs.shift()!);
+    }
+  }
+
+  function kickPump(): void {
+    fillSlots();
+    if (!pumping && (jobs.length > 0 || runningIds.size > 0)) {
+      pumping = true;
+      pumpTail = pumpLoop();
     }
   }
 
   async function pumpLoop(): Promise<void> {
     try {
-      while (jobs.length > 0 && !disposed) {
-        const job = jobs.shift()!;
-        runningId = job.id;
-        patchItem(job.id, { phase: "loading" });
-        toast = liveToast(job.kind);
-        emit();
-        try {
-          await job.run();
-          if (job.kind === "save") savedOk += 1;
-          else if (job.kind === "remove") removedOk += 1;
-          else if (job.kind === "cache") cachedOk += 1;
-          else {
-            const _never: never = job.kind;
-            void _never;
-          }
-          patchItem(job.id, { phase: "ready" });
-        } catch (err) {
-          failed += 1;
-          lastError = errorMessage(err);
-          patchItem(job.id, { phase: "error", errorDetail: lastError });
-        } finally {
-          busyIds.delete(job.id);
-          runningId = null;
-        }
+      while (!disposed && (jobs.length > 0 || runningIds.size > 0)) {
+        fillSlots();
+        if (inflight.size === 0) break;
+        await Promise.race([...inflight]);
       }
-      if (disposed || jobs.length > 0) return;
+      if (disposed || jobs.length > 0 || runningIds.size > 0) return;
       toast = finishToast();
       emit();
       opts?.onIdle?.();
       scheduleHold();
     } finally {
-      if (!disposed && jobs.length > 0) {
+      if (!disposed && (jobs.length > 0 || runningIds.size > 0)) {
         pumpTail = pumpLoop();
         await pumpTail;
       } else {
@@ -578,7 +733,7 @@ export function createFavoriteSaveQueue(opts?: {
     if (disposed) return false;
     if (busyIds.has(job.id)) return false;
     clearHoldState();
-    if (!pumping && jobs.length === 0 && runningId == null) {
+    if (!pumping && jobs.length === 0 && runningIds.size === 0) {
       resetBatch();
     }
     jobs.push(job);
@@ -594,17 +749,17 @@ export function createFavoriteSaveQueue(opts?: {
         publicId: job.publicId?.trim() || job.id,
       }),
       detail: job.detail?.trim() || null,
-      phase: runningId || pumping ? "queued" : "loading",
+      phase: runningIds.size > 0 || pumping ? "queued" : "loading",
       errorDetail: null,
       groupId: job.group?.id.trim() || null,
       groupLabel: job.group?.label.trim() || null,
+      percent: null,
+      loadedBytes: 0,
+      totalBytes: null,
     });
     toast = liveToast(job.kind);
     emit();
-    if (!pumping) {
-      pumping = true;
-      pumpTail = pumpLoop();
-    }
+    kickPump();
     return true;
   }
 
@@ -625,7 +780,9 @@ export function createFavoriteSaveQueue(opts?: {
     jobs.length = 0;
     items.length = 0;
     busyIds.clear();
-    runningId = null;
+    runningIds.clear();
+    runningExclusive.clear();
+    inflight.clear();
     clearHoldState();
   }
 

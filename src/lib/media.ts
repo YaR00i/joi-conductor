@@ -214,12 +214,15 @@ export function saveMediaLibrary(
 }
 
 function guessKindFromName(url: string): MediaKind {
+  if (mediaUrlLooksLikeVideo(url)) return "video";
   const u = url.toLowerCase();
-  if (u.includes(".mp4") || u.includes(".webm") || u.includes(".mkv")) {
-    return "video";
-  }
   if (u.includes(".gif")) return "gif";
   return "image";
+}
+
+export function mediaUrlLooksLikeVideo(url: string): boolean {
+  const u = url.trim().toLowerCase();
+  return u.includes(".mp4") || u.includes(".webm") || u.includes(".mkv");
 }
 
 /** File extension plus Gelbooru tags (`animated` vs `video`). */
@@ -941,25 +944,97 @@ export function reshuffleMediaCycle(
   return shuffled;
 }
 
-/** Remote booru URLs → same-origin proxy (fixes hotlink / blank stage). */
-export function displayMediaUrl(item: MediaItem): string {
-  if (item.source === "local" || item.source === "favorites") return item.url;
-  if (item.url.startsWith("blob:") || item.url.startsWith("data:")) {
-    return item.url;
-  }
-  if (item.url.startsWith("/")) return item.url;
-  return `/api/media-proxy?url=${encodeURIComponent(item.url)}`;
+export function isDesktopMediaShell(): boolean {
+  return (
+    typeof window !== "undefined" && Boolean(window.joiDesktop?.isDesktop)
+  );
 }
 
-function isRemoteGelbooruStill(item: MediaItem): boolean {
-  if (item.kind === "video") return false;
+function isHttpRemoteUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url);
+}
+
+/** XHR/fetch must stay same-origin: CDN CORS blocks renderer → gelbooru/nhentai. */
+export function proxiedRemoteMediaUrl(url: string): string {
+  const u = url.trim();
+  if (!u) return u;
+  if (u.startsWith("blob:") || u.startsWith("data:") || u.startsWith("/")) {
+    return u;
+  }
+  if (!isHttpRemoteUrl(u)) return u;
+  return `/api/media-proxy?url=${encodeURIComponent(u)}`;
+}
+
+/**
+ * `<img>` / `<video>` src. Electron talks to the CDN (Referer in main);
+ * Vite-in-browser still goes through the proxy.
+ */
+export function displayRemoteMediaUrl(url: string): string {
+  const u = url.trim();
+  if (!u) return u;
+  if (u.startsWith("blob:") || u.startsWith("data:") || u.startsWith("/")) {
+    return u;
+  }
+  if (!isHttpRemoteUrl(u)) return u;
+  if (isDesktopMediaShell()) return u;
+  return proxiedRemoteMediaUrl(u);
+}
+
+export function displayMediaUrl(item: MediaItem): string {
+  if (item.source === "local" || item.source === "favorites") return item.url;
+  // Videos always go through the proxy: Node fills a wide Range with several
+  // CDN connections. Direct CDN is one TCP stream and buffers like the site.
+  if (item.kind === "video") return proxiedRemoteMediaUrl(item.url);
+  return displayRemoteMediaUrl(item.url);
+}
+
+/** Always proxy remote HTTP so save/cache XHR is same-origin. */
+export function downloadMediaUrl(item: MediaItem): string {
+  if (item.source === "local" || item.source === "favorites") return item.url;
+  return proxiedRemoteMediaUrl(item.url);
+}
+
+/**
+ * Remote videos play as a stream (Range). Do not wait for a full RAM blob —
+ * originals are often hundreds of MB and the old XHR path timed out and
+ * retried for minutes.
+ */
+export function mediaStreamsWithoutCache(item: MediaItem): boolean {
+  if (item.kind !== "video") return false;
   if (item.source === "local" || item.source === "favorites") return false;
   if (item.url.startsWith("blob:") || item.url.startsWith("data:")) return false;
   return true;
 }
 
+function isRemoteBooruCard(item: MediaItem): boolean {
+  if (item.source === "local" || item.source === "favorites") return false;
+  if (item.url.startsWith("blob:") || item.url.startsWith("data:")) return false;
+  return true;
+}
+
+/**
+ * Still frame for a masonry card. Video posts use Gelbooru `preview_url`
+ * (jpeg); the original webm/mp4 stays off the wall.
+ */
+export function masonryStillUrl(item: MediaItem): string | null {
+  for (const raw of [item.previewUrl, item.sampleUrl]) {
+    const url = raw?.trim();
+    if (!url || mediaUrlLooksLikeVideo(url)) continue;
+    return url;
+  }
+  if (item.kind === "video") return null;
+  const url = item.url.trim();
+  if (!url || mediaUrlLooksLikeVideo(url)) return null;
+  return url;
+}
+
 /** Tiny preview for the first paint of a masonry card. */
 export function masonryPreviewSrc(item: MediaItem): string {
+  const still = masonryStillUrl(item);
+  if (still) {
+    return displayMediaUrl({ ...item, kind: "image", url: still });
+  }
+  if (item.kind === "video") return "";
   return displayMediaUrl({
     ...item,
     url: item.previewUrl || item.sampleUrl || item.url,
@@ -968,15 +1043,15 @@ export function masonryPreviewSrc(item: MediaItem): string {
 
 /**
  * Sharper wall source (Gelbooru sample). Null when preview is already best
- * or when upgrading would pull the original file.
+ * or when upgrading would pull a video original.
  */
 export function masonryUpgradeSrc(item: MediaItem): string | null {
-  if (!isRemoteGelbooruStill(item)) return null;
+  if (!isRemoteBooruCard(item)) return null;
   const hi = item.sampleUrl?.trim();
-  if (!hi) return null;
+  if (!hi || mediaUrlLooksLikeVideo(hi)) return null;
   const lo = (item.previewUrl || hi).trim();
   if (hi === lo) return null;
-  return displayMediaUrl({ ...item, url: hi });
+  return displayMediaUrl({ ...item, kind: "image", url: hi });
 }
 
 /** How long to keep a slide on screen / whether video should HTML-loop. */

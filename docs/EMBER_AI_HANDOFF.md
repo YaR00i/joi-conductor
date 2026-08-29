@@ -1,18 +1,22 @@
 # Ember — инструкция и handoff для ИИ
 
-Актуально на 25 августа 2026 года. Этот документ — рабочий контекст для Cursor/Codex при продолжении разработки Ember. Он описывает не только существующий код, но и намерение системы: чего добивались, какие решения уже приняты и куда двигаться дальше.
+Актуально на **29 августа 2026**. Этот документ — рабочий контекст для Cursor/Codex. Он описывает существующий код, принятые решения и куда двигаться дальше.
 
-**AI-агенты: механики (телепорт, зоны, ходьба, камера, тайлы, интерьеры, растительность, editor round-trip) проверять на стадии `agent_sandbox` / «Песочница агента». Не использовать арену `hu_tao_p1` и двор `hu_tao_yard` — там волны бьют по HP до того, как агент дойдёт до пада.**
+**Статус:** Ember через **Three.js приостановлен**. Не развивать JOI play (`EmberThreeWorld`), World Editor viewport, crowd, atlas и свет в `src/game/three`. **Фокус — Godot 4** (sibling `../ember-godot`) и постепенная миграция: `.tscn` после импорта, тот же `content/ember`. Приёмка — `../ember-godot/MIGRATION_TEST_PLAN.md`. Нижележащие §0–§8 и §9.1 — frozen контракт legacy, не backlog фич.
 
-Для задач Ember этот handoff имеет приоритет над старой пометкой «Ember не трогаем» в общем `docs/IMPROVEMENTS.md`: пользователь явно продолжает разработку Ember.
+**AI-агенты:** продуктовые механики проверять в Godot `agent_sandbox`. JOI `ember-agent` / MCP — сверка пака. Не использовать арену `hu_tao_p1` и двор `hu_tao_yard`. Не водить WASD в Chromium.
 
-**Целевой продуктовый vision:** [`EMBER_JRPG_DESIGN.md`](EMBER_JRPG_DESIGN.md). Это цветастая top-down party JRPG с графом зон, пошаговой стихийной боёвкой, спутниками, отношениями и сюжетной романтикой. Исследованные официальные референсы и границы заимствования находятся в [`EMBER_JRPG_REFERENCES.md`](EMBER_JRPG_REFERENCES.md). Vampire Survivors-подобный Arena/Anomaly снят с продуктового направления; его runtime — legacy-совместимость, а не будущий режим. GDD не разрешает напрямую менять schema: открытые боевые и нарративные решения сначала проходят D0/D1-прототип.
+Для задач Ember этот handoff имеет приоритет над старой пометкой «Ember не трогаем» в `docs/IMPROVEMENTS.md`. Three-пауза имеет приоритет над волнами в `EMBER_RESTRUCTURE_PLAN.md`.
 
-**Перед любой правкой проекта прочитать корневой [`AGENTS.md`](../AGENTS.md). Перед декомпозицией или добавлением подсистемы также прочитать [`EMBER_RESTRUCTURE_PLAN.md`](EMBER_RESTRUCTURE_PLAN.md).** Эти документы запрещают параллельные `V2/New`-реализации, рост legacy-монолитов и копирование общей математики между editor, preview и runtime.
+**Целевой продуктовый vision:** [`EMBER_JRPG_DESIGN.md`](EMBER_JRPG_DESIGN.md). Это цветастая top-down party JRPG с графом зон, пошаговой стихийной боёвкой, спутниками, отношениями и сюжетной романтикой. Исследованные официальные референсы и границы заимствования находятся в [`EMBER_JRPG_REFERENCES.md`](EMBER_JRPG_REFERENCES.md). Vampire Survivors-подобный Arena/Anomaly снят с продуктового направления; его JOI/Three runtime — frozen legacy, а не будущий режим. GDD не разрешает напрямую менять schema: открытые боевые и нарративные решения сначала проходят D0/D1-прототип.
 
-## 0. Текущий контракт crowd-навигации — читать перед изменением AI
+**Перед любой правкой проекта прочитать корневой [`AGENTS.md`](../AGENTS.md).** Новые системы — в Godot. JOI pack + voxel sculptor остаются writer'ами моделей. `EMBER_RESTRUCTURE_PLAN.md` не исполнять.
 
-С 25 августа 2026 года источником правды для перемещения большой толпы является **baked height-surface grid**, а не старые плоские этажи и не специальные маршруты для отдельных лестниц.
+## 0. Frozen контракт crowd (JOI/Three) — не развивать
+
+С 29 августа 2026 crowd/Three на паузе. Ниже — как было; не расширять bake/flow в JOI. Продуктовое движение — Godot.
+
+С 25 августа 2026 года источником правды для перемещения большой толпы в legacy Three являлся **baked height-surface grid**, а не старые плоские этажи и не специальные маршруты для отдельных лестниц.
 
 - `enemyCrowdOpenField.ts` при создании runtime запекает карту с разрешением `2×2` навигационные ячейки на тайл. Для `hu_tao_yard` это `96×96 = 9216` ячеек. В ячейке хранятся высота центра и высоты четырёх границ.
 - Высота берётся через общий `navigationSurfaceElevAtWorld`: terrain, ramp и physical voxel supports видны AI так же, как игроку. Нельзя вводить отдельную «лестничную» геометрию, не совпадающую с физикой игрока.
@@ -27,22 +31,24 @@
 
 ## 1. Что такое Ember
 
-Ember — встроенная в JOI Conductor игра и редактор контента с кубичной/воксельной стилистикой.
+Целевая игра — Godot 4 (`../ember-godot`). JOI Conductor держит пак `content/ember` и voxel-скульптор; встроенные вкладки Аномалия / Ember Editor — **приостановленный Three-shell**.
 
 Основные игровые направления:
 
-1. Исследование объёмных карт: прогулка, поиск путей, головоломки, интерактивные объекты, триггеры, события и сюжетные зоны.
-2. Legacy Arena/Anomaly: существующие карты с ордами, автоматическими атаками, опытом и сундуками остаются только для совместимости и регрессионных проверок. Новый контент и продуктовые системы для этого режима не планируются.
-3. Редактор должен позволять собирать оба типа карт без правки кода.
+1. Исследование объёмных карт: прогулка, поиск путей, головоломки, интерактивные объекты, триггеры, события и сюжетные зоны — **в Godot**.
+2. Legacy Arena/Anomaly в JOI: только совместимость; новый контент для этого режима не планируется.
+3. Авторство карт после импорта — Godot `.tscn`; voxel-модели по-прежнему пишутся в JOI.
 
-Источник правды режима — `EmberMap.playProfile` (`arena` | `explore`, omit = `arena`). Это один Three.js play loop (`EmberThreeWorld`), не два движка. Богатые локальные умбры деревни не являются целью этого loop: см. §9.2 (Godot sibling). В play мышь крутит камеру с pointer lock с клика «Начать». Риг — `EmberMap.camera` (`emberCamera.ts`): FOV, дистанция, polar, yaw, lookHeight, near/far, pitch lock. Omit = iso JRPG (FOV 40°, polar 0.95, dist tile×7.5). Встроенные пресеты Iso / Ближе / Высоко / Широкий (FOV 60°). Пользовательские — `pack.cameraPresets` (`cameras/registry.json`, id `cam_*`): **все карты** или `mapId` только этой карты. Dock Камера и пауза play сохраняют в реестр; слайдеры play по-прежнему сессия и карту не пишут. Esc открывает меню паузы (курсор виден) с теми же слайдерами камеры (сессия, карту не пишет). Alt-tab / другое окно / скрытая вкладка тоже открывают паузу (`playBackgroundShouldPause`); сами не снимают. Chromium после Esc ~1.25 с отвергает `requestPointerLock` даже с клика, поэтому «Продолжить» активна после этой паузы и берёт lock с жеста. Пока lock нет, Windows ClipCursor по HWND окна + SetCursorPos в центр (как в играх): курсор не уходит на второй монитор и камера не упирается в край. Не открывать меню на каждый `pointerlockchange`/`pointerlockerror`. ЛКМ не атакует. Explore грузит всю карту до `api.ready` и не пересобирает свет при смене чанка.
+Источник правды режима в паке — `EmberMap.playProfile` (`arena` | `explore`, omit = `arena`). **JOI Three play loop (`EmberThreeWorld`) заморожен**, не развивать и не плодить второй Three-движок. Богатые локальные умбры — §9.2 (Godot).
+
+Frozen JOI play (не backlog): мышь крутит камеру с pointer lock с клика «Начать». Риг — `EmberMap.camera` (`emberCamera.ts`): FOV, дистанция, polar, yaw, lookHeight, near/far, pitch lock. Omit = iso JRPG (FOV 40°, polar 0.95, dist tile×7.5). Встроенные пресеты Iso / Ближе / Высоко / Широкий (FOV 60°). Пользовательские — `pack.cameraPresets` (`cameras/registry.json`, id `cam_*`): **все карты** или `mapId` только этой карты. Dock Камера и пауза play сохраняют в реестр; слайдеры play по-прежнему сессия и карту не пишут. Esc открывает меню паузы (курсор виден) с теми же слайдерами камеры (сессия, карту не пишет). Alt-tab / другое окно / скрытая вкладка тоже открывают паузу (`playBackgroundShouldPause`); сами не снимают. Chromium после Esc ~1.25 с отвергает `requestPointerLock` даже с клика, поэтому «Продолжить» активна после этой паузы и берёт lock с жеста. Пока lock нет, Windows ClipCursor по HWND окна + SetCursorPos в центр (как в играх): курсор не уходит на второй монитор и камера не упирается в край. Не открывать меню на каждый `pointerlockchange`/`pointerlockerror`. ЛКМ не атакует. Explore грузит всю карту до `api.ready` и не пересобирает свет при смене чанка.
 
 - **Арена** (в т.ч. существующий `hu_tao_yard` без поля): волны из spawn table, F4/Shift+F4 орда, enemy LOD/crowd, мало PointLight cube-shadow, геометрия может быть простой.
 - **Исследование** (деревня / JRPG): орда и F4 выключены; bake-солнце, уличные фонари (cube только у ближайших), окна = emissive fill без cube, стоячие/гуляющие NPC (кап 24, без боя). Диалоги и лавка висят на объектах (`talk` / `shop` / `quest_marker`), не на регионах NPC.
 
 Бюджеты профиля: `resolvePlayProfileBudget` в `renderBudget.ts`. Stage не дублирует профиль: если stage ссылается на explore-карту, волны просто не идут.
 
-Главная инженерная цель: не набор независимых редакторов и специальных случаев, а единый надёжный «скелет мира», похожий по понятиям на Unity/Blender:
+Главная инженерная цель сейчас — Godot-скелет мира (сцена, Inspect, один owner на систему). JOI Three editor не наращивать. Понятия ниже относятся к паку и к Godot, не к новым Three-системам:
 
 - Scene и иерархия объектов;
 - GameObject/WorldObject;
@@ -61,11 +67,15 @@ Ember — встроенная в JOI Conductor игра и редактор к�
 - `src/game/index.ts` — публичный barrel API Ember.
 - `src/game/bridge/events.ts` — минимальный мост runtime → React (`hud`, loot, result, event, toast).
 
-### Активный игровой runtime
+### JOI/Three runtime — пауза
+
+Не развивать. Справка для hotfix и сверки с Godot:
 
 - `src/game/three/createEmberThreeGame.ts` — фабрика Three.js runtime.
-- `src/game/three/EmberThreeWorld.ts` — главный runtime мира, движения, боя, камеры, streaming, света и рендера.
-- `src/game/phaser/` — legacy-реализация. Использовать только для сверки старого поведения. Новые системы не дублировать туда без отдельного решения о миграции.
+- `src/game/three/EmberThreeWorld.ts` — бывший play loop.
+- `src/game/phaser/` — ещё более старый legacy. Не дублировать системы ни туда, ни в Three.
+
+Продуктовый play и authoring карт — `../ember-godot`.
 
 ### Главный редактор карты
 
@@ -292,7 +302,9 @@ Preview должен показывать будущий объект в мес�
 
 Нельзя возвращать проверку вида «в клетке есть solid → движение запрещено» без учёта вертикального span.
 
-## 8. Three.js render/runtime
+## 8. Three.js render/runtime (frozen)
+
+Не расширять. Ниже — как было на момент паузы 29 августа 2026, для сверки с Godot.
 
 ### Terrain и ресурсы
 
@@ -464,9 +476,9 @@ Ember сейчас на стоковом MeshToon + `USE_SHADOWMAP`: кажды�
 
 **Заморозка (25 августа 2026).** Волны A–E закрыты. В JOI больше не расширять atlas (не поднимать K, не возвращать `WebGLShadowMap.render`, не чинить «каждый фонарь как URP»). Fill ламп не резать. Срез механик — `agent_sandbox`. Богатые умбры деревни проверяются **вне** этого репо.
 
-## 9.2 Выход в Godot 4 — sibling, не второй runtime в JOI
+## 9.2 Godot 4 — активный runtime и постепенная миграция
 
-Картинка «много локальных умбр + эффекты» не является целью Three MeshToon. Sibling-проект рядом с JOI: `../ember-godot` (Godot 4 Forward+). **Правда карты — Godot `.tscn` / `res://prefabs/voxels/*.tscn`; правда voxel-модели — существующая пара `.vox` + `.json` в JOI pack.** Godot-prefab/mesh является производным cache, а не вторым voxel-форматом. Полный импорт placements/terrain из JOI односторонний; меню **Ember: Reimport map from pack…** затирает сцену и требует подтверждения. Оси: MagicaVoxel Z-up → Ember/Godot Y-up, `ember(x,y,z) = vox(x,z,y)`. Лампа: Omni в центроиде emissive-вокселей, ребёнок пропа; камень кастит, glow-воксели окон — нет. Godot toon shader оставляет штатный view-space `LIGHT_VERTEX` без записи: повторный `MODEL_MATRIX → world → VIEW_MATRIX` давал precision drift и частую shadow-acne «черепицу» на больших поверхностях. `voxelSnapLight` остаётся Three-only настройкой вида и в Godot не импортируется. Toon-ступени применяются только к directional-свету; локальные Omni используют плавную `N·L` ramp (`Map.lamp_softness`, default 1), иначе каждый PointLight рисует концентрические кольца даже при выключенных тенях. Луна: `moon_energy(...)`; PSSM и atlas на инспекторе `Map` (по умолчанию 4 split + 4096). Omni fill все лампы; cube-тени — ближайшие `lantern` (`omni_shadow_count`, гистерезис, в редакторе по явному preview-флагу), `ShadowBody` слой 2. Дальность камеры — `Map.camera_far` (по умолчанию 5000). Play: WASD на `scenes/fan_town.tscn` / `scenes/agent_sandbox.tscn` (не `hu_tao_yard` / `hu_tao_p1`, не Chromium). В joi-conductor не заводить второй renderer / `*ShadowV2` / Godot-bridge.
+Three в JOI на паузе. Продуктовая разработка — sibling `../ember-godot` (Godot 4 Forward+), не второй renderer внутри joi-conductor. **Правда карты — Godot `.tscn` / `res://prefabs/voxels/*.tscn`; правда voxel-модели — пара `.vox` + `.json` в JOI pack.** Godot-prefab/mesh является производным cache, а не вторым voxel-форматом. Полный импорт placements/terrain из JOI односторонний; меню **Ember: Reimport map from pack…** затирает сцену и требует подтверждения. Оси: MagicaVoxel Z-up → Ember/Godot Y-up, `ember(x,y,z) = vox(x,z,y)`. Лампа: Omni в центроиде emissive-вокселей, ребёнок пропа; камень кастит, glow-воксели окон — нет. Godot toon shader оставляет штатный view-space `LIGHT_VERTEX` без записи: повторный `MODEL_MATRIX → world → VIEW_MATRIX` давал precision drift и частую shadow-acne «черепицу» на больших поверхностях. `voxelSnapLight` остаётся Three-only настройкой вида и в Godot не импортируется. Toon-ступени применяются только к directional-свету; локальные Omni используют плавную `N·L` ramp (`Map.lamp_softness`, default 1), иначе каждый PointLight рисует концентрические кольца даже при выключенных тенях. Луна: `moon_energy(...)`; PSSM и atlas на инспекторе `Map` (по умолчанию 4 split + 4096). Omni fill все лампы; cube-тени — ближайшие `lantern` (`omni_shadow_count`, гистерезис, в редакторе по явному preview-флагу), `ShadowBody` слой 2. Дальность камеры — `Map.camera_far` (по умолчанию 5000). Play: WASD на `scenes/fan_town.tscn` / `scenes/agent_sandbox.tscn` (не `hu_tao_yard` / `hu_tao_p1`, не Chromium). В joi-conductor не заводить второй renderer / `*ShadowV2` / Godot-bridge.
 
 Проверка миграции зафиксирована в `../ember-godot/MIGRATION_TEST_PLAN.md`: одинаковый маршрут и метрики на профилях 0/2/4/8 (F3 overlay, F4 следующий профиль), затем три timed voxel-задачи. Editor dock `EMBER · проверка миграции` применяет профиль, отдельно показывает `.vox` и `.json` выбранного `EmberVoxelProp`, число instance и свежесть generated prefab по SHA-256 пары исходников. Точечная пересборка `res://prefabs/voxels/<modelId>.tscn` вызывает общий `EmberVoxelPrefab.validate_packed`: проверяет Mesh и ожидаемые по metadata Collision / Omni / host ShadowBody, затем сравнивает hash `.tscn` карты и `transform + placement_id` всех instance до/после. Generated mesh/prefab сохраняют UID из заголовка ресурса при перезаписи, иначе ссылки открытых сцен протухают после headless rebuild. Тот же контракт закреплён headless smoke `../ember-godot/tools/test_voxel_prefab_rebuild.gd`, включая проверку UID. Карта не переимпортируется и открытая сцена намеренно не reload'ится, чтобы не потерять unsaved ручные правки. Для material UX-разрыва добавлен узкий URL-контракт `?emberEditor=voxel&modelId=<safe-id>&workspace=material&tool=<emit|transparency>`: Godot-кнопки **Эмиссия в JOI · Материал** и **Прозрачность в JOI · Материал** открывают выбранную модель в существующем JOI sculptor, а не создают второй редактор. JOI остаётся единственным writer через штатный `writeVoxelRegistry`; query не является schema/состоянием контента и не даёт Godot права писать metadata напрямую. Godot mesher читает `model.transparency`, использует ту же формулу opacity с минимумом 0.08 и разделяет generated mesh на `opaque` и `transparent` surfaces; отдельный alpha toon shader не переводит непрозрачную геометрию в transparent pipeline. Surface name/material/vertex alpha сохраняются при in-place rebuild и проверяются smoke-тестом.
 
@@ -674,4 +686,4 @@ npm run build
 
 ## 15. Главный принцип
 
-Каждая следующая функция Ember должна укреплять единый каркас мира. Если изменение добавляет ещё один специальный путь для тайла, света, вокселя или Library, сначала нужно попытаться выразить его через общий WorldObject, Transform, Components, Modifiers, CommandStack и единый renderer/runtime contract.
+Новые функции Ember укрепляют **Godot-каркас** (сцена, Inspect, interact, save v1, один owner на систему). JOI/Three не наращивать «ещё одним специальным путём»: Three на паузе. Контент-пак и voxel-модели по-прежнему живут в этом репо и импортируются в Godot.

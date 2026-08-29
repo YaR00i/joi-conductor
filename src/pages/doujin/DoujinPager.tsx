@@ -18,11 +18,16 @@ type Props = {
   total?: number;
   loading?: boolean;
   mode?: "pages" | "refresh";
+  layout?: "pager" | "tools";
   recsTitle?: string;
   onPage: (page: number) => void;
   onRefresh?: () => void;
   onPackFound?: () => void;
   packDisabled?: boolean;
+  packTitle?: string;
+  onDeleteSelected?: () => void;
+  deleteDisabled?: boolean;
+  deleteTitle?: string;
   catalogSort?: DoujinLibraryCatalogSort;
   onCatalogSort?: (sort: DoujinLibraryCatalogSort) => void;
 };
@@ -33,11 +38,16 @@ export function DoujinPager({
   total,
   loading = false,
   mode = "pages",
+  layout = "pager",
   recsTitle,
   onPage,
   onRefresh,
   onPackFound,
   packDisabled = false,
+  packTitle = "В список из найденного",
+  onDeleteSelected,
+  deleteDisabled = false,
+  deleteTitle = "Удалить выбранные",
   catalogSort,
   onCatalogSort,
 }: Props) {
@@ -84,8 +94,8 @@ export function DoujinPager({
           type="button"
           className="gelbooru-hub__icon-btn is-list"
           disabled={packDisabled}
-          title="В список из найденного"
-          aria-label="В список из найденного"
+          title={packTitle}
+          aria-label={packTitle}
           onClick={() => {
             setMenu(null);
             onPackFound();
@@ -94,7 +104,22 @@ export function DoujinPager({
           <BookmarkIcon filled={false} />
         </button>
       ) : null}
-      {showSort && catalogSort && onCatalogSort ? (
+      {onDeleteSelected ? (
+        <button
+          type="button"
+          className="gelbooru-hub__icon-btn is-list"
+          disabled={deleteDisabled}
+          title={deleteTitle}
+          aria-label={deleteTitle}
+          onClick={() => {
+            setMenu(null);
+            onDeleteSelected();
+          }}
+        >
+          <TrashIcon />
+        </button>
+      ) : null}
+      {layout === "pager" && showSort && catalogSort && onCatalogSort ? (
         <button
           type="button"
           className={
@@ -108,6 +133,8 @@ export function DoujinPager({
           {sortRow?.label ?? "Порядок"}
         </button>
       ) : null}
+      {layout === "pager" ? (
+        <>
       <button
         type="button"
         className="btn-ghost"
@@ -184,8 +211,25 @@ export function DoujinPager({
           />
         </div>
       ) : null}
+        </>
+      ) : null}
       </div>
     </div>,
     document.body,
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden>
+      <path
+        d="M3.2 4.3h9.6M6.2 4.3V3.2h3.6v1.1M5.1 6.1v6.1M8 6.1v6.1M10.9 6.1v6.1M4.3 4.3l.65 8.3c.06.55.5.95 1.05.95h4c.55 0 1-.4 1.05-.95l.65-8.3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

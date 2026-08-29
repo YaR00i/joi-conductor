@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { WheelPicker } from "../../components/WheelPicker";
+import { defaultFeedTake } from "../../lib/feedTake";
 import { displayTitle } from "../../lib/doujin/normalize";
 import {
   DEFAULT_READING_LIST_NAME,
@@ -14,15 +15,15 @@ type Props = {
   /** Loaded search / library order. When set, the drum packs N works from the start. */
   pool?: DoujinCard[] | null;
   heading?: string;
+  packExact?: boolean;
   onClose: () => void;
   onToggle: (listId: string) => void | Promise<void>;
   onPack?: (listId: string, cards: DoujinCard[]) => void | Promise<void>;
   onCreate: (name: string, cards?: DoujinCard[]) => void | Promise<void>;
 };
 
-function defaultTake(counts: number[]): number {
-  if (counts.includes(10)) return 10;
-  return counts[counts.length - 1] ?? 1;
+function defaultTake(remaining: number, preferAll: boolean): number {
+  return defaultFeedTake(remaining, preferAll);
 }
 
 export function DoujinListPicker({
@@ -30,6 +31,7 @@ export function DoujinListPicker({
   lists,
   pool,
   heading,
+  packExact = false,
   onClose,
   onToggle,
   onPack,
@@ -43,8 +45,12 @@ export function DoujinListPicker({
     return Math.max(1, sliced.length);
   }, [pool, startId]);
   const counts = readingFeedTakeCounts(remaining);
-  const [take, setTake] = useState(() => defaultTake(counts));
-  const takeSafe = counts.includes(take) ? take : defaultTake(counts);
+  const [take, setTake] = useState(() =>
+    defaultTake(remaining, packExact),
+  );
+  const takeSafe = counts.includes(take)
+    ? take
+    : defaultTake(remaining, packExact);
   const [name, setName] = useState("");
   const [pickedListId, setPickedListId] = useState(lists[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
@@ -144,7 +150,11 @@ export function DoujinListPicker({
         <header className="doujin-picker__head">
           <div className="doujin-picker__titles">
             <span className="doujin-chrome__kicker">
-              {packMode ? "из найденного" : "добавить в список"}
+              {packExact
+                ? "выбранное"
+                : packMode
+                  ? "из найденного"
+                  : "добавить в список"}
             </span>
             <h2 id="doujin-picker-title">{title}</h2>
           </div>
@@ -156,7 +166,11 @@ export function DoujinListPicker({
             {packMode ? "Отмена" : "Готово"}
           </button>
         </header>
-        {packMode ? (
+        {packExact ? (
+          <p className="doujin-picker__hint">
+            Выбранные работы. Новый список — имя ниже, или выбери очередь.
+          </p>
+        ) : packMode ? (
           <p className="doujin-picker__hint">
             Сколько работ из найденного. Новый список — имя ниже, или выбери
             очередь.

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   masonryPreviewSrc,
+  masonryStillUrl,
   masonryUpgradeSrc,
   type MediaItem,
 } from "../lib/media";
@@ -198,16 +199,22 @@ export function FavMasonryMedia({ item }: Props) {
   }, [item.kind, src]);
 
   if (item.kind === "video") {
-    return (
-      <video
-        className="fav-masonry__media"
-        src={src}
-        muted
-        loop
-        playsInline
-        preload="metadata"
-      />
-    );
+    if (masonryStillUrl(item)) {
+      return <ProgressiveStill item={item} />;
+    }
+    if (item.source === "favorites" || item.source === "local") {
+      return (
+        <video
+          className="fav-masonry__media"
+          src={item.url}
+          muted
+          loop
+          playsInline
+          preload="metadata"
+        />
+      );
+    }
+    return <div className="fav-masonry__media-host is-still" />;
   }
 
   if (item.kind !== "gif") {

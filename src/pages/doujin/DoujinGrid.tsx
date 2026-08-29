@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { CardSelectButton } from "../../components/FavLightbox";
 import { proxiedImageUrl } from "../../lib/doujin/cdn";
 import {
   displayTitle,
@@ -43,6 +44,8 @@ type Props = {
   onOpen: (id: number) => void;
   onToggleSave: (card: DoujinCard) => void;
   onOpenLists: (card: DoujinCard) => void;
+  selectedIds?: ReadonlySet<number>;
+  onToggleSelect?: (card: DoujinCard) => void;
 };
 
 export function DoujinGrid({
@@ -57,6 +60,8 @@ export function DoujinGrid({
   onOpen,
   onToggleSave,
   onOpenLists,
+  selectedIds,
+  onToggleSelect,
 }: Props) {
   const style = {
     "--doujin-cols": cols,
@@ -84,13 +89,14 @@ export function DoujinGrid({
             const title = displayTitle(card.title) || `#${card.id}`;
             const saved = savedIds.has(card.id);
             const listed = listedIds.has(card.id);
+            const picked = Boolean(selectedIds?.has(card.id));
             const cover =
               coverOverrides?.[card.id] ||
               proxiedImageUrl(card.thumbnailUrl || card.coverUrl);
             return (
               <article
                 key={card.id}
-                className="doujin-card"
+                className={"doujin-card" + (picked ? " is-selected" : "")}
                 style={{ "--stagger": Math.min(index, 11) } as CSSProperties}
               >
                 <DoujinLangBadges
@@ -98,6 +104,12 @@ export function DoujinGrid({
                   language={card.language}
                 />
                 <div className="doujin-card__actions">
+                  {onToggleSelect ? (
+                    <CardSelectButton
+                      selected={picked}
+                      onClick={() => onToggleSelect(card)}
+                    />
+                  ) : null}
                   <button
                     type="button"
                     className={"doujin-card__list" + (listed ? " is-on" : "")}

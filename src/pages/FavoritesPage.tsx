@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { BookmarkIcon, FavLightbox } from "../components/FavLightbox";
+import {
+  BookmarkIcon,
+  CardSelectButton,
+  FavLightbox,
+} from "../components/FavLightbox";
 import { FavMasonryMedia } from "../components/FavMasonryMedia";
 import { FavTagChip } from "../components/FavTagChip";
 import { MediaKindFilter } from "../components/MediaKindFilter";
@@ -58,6 +62,9 @@ interface FavoritesPageProps {
   /** Hide the standalone h1 when nested under Content chrome. */
   embedded?: boolean;
   listedIds?: Set<string>;
+  selectedIds?: ReadonlySet<string>;
+  onToggleSelect?: (item: MediaItem) => void;
+  onClearSelection?: () => void;
   onOpenLists?: (item: MediaItem) => void;
   onPackFound?: (pool: MediaItem[]) => void;
   onOpenSearch?: (query: string, kind: FavoriteKindFilter) => void;
@@ -105,12 +112,52 @@ function SearchIcon() {
   );
 }
 
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden>
+      <path
+        d="M3.2 4.3h9.6M6.2 4.3V3.2h3.6v1.1M5.1 6.1v6.1M8 6.1v6.1M10.9 6.1v6.1M4.3 4.3l.65 8.3c.06.55.5.95 1.05.95h4c.55 0 1-.4 1.05-.95l.65-8.3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function pickForFavorite(record: FavoriteRecord, item: MediaItem): MediaItem {
+  return (
+    favoriteRecordToListItem(record) ?? {
+      id: record.id,
+      url: item.url,
+      kind: item.kind,
+      source: item.source,
+      tags: record.tags,
+      gelbooruId: record.gelbooruId,
+    }
+  );
+}
+
+function favoriteIsSelected(
+  record: FavoriteRecord,
+  selectedIds: ReadonlySet<string> | undefined,
+): boolean {
+  if (!selectedIds || selectedIds.size === 0) return false;
+  const listed = favoriteRecordToListItem(record);
+  return selectedIds.has(listed?.id ?? record.id) || selectedIds.has(record.id);
+}
+
 export function FavoritesPage({
   onFavoritesChanged,
   onNavigate,
   unlocks = { ...emptyWallet().unlocks, pendingShopTags: [] },
   embedded = false,
   listedIds,
+  selectedIds,
+  onToggleSelect,
+  onClearSelection,
   onOpenLists,
   onPackFound,
   onOpenSearch,
@@ -118,6 +165,7 @@ export function FavoritesPage({
   const [views, setViews] = useState<FavView[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewerId, setViewerId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -231,6 +279,17 @@ export function FavoritesPage({
     }
     return out;
   }, [onPackFound, views]);
+  const selectedCount = selectedIds?.size ?? 0;
+  const packTitle =
+    selectedCount > 0
+      ? `В список: ${selectedCount} выбранных`
+      : "В список из найденного";
+  const packDisabled = selectedCount === 0 && listPool.length === 0;
+  const onClearSelectionRef = useRef(onClearSelection);
+  onClearSelectionRef.current = onClearSelection;
+  useEffect(() => {
+    onClearSelectionRef.current?.();
+  }, [kindFilter, search, selectedTags]);
   const enterIndexById = useMemo(() => {
     const map = new Map<string, number>();
     enterIds.forEach((id, index) => map.set(id, index));
@@ -487,12 +546,14 @@ export function FavoritesPage({
   }
 
   async function handleDelete(id: string) {
-    if (busyId) return;
+    if (busyId || bulkBusy) return;
     setBusyId(id);
     try {
       const idx = filtered.findIndex((v) => v.record.id === id);
       const fallback =
         filtered[idx + 1] ?? filtered[idx - 1] ?? null;
+      const view = viewsRef.current.find((row) => row.record.id === id);
+      const pick = view ? pickForFavorite(view.record, view.item) : null;
       await removeFavorite(id);
       setViews((prev) => {
         const gone = prev.filter((v) => v.record.id === id);
@@ -500,6 +561,9 @@ export function FavoritesPage({
         return prev.filter((v) => v.record.id !== id);
       });
       await refreshFavoriteMetadata();
+      if (view && pick && favoriteIsSelected(view.record, selectedIds)) {
+        onToggleSelect?.(pick);
+      }
       if (viewerId === id) {
         setViewerId(
           fallback && fallback.record.id !== id ? fallback.record.id : null,
@@ -510,6 +574,46 @@ export function FavoritesPage({
       setError(err instanceof Error ? err.message : "Не удалось удалить");
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function handleDeleteSelected() {
+    if (selectedCount === 0 || bulkBusy || busyId) return;
+    const targets = viewsRef.current.filter((view) =>
+      favoriteIsSelected(view.record, selectedIds),
+    );
+    if (targets.length === 0) return;
+    setBulkBusy(true);
+    setError(null);
+    const goneIds = new Set<string>();
+    try {
+      for (const view of targets) {
+        await removeFavorite(view.record.id);
+        goneIds.add(view.record.id);
+      }
+      setViews((prev) => {
+        const gone = prev.filter((v) => goneIds.has(v.record.id));
+        revokeViews(gone);
+        return prev.filter((v) => !goneIds.has(v.record.id));
+      });
+      if (viewerId && goneIds.has(viewerId)) setViewerId(null);
+      await refreshFavoriteMetadata();
+      onClearSelection?.();
+      onFavoritesChanged();
+    } catch (err) {
+      if (goneIds.size > 0) {
+        setViews((prev) => {
+          const gone = prev.filter((v) => goneIds.has(v.record.id));
+          revokeViews(gone);
+          return prev.filter((v) => !goneIds.has(v.record.id));
+        });
+        await refreshFavoriteMetadata();
+        onClearSelection?.();
+        onFavoritesChanged();
+      }
+      setError(err instanceof Error ? err.message : "Не удалось удалить");
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -559,12 +663,32 @@ export function FavoritesPage({
               <button
                 type="button"
                 className="favorites-page__pack"
-                disabled={listPool.length === 0}
-                title="В список из найденного"
-                aria-label="В список из найденного"
+                disabled={packDisabled || bulkBusy}
+                title={packTitle}
+                aria-label={packTitle}
                 onClick={() => onPackFound(listPool)}
               >
                 <BookmarkIcon filled={false} />
+              </button>
+            ) : null}
+            {onToggleSelect ? (
+              <button
+                type="button"
+                className="favorites-page__pack"
+                disabled={selectedCount === 0 || bulkBusy}
+                title={
+                  selectedCount > 0
+                    ? `Удалить выбранные: ${selectedCount}`
+                    : "Удалить выбранные"
+                }
+                aria-label={
+                  selectedCount > 0
+                    ? `Удалить выбранные: ${selectedCount}`
+                    : "Удалить выбранные"
+                }
+                onClick={() => void handleDeleteSelected()}
+              >
+                <TrashIcon />
               </button>
             ) : null}
             {onOpenSearch ? (
@@ -716,12 +840,15 @@ export function FavoritesPage({
                         (record.gelbooruId &&
                           listedIds?.has(`gb-${record.gelbooruId}`))),
                   );
+                  const chosen = favoriteIsSelected(record, selectedIds);
+                  const pick = pickForFavorite(record, item);
                   return (
                   <article
                     key={record.id}
                     className={
                       "fav-masonry__card" +
-                      (enterI != null ? " is-enter" : "")
+                      (enterI != null ? " is-enter" : "") +
+                      (chosen ? " is-selected" : "")
                     }
                     style={
                       enterI != null
@@ -739,22 +866,30 @@ export function FavoritesPage({
                       <FavMasonryMedia item={item} />
                       <span className="fav-masonry__glow" aria-hidden />
                     </button>
-                    {listItem ? (
+                    {onToggleSelect || listItem ? (
                       <div className="doujin-card__actions">
-                        <button
-                          type="button"
-                          className={
-                            "doujin-card__list" + (listed ? " is-on" : "")
-                          }
-                          aria-pressed={listed}
-                          title={listed ? "В списках" : "Добавить в список"}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenLists?.(listItem);
-                          }}
-                        >
-                          <BookmarkIcon filled={listed} />
-                        </button>
+                        {onToggleSelect ? (
+                          <CardSelectButton
+                            selected={chosen}
+                            onClick={() => onToggleSelect(pick)}
+                          />
+                        ) : null}
+                        {listItem ? (
+                          <button
+                            type="button"
+                            className={
+                              "doujin-card__list" + (listed ? " is-on" : "")
+                            }
+                            aria-pressed={listed}
+                            title={listed ? "В списках" : "Добавить в список"}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenLists?.(listItem);
+                            }}
+                          >
+                            <BookmarkIcon filled={listed} />
+                          </button>
+                        ) : null}
                       </div>
                     ) : null}
                     <div className="fav-masonry__bar">
@@ -769,11 +904,11 @@ export function FavoritesPage({
                       <button
                         type="button"
                         className="fav-masonry__del"
-                        disabled={busyId === record.id}
+                        disabled={busyId === record.id || bulkBusy}
                         title="Удалить из избранного"
                         onClick={() => void handleDelete(record.id)}
                       >
-                        {busyId === record.id ? "…" : "Удалить"}
+                        {busyId === record.id || bulkBusy ? "…" : "Удалить"}
                       </button>
                     </div>
                   </article>
@@ -867,7 +1002,7 @@ export function FavoritesPage({
           canNext={canNext}
           saved
           listed={listed}
-          saveBusy={busyId === viewer.record.id}
+          saveBusy={busyId === viewer.record.id || bulkBusy}
           counter={
             filtered.length > 1
               ? `${viewerIndex + 1} / ${filtered.length}${hasMore ? "+" : ""}`

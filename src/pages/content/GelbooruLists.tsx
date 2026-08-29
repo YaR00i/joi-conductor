@@ -23,6 +23,10 @@ import {
   loadControlState,
 } from "../../lib/soul/control";
 import { DoujinListDeck } from "../doujin/DoujinListDeck";
+import {
+  DoujinListTileActions,
+  type ListTileCacheState,
+} from "../doujin/DoujinListTileActions";
 import { GelbooruFeed } from "./GelbooruFeed";
 import { useFavColumnCount } from "./favWallLayout";
 
@@ -92,6 +96,20 @@ function listCachePending(
       !isMediaCached(item.id) &&
       !busyIds?.has(listDownloadJobId(item.id)),
   ).length;
+}
+
+function gelbooruListTileCacheState(
+  list: GelbooruPlayList,
+  savedIds: ReadonlySet<string>,
+  busyIds?: ReadonlySet<string>,
+): ListTileCacheState {
+  if (list.items.length === 0) return "idle";
+  const running = list.items.some((item) =>
+    busyIds?.has(listDownloadJobId(item.id)),
+  );
+  if (running) return "running";
+  if (listCachePending(list, savedIds, busyIds) === 0) return "done";
+  return "idle";
 }
 
 function kindLabel(kind: GelbooruPlayList["items"][number]["kind"]): string {
@@ -658,8 +676,11 @@ export function GelbooruLists({
         {lists.map((list, index) => {
           const resumeAt = gelbooruListResumeIndex(list);
           const canResume = gelbooruListCanResume(list);
-          const cachePending = listCachePending(list, savedIds, busyIds);
-          const unsaved = gelbooruListUnsavedItems(list, savedIds, busyIds).length;
+          const cacheState = gelbooruListTileCacheState(
+            list,
+            savedIds,
+            busyIds,
+          );
           return (
             <li key={list.id} className="doujin-lists__tile">
               <button
@@ -672,12 +693,7 @@ export function GelbooruLists({
                   stagger={`${(index % 4) * 0.55}s`}
                 />
               </button>
-              <div
-                className={
-                  "doujin-lists__tile-foot gelbooru-lists__tile-foot" +
-                  (canResume ? "" : " doujin-lists__tile-foot--solo")
-                }
-              >
+              <div className="doujin-lists__tile-foot">
                 <button
                   type="button"
                   className="doujin-lists__tile-caption"
@@ -685,46 +701,20 @@ export function GelbooruLists({
                 >
                   <span className="doujin-lists__title">{list.name}</span>
                 </button>
-                <button
-                  type="button"
-                  className="doujin-lists__tile-play"
-                  disabled={list.items.length === 0}
-                  onClick={() => playAt(list, 0)}
-                >
-                  Читать
-                </button>
-                <div className="gelbooru-lists__tile-xfer">
-                  <button
-                    type="button"
-                    className="doujin-lists__tile-play"
-                    disabled={cachePending === 0}
-                    onClick={() => onDownloadList(list.id)}
-                  >
-                    Скачать
-                  </button>
-                  <button
-                    type="button"
-                    className="doujin-lists__tile-play"
-                    disabled={unsaved === 0}
-                    onClick={() => onSaveList(list.id)}
-                  >
-                    На полку
-                  </button>
-                </div>
+                <DoujinListTileActions
+                  cacheState={cacheState}
+                  canRead={list.items.length > 0}
+                  canResume={canResume}
+                  downloadDisabled={list.items.length === 0}
+                  onDownload={() => onDownloadList(list.id)}
+                  onRead={() => playAt(list, 0)}
+                  onResume={() => playAt(list, resumeAt)}
+                />
                 <span className="doujin-lists__sub">
                   {postsLabel(list.items.length)}
                   {gelbooruListOrigin(list) === "mistress" ? " · её" : ""}
                   {canResume ? ` · с ${resumeAt + 1}` : ""}
                 </span>
-                {canResume ? (
-                  <button
-                    type="button"
-                    className="doujin-lists__tile-resume"
-                    onClick={() => playAt(list, resumeAt)}
-                  >
-                    Продолжить
-                  </button>
-                ) : null}
               </div>
             </li>
           );

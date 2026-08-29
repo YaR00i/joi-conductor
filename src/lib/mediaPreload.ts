@@ -1,4 +1,5 @@
-import { displayMediaUrl, type MediaItem, type MediaKind } from "./media";
+import { downloadMediaUrl, type MediaItem, type MediaKind } from "./media";
+import { downloadMediaBlob } from "./mediaRangeDownload";
 import { getMatchingFavoriteRecord } from "./mediaFavorites";
 
 export type PreloadProgress = {
@@ -70,52 +71,11 @@ const cache = new Map<string, CacheEntry>();
 /** Floor when not retaining a full playlist. */
 const MAX_ENTRIES_FLOOR = 8;
 
-/** CDN / proxy hang (often no VPN) — abort and retry. */
-const MEDIA_DOWNLOAD_TIMEOUT_MS = 25_000;
-/** Videos are large; give them a longer per-attempt timeout. */
-const MEDIA_VIDEO_DOWNLOAD_TIMEOUT_MS = 45_000;
 const MEDIA_DOWNLOAD_ATTEMPTS = 6;
 const MEDIA_DOWNLOAD_RETRY_BASE_MS = 2_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function downloadMediaBlob(
-  remote: string,
-  onProgress: (loaded: number, total: number | null) => void,
-  kind?: MediaKind,
-): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("GET", remote);
-    xhr.responseType = "blob";
-    const timeout =
-      kind === "video" || kind === "gif"
-        ? MEDIA_VIDEO_DOWNLOAD_TIMEOUT_MS
-        : MEDIA_DOWNLOAD_TIMEOUT_MS;
-    xhr.timeout = timeout;
-    xhr.onprogress = (e) => {
-      const total = e.lengthComputable && e.total > 0 ? e.total : null;
-      onProgress(e.loaded, total);
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300 && xhr.response) {
-        resolve(xhr.response as Blob);
-        return;
-      }
-      // Retryable gateway / rate-limit
-      if (xhr.status === 429 || xhr.status >= 500) {
-        reject(new Error(`preload HTTP ${xhr.status}`));
-        return;
-      }
-      reject(new Error(`preload HTTP ${xhr.status}`));
-    };
-    xhr.onerror = () => reject(new Error("preload network error"));
-    xhr.ontimeout = () => reject(new Error("preload timeout"));
-    xhr.onabort = () => reject(new Error("preload aborted"));
-    xhr.send();
-  });
 }
 
 function isRetryableDownloadError(err: unknown): boolean {
@@ -392,6 +352,23 @@ export function peekCachedPlayUrl(itemId: string): string | null {
   return entry.playUrl;
 }
 
+type MediaCacheReadyListener = (itemId: string, playUrl: string) => void;
+const cacheReadyListeners = new Set<MediaCacheReadyListener>();
+
+function emitCacheReady(itemId: string, playUrl: string): void {
+  for (const listener of cacheReadyListeners) listener(itemId, playUrl);
+}
+
+/** Shelf/RAM blob became playable — lightbox can leave the CDN stream. */
+export function subscribeMediaCacheReady(
+  fn: MediaCacheReadyListener,
+): () => void {
+  cacheReadyListeners.add(fn);
+  return () => {
+    cacheReadyListeners.delete(fn);
+  };
+}
+
 export function isMediaCached(itemId: string): boolean {
   const entry = cache.get(itemId);
   return Boolean(entry?.ready && !entry.error);
@@ -453,6 +430,7 @@ function commitReadyBlob(
     totalBytes: size,
   });
   emitDetail(lastStatus.active, true);
+  emitCacheReady(itemId, blobUrl);
   return blobUrl;
 }
 
@@ -474,6 +452,35 @@ async function playUrlFromSavedFavorite(
   } catch {
     return null;
   }
+}
+
+/** RAM cache or shelf blob, without touching the CDN. */
+export async function hydratePlayUrlFromShelf(
+  item: MediaItem,
+): Promise<string | null> {
+  const ram = peekCachedPlayUrl(item.id);
+  if (ram) return ram;
+  const saved = await playUrlFromSavedFavorite(item);
+  if (!saved) return null;
+  const stub: CacheEntry = {
+    itemId: item.id,
+    playUrl: saved.url,
+    blobUrl: saved.url,
+    ready: false,
+    error: false,
+    promise: null,
+    lastUsed: now(),
+    progressListeners: new Set(),
+    loadedBytes: saved.size,
+    totalBytes: saved.size,
+    speedEma: null,
+    lastSampleAt: now(),
+    lastSampleBytes: saved.size,
+    attempt: 0,
+    lastError: null,
+    retryAt: null,
+  };
+  return commitReadyBlob(item.id, stub, saved.url, saved.size);
 }
 
 /**
@@ -512,7 +519,7 @@ export function ensureMediaCached(
     );
   }
 
-  const remote = displayMediaUrl(item);
+  const remote = downloadMediaUrl(item);
   if (
     item.source === "local" ||
     item.source === "favorites" ||
@@ -754,6 +761,7 @@ export async function retryAllFailedMedia(): Promise<number> {
 /**
  * Warm next/prev slides around `centerIndex`.
  * Skips eviction of retained playlist ids.
+ * Remote videos stream in the player — do not full-download them here.
  */
 export function preloadAround(
   items: MediaItem[],
@@ -774,6 +782,7 @@ export function preloadAround(
   }
 
   for (const item of order) {
+    if (item.kind === "video") continue;
     if (isMediaCached(item.id)) continue;
     const entry = cache.get(item.id);
     if (entry?.promise) continue;

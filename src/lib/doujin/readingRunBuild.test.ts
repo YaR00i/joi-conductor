@@ -13,6 +13,7 @@ const tags: DoujinTag[] = [
   { type: "character", name: "hu tao", count: 20 },
   { type: "tag", name: "sole female", count: 12 },
   { type: "artist", name: "foo", count: 8 },
+  { type: "group", name: "circle nine", count: 80 },
 ];
 
 function card(id: number): DoujinCard {
@@ -28,7 +29,7 @@ function card(id: number): DoujinCard {
 }
 
 describe("pickMistressQueuePlans", () => {
-  it("forces language:english and skips group/language types", () => {
+  it("forces language:english and skips unstarred circles", () => {
     const plans = pickMistressQueuePlans(2, tags, [], [], () => 0);
     expect(plans.length).toBeGreaterThan(0);
     for (const plan of plans) {

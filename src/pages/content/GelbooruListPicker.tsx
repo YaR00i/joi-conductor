@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { WheelPicker } from "../../components/WheelPicker";
+import { defaultFeedTake } from "../../lib/feedTake";
 import {
   DEFAULT_GELBOORU_LIST_NAME,
   gelbooruFeedTakeCounts,
@@ -14,15 +15,15 @@ type Props = {
   /** Loaded search / shelf order. When set, the drum packs N posts from the start. */
   pool?: MediaItem[] | null;
   heading?: string;
+  packExact?: boolean;
   onClose: () => void;
   onToggle: (listId: string) => void | Promise<void>;
   onPack?: (listId: string, items: MediaItem[]) => void | Promise<void>;
   onCreate: (name: string, items?: MediaItem[]) => void | Promise<void>;
 };
 
-function defaultTake(counts: number[]): number {
-  if (counts.includes(10)) return 10;
-  return counts[counts.length - 1] ?? 1;
+function defaultTake(remaining: number, preferAll: boolean): number {
+  return defaultFeedTake(remaining, preferAll);
 }
 
 export function GelbooruListPicker({
@@ -30,6 +31,7 @@ export function GelbooruListPicker({
   lists,
   pool,
   heading,
+  packExact = false,
   onClose,
   onToggle,
   onPack,
@@ -43,8 +45,12 @@ export function GelbooruListPicker({
     return Math.max(1, sliced.length);
   }, [pool, startId]);
   const counts = gelbooruFeedTakeCounts(remaining);
-  const [take, setTake] = useState(() => defaultTake(counts));
-  const takeSafe = counts.includes(take) ? take : defaultTake(counts);
+  const [take, setTake] = useState(() =>
+    defaultTake(remaining, packExact),
+  );
+  const takeSafe = counts.includes(take)
+    ? take
+    : defaultTake(remaining, packExact);
   const [name, setName] = useState("");
   const [pickedListId, setPickedListId] = useState(lists[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
@@ -144,7 +150,11 @@ export function GelbooruListPicker({
         <header className="doujin-picker__head">
           <div className="doujin-picker__titles">
             <span className="doujin-chrome__kicker">
-              {packMode ? "из найденного" : "добавить в список"}
+              {packExact
+                ? "выбранное"
+                : packMode
+                  ? "из найденного"
+                  : "добавить в список"}
             </span>
             <h2 id="gelbooru-picker-title">{title}</h2>
           </div>
@@ -156,7 +166,11 @@ export function GelbooruListPicker({
             {packMode ? "Отмена" : "Готово"}
           </button>
         </header>
-        {packMode ? (
+        {packExact ? (
+          <p className="doujin-picker__hint">
+            Выбранные посты. Новый список — имя ниже, или выбери очередь.
+          </p>
+        ) : packMode ? (
           <p className="doujin-picker__hint">
             Сколько постов из найденного. Новый список — имя ниже, или выбери
             очередь.

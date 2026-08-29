@@ -1375,7 +1375,8 @@ button:focus-visible {
     transform 0.28s ease;
 }
 
-.fav-masonry__card.is-picked {
+.fav-masonry__card.is-picked,
+.fav-masonry__card.is-selected {
   border-color: color-mix(in srgb, var(--accent) 70%, transparent);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent),

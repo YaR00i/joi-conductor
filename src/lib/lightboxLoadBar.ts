@@ -10,11 +10,14 @@ export function lightboxLoadLabel(
   percent: number | null,
   phase: "loading" | "opening" | "error",
   detail?: string | null,
+  streamed = false,
 ): string {
   if (phase === "error") return lightboxErrorSummary(detail);
   const noun =
     kind === "video" ? "видео" : kind === "gif" ? "gif" : "фото";
-  if (phase === "opening") return `Файл скачан · открываю ${noun}…`;
+  if (phase === "opening") {
+    return streamed ? `Открываю ${noun}…` : `Файл скачан · открываю ${noun}…`;
+  }
   if (percent == null) return `Качаю ${noun}…`;
   return `Качаю ${noun} · ${percent}%`;
 }

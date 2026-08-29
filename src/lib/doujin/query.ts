@@ -10,7 +10,7 @@ import type {
   DoujinTag,
 } from "./types";
 
-const TASTE_TYPES = new Set(["tag", "parody", "character", "artist"]);
+const TASTE_TYPES = new Set(["tag", "parody", "character", "artist", "group"]);
 
 const TASTE_NOISE = new Set([
   "english",

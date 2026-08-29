@@ -208,47 +208,6 @@
   overflow: hidden;
 }
 
-.page--doujin .gelbooru-hub.is-lists .gelbooru-lists__tile-foot,
-.doujin-lists .gelbooru-lists__tile-foot {
-  grid-template-areas:
-    "title play"
-    "sub resume"
-    "xfer xfer";
-}
-
-.page--doujin .gelbooru-hub.is-lists .gelbooru-lists__tile-foot.doujin-lists__tile-foot--solo,
-.doujin-lists .gelbooru-lists__tile-foot.doujin-lists__tile-foot--solo {
-  grid-template-areas:
-    "title play"
-    "sub xfer";
-}
-
-.gelbooru-lists__tile-xfer {
-  grid-area: xfer;
-  display: flex;
-  gap: 0.28rem;
-  min-width: 0;
-  justify-self: end;
-}
-
-.page--doujin .gelbooru-hub.is-lists .gelbooru-lists__tile-xfer .doujin-lists__tile-play,
-.doujin-lists .gelbooru-lists__tile-xfer .doujin-lists__tile-play {
-  grid-area: auto;
-  flex: 1 1 auto;
-  padding: 0.12rem 0.48rem;
-  font-size: 0.7rem;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
-  border: 1px solid var(--line);
-}
-
-.page--doujin .gelbooru-hub.is-lists .gelbooru-lists__tile-xfer .doujin-lists__tile-play:hover:not(:disabled),
-.doujin-lists .gelbooru-lists__tile-xfer .doujin-lists__tile-play:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
-  color: var(--accent);
-  filter: none;
-}
-
 .gelbooru-lists__wall {
   min-width: 0;
   min-height: 0;
@@ -338,21 +297,27 @@
 }
 
 .page--doujin .gelbooru-hub__icon-btn.is-list,
-.hub-search-dock .gelbooru-hub__icon-btn.is-list {
+.hub-search-dock .gelbooru-hub__icon-btn.is-list,
+.gelbooru-hub__recs-overlay .gelbooru-hub__icon-btn.is-list,
+.doujin-pager-overlay .gelbooru-hub__icon-btn.is-list {
   background: var(--bg1);
   color: var(--text);
   border: 1px solid var(--line);
 }
 
 .page--doujin .gelbooru-hub__icon-btn.is-list:hover:not(:disabled),
-.hub-search-dock .gelbooru-hub__icon-btn.is-list:hover:not(:disabled) {
+.hub-search-dock .gelbooru-hub__icon-btn.is-list:hover:not(:disabled),
+.gelbooru-hub__recs-overlay .gelbooru-hub__icon-btn.is-list:hover:not(:disabled),
+.doujin-pager-overlay .gelbooru-hub__icon-btn.is-list:hover:not(:disabled) {
   filter: none;
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
   color: var(--accent);
 }
 
 .page--doujin .gelbooru-hub__icon-btn.is-list:disabled,
-.hub-search-dock .gelbooru-hub__icon-btn.is-list:disabled {
+.hub-search-dock .gelbooru-hub__icon-btn.is-list:disabled,
+.gelbooru-hub__recs-overlay .gelbooru-hub__icon-btn.is-list:disabled,
+.doujin-pager-overlay .gelbooru-hub__icon-btn.is-list:disabled {
   opacity: 0.4;
   cursor: default;
 }
@@ -1800,8 +1765,10 @@
 
 .page--doujin .doujin-card__fav,
 .page--doujin .doujin-card__list,
+.page--doujin .doujin-card__select,
 .page--doujin .doujin-card__fav:hover:not(:disabled),
-.page--doujin .doujin-card__list:hover:not(:disabled) {
+.page--doujin .doujin-card__list:hover:not(:disabled),
+.page--doujin .doujin-card__select:hover:not(:disabled) {
   position: static;
   box-sizing: border-box;
   display: grid;
@@ -1821,20 +1788,29 @@
 }
 
 .page--doujin .doujin-card__fav:hover:not(:disabled),
-.page--doujin .doujin-card__list:hover:not(:disabled) {
+.page--doujin .doujin-card__list:hover:not(:disabled),
+.page--doujin .doujin-card__select:hover:not(:disabled) {
   background: rgba(10, 7, 8, 0.94);
 }
 
 .doujin-card__fav svg,
-.doujin-card__list svg {
+.doujin-card__list svg,
+.doujin-card__select svg {
   display: block;
   width: 15px;
   height: 15px;
 }
 
 .doujin-card__fav.is-on,
-.doujin-card__list.is-on {
+.doujin-card__list.is-on,
+.doujin-card__select.is-on {
   color: var(--accent);
+}
+
+.doujin-card.is-selected {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 10px 28px rgba(0, 0, 0, 0.32);
 }
 
 .doujin-pager {
@@ -3737,9 +3713,9 @@ body:has(.app-frame--fullscreen) .gelbooru-hub__recs-overlay {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
-    "title play"
-    "sub resume";
-  align-items: center;
+    "title actions"
+    "sub sub";
+  align-items: start;
   column-gap: 0.4rem;
   row-gap: 0.22rem;
   width: 82%;
@@ -3813,6 +3789,89 @@ body:has(.app-frame--fullscreen) .gelbooru-hub__recs-overlay {
   grid-area: sub;
 }
 
+.doujin-lists__tile-actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.2rem;
+  justify-self: end;
+  flex-shrink: 0;
+}
+
+.page--doujin .doujin-lists__tile-icon,
+.doujin-lists .doujin-lists__tile-icon {
+  width: 1.72rem;
+  height: 1.72rem;
+  min-width: 1.72rem;
+  min-height: 1.72rem;
+  margin: 0;
+  padding: 0;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transform: none;
+}
+
+.page--doujin .doujin-lists__tile-icon svg,
+.doujin-lists .doujin-lists__tile-icon svg {
+  width: 0.92rem;
+  height: 0.92rem;
+  display: block;
+  transform-origin: 50% 50%;
+}
+
+.page--doujin .doujin-lists__tile-icon.is-read,
+.doujin-lists .doujin-lists__tile-icon.is-read {
+  border: 0;
+  background: var(--accent);
+  color: #1a0d08;
+}
+
+.page--doujin .doujin-lists__tile-icon.is-ghost,
+.doujin-lists .doujin-lists__tile-icon.is-ghost {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+.page--doujin .doujin-lists__tile-icon.is-done,
+.doujin-lists .doujin-lists__tile-icon.is-done {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.page--doujin .doujin-lists__tile-icon.is-live svg,
+.doujin-lists .doujin-lists__tile-icon.is-live svg {
+  animation: doujin-lists-spin 0.75s linear infinite;
+}
+
+.page--doujin .doujin-lists__tile-icon.is-read:hover:not(:disabled),
+.doujin-lists .doujin-lists__tile-icon.is-read:hover:not(:disabled) {
+  transform: none;
+  filter: brightness(1.06);
+}
+
+.page--doujin .doujin-lists__tile-icon.is-ghost:hover:not(:disabled),
+.doujin-lists .doujin-lists__tile-icon.is-ghost:hover:not(:disabled) {
+  transform: none;
+  filter: none;
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  color: var(--accent);
+}
+
+.page--doujin .doujin-lists__tile-icon:disabled,
+.doujin-lists .doujin-lists__tile-icon:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.page--doujin .doujin-lists__tile-icon.is-done:disabled,
+.doujin-lists .doujin-lists__tile-icon.is-done:disabled {
+  opacity: 0.92;
+}
+
 .page--doujin .doujin-lists__tile-play {
   grid-area: play;
   position: static;
@@ -3866,12 +3925,18 @@ body:has(.app-frame--fullscreen) .gelbooru-hub__recs-overlay {
 }
 
 .doujin-lists__tile--assemble .doujin-lists__tile-foot,
-.doujin-lists__tile--add .doujin-lists__tile-foot,
-.doujin-lists__tile-foot--solo {
+.doujin-lists__tile--add .doujin-lists__tile-foot {
   grid-template-areas:
     "title play"
     "sub .";
+  align-items: center;
   row-gap: 0.12rem;
+}
+
+@keyframes doujin-lists-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .doujin-lists__deck {

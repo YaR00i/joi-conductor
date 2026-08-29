@@ -32,8 +32,8 @@ import {
   stepMediaZoom,
 } from "../lib/mediaFitZoom";
 import { masonryPreviewSrc, type MediaItem } from "../lib/media";
+import { startMediaPlaySrc } from "../lib/mediaPlaySrc";
 import {
-  ensureMediaCached,
   forgetCachedMedia,
   markMediaPlaybackError,
   type PreloadProgress,
@@ -46,9 +46,11 @@ type Props = {
 };
 
 const OPEN_TIMEOUT_MS = 12_000;
+const STREAM_OPEN_TIMEOUT_MS = 25_000;
 
 const DECODE_FAIL =
   "файл скачан, но Chromium не смог его открыть (кодек или битый файл)";
+const STREAM_FAIL = "не удалось начать воспроизведение (сеть или CDN)";
 
 function bindRef(ref: Ref<HTMLVideoElement> | undefined, node: HTMLVideoElement | null) {
   if (!ref) return;
@@ -88,6 +90,7 @@ function lightboxNavReserve(viewer: HTMLElement): { left: number; right: number 
 
 export function FavLightboxMedia({ item, videoRef, children }: Props) {
   const [playSrc, setPlaySrc] = useState<string | null>(null);
+  const [streamed, setStreamed] = useState(false);
   const [progress, setProgress] = useState<PreloadProgress>({
     percent: null,
     phase: "loading",
@@ -112,6 +115,8 @@ export function FavLightboxMedia({ item, videoRef, children }: Props) {
   const slotRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const playSrcRef = useRef<string | null>(null);
+  const pendingSeekRef = useRef<number | null>(null);
   const dragRef = useRef<{
     pointerId: number;
     x: number;
@@ -122,10 +127,14 @@ export function FavLightboxMedia({ item, videoRef, children }: Props) {
   const zoomCursorRef = useRef<{ x: number; y: number } | null>(null);
   const prevZoomRef = useRef(MEDIA_ZOOM_MIN);
   const still = item.kind !== "video";
+  playSrcRef.current = playSrc;
+  const streamedRef = useRef(streamed);
+  streamedRef.current = streamed;
 
   useEffect(() => {
     let cancelled = false;
     setPlaySrc(null);
+    setStreamed(false);
     setOpened(false);
     setErrorDetail(null);
     setZoom(MEDIA_ZOOM_MIN);
@@ -141,32 +150,55 @@ export function FavLightboxMedia({ item, videoRef, children }: Props) {
     prevZoomRef.current = MEDIA_ZOOM_MIN;
     zoomCursorRef.current = null;
     dragRef.current = null;
+    pendingSeekRef.current = null;
     setProgress({ percent: null, phase: "loading" });
-    void ensureMediaCached(item, (next) => {
-      if (!cancelled) setProgress(next);
-    })
-      .then((url) => {
+
+    const stop = startMediaPlaySrc(item, {
+      onSrc: (src, nextStreamed) => {
         if (cancelled) return;
-        setPlaySrc(url);
-      })
-      .catch((err: unknown) => {
+        const video = localVideoRef.current;
+        if (
+          video &&
+          playSrcRef.current &&
+          playSrcRef.current !== src &&
+          Number.isFinite(video.currentTime) &&
+          video.currentTime > 0.25
+        ) {
+          pendingSeekRef.current = video.currentTime;
+        }
+        setPlaySrc(src);
+        setStreamed(nextStreamed);
+        playSrcRef.current = src;
+      },
+      onProgress: (next) => {
+        if (!cancelled) setProgress(next);
+      },
+      onError: (err: unknown) => {
         if (cancelled) return;
         setPlaySrc(null);
+        setStreamed(false);
         setProgress({ percent: null, phase: "error" });
         setErrorDetail(errorMessage(err));
-      });
+      },
+    });
     return () => {
       cancelled = true;
+      stop();
     };
   }, [item.id, item.kind, item.url, retryTick]);
 
   useEffect(() => {
     if (!playSrc || errorDetail || opened) return;
+    const timeoutMs = streamedRef.current
+      ? STREAM_OPEN_TIMEOUT_MS
+      : OPEN_TIMEOUT_MS;
     const timer = window.setTimeout(() => {
-      setErrorDetail(DECODE_FAIL);
+      setErrorDetail(streamedRef.current ? STREAM_FAIL : DECODE_FAIL);
       setProgress({ percent: null, phase: "error" });
-      markMediaPlaybackError(item.id, DECODE_FAIL);
-    }, OPEN_TIMEOUT_MS);
+      if (!streamedRef.current) {
+        markMediaPlaybackError(item.id, DECODE_FAIL);
+      }
+    }, timeoutMs);
     return () => window.clearTimeout(timer);
   }, [playSrc, errorDetail, opened, item.id]);
 
@@ -317,11 +349,13 @@ export function FavLightboxMedia({ item, videoRef, children }: Props) {
     return () => host.removeEventListener("wheel", onWheel);
   }, [still, errorDetail, playSrc, boxW, boxH, bumpZoom]);
 
-  function failOpen(detail = DECODE_FAIL) {
+  function failOpen(detail?: string) {
+    const streamedFail = streamedRef.current;
+    const message = detail ?? (streamedFail ? STREAM_FAIL : DECODE_FAIL);
     setOpened(false);
-    setErrorDetail(detail);
+    setErrorDetail(message);
     setProgress({ percent: null, phase: "error" });
-    markMediaPlaybackError(item.id, detail);
+    if (!streamedFail) markMediaPlaybackError(item.id, message);
   }
 
   function retry() {
@@ -365,8 +399,13 @@ export function FavLightboxMedia({ item, videoRef, children }: Props) {
       : lightboxLoadLabel(
           item.kind,
           progress.percent,
-          phase === "error" ? "error" : phase === "opening" ? "opening" : "loading",
+          phase === "error"
+            ? "error"
+            : phase === "opening" || (item.kind === "video" && phase === "loading")
+              ? "opening"
+              : "loading",
           errorDetail,
+          streamed || (item.kind === "video" && !playSrc),
         );
   const overflows = mediaPaintOverflows(box, paint);
   const pos = box && paint ? mediaPaintPosition(box, paint, pan) : null;
@@ -476,7 +515,20 @@ export function FavLightboxMedia({ item, videoRef, children }: Props) {
                   setOpened(true);
                   measureFit();
                 }}
-                onLoadedMetadata={() => measureFit()}
+                onLoadedMetadata={() => {
+                  const seek = pendingSeekRef.current;
+                  const video = localVideoRef.current;
+                  if (
+                    seek != null &&
+                    video &&
+                    Number.isFinite(video.duration) &&
+                    video.duration > 0
+                  ) {
+                    video.currentTime = Math.min(seek, video.duration - 0.05);
+                    pendingSeekRef.current = null;
+                  }
+                  measureFit();
+                }}
                 onError={() => failOpen()}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}

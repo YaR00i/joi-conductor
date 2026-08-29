@@ -6,11 +6,10 @@ import {
   type MediaItem,
   type MediaKind,
 } from "../lib/media";
+import { startMediaPlaySrc } from "../lib/mediaPlaySrc";
 import {
-  ensureMediaCached,
   getFilePreloadPhase,
   markMediaPlaybackError,
-  peekCachedPlayUrl,
   preloadAround,
   preloadEntirePlaylist,
   retryMediaItem,
@@ -105,6 +104,8 @@ export function MediaStage({
 
   const holdTimerRef = useRef(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const playSrcRef = useRef("");
+  const pendingSeekRef = useRef<number | null>(null);
   const loadGenRef = useRef(0);
   const holdGenRef = useRef(0);
   /** User explicitly paused via click — don't auto-resume until they click again. */
@@ -442,17 +443,11 @@ export function MediaStage({
   useEffect(() => {
     const gen = ++loadGenRef.current;
     setPlaySrc("");
+    playSrcRef.current = "";
+    pendingSeekRef.current = null;
 
     if (!current) {
       reportLoad({ kind: null, percent: null, phase: "idle" });
-      return;
-    }
-
-    const hit = peekCachedPlayUrl(current.id);
-    if (hit) {
-      setPlaySrc(hit);
-      reportLoad({ kind: current.kind, percent: 100, phase: "ready" });
-      preloadAround(deckRef.current, index, 3, 1);
       return;
     }
 
@@ -462,9 +457,6 @@ export function MediaStage({
       phase: "loading",
     });
 
-    // If this item previously failed to cache, kick a single auto-retry before
-    // falling back to ensureMediaCached (which would otherwise resolve to the
-    // cached error immediately). Guarded so we only try once per item per mount.
     const phase = getFilePreloadPhase(current.id);
     if (
       phase === "error" &&
@@ -476,31 +468,41 @@ export function MediaStage({
       autoRetriedIdsRef.current.delete(current.id);
     }
 
-    let cancelled = false;
-    void ensureMediaCached(current, (p) => {
-      if (cancelled || loadGenRef.current !== gen) return;
-      reportLoad({
-        kind: current.kind,
-        percent: p.percent,
-        phase: p.phase === "error" ? "error" : p.phase,
-      });
-    })
-      .then((url) => {
-        if (cancelled || loadGenRef.current !== gen) return;
-        setPlaySrc(url);
-        reportLoad({ kind: current.kind, percent: 100, phase: "ready" });
-        preloadAround(deckRef.current, index, 3, 1);
-      })
-      .catch(() => {
-        if (cancelled || loadGenRef.current !== gen) return;
+    const stop = startMediaPlaySrc(current, {
+      onSrc: (src) => {
+        if (loadGenRef.current !== gen) return;
+        const video = videoRef.current;
+        if (
+          video &&
+          playSrcRef.current &&
+          playSrcRef.current !== src &&
+          Number.isFinite(video.currentTime) &&
+          video.currentTime > 0.25
+        ) {
+          pendingSeekRef.current = video.currentTime;
+        }
+        setPlaySrc(src);
+        playSrcRef.current = src;
+      },
+      onProgress: (p) => {
+        if (loadGenRef.current !== gen) return;
+        reportLoad({
+          kind: current.kind,
+          percent: p.percent,
+          phase: p.phase === "error" ? "error" : p.phase,
+        });
+      },
+      onError: () => {
+        if (loadGenRef.current !== gen) return;
         reportLoad({ kind: current.kind, percent: null, phase: "error" });
         setFailed(true);
-      });
+      },
+    });
 
     preloadAround(deckRef.current, index, 3, 1);
 
     return () => {
-      cancelled = true;
+      stop();
     };
   }, [current?.id, current?.kind, index]);
 
@@ -712,6 +714,19 @@ export function MediaStage({
                   controls={false}
                   onClick={onVideoClick}
                   onError={onMediaError}
+                  onLoadedMetadata={() => {
+                    const seek = pendingSeekRef.current;
+                    const video = videoRef.current;
+                    if (
+                      seek != null &&
+                      video &&
+                      Number.isFinite(video.duration) &&
+                      video.duration > 0
+                    ) {
+                      video.currentTime = Math.min(seek, video.duration - 0.05);
+                      pendingSeekRef.current = null;
+                    }
+                  }}
                 />
               ) : (
                 <div className="media-stage__loading" aria-hidden>

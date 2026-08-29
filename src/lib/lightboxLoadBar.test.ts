@@ -17,6 +17,9 @@ describe("lightboxLoadBar", () => {
     expect(lightboxLoadLabel("video", 100, "opening")).toBe(
       "Файл скачан · открываю видео…",
     );
+    expect(lightboxLoadLabel("video", null, "opening", null, true)).toBe(
+      "Открываю видео…",
+    );
     expect(lightboxLoadLabel("gif", 12, "error")).toBe("Не удалось загрузить");
   });
 

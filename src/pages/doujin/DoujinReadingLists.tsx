@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { WheelPicker } from "../../components/WheelPicker";
 import { proxiedImageUrl } from "../../lib/doujin/cdn";
-import type { PageCacheProgress } from "../../lib/doujin/pageCache";
+import {
+  countPageBlobsByGallery,
+  readingListIsCached,
+  type PageCacheProgress,
+} from "../../lib/doujin/pageCache";
 import {
   DEFAULT_READING_LIST_NAME,
   READING_LIST_NOTE_MAX,
@@ -22,6 +26,10 @@ import {
 import { DoujinLangBadges } from "./DoujinGrid";
 import { DoujinListDeck, listDeckPreviewUrls } from "./DoujinListDeck";
 import { DoujinListPreview } from "./DoujinListPreview";
+import {
+  DoujinListTileActions,
+  type ListTileCacheState,
+} from "./DoujinListTileActions";
 
 type Props = {
   lists: DoujinReadingList[];
@@ -130,6 +138,9 @@ export function DoujinReadingLists({
   const triedEnrich = useRef<Set<string>>(new Set());
   const nameRef = useRef<HTMLInputElement>(null);
   const portrait = useMistressPortrait();
+  const [blobCounts, setBlobCounts] = useState<Map<number, number>>(
+    () => new Map(),
+  );
 
   async function createList() {
     setBusy(true);
@@ -150,6 +161,20 @@ export function DoujinReadingLists({
     setNoteOpen(false);
     setNoteDraft("");
   }, [openListId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void countPageBlobsByGallery()
+      .then((counts) => {
+        if (!cancelled) setBlobCounts(counts);
+      })
+      .catch(() => {
+        if (!cancelled) setBlobCounts(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [lists, cacheProgress?.status, cacheProgress?.listId]);
 
   const editingName = rename !== null;
   useEffect(() => {
@@ -598,75 +623,58 @@ export function DoujinReadingLists({
         {lists.map((list, index) => {
           const resumeAt = listResumeIndex(list);
           const canResume = listCanResume(list, pageProgress);
-            return (
-              <li key={list.id} className="doujin-lists__tile">
+          const cacheState: ListTileCacheState =
+            cacheProgress?.listId === list.id &&
+            cacheProgress.status === "running"
+              ? "running"
+              : readingListIsCached(list, blobCounts)
+                ? "done"
+                : "idle";
+          return (
+            <li key={list.id} className="doujin-lists__tile">
+              <button
+                type="button"
+                className="doujin-lists__tile-hit"
+                onClick={() => onOpenList(list.id)}
+              >
+                <DoujinListDeck
+                  urls={listDeckPreviewUrls(list.items, coverOverrides)}
+                  stagger={`${(index % 4) * 0.55}s`}
+                />
+              </button>
+              <div className="doujin-lists__tile-foot">
                 <button
                   type="button"
-                  className="doujin-lists__tile-hit"
+                  className="doujin-lists__tile-caption"
                   onClick={() => onOpenList(list.id)}
                 >
-                  <DoujinListDeck
-                    urls={listDeckPreviewUrls(list.items, coverOverrides)}
-                    stagger={`${(index % 4) * 0.55}s`}
-                  />
+                  <span className="doujin-lists__title">{list.name}</span>
                 </button>
-                <div
-                  className={
-                    "doujin-lists__tile-foot gelbooru-lists__tile-foot" +
-                    (canResume ? "" : " doujin-lists__tile-foot--solo")
+                <DoujinListTileActions
+                  cacheState={cacheState}
+                  canRead={list.items.length > 0}
+                  canResume={canResume}
+                  downloadDisabled={
+                    !keyed ||
+                    list.items.length === 0 ||
+                    cacheProgress?.status === "running"
                   }
-                >
-                  <button
-                    type="button"
-                    className="doujin-lists__tile-caption"
-                    onClick={() => onOpenList(list.id)}
-                  >
-                    <span className="doujin-lists__title">{list.name}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="doujin-lists__tile-play"
-                    disabled={list.items.length === 0}
-                    onClick={() => onPlay(list.id, 0, 0)}
-                  >
-                    Читать
-                  </button>
-                  {onDownloadList ? (
-                    <div className="gelbooru-lists__tile-xfer">
-                      <button
-                        type="button"
-                        className="doujin-lists__tile-play"
-                        disabled={
-                          !keyed ||
-                          list.items.length === 0 ||
-                          cacheProgress?.status === "running"
-                        }
-                        onClick={() => onDownloadList(list.id)}
-                      >
-                        {cacheProgress?.listId === list.id &&
-                        cacheProgress.status === "running"
-                          ? "Качаю…"
-                          : "Скачать"}
-                      </button>
-                    </div>
-                  ) : null}
-                  <span className="doujin-lists__sub">
-                    {worksLabel(list.items.length)}
-                    {listOrigin(list) === "mistress" ? " · её" : ""}
-                    {canResume ? ` · с ${resumeAt + 1}` : ""}
-                  </span>
-                  {canResume ? (
-                    <button
-                      type="button"
-                      className="doujin-lists__tile-resume"
-                      onClick={() => onPlay(list.id, resumeAt)}
-                    >
-                      Продолжить
-                    </button>
-                  ) : null}
-                </div>
-              </li>
-            );
+                  onDownload={
+                    onDownloadList
+                      ? () => onDownloadList(list.id)
+                      : undefined
+                  }
+                  onRead={() => onPlay(list.id, 0, 0)}
+                  onResume={() => onPlay(list.id, resumeAt)}
+                />
+                <span className="doujin-lists__sub">
+                  {worksLabel(list.items.length)}
+                  {listOrigin(list) === "mistress" ? " · её" : ""}
+                  {canResume ? ` · с ${resumeAt + 1}` : ""}
+                </span>
+              </div>
+            </li>
+          );
         })}
       </ul>
     </div>

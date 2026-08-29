@@ -1,4 +1,4 @@
-import type { IncomingMessage } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   cpSync,
   existsSync,
@@ -7,10 +7,21 @@ import {
   statSync,
 } from "node:fs";
 import path from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import type { Connect, Plugin } from "vite";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import {
+  MEDIA_STREAM_HEAD_BYTES,
+  MEDIA_STREAM_TAIL_PARTS,
+  mediaByteSegments,
+  mediaStreamHeadEnd,
+  parseContentRangeTotal,
+  parseHttpRange,
+  shouldParallelStreamRange,
+} from "./src/lib/mediaRangeParts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -107,6 +118,117 @@ function mediaProxyReferer(hostname: string): string {
   return "https://gelbooru.com/";
 }
 
+function mediaCdnHeaders(
+  hostname: string,
+  range?: string,
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    Accept: "*/*",
+    Referer: mediaProxyReferer(hostname),
+  };
+  if (range) headers.Range = range;
+  return headers;
+}
+
+async function pipeWebBody(
+  body: ReadableStream<Uint8Array>,
+  res: ServerResponse,
+  end: boolean,
+): Promise<void> {
+  const node = Readable.fromWeb(
+    body as import("node:stream/web").ReadableStream,
+  );
+  if (end) {
+    await pipeline(node, res);
+    return;
+  }
+  await new Promise<void>((resolve, reject) => {
+    const onError = (err: Error) => {
+      node.destroy();
+      reject(err);
+    };
+    node.once("error", onError);
+    res.once("error", onError);
+    node.once("end", () => resolve());
+    node.pipe(res, { end: false });
+  });
+}
+
+function writeProxyCommonHeaders(
+  res: ServerResponse,
+  type: string,
+  length: number | null,
+  extra?: { acceptRanges?: string; contentRange?: string },
+): void {
+  res.setHeader("Content-Type", type);
+  if (length != null) res.setHeader("Content-Length", String(length));
+  if (extra?.acceptRanges) res.setHeader("Accept-Ranges", extra.acceptRanges);
+  else res.setHeader("Accept-Ranges", "bytes");
+  if (extra?.contentRange) res.setHeader("Content-Range", extra.contentRange);
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader(
+    "Access-Control-Expose-Headers",
+    "Content-Length, Content-Range, Accept-Ranges",
+  );
+}
+
+async function proxyParallelRange(opts: {
+  url: string;
+  hostname: string;
+  start: number;
+  wantEnd: number;
+  total: number;
+  head: Response;
+  headEnd: number;
+  tailCount: number;
+  clientHadRange: boolean;
+  signal: AbortSignal;
+  res: ServerResponse;
+}): Promise<void> {
+  const type =
+    opts.head.headers.get("content-type") || "application/octet-stream";
+  const length = opts.wantEnd - opts.start + 1;
+  opts.res.statusCode = opts.clientHadRange ? 206 : 200;
+  writeProxyCommonHeaders(opts.res, type, length, {
+    contentRange: opts.clientHadRange
+      ? `bytes ${opts.start}-${opts.wantEnd}/${opts.total}`
+      : undefined,
+  });
+
+  const tails =
+    opts.wantEnd > opts.headEnd
+      ? mediaByteSegments(
+          opts.headEnd + 1,
+          opts.wantEnd,
+          Math.max(1, opts.tailCount),
+        ).map((part) =>
+          fetch(opts.url, {
+            headers: mediaCdnHeaders(
+              opts.hostname,
+              `bytes=${part.start}-${part.end}`,
+            ),
+            redirect: "follow",
+            signal: opts.signal,
+          }),
+        )
+      : [];
+
+  if (!opts.head.body) {
+    throw new Error("upstream empty");
+  }
+  await pipeWebBody(opts.head.body, opts.res, tails.length === 0);
+  for (let i = 0; i < tails.length; i += 1) {
+    const upstream = await tails[i]!;
+    if (upstream.status !== 206 || !upstream.body) {
+      throw new Error(`upstream ${upstream.status}`);
+    }
+    await pipeWebBody(upstream.body, opts.res, i === tails.length - 1);
+  }
+}
+
 function mediaProxyMiddleware(): Connect.NextHandleFunction {
   return async (req, res, next) => {
     if (!req.url?.startsWith("/api/media-proxy")) {
@@ -138,34 +260,126 @@ function mediaProxyMiddleware(): Connect.NextHandleFunction {
         return;
       }
 
+      const ac = new AbortController();
+      const onClose = () => ac.abort();
+      req.on("close", onClose);
+
+      const rangeHeader =
+        typeof req.headers.range === "string" ? req.headers.range.trim() : "";
+      const parsedRange = parseHttpRange(rangeHeader || null);
+      const clientHadRange = Boolean(rangeHeader);
+      const start = parsedRange?.start ?? 0;
+      const hintedEnd = parsedRange?.end ?? null;
+      const headEndHint =
+        hintedEnd != null
+          ? mediaStreamHeadEnd(start, hintedEnd)
+          : start + MEDIA_STREAM_HEAD_BYTES - 1;
+
+      const headers = mediaCdnHeaders(
+        parsed.hostname,
+        parsedRange == null
+          ? rangeHeader || undefined
+          : `bytes=${start}-${headEndHint}`,
+      );
+
       const upstream = await fetch(parsed.toString(), {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-          Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-          Referer: mediaProxyReferer(parsed.hostname),
-        },
+        headers,
         redirect: "follow",
+        signal: ac.signal,
       });
 
-      if (!upstream.ok || !upstream.body) {
+      if (!upstream.body) {
+        req.off("close", onClose);
         res.statusCode = upstream.status || 502;
         res.end(`upstream ${upstream.status}`);
         return;
       }
 
-      const type = upstream.headers.get("content-type") || "application/octet-stream";
-      res.setHeader("Content-Type", type);
-      res.setHeader("Cache-Control", "public, max-age=3600");
-      res.setHeader("Access-Control-Allow-Origin", "*");
+      const total =
+        parseContentRangeTotal(upstream.headers.get("content-range")) ??
+        (upstream.status === 200
+          ? Number(upstream.headers.get("content-length")) || null
+          : null);
+      const canFanOut =
+        upstream.status === 206 &&
+        parsedRange != null &&
+        total != null &&
+        Number.isFinite(total);
 
-      const buf = Buffer.from(await upstream.arrayBuffer());
-      res.end(buf);
+      if (canFanOut) {
+        const wantEnd =
+          hintedEnd == null ? total - 1 : Math.min(hintedEnd, total - 1);
+        const headEnd = Math.min(
+          mediaStreamHeadEnd(start, wantEnd),
+          wantEnd,
+        );
+        if (wantEnd > headEnd) {
+          try {
+            await proxyParallelRange({
+              url: parsed.toString(),
+              hostname: parsed.hostname,
+              start,
+              wantEnd,
+              total,
+              head: upstream,
+              headEnd,
+              tailCount: shouldParallelStreamRange(wantEnd - start + 1)
+                ? MEDIA_STREAM_TAIL_PARTS
+                : 1,
+              clientHadRange,
+              signal: ac.signal,
+              res,
+            });
+          } finally {
+            req.off("close", onClose);
+          }
+          return;
+        }
+      }
+
+      res.statusCode = upstream.status;
+      copyProxyResponseHeaders(upstream, res);
+
+      try {
+        await pipeline(
+          Readable.fromWeb(
+            upstream.body as import("node:stream/web").ReadableStream,
+          ),
+          res,
+        );
+      } catch (err) {
+        if (ac.signal.aborted || req.destroyed || res.destroyed) return;
+        throw err;
+      } finally {
+        req.off("close", onClose);
+      }
     } catch (err) {
+      if (res.headersSent || res.destroyed) return;
+      if (err instanceof Error && err.name === "AbortError") return;
       res.statusCode = 502;
       res.end(err instanceof Error ? err.message : "proxy error");
     }
   };
+}
+
+function copyProxyResponseHeaders(
+  upstream: Response,
+  res: ServerResponse,
+): void {
+  const type = upstream.headers.get("content-type") || "application/octet-stream";
+  res.setHeader("Content-Type", type);
+  const length = upstream.headers.get("content-length");
+  if (length) res.setHeader("Content-Length", length);
+  const acceptRanges = upstream.headers.get("accept-ranges");
+  if (acceptRanges) res.setHeader("Accept-Ranges", acceptRanges);
+  const contentRange = upstream.headers.get("content-range");
+  if (contentRange) res.setHeader("Content-Range", contentRange);
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader(
+    "Access-Control-Expose-Headers",
+    "Content-Length, Content-Range, Accept-Ranges",
+  );
 }
 
 /** Proxy remote booru / nhentai CDN files so <img> isn't blocked by hotlink/CORS. */

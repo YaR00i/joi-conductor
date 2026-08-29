@@ -10,3 +10,20 @@ export function feedTakeCounts(remaining: number): number[] {
   if (!out.includes(cap)) out.push(cap);
   return out;
 }
+
+export function defaultFeedTake(remaining: number, preferAll = false): number {
+  const counts = feedTakeCounts(remaining);
+  if (preferAll) return counts[counts.length - 1] ?? 1;
+  if (counts.includes(10)) return 10;
+  return counts[counts.length - 1] ?? 1;
+}
+
+export function toggleSelectedById<T extends { id: string | number }>(
+  list: readonly T[],
+  item: T,
+): T[] {
+  if (list.some((row) => row.id === item.id)) {
+    return list.filter((row) => row.id !== item.id);
+  }
+  return [...list, item];
+}

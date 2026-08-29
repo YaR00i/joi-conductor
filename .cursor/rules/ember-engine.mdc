@@ -1,20 +1,16 @@
 ---
-description: Архитектурный контракт движка и редактора Ember
+description: Архитектурный контракт Ember — Godot first, Three на паузе
 globs: "{src/game/**,src/components/ember/**,src/pages/Ember*.tsx,content/ember/**,docs/EMBER*.md}"
 alwaysApply: false
 ---
 
 # Ember Engine Contract
 
-Перед изменениями прочитай корневой `AGENTS.md`, `docs/EMBER_AI_HANDOFF.md` и, для архитектурных работ, `docs/EMBER_RESTRUCTURE_PLAN.md`. Продуктовая спецификация — `docs/EMBER_ANOMALY.md`. Воксельный контент-бот — `docs/EMBER_VOXEL_BOT.md`, он не даёт права менять движок.
+Перед изменениями прочитай корневой `AGENTS.md` и `docs/EMBER_AI_HANDOFF.md`. Продуктовый vision — `docs/EMBER_JRPG_DESIGN.md`. Воксельный контент-бот — `docs/EMBER_VOXEL_BOT.md`, он не даёт права менять движок. `EMBER_RESTRUCTURE_PLAN.md` не исполнять.
 
-- Цель: единый Unity/Blender-подобный редактор кубичного мира и один Three.js runtime (`EmberThreeWorld.ts`). Phaser — legacy, не вторая реализация. Creative Mode отложен.
-- Координаты данных: X/Y — карта, Z — высота. Three.js: X/Z — земля, Y — вверх. Используй готовые преобразования. `position.z: null` наследует поверхность. Scale учитывается renderer, collider, outline, light pivot и preview одинаково.
-- Коллизии объёмные: блок мешает только при пересечении вертикальных spans. Игрок и AI опираются на одну поверхность (`navigationSurfaceElevAtWorld`).
-- Crowd: baked height-surface grid 2×2 ячейки на тайл, ребро только если каждый подъём ≤ `MAX_AUTO_STEP_VOXELS = 4`. Не сериализовать flow, не возвращать connector-chain / route hashing / admin corridor, не ставить локальный `scale: 1.04`. Общий seam bleed `0.05` в `voxelPlacement.ts`.
-- Инспектор строится из компонентных схем (asset default / instance override / tombstone). Viewport, Outliner и Library ведут к одной `EmberWorldObjectRef`. Preview = commit; тяжёлый input — на pointer-up/Enter.
-- Скульптор: режимы Модель / Материал / Сцена / Анимация — представление над тем же JSON, не новый формат. Не возвращать глобальные хоткеи, где одна клавиша меняет инструменты двух режимов.
-- PointLight-тени пекутся только для static layer 0; актёры на layer 1. Не возвращать fake actor shadows и не подключать `three/addons/csm/CSM`. После правки статики — `invalidatePointLightShadows`.
-- Сначала проверяй local overrides: браузерный override старше диска, **кроме** пустого/тонкого voxel override. Пустой файл на диске не доказывает отсутствие данных; смотри `.bak`.
-- Воксели — пара `voxels/models/<id>.json` + `<id>.vox`. Писать только через `writeVoxelRegistry` с `dirtyIds`. Импорт/watch MagicaVoxel не затирает Ember JSON. Не дампить `registry.json`. Отсутствие в памяти ≠ удаление с диска.
-- Не reset/checkout рабочее дерево и Ember JSON. После изменений: targeted tests → `npm test` → `npm run build`; свет — дождаться flicker; crowd — F3 + F4/Shift+F4/F6, XP = 0. Обновляй handoff при смене контракта.
+- **Three.js play/editor в JOI приостановлен.** Не добавлять механики, свет, crowd, atlas и подсистемы в `EmberThreeWorld` / `src/game/three`. Фокус — sibling `ember-godot` (Godot 4 Forward+) и постепенная миграция.
+- Phaser — legacy, не вторая реализация. Creative Mode отложен. Не создавать третий renderer в этом репо.
+- Координаты данных: X/Y — карта, Z — высота. Three.js (frozen): X/Z — земля, Y — вверх. Godot: Y-up, `ember(x,y,z) = vox(x,z,y)`.
+- Воксели — пара `voxels/models/<id>.json` + `<id>.vox`. Писать только через `writeVoxelRegistry` с `dirtyIds`. Не дампить `registry.json`.
+- Новая механика принимается в Godot (Inspector, Undo/Redo, save/reopen). JOI sculptor остаётся writer моделей.
+- Не reset/checkout рабочее дерево и Ember JSON. Механики проверяй в Godot `agent_sandbox`, не WASD в Chromium.

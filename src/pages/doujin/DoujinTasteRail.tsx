@@ -12,6 +12,10 @@ import {
   tasteSyncProgressRatio,
   type TasteSyncStatus,
 } from "../../lib/doujin/tasteSync";
+import {
+  formatPageCacheProgress,
+  type PageCacheProgress,
+} from "../../lib/doujin/pageCache";
 import type {
   DoujinTag,
   DoujinTagType,
@@ -571,6 +575,51 @@ export function DoujinSyncToast({ sync }: { sync: TasteSyncStatus }) {
     >
       <span className="doujin-toast__kicker">
         {sync.running ? "Синхронизация" : sync.error ? "Ошибка" : "Готово"}
+      </span>
+      <span className="doujin-toast__text">{text}</span>
+    </div>
+  );
+}
+
+export function DoujinCacheToast({
+  progress,
+}: {
+  progress: PageCacheProgress | null;
+}) {
+  const [hold, setHold] = useState(false);
+  const wasRunning = useRef(false);
+
+  useEffect(() => {
+    if (!progress || progress.status === "idle") return;
+    if (progress.status === "running") {
+      wasRunning.current = true;
+      setHold(true);
+      return;
+    }
+    if (!wasRunning.current) return;
+    wasRunning.current = false;
+    setHold(true);
+    if (progress.status === "error") return;
+    const timer = window.setTimeout(() => setHold(false), 8000);
+    return () => window.clearTimeout(timer);
+  }, [progress]);
+
+  const text = formatPageCacheProgress(progress);
+  const running = progress?.status === "running";
+  const failed = progress?.status === "error";
+  if (!text || (!running && !failed && !hold)) return null;
+
+  return (
+    <div
+      className={
+        "doujin-toast" +
+        (failed ? " is-error" : running ? " is-live" : " is-done")
+      }
+      role="status"
+      aria-live="polite"
+    >
+      <span className="doujin-toast__kicker">
+        {running ? "Кэш" : failed ? "Ошибка" : "Готово"}
       </span>
       <span className="doujin-toast__text">{text}</span>
     </div>

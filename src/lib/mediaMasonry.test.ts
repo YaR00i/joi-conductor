@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   masonryPreviewSrc,
+  masonryStillUrl,
   masonryUpgradeSrc,
   type MediaItem,
 } from "./media";
@@ -32,11 +33,34 @@ describe("masonryPreviewSrc / masonryUpgradeSrc", () => {
     expect(masonryUpgradeSrc(post({ sampleUrl: undefined }))).toBeNull();
   });
 
-  it("does not upgrade local shelf, blobs, or video thumbs", () => {
+  it("does not upgrade local shelf or blobs", () => {
     expect(
       masonryUpgradeSrc(post({ source: "favorites", url: "blob:fav" })),
     ).toBeNull();
-    expect(masonryUpgradeSrc(post({ kind: "video" }))).toBeNull();
+  });
+
+  it("paints a still jpeg on video cards, not the webm/mp4", () => {
+    const item = post({
+      kind: "video",
+      url: "https://video.example/clip.mp4",
+      previewUrl: "https://img.example/thumb.jpg",
+      sampleUrl: "https://img.example/sample.jpg",
+    });
+    expect(masonryStillUrl(item)).toBe(item.previewUrl);
+    expect(masonryPreviewSrc(item)).toContain(encodeURIComponent("thumb.jpg"));
+    expect(masonryPreviewSrc(item)).not.toContain("clip.mp4");
+    expect(masonryUpgradeSrc(item)).toContain(encodeURIComponent("sample.jpg"));
+  });
+
+  it("does not put a sample video on the wall", () => {
+    const item = post({
+      kind: "video",
+      url: "https://video.example/clip.webm",
+      previewUrl: "https://img.example/thumb.jpg",
+      sampleUrl: "https://video.example/sample.webm",
+    });
+    expect(masonryUpgradeSrc(item)).toBeNull();
+    expect(masonryPreviewSrc(item)).toContain("thumb.jpg");
   });
 
   it("local shelf wall prefers the stored thumb blob, not the original", () => {

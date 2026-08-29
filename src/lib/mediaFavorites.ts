@@ -3,7 +3,7 @@ import {
   mapWithConcurrency,
   stillBlobToWallThumb,
 } from "./favoriteWallThumb";
-import { displayMediaUrl, type MediaItem, type MediaKind } from "./media";
+import { downloadMediaUrl, type MediaItem, type MediaKind } from "./media";
 import type { HubKindFilter } from "./mediaTypeFilter";
 import { isJunkBooruTag } from "./shopTagNoise";
 
@@ -597,7 +597,7 @@ export async function listFavoriteRecordsByIds(
 }
 
 async function fetchFavoriteBlob(item: MediaItem): Promise<Blob> {
-  const fetchUrl = displayMediaUrl(item);
+  const fetchUrl = downloadMediaUrl(item);
   const res = await fetch(fetchUrl);
   if (!res.ok) {
     throw new Error(`Не удалось скачать медиа (${res.status})`);
@@ -747,7 +747,7 @@ async function resolveFavoriteThumbBlob(
   const sampleUrl = item.sampleUrl?.trim();
   if (sampleUrl && sampleUrl !== item.url) {
     try {
-      const res = await fetch(displayMediaUrl({ ...item, url: sampleUrl }));
+      const res = await fetch(downloadMediaUrl({ ...item, url: sampleUrl }));
       if (res.ok) {
         const sample = await res.blob();
         if (

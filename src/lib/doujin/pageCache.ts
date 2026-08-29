@@ -117,6 +117,61 @@ export function emptyPageCacheProgress(listId = ""): PageCacheProgress {
   };
 }
 
+export function formatPageCacheProgress(
+  progress: PageCacheProgress | null | undefined,
+): string {
+  if (!progress || progress.status === "idle") return "";
+  if (progress.status === "error") {
+    return progress.error?.trim() || "Не удалось скачать список";
+  }
+  const pages =
+    progress.pagesTotal > 0
+      ? `${progress.pagesDone} / ${progress.pagesTotal} стр.`
+      : "";
+  const works =
+    progress.galleriesTotal > 0
+      ? `${progress.galleriesDone} / ${progress.galleriesTotal} работ`
+      : "";
+  if (progress.status === "done") {
+    if (progress.galleriesTotal > 0) {
+      return `Скачано · ${progress.galleriesDone} работ`;
+    }
+    return pages ? `Скачано · ${pages}` : "Скачано";
+  }
+  if (pages && works) return `${works} · ${pages}`;
+  return pages || works || "Качаю…";
+}
+
 export function estimateListPages(list: DoujinReadingList): number {
   return list.items.reduce((sum, item) => sum + Math.max(0, item.numPages), 0);
+}
+
+/** Counts cached pages per gallery from blob keys only — does not load blobs. */
+export async function countPageBlobsByGallery(): Promise<Map<number, number>> {
+  const db = await openDoujinDb();
+  const tx = db.transaction(PAGE_BLOBS_STORE, "readonly");
+  const keys = (await idbRequest(
+    tx.objectStore(PAGE_BLOBS_STORE).getAllKeys(),
+  )) as IDBValidKey[];
+  const counts = new Map<number, number>();
+  for (const key of keys) {
+    if (typeof key !== "string") continue;
+    const colon = key.indexOf(":");
+    if (colon <= 0) continue;
+    const id = Number(key.slice(0, colon));
+    if (!Number.isFinite(id)) continue;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
+}
+
+export function readingListIsCached(
+  list: Pick<DoujinReadingList, "items">,
+  counts: ReadonlyMap<number, number>,
+): boolean {
+  if (list.items.length === 0) return false;
+  return list.items.every((item) => {
+    const need = Math.max(1, item.numPages || 0);
+    return (counts.get(item.galleryId) ?? 0) >= need;
+  });
 }

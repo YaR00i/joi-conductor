@@ -230,6 +230,48 @@ function configureSessionPermissions() {
   ses.setPermissionCheckHandler((_wc, permission) => allow(permission));
 }
 
+const MEDIA_CDN_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+
+function mediaCdnReferer(url) {
+  try {
+    const host = new URL(url).hostname;
+    if (host === "nhentai.net" || host.endsWith(".nhentai.net")) {
+      return "https://nhentai.net/";
+    }
+    if (host === "gelbooru.com" || host.endsWith(".gelbooru.com")) {
+      return "https://gelbooru.com/";
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+/** Let <video>/<img> hit the CDN like the site (hotlink). XHR still uses the proxy. */
+function configureMediaCdnHeaders() {
+  const filter = {
+    urls: [
+      "https://*.gelbooru.com/*",
+      "https://gelbooru.com/*",
+      "https://*.nhentai.net/*",
+      "https://nhentai.net/*",
+    ],
+  };
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    filter,
+    (details, callback) => {
+      const referer = mediaCdnReferer(details.url);
+      const requestHeaders = { ...details.requestHeaders };
+      if (referer) {
+        requestHeaders.Referer = referer;
+        requestHeaders["User-Agent"] = MEDIA_CDN_UA;
+      }
+      callback({ requestHeaders });
+    },
+  );
+}
+
 ipcMain.on("window:minimize", () => mainWindow?.minimize());
 ipcMain.on("window:maximize", () => {
   if (!mainWindow) return;
@@ -879,6 +921,7 @@ ipcMain.handle("tts:speak", async (_e, payload) => {
 
 app.whenReady().then(() => {
   configureSessionPermissions();
+  configureMediaCdnHeaders();
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

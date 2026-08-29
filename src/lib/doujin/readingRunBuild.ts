@@ -37,8 +37,9 @@ function shuffle<T>(items: readonly T[], rng: () => number): T[] {
 }
 
 /**
- * Loved vs rare AND-pairs for an auto-list. Never circles/languages;
- * english is forced later via withLanguage.
+ * Loved vs rare AND-pairs for an auto-list. Unstarred circles and languages
+ * stay out of the pairing types; a starred circle can enter via loved tags.
+ * English is forced later via withLanguage.
  */
 export function pickMistressQueuePlans(
   moodScore: number,

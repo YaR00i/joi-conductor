@@ -138,6 +138,7 @@ import {
   type ContentTab,
 } from "../../lib/contentHub";
 import { useFavoriteSaveQueue } from "../../lib/favoriteSaveQueue";
+import { toggleSelectedById } from "../../lib/feedTake";
 import { ContentSourceKicker } from "../content/ContentSourceKicker";
 import { GelbooruHub } from "../content/GelbooruHub";
 import { DoujinPager } from "./DoujinPager";
@@ -150,6 +151,7 @@ import { DoujinReadingRunHud } from "./DoujinReadingRunHud";
 import { DoujinReadingRunPrompt } from "./DoujinReadingRunPrompt";
 import { DoujinSearchBar } from "./DoujinSearchBar";
 import {
+  DoujinCacheToast,
   DoujinSyncToast,
   DoujinTasteRail,
 } from "./DoujinTasteRail";
@@ -247,7 +249,9 @@ export function DoujinPage({
     card: DoujinCard;
     pool: DoujinCard[] | null;
     heading?: string;
+    packExact?: boolean;
   } | null>(null);
+  const [selectedCards, setSelectedCards] = useState<DoujinCard[]>([]);
   const [pageProgress, setPageProgress] = useState<Record<number, number>>(
     {},
   );
@@ -647,6 +651,10 @@ export function DoujinPage({
     saveContentHub({ source, tab });
   }, [source, tab]);
 
+  useEffect(() => {
+    setSelectedCards([]);
+  }, [tab, committedQuery, source]);
+
   async function openGallery(
     id: number,
     fromList?: { listId: string; index: number },
@@ -758,10 +766,22 @@ export function DoujinPage({
     await refreshLists();
   }
 
-  function openFoundPack(pool: DoujinCard[], heading: string) {
+  function openFoundPack(
+    pool: DoujinCard[],
+    heading: string,
+    packExact = false,
+  ) {
     const first = pool[0];
     if (!first) return;
-    setListTarget({ card: first, pool, heading });
+    setListTarget({ card: first, pool, heading, packExact });
+  }
+
+  function unfavoriteSelected() {
+    if (selectedCards.length === 0) return;
+    for (const card of selectedCards) {
+      if (savedIds.has(card.id)) toggleSave(card);
+    }
+    setSelectedCards([]);
   }
 
   async function playFromList(
@@ -964,19 +984,29 @@ export function DoujinPage({
     };
   })();
 
+  const selectedIds = useMemo(
+    () => new Set(selectedCards.map((card) => card.id)),
+    [selectedCards],
+  );
   const picker = listTarget ? (
     <DoujinListPicker
       card={listTarget.card}
       lists={lists}
       pool={listTarget.pool}
       heading={listTarget.heading}
+      packExact={listTarget.packExact}
       onClose={() => setListTarget(null)}
       onToggle={(id) => toggleCardInList(id, listTarget.card)}
       onPack={(id, cards) =>
-        addManyToReadingList(id, cards).then(() => refreshLists())
+        addManyToReadingList(id, cards).then(() => {
+          if (listTarget.packExact) setSelectedCards([]);
+          return refreshLists();
+        })
       }
       onCreate={(name, cards) =>
-        createListAndAdd(name, cards ?? [listTarget.card])
+        createListAndAdd(name, cards ?? [listTarget.card]).then(() => {
+          if (listTarget.packExact) setSelectedCards([]);
+        })
       }
     />
   ) : null;
@@ -988,6 +1018,7 @@ export function DoujinPage({
       }
     >
       {syncToast}
+      <DoujinCacheToast progress={cacheProgress} />
     </div>
   );
   const startPromptList =
@@ -1407,6 +1438,12 @@ export function DoujinPage({
                     onOpenLists={(card) =>
                       setListTarget({ card, pool: null })
                     }
+                    selectedIds={selectedIds}
+                    onToggleSelect={(card) =>
+                      setSelectedCards((prev) =>
+                        toggleSelectedById(prev, card),
+                      )
+                    }
                   />
                 </div>
               );
@@ -1460,13 +1497,37 @@ export function DoujinPage({
             setPage(1);
             setRecsTick((n) => n + 1);
           }}
-          onPackFound={() =>
+          onPackFound={() => {
+            if (selectedCards.length > 0) {
+              openFoundPack(
+                selectedCards,
+                `${selectedCards.length} выбранных`,
+                true,
+              );
+              return;
+            }
             openFoundPack(
               items,
               tab === "library" ? "Избранное" : "Найденное",
-            )
+            );
+          }}
+          packDisabled={
+            selectedCards.length === 0 && items.length === 0
           }
-          packDisabled={items.length === 0}
+          packTitle={
+            selectedCards.length > 0
+              ? `В список: ${selectedCards.length} выбранных`
+              : "В список из найденного"
+          }
+          onDeleteSelected={
+            tab === "library" ? unfavoriteSelected : undefined
+          }
+          deleteDisabled={selectedCards.length === 0}
+          deleteTitle={
+            selectedCards.length > 0
+              ? `Убрать из избранного: ${selectedCards.length}`
+              : "Выбери работы, чтобы убрать из избранного"
+          }
           catalogSort={tab === "library" ? libraryCatalogSort : undefined}
           onCatalogSort={tab === "library" ? setCatalogSort : undefined}
         />

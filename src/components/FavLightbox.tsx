@@ -341,6 +341,56 @@ export function BookmarkIcon({ filled }: { filled: boolean }) {
   );
 }
 
+export function SelectIcon({ on }: { on: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden>
+      <rect
+        x="2.5"
+        y="2.5"
+        width="11"
+        height="11"
+        rx="2.2"
+        fill={on ? "currentColor" : "none"}
+        stroke="currentColor"
+        strokeWidth="1.35"
+      />
+      {on ? (
+        <path
+          d="M5.15 8.15 7.1 10.05 11 5.7"
+          fill="none"
+          stroke="#1a0d08"
+          strokeWidth="1.55"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ) : null}
+    </svg>
+  );
+}
+
+export function CardSelectButton({
+  selected,
+  onClick,
+}: {
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={"doujin-card__select" + (selected ? " is-on" : "")}
+      aria-pressed={selected}
+      title={selected ? "Убрать из выбранных" : "Выбрать"}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+    >
+      <SelectIcon on={selected} />
+    </button>
+  );
+}
+
 function FullscreenIcon({ expanded }: { expanded: boolean }) {
   return (
     <svg viewBox="0 0 16 16" aria-hidden>
