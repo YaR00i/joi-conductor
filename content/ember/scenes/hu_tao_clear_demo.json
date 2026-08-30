@@ -25,12 +25,12 @@
           "id": "main",
           "speaker": "hu_tao",
           "portraitKey": "bunny_tease",
-          "x": 50,
-          "y": 100,
-          "scale": 1,
-          "z": 1,
+          "x": 50.0,
+          "y": 100.0,
+          "scale": 1.0,
+          "z": 1.0,
           "lockY": true,
-          "floorY": 100
+          "floorY": 100.0
         }
       ],
       "next": "choice"
@@ -45,10 +45,10 @@
           "id": "main",
           "speaker": "hu_tao",
           "portraitKey": "bunny_tease",
-          "x": 50,
-          "y": 92,
+          "x": 50.0,
+          "y": 92.0,
           "scale": 1.6,
-          "z": 1
+          "z": 1.0
         }
       ],
       "options": [
@@ -78,13 +78,13 @@
           "id": "main",
           "speaker": "hu_tao",
           "portraitKey": "bunny_smirk",
-          "x": 50,
-          "y": 100,
-          "scale": 1,
+          "x": 50.0,
+          "y": 100.0,
+          "scale": 1.0,
           "flipX": true,
-          "z": 1,
+          "z": 1.0,
           "lockY": true,
-          "floorY": 100
+          "floorY": 100.0
         }
       ],
       "next": "reward"
@@ -103,13 +103,13 @@
           "id": "main",
           "speaker": "hu_tao",
           "portraitKey": "bunny_shy",
-          "x": 50,
-          "y": 100,
-          "scale": 1,
-          "rotate": 0,
-          "z": 1,
+          "x": 50.0,
+          "y": 100.0,
+          "scale": 1.0,
+          "rotate": 0.0,
+          "z": 1.0,
           "lockY": true,
-          "floorY": 100
+          "floorY": 100.0
         }
       ],
       "next": "reward"
@@ -117,7 +117,7 @@
     {
       "id": "reward",
       "type": "grant_cinders",
-      "amount": 5,
+      "amount": 5.0,
       "next": "end"
     },
     {
@@ -127,32 +127,45 @@
   ],
   "editorLayout": {
     "cg": {
-      "x": 0,
-      "y": 0
+      "x": 0.0,
+      "y": 0.0
     },
     "intro": {
-      "x": 280,
-      "y": 0
+      "x": 420.0,
+      "y": -80.0
     },
     "choice": {
-      "x": 560,
-      "y": 0
+      "x": 820.0,
+      "y": -20.0
     },
     "brave_reply": {
-      "x": 835.4108721699255,
-      "y": -160.61947405260636
+      "x": 1240.0,
+      "y": -20.0
     },
     "fluster_reply": {
-      "x": 840,
-      "y": 234.0771205165266
+      "x": 1240.0,
+      "y": 360.0
     },
     "reward": {
-      "x": 1122.3908927969815,
-      "y": 0
+      "x": 1640.0,
+      "y": 120.0
     },
     "end": {
-      "x": 1400,
-      "y": 0
+      "x": 2060.0,
+      "y": 120.0
     }
-  }
+  },
+  "editorGroups": [
+    {
+      "id": "group_1",
+      "title": "Новая группа",
+      "members": [
+        "intro",
+        "choice",
+        "brave_reply",
+        "fluster_reply"
+      ],
+      "collapsed": false
+    }
+  ]
 }

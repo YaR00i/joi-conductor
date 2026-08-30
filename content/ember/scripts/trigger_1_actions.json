@@ -3,6 +3,10 @@
   "nameRu": "Новая цепочка",
   "steps": [
     {
+      "type": "talk",
+      "dialogueId": "trigger_1_actions_talk"
+    },
+    {
       "type": "give_item",
       "itemId": "coin",
       "count": 10

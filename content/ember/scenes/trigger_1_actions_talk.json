@@ -1,0 +1,65 @@
+{
+  "id": "trigger_1_actions_talk",
+  "nameRu": "Новый диалог",
+  "use": "talk",
+  "startStepId": "choice_1",
+  "steps": [
+    {
+      "id": "choice_1_reply_1",
+      "type": "dialogue",
+      "speaker": "guide",
+      "portraitKey": "neutral",
+      "nameRu": "Проводник",
+      "textRu": "Ну норм так норм, держи монетки",
+      "next": "end"
+    },
+    {
+      "id": "choice_1_reply_2",
+      "type": "dialogue",
+      "speaker": "guide",
+      "portraitKey": "neutral",
+      "nameRu": "Проводник",
+      "textRu": "Так взбодрись! Держи монетки",
+      "next": "end"
+    },
+    {
+      "id": "choice_1",
+      "type": "choice",
+      "promptRu": "хеллоу, капсула! Как жизнь?",
+      "options": [
+        {
+          "id": "option_1",
+          "labelRu": "Норм",
+          "next": "choice_1_reply_1"
+        },
+        {
+          "id": "option_2",
+          "labelRu": "Так себе",
+          "next": "choice_1_reply_2"
+        }
+      ]
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  "editorLayout": {
+    "choice_1": {
+      "x": 40,
+      "y": 80
+    },
+    "choice_1_reply_1": {
+      "x": 320,
+      "y": 20
+    },
+    "choice_1_reply_2": {
+      "x": 320,
+      "y": 160
+    },
+    "end": {
+      "x": 320,
+      "y": 80
+    }
+  }
+}

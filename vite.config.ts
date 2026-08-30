@@ -22,6 +22,11 @@ import {
   parseHttpRange,
   shouldParallelStreamRange,
 } from "./src/lib/mediaRangeParts";
+import {
+  cancelWebBody,
+  isBenignProxyDisconnect,
+  watchFetchAbort,
+} from "./src/lib/proxyAbort";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -105,7 +110,14 @@ function emberContentPlugin(): Plugin {
     },
     writeBundle() {
       const out = path.resolve(__dirname, "dist/ember");
-      cpSync(root, out, { recursive: true });
+      cpSync(root, out, {
+        recursive: true,
+        // Crash-leftover `.tmp-*` siblings and `.bak` backups are not content.
+        filter: (src) => {
+          const name = path.basename(src);
+          return !/\.tmp-/.test(name) && !name.endsWith(".bak.json");
+        },
+      });
       console.log(`[ember-content] copied → ${out}`);
     },
   };
@@ -140,20 +152,25 @@ async function pipeWebBody(
   const node = Readable.fromWeb(
     body as import("node:stream/web").ReadableStream,
   );
-  if (end) {
-    await pipeline(node, res);
-    return;
+  try {
+    if (end) {
+      await pipeline(node, res);
+      return;
+    }
+    await new Promise<void>((resolve, reject) => {
+      const onError = (err: Error) => {
+        node.destroy();
+        reject(err);
+      };
+      node.once("error", onError);
+      res.once("error", onError);
+      node.once("end", () => resolve());
+      node.pipe(res, { end: false });
+    });
+  } catch (err) {
+    if (isBenignProxyDisconnect(err)) return;
+    throw err;
   }
-  await new Promise<void>((resolve, reject) => {
-    const onError = (err: Error) => {
-      node.destroy();
-      reject(err);
-    };
-    node.once("error", onError);
-    res.once("error", onError);
-    node.once("end", () => resolve());
-    node.pipe(res, { end: false });
-  });
 }
 
 function writeProxyCommonHeaders(
@@ -205,14 +222,16 @@ async function proxyParallelRange(opts: {
           opts.wantEnd,
           Math.max(1, opts.tailCount),
         ).map((part) =>
-          fetch(opts.url, {
-            headers: mediaCdnHeaders(
-              opts.hostname,
-              `bytes=${part.start}-${part.end}`,
-            ),
-            redirect: "follow",
-            signal: opts.signal,
-          }),
+          watchFetchAbort(
+            fetch(opts.url, {
+              headers: mediaCdnHeaders(
+                opts.hostname,
+                `bytes=${part.start}-${part.end}`,
+              ),
+              redirect: "follow",
+              signal: opts.signal,
+            }),
+          ),
         )
       : [];
 
@@ -236,6 +255,8 @@ function mediaProxyMiddleware(): Connect.NextHandleFunction {
       return;
     }
 
+    let settled = false;
+    let onClose: (() => void) | undefined;
     try {
       const incoming = new URL(req.url, "http://127.0.0.1");
       const target = incoming.searchParams.get("url");
@@ -261,7 +282,9 @@ function mediaProxyMiddleware(): Connect.NextHandleFunction {
       }
 
       const ac = new AbortController();
-      const onClose = () => ac.abort();
+      onClose = () => {
+        if (!settled) ac.abort();
+      };
       req.on("close", onClose);
 
       const rangeHeader =
@@ -282,14 +305,25 @@ function mediaProxyMiddleware(): Connect.NextHandleFunction {
           : `bytes=${start}-${headEndHint}`,
       );
 
-      const upstream = await fetch(parsed.toString(), {
-        headers,
-        redirect: "follow",
-        signal: ac.signal,
-      });
+      const upstream = await watchFetchAbort(
+        fetch(parsed.toString(), {
+          headers,
+          redirect: "follow",
+          signal: ac.signal,
+        }),
+      );
+
+      if (ac.signal.aborted) {
+        cancelWebBody(upstream.body);
+        return;
+      }
+      ac.signal.addEventListener(
+        "abort",
+        () => cancelWebBody(upstream.body),
+        { once: true },
+      );
 
       if (!upstream.body) {
-        req.off("close", onClose);
         res.statusCode = upstream.status || 502;
         res.end(`upstream ${upstream.status}`);
         return;
@@ -314,25 +348,21 @@ function mediaProxyMiddleware(): Connect.NextHandleFunction {
           wantEnd,
         );
         if (wantEnd > headEnd) {
-          try {
-            await proxyParallelRange({
-              url: parsed.toString(),
-              hostname: parsed.hostname,
-              start,
-              wantEnd,
-              total,
-              head: upstream,
-              headEnd,
-              tailCount: shouldParallelStreamRange(wantEnd - start + 1)
-                ? MEDIA_STREAM_TAIL_PARTS
-                : 1,
-              clientHadRange,
-              signal: ac.signal,
-              res,
-            });
-          } finally {
-            req.off("close", onClose);
-          }
+          await proxyParallelRange({
+            url: parsed.toString(),
+            hostname: parsed.hostname,
+            start,
+            wantEnd,
+            total,
+            head: upstream,
+            headEnd,
+            tailCount: shouldParallelStreamRange(wantEnd - start + 1)
+              ? MEDIA_STREAM_TAIL_PARTS
+              : 1,
+            clientHadRange,
+            signal: ac.signal,
+            res,
+          });
           return;
         }
       }
@@ -348,16 +378,30 @@ function mediaProxyMiddleware(): Connect.NextHandleFunction {
           res,
         );
       } catch (err) {
-        if (ac.signal.aborted || req.destroyed || res.destroyed) return;
+        if (
+          ac.signal.aborted ||
+          req.destroyed ||
+          res.destroyed ||
+          isBenignProxyDisconnect(err)
+        ) {
+          return;
+        }
         throw err;
-      } finally {
-        req.off("close", onClose);
       }
     } catch (err) {
-      if (res.headersSent || res.destroyed) return;
-      if (err instanceof Error && err.name === "AbortError") return;
+      if (
+        isBenignProxyDisconnect(err) ||
+        req.destroyed ||
+        res.destroyed ||
+        res.headersSent
+      ) {
+        return;
+      }
       res.statusCode = 502;
       res.end(err instanceof Error ? err.message : "proxy error");
+    } finally {
+      settled = true;
+      if (onClose) req.off("close", onClose);
     }
   };
 }
@@ -595,6 +639,20 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) =>
           path.replace(/^\/api\/gelbooru/, "/index.php"),
+        configure(proxy) {
+          proxy.on("error", (err, _req, socket) => {
+            if (isBenignProxyDisconnect(err)) return;
+            const res = socket as ServerResponse | undefined;
+            if (res && "headersSent" in res && !res.headersSent) {
+              try {
+                res.statusCode = 502;
+                res.end("gelbooru proxy error");
+              } catch {
+                /* client gone */
+              }
+            }
+          });
+        },
       },
       "/api/ollama": {
         target: "http://127.0.0.1:11434",
