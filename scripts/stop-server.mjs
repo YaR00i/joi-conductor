@@ -5,7 +5,9 @@ import {
   isPortListening,
   killPortListeners,
   killProcessTree,
-  killProjectNodeProcesses,
+  killProjectElectronProcesses,
+  killProjectViteProcesses,
+  listProjectViteProcesses,
 } from "./process-utils.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -23,7 +25,15 @@ export function stopJoiConductorServer(options = {}) {
     const raw = readFileSync(pidFile, "utf8").trim();
     const pid = Number(raw.split(/\s+/)[0]);
     if (Number.isFinite(pid) && pid > 0) {
-      if (killProcessTree(pid)) stopped += 1;
+      // Windows recycles PIDs; never kill whatever happens to own the number now.
+      const stillOurs = listProjectViteProcesses(root).some(
+        (row) => row.ProcessId === pid,
+      );
+      if (stillOurs) {
+        if (killProcessTree(pid)) stopped += 1;
+      } else {
+        log(`[Внимание] PID ${pid} из pid-файла больше не наш сервер — не трогаю его.`);
+      }
     }
     try {
       unlinkSync(pidFile);
@@ -33,7 +43,8 @@ export function stopJoiConductorServer(options = {}) {
   }
 
   stopped += killPortListeners(port);
-  stopped += killProjectNodeProcesses(root);
+  stopped += killProjectViteProcesses(root);
+  stopped += killProjectElectronProcesses(root);
 
   const stillUp = isPortListening(port);
   if (!silent) {

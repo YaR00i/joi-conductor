@@ -214,7 +214,8 @@ os.makedirs(dest, exist_ok=True)
 tmp = tempfile.mkdtemp(prefix="gsv-")
 zip_path = os.path.join(tmp, "src.zip")
 print("скачиваю архив репозитория…", flush=True)
-urllib.request.urlretrieve(url, zip_path)
+with urllib.request.urlopen(url, timeout=30) as r, open(zip_path, "wb") as f:
+    shutil.copyfileobj(r, f)
 with zipfile.ZipFile(zip_path) as z:
     z.extractall(tmp)
 found = None

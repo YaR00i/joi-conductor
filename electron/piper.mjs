@@ -2,13 +2,11 @@
  * Local Piper neural TTS (RU Irina) — works offline after one-time download.
  */
 import { app } from "electron";
-import { createWriteStream, existsSync, mkdirSync, promises as fs } from "node:fs";
+import { existsSync, mkdirSync, promises as fs } from "node:fs";
 import path from "node:path";
+import { downloadFile } from "./installDownload.mjs";
 import { spawn } from "node:child_process";
-import { pipeline } from "node:stream/promises";
 import { createHash } from "node:crypto";
-import https from "node:https";
-import http from "node:http";
 
 const PIPER_ZIP =
   "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_windows_amd64.zip";
@@ -60,49 +58,6 @@ export function getPiperStatus() {
     root: piperRoot(),
     voice: "ru_RU-irina-medium",
   };
-}
-
-function downloadFile(url, dest, onProgress) {
-  return new Promise((resolve, reject) => {
-    mkdirSync(path.dirname(dest), { recursive: true });
-    const file = createWriteStream(dest);
-    const getter = url.startsWith("https") ? https : http;
-
-    const follow = (u, redirects = 0) => {
-      if (redirects > 8) {
-        reject(new Error("Слишком много редиректов"));
-        return;
-      }
-      getter
-        .get(u, { headers: { "User-Agent": "joi-conductor/piper" } }, (res) => {
-          if (
-            res.statusCode &&
-            res.statusCode >= 300 &&
-            res.statusCode < 400 &&
-            res.headers.location
-          ) {
-            res.resume();
-            follow(res.headers.location, redirects + 1);
-            return;
-          }
-          if ((res.statusCode ?? 500) >= 400) {
-            reject(new Error(`HTTP ${res.statusCode} для ${u}`));
-            return;
-          }
-          const total = Number(res.headers["content-length"] || 0);
-          let got = 0;
-          res.on("data", (chunk) => {
-            got += chunk.length;
-            if (total > 0 && onProgress) {
-              onProgress(Math.min(99, Math.round((got / total) * 100)));
-            }
-          });
-          pipeline(res, file).then(resolve).catch(reject);
-        })
-        .on("error", reject);
-    };
-    follow(url);
-  });
 }
 
 function expandZip(zipPath, outDir) {

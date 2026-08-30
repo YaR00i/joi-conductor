@@ -13,6 +13,7 @@ export async function fetchOllamaSearchHtml(query) {
       Accept: "text/html",
       "User-Agent": "joi-conductor/ollama-search",
     },
+    signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) {
     throw new Error(`Библиотека Ollama HTTP ${res.status}`);

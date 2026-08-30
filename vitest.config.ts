@@ -7,7 +7,11 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["src/**/*.{test,spec}.ts", "electron/**/*.test.ts"],
+    include: [
+      "src/**/*.{test,spec}.ts",
+      "electron/**/*.test.ts",
+      "scripts/**/*.test.ts",
+    ],
     clearMocks: true,
   },
   resolve: {

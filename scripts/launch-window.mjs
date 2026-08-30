@@ -27,6 +27,10 @@ function waitForServer(timeoutMs = 90000) {
         res.resume();
         resolve();
       });
+      // A half-open socket must count against the budget, not hang the poll.
+      req.setTimeout(10_000, () => {
+        req.destroy(new Error("probe timeout"));
+      });
       req.on("error", () => {
         if (Date.now() - started > timeoutMs) {
           reject(new Error(`Сервер не ответил за ${timeoutMs / 1000}с: ${url}`));

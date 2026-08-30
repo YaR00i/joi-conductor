@@ -577,8 +577,27 @@ export function deviceStatus() {
   return snapshot();
 }
 
-export function deviceStopOnQuit() {
+const DEVICE_STOP_ON_QUIT_GRACE_MS = 1500;
+let deviceStopOnQuitStarted = false;
+
+/**
+ * The stop command must reach the device before bpClose() discards pending
+ * sends — otherwise a connected toy keeps running after the app exits.
+ * Bounded by a short grace so quit is never delayed for long.
+ */
+export async function deviceStopOnQuit() {
   stopMockPulse();
-  void deviceStop().catch(() => {});
+  if (deviceStopOnQuitStarted) return;
+  deviceStopOnQuitStarted = true;
+  try {
+    await Promise.race([
+      deviceStop(),
+      new Promise((resolve) =>
+        setTimeout(resolve, DEVICE_STOP_ON_QUIT_GRACE_MS),
+      ),
+    ]);
+  } catch {
+    /* device already gone */
+  }
   bpClose();
 }

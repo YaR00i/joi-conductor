@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, session, shell } from "electron";
 import {
+  appendFileSync,
   copyFileSync,
   existsSync,
   mkdirSync,
@@ -97,6 +98,45 @@ const root = path.resolve(__dirname, "..");
 const port = Number(process.env.PORT || 5173);
 const startUrl =
   process.env.JOI_CONDUCTOR_URL || `http://127.0.0.1:${port}`;
+
+// One window owns the pack and the dev server; a second launch focuses the
+// existing window instead of racing it for content/ember writes.
+const singleInstanceLockHeld = app.requestSingleInstanceLock();
+if (!singleInstanceLockHeld) app.quit();
+
+app.on("second-instance", () => {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.focus();
+});
+
+// A stray throw in main would exit before before-quit runs and orphan the
+// managed child processes (ollama/qwen/sovits/wd14). Log and stay alive.
+const mainErrorLogPath = path.join(app.getPath("userData"), "main-errors.log");
+
+function logMainError(kind, err) {
+  const detail =
+    err instanceof Error ? err.stack ?? err.message : String(err);
+  const line = `${new Date().toISOString()} ${kind} ${detail}\n`;
+  console.error(line.trimEnd());
+  try {
+    mkdirSync(path.dirname(mainErrorLogPath), { recursive: true });
+    if (
+      existsSync(mainErrorLogPath) &&
+      statSync(mainErrorLogPath).size > 1_000_000
+    ) {
+      renameSync(mainErrorLogPath, `${mainErrorLogPath}.old`);
+    }
+    appendFileSync(mainErrorLogPath, line, "utf8");
+  } catch {
+    // logging must never take main down
+  }
+}
+
+process.on("uncaughtException", (err) => logMainError("uncaughtException", err));
+process.on("unhandledRejection", (reason) =>
+  logMainError("unhandledRejection", reason),
+);
 
 // Chromium often blocks/mutes media in Electron without this.
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
@@ -461,6 +501,8 @@ ipcMain.handle("ember:list", async (_e, relDir) => {
   }
   try {
     const names = readdirSync(abs).filter((name) => {
+      // Crash-leftover `.tmp-*` siblings and `.bak` backups are not content.
+      if (/\.tmp-/.test(name) || name.endsWith(".bak.json")) return false;
       try {
         return statSync(path.join(abs, name)).isFile();
       } catch {
@@ -920,6 +962,7 @@ ipcMain.handle("tts:speak", async (_e, payload) => {
 });
 
 app.whenReady().then(() => {
+  if (!singleInstanceLockHeld) return;
   configureSessionPermissions();
   configureMediaCdnHeaders();
   createWindow();
@@ -946,8 +989,8 @@ app.on("before-quit", () => {
   stopWd14OnQuit();
 });
 
-app.on("window-all-closed", () => {
-  deviceStopOnQuit();
+app.on("window-all-closed", async () => {
+  await deviceStopOnQuit();
   stopOllamaOnQuit();
   stopSovitsOnQuit();
   stopQwenOnQuit();

@@ -44,6 +44,8 @@ export async function tagImageViaServer(opts) {
       "Content-Length": String(body.length),
     },
     body,
+    // First inference may load the model on CPU, so keep this generous.
+    signal: AbortSignal.timeout(120_000),
   });
 
   if (!res.ok) {

@@ -2,11 +2,9 @@
  * App-managed WD14 env: venv + onnxruntime/fastapi + MoAT weights in userData.
  */
 import { app } from "electron";
-import { createWriteStream, existsSync, mkdirSync } from "node:fs";
-import http from "node:http";
-import https from "node:https";
+import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
-import { pipeline } from "node:stream/promises";
+import { downloadFile } from "./installDownload.mjs";
 import { ensureQwenPythonEnv, venvPythonPath } from "./qwenEnv.mjs";
 import { findHostPython, spawnCapture } from "./qwenInstall.mjs";
 import { wd14ModelsReady } from "./wd14Runtime.mjs";
@@ -42,49 +40,6 @@ export function wd14AppModelDir() {
 export function findAppWd14Python() {
   const py = venvPythonPath(wd14AppVenvDir());
   return existsSync(py) ? py : null;
-}
-
-function downloadFile(url, dest, onProgress) {
-  return new Promise((resolve, reject) => {
-    mkdirSync(path.dirname(dest), { recursive: true });
-    const file = createWriteStream(dest);
-    const getter = url.startsWith("https") ? https : http;
-    const follow = (u, redirects = 0) => {
-      if (redirects > 8) {
-        reject(new Error("Слишком много редиректов"));
-        return;
-      }
-      getter
-        .get(u, { headers: { "User-Agent": "joi-conductor/wd14" } }, (res) => {
-          if (
-            res.statusCode &&
-            res.statusCode >= 300 &&
-            res.statusCode < 400 &&
-            res.headers.location
-          ) {
-            res.resume();
-            follow(res.headers.location, redirects + 1);
-            return;
-          }
-          if ((res.statusCode ?? 500) >= 400) {
-            file.close();
-            reject(new Error(`HTTP ${res.statusCode} для ${u}`));
-            return;
-          }
-          const total = Number(res.headers["content-length"] || 0);
-          let got = 0;
-          res.on("data", (chunk) => {
-            got += chunk.length;
-            if (total > 0 && onProgress) {
-              onProgress(Math.min(99, Math.round((got / total) * 100)));
-            }
-          });
-          pipeline(res, file).then(resolve).catch(reject);
-        })
-        .on("error", reject);
-    };
-    follow(url);
-  });
 }
 
 /**

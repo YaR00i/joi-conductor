@@ -62,16 +62,40 @@ export function killPortListeners(targetPort) {
   return killed;
 }
 
-/** Kill node.exe processes tied to this project. */
-export function killProjectNodeProcesses(projectRoot) {
-  if (process.platform !== "win32") return 0;
+const VITE_SCRIPT_SEGMENT = "node_modules/vite/bin/vite.js";
 
-  const marker = projectRoot.replace(/\\/g, "\\\\");
+function normalizeForMatch(value) {
+  return String(value ?? "").replace(/\\/g, "/").toLowerCase();
+}
+
+/**
+ * True only for this project's own vite dev/preview server. Stop runs on every
+ * app launch, so a broader match (any project node.exe) used to take down
+ * vitest watchers, tsx agents and editor tooling sharing the repo path.
+ */
+export function isProjectViteCommandLine(commandLine, projectRoot) {
+  if (typeof commandLine !== "string" || !commandLine) return false;
+  const line = normalizeForMatch(commandLine);
+  const root = normalizeForMatch(projectRoot).replace(/\/+$/, "");
+  return line.includes(root) && line.includes(VITE_SCRIPT_SEGMENT);
+}
+
+/** True when the executable is Electron shipped in this project's node_modules. */
+export function isProjectElectronPath(executablePath, projectRoot) {
+  if (typeof executablePath !== "string" || !executablePath) return false;
+  const exe = normalizeForMatch(executablePath);
+  const root = normalizeForMatch(projectRoot).replace(/\/+$/, "");
+  return exe.startsWith(`${root}/node_modules/electron/`);
+}
+
+/** Windows-only process rows for an image name (pid, command line, exe path). */
+function listWindowsProcesses(imageName) {
+  if (process.platform !== "win32") return [];
+
   const ps = `
-    $root = '${marker}'
-    Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" |
-      Where-Object { $_.CommandLine -and $_.CommandLine -like "*$root*" } |
-      ForEach-Object { $_.ProcessId }
+    Get-CimInstance Win32_Process -Filter "Name = '${imageName}'" |
+      Select-Object ProcessId, CommandLine, ExecutablePath |
+      ConvertTo-Json -Compress
   `;
 
   const result = spawnSync(
@@ -80,14 +104,40 @@ export function killProjectNodeProcesses(projectRoot) {
     { encoding: "utf8", windowsHide: true },
   );
 
-  const pids = (result.stdout || "")
-    .split(/\r?\n/)
-    .map((line) => Number(line.trim()))
-    .filter((pid) => Number.isFinite(pid) && pid > 0 && pid !== process.pid);
+  const stdout = (result.stdout || "").trim();
+  if (!stdout) return [];
+  try {
+    const parsed = JSON.parse(stdout);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return [];
+  }
+}
 
+/** Live vite dev/preview server processes belonging to this project. */
+export function listProjectViteProcesses(projectRoot) {
+  return listWindowsProcesses("node.exe").filter((row) =>
+    isProjectViteCommandLine(row.CommandLine, projectRoot),
+  );
+}
+
+/** Kill this project's vite servers; unrelated project tooling survives. */
+export function killProjectViteProcesses(projectRoot) {
   let killed = 0;
-  for (const pid of pids) {
-    if (killProcessTree(pid)) killed += 1;
+  for (const row of listProjectViteProcesses(projectRoot)) {
+    if (row.ProcessId === process.pid) continue;
+    if (killProcessTree(row.ProcessId)) killed += 1;
+  }
+  return killed;
+}
+
+/** Kill Electron windows launched from this project's node_modules. */
+export function killProjectElectronProcesses(projectRoot) {
+  let killed = 0;
+  for (const row of listWindowsProcesses("electron.exe")) {
+    if (row.ProcessId === process.pid) continue;
+    if (!isProjectElectronPath(row.ExecutablePath, projectRoot)) continue;
+    if (killProcessTree(row.ProcessId)) killed += 1;
   }
   return killed;
 }
