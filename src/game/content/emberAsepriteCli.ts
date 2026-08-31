@@ -7,6 +7,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
@@ -51,7 +52,9 @@ function loadSpritesFile(filePath: string): EmberSpritesFile {
 
 function writeSpritesFile(filePath: string, file: EmberSpritesFile): void {
   mkdirSync(path.dirname(filePath), { recursive: true });
-  writeFileSync(filePath, `${JSON.stringify(file, null, 2)}\n`, "utf8");
+  const tmp = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+  writeFileSync(tmp, `${JSON.stringify(file, null, 2)}\n`, "utf8");
+  renameSync(tmp, filePath);
 }
 
 function upsertSprite(

@@ -402,6 +402,15 @@ export async function readCachedMediaBlob(
   }
 }
 
+/** Prefer RAM cache (already downloaded for play) so a like does not re-hit the CDN. */
+export async function blobForFavoriteSave(
+  item: MediaItem,
+  onProgress?: (p: PreloadProgress) => void,
+): Promise<Blob | null> {
+  await ensureMediaCached(item, onProgress);
+  return readCachedMediaBlob(item.id);
+}
+
 function commitReadyBlob(
   itemId: string,
   stub: CacheEntry,

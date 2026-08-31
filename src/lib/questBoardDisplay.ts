@@ -4,10 +4,8 @@ import type { QuestExerciseKind } from "./types";
 export type QuestBoardRow = {
   id: QuestDef["id"];
   nameRu: string;
-  ruleRu: string;
   kindRu: string;
-  durationLabelRu: string;
-  rewardLabelRu: string;
+  enabled: boolean;
 };
 
 export function questExerciseKindRu(kind: QuestExerciseKind): string {
@@ -45,16 +43,15 @@ export function formatQuestDurationRu(sec: number): string {
   return s > 0 ? `${m} мин ${s} с` : `${m} мин`;
 }
 
-/** Read-only meta board rows from the mid-session quest catalog. */
+/** Pool rows: names only — no rules, so the live offer stays a surprise. */
 export function listQuestBoardRows(
   catalog: readonly QuestDef[] = QUEST_CATALOG,
+  disabledIds: ReadonlySet<string> = new Set(),
 ): QuestBoardRow[] {
   return catalog.map((q) => ({
     id: q.id,
     nameRu: q.nameRu,
-    ruleRu: q.ruleRu,
     kindRu: questExerciseKindRu(q.exerciseKind),
-    durationLabelRu: formatQuestDurationRu(q.durationSec),
-    rewardLabelRu: formatQuestRewardRangeRu(q.rewardMin, q.rewardMax),
+    enabled: !disabledIds.has(q.id),
   }));
 }

@@ -141,6 +141,28 @@ function fillTemplate(
   });
 }
 
+/** Pull latest catalog name/body onto open rows so copy waves land today. */
+function syncOpenContractCopy(board: DailyContractBoard): DailyContractBoard {
+  let changed = false;
+  const contracts = board.contracts.map((c) => {
+    if (c.status !== "open") return c;
+    const def = getContractDef(c.defId);
+    if (!def) return c;
+    const titleRu = def.nameRu;
+    const bodyRu = fillTemplate(def.instructionRu, c.params);
+    if (
+      titleRu === c.titleRu &&
+      bodyRu === c.bodyRu &&
+      def.category === c.category
+    ) {
+      return c;
+    }
+    changed = true;
+    return { ...c, titleRu, bodyRu, category: def.category };
+  });
+  return changed ? { ...board, contracts } : board;
+}
+
 function rollParams(
   def: ContractDef,
   rng: () => number,
@@ -359,7 +381,7 @@ function expireOpen(board: DailyContractBoard, nowMs: number): DailyContractBoar
   return changed ? { ...board, contracts } : board;
 }
 
-function isAcceptedOpen(c: ContractInstance): boolean {
+export function isAcceptedOpen(c: ContractInstance): boolean {
   return c.status === "open" && typeof c.acceptedAtMs === "number";
 }
 
@@ -514,7 +536,9 @@ export function ensureDailyContractBoard(
     existing.mistressId === mistressId &&
     !boardNeedsReroll(existing)
   ) {
-    const next = ensureMediaDrillSlot(expireOpen(existing, nowMs));
+    const next = syncOpenContractCopy(
+      ensureMediaDrillSlot(expireOpen(existing, nowMs)),
+    );
     if (next !== existing) saveContractBoard(next);
     return next;
   }
@@ -656,6 +680,78 @@ export function assignProgramContract(
   }
   saveContractBoard({ ...board, contracts });
   return named;
+}
+
+/**
+ * Bind a live timer (cage / plug / denial) to a board row without replacing
+ * an unrelated daily slot. Reuses an open row of the same def when present.
+ */
+export function ensureAcceptedProgramContract(
+  defId: string,
+  paramOverrides: Record<string, string | number> = {},
+  opts?: { titleRu?: string; deadlineMs?: number; atMs?: number },
+): ContractInstance | null {
+  const def = getContractDef(defId);
+  if (!def) return null;
+  const board = ensureDailyContractBoard();
+  const atMs = opts?.atMs ?? Date.now();
+  const extraDeadline = opts?.deadlineMs;
+  const idx = board.contracts.findIndex(
+    (c) => c.status === "open" && c.defId === defId,
+  );
+  if (idx >= 0) {
+    const cur = board.contracts[idx]!;
+    const deadlineMs = Math.max(
+      cur.deadlineMs,
+      extraDeadline ?? 0,
+      endOfLocalDayMs(board.dayKey),
+    );
+    if (isAcceptedOpen(cur)) {
+      if (deadlineMs === cur.deadlineMs) return cur;
+      const contracts = board.contracts.slice();
+      const nextRow = { ...cur, deadlineMs };
+      contracts[idx] = nextRow;
+      saveContractBoard({ ...board, contracts });
+      return nextRow;
+    }
+    const params = { ...cur.params, ...paramOverrides };
+    const nextRow: ContractInstance = {
+      ...cur,
+      params,
+      bodyRu: fillTemplate(def.instructionRu, params),
+      titleRu: opts?.titleRu ?? cur.titleRu,
+      acceptedAtMs: atMs,
+      deadlineMs,
+    };
+    const contracts = board.contracts.slice();
+    contracts[idx] = nextRow;
+    saveContractBoard({ ...board, contracts });
+    return nextRow;
+  }
+  const rng = mulberry32(
+    hashSeed(`${board.dayKey}|${defId}|live|${atMs}`),
+  );
+  const instance = instantiate(
+    def,
+    board.dayKey,
+    board.mistressId,
+    rng,
+    paramOverrides,
+  );
+  const nextRow: ContractInstance = {
+    ...instance,
+    titleRu: opts?.titleRu ?? instance.titleRu,
+    acceptedAtMs: atMs,
+    deadlineMs: Math.max(
+      instance.deadlineMs,
+      extraDeadline ?? 0,
+    ),
+  };
+  saveContractBoard({
+    ...board,
+    contracts: [...board.contracts, nextRow],
+  });
+  return nextRow;
 }
 
 export function categoryLabelRu(cat: ContractCategory): string {

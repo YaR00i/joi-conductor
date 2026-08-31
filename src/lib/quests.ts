@@ -180,6 +180,8 @@ export type BuildQuestOfferOptions = QuestOfferContext & {
   rewardOverride?: number;
   /** Prefix / replace rule with contract flavor. */
   contractRuleRu?: string;
+  /** Random-pick pool. Forced ids still resolve against the full catalog. */
+  pool?: readonly QuestDef[];
 };
 
 function finalizeQuestOffer(
@@ -253,11 +255,14 @@ function finalizeQuestOffer(
 export function buildQuestOffer(
   rng: () => number,
   ctx: BuildQuestOfferOptions = { mood: "calm" },
-): QuestOffer {
+): QuestOffer | null {
   const forced = ctx.forceQuestId
     ? QUEST_CATALOG.find((q) => q.id === ctx.forceQuestId)
     : null;
-  const def = forced ?? pickWeighted(rng, QUEST_CATALOG, questPlayBiasWeight);
+  if (forced) return finalizeQuestOffer(rng, forced, ctx);
+  const pool = ctx.pool ?? QUEST_CATALOG;
+  if (pool.length === 0) return null;
+  const def = pickWeighted(rng, [...pool], questPlayBiasWeight);
   return finalizeQuestOffer(rng, def, ctx);
 }
 
@@ -267,7 +272,9 @@ export function buildForcedQuestOffer(
   questId: QuestId,
   ctx: Omit<BuildQuestOfferOptions, "forceQuestId"> = { mood: "calm" },
 ): QuestOffer {
-  return buildQuestOffer(rng, { ...ctx, forceQuestId: questId });
+  const offer = buildQuestOffer(rng, { ...ctx, forceQuestId: questId });
+  if (offer) return offer;
+  return finalizeQuestOffer(rng, QUEST_CATALOG[0]!, ctx);
 }
 
 export function makeQuestBlock(

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   masonryPreviewSrc,
   masonryStillUrl,
+  masonryUpgradeCandidates,
   masonryUpgradeSrc,
   type MediaItem,
 } from "./media";
@@ -24,6 +25,28 @@ describe("masonryPreviewSrc / masonryUpgradeSrc", () => {
     expect(masonryPreviewSrc(item)).toContain(encodeURIComponent(item.previewUrl!));
     expect(masonryUpgradeSrc(item)).toContain(encodeURIComponent(item.sampleUrl!));
     expect(masonryUpgradeSrc(item)).not.toContain("original.jpg");
+  });
+
+  it("falls back to a still original when the sample 404s", () => {
+    const item = post();
+    expect(masonryUpgradeCandidates(item)).toEqual([
+      expect.stringContaining(encodeURIComponent(item.sampleUrl!)),
+      expect.stringContaining(encodeURIComponent("original.jpg")),
+    ]);
+    expect(masonryUpgradeSrc(item)).not.toContain("original.jpg");
+  });
+
+  it("does not pull a video original after a missing sample", () => {
+    const item = post({
+      kind: "video",
+      url: "https://video.example/clip.webm",
+      previewUrl: "https://img.example/thumb.jpg",
+      sampleUrl: "https://img.example/poster.jpg",
+    });
+    const candidates = masonryUpgradeCandidates(item);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]).toContain(encodeURIComponent("poster.jpg"));
+    expect(candidates[0]).not.toContain("clip.webm");
   });
 
   it("skips upgrade when sample matches preview or is missing", () => {

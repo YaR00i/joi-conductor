@@ -58,3 +58,29 @@ export function insertBlockAfter(
     ...queue.slice(afterIndex + 1),
   ];
 }
+
+/** Append after the last non-finale block (current allowed). Finale stays last. */
+export function appendUpcomingBlocks(
+  queue: Block[],
+  currentIndex: number,
+  blocks: Block[],
+): Block[] | null {
+  if (blocks.length === 0) return null;
+  if (currentIndex < 0 || currentIndex >= queue.length) return null;
+  let afterIndex = -1;
+  for (let i = queue.length - 1; i >= currentIndex; i--) {
+    if (queue[i]!.goal !== "finale") {
+      afterIndex = i;
+      break;
+    }
+  }
+  if (afterIndex < 0) return null;
+  let next = queue;
+  for (const block of blocks) {
+    const inserted = insertBlockAfter(next, afterIndex, currentIndex, block);
+    if (!inserted) return null;
+    next = inserted;
+    afterIndex += 1;
+  }
+  return next;
+}

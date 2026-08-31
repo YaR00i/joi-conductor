@@ -102,7 +102,7 @@ export type ControlDispatch = {
   phase: DispatchPhase;
   morningIds: string[];
   punishIds: string[];
-  /** Non-punish out-of-session tasks offered from chat. */
+  /** Out-of-session contract instance ids offered from chat. */
   taskIds: string[];
   lastOfferDate: string | null;
 };

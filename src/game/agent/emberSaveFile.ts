@@ -2,7 +2,7 @@
  * Node-only JSON save folder for ember-agent CLI.
  * Play still uses localStorage; this is for testers dumping slots on disk.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   EMBER_SAVE_SLOT_MAX,
@@ -89,7 +89,9 @@ export function createFileSaveBackend(rootDir: string): EmberSaveBackend {
       const file = keyToPath(root, key);
       if (!file) return;
       mkdirSync(path.dirname(file), { recursive: true });
-      writeFileSync(file, value);
+      const tmp = `${file}.tmp-${process.pid}-${Date.now()}`;
+      writeFileSync(tmp, value);
+      renameSync(tmp, file);
     },
     removeItem(key) {
       const file = keyToPath(root, key);

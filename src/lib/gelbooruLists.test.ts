@@ -16,6 +16,7 @@ import {
   gelbooruListDeckUrls,
   gelbooruListItemLabel,
   gelbooruListOption,
+  gelbooruListsKey,
   gelbooruListUnsavedItems,
   itemToGelbooruListItem,
   listedGelbooruIds,
@@ -56,6 +57,19 @@ describe("itemToGelbooruListItem", () => {
     expect(row?.sampleUrl).toContain("-s.jpg");
     expect(itemToGelbooruListItem(post("12", { url: "blob:x" }))).toBeNull();
   });
+
+  it("keeps a namespaced id for other booru sites", () => {
+    const row = itemToGelbooruListItem(
+      post("9", { id: "blacked-9", booruSite: "blacked" }),
+    );
+    expect(row?.id).toBe("blacked-9");
+    expect(row?.booruSite).toBe("blacked");
+    const xb = itemToGelbooruListItem(
+      post("9", { id: "xb-9", booruSite: "xbooru" }),
+    );
+    expect(xb?.id).toBe("xb-9");
+    expect(xb?.booruSite).toBe("xbooru");
+  });
 });
 
 describe("gelbooru lists CRUD", () => {
@@ -76,6 +90,39 @@ describe("gelbooru lists CRUD", () => {
   it("falls back to the default name", async () => {
     const list = await createGelbooruList("   ");
     expect(list.name).toBe(DEFAULT_GELBOORU_LIST_NAME);
+  });
+
+  it("keeps blacked lists off the gelbooru key", async () => {
+    await createGelbooruList("Gel", { site: "gelbooru" });
+    await createGelbooruList("Blk", { site: "blacked" });
+    expect((await listGelbooruLists("gelbooru")).map((row) => row.name)).toEqual(
+      ["Gel"],
+    );
+    expect((await listGelbooruLists("blacked")).map((row) => row.name)).toEqual(
+      ["Blk"],
+    );
+  });
+
+  it("isolates xbooru and hypnohub lists from gelbooru", async () => {
+    expect(gelbooruListsKey("xbooru")).toBe("joi-booru-lists-xbooru-v1");
+    expect(gelbooruListsKey("hypnohub")).toBe("joi-booru-lists-hypnohub-v1");
+    expect(gelbooruListsKey("realbooru")).toBe("joi-booru-lists-realbooru-v1");
+    await createGelbooruList("Gel", { site: "gelbooru" });
+    await createGelbooruList("Xb", { site: "xbooru" });
+    await createGelbooruList("Hh", { site: "hypnohub" });
+    await createGelbooruList("Rb", { site: "realbooru" });
+    expect((await listGelbooruLists("gelbooru")).map((row) => row.name)).toEqual(
+      ["Gel"],
+    );
+    expect((await listGelbooruLists("xbooru")).map((row) => row.name)).toEqual([
+      "Xb",
+    ]);
+    expect((await listGelbooruLists("hypnohub")).map((row) => row.name)).toEqual(
+      ["Hh"],
+    );
+    expect((await listGelbooruLists("realbooru")).map((row) => row.name)).toEqual(
+      ["Rb"],
+    );
   });
 
   it("accumulates play stats on the queue", async () => {

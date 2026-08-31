@@ -1,4 +1,6 @@
+import dns from "node:dns";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import https from "node:https";
 import {
   cpSync,
   existsSync,
@@ -23,6 +25,10 @@ import {
   shouldParallelStreamRange,
 } from "./src/lib/mediaRangeParts";
 import {
+  fetchMediaCdnIpv4,
+  mediaCdnRequestHeaders,
+} from "./src/lib/mediaCdnIpv4Fetch";
+import {
   cancelWebBody,
   isBenignProxyDisconnect,
   watchFetchAbort,
@@ -30,6 +36,12 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// *.booru.org / xbooru / hypnohub publish AAAA that black-hole here.
+// List proxies use https.Agent({ family: 4 }). Media-proxy must not use
+// Node fetch/undici: ipv4first is ignored and the shelf save hangs on КАЧАЮ.
+dns.setDefaultResultOrder("ipv4first");
+const booruIpv4Agent = new https.Agent({ family: 4, keepAlive: true });
 
 function emberMiddleware(root: string): Connect.NextHandleFunction {
   return (req, res, next) => {
@@ -123,25 +135,12 @@ function emberContentPlugin(): Plugin {
   };
 }
 
-function mediaProxyReferer(hostname: string): string {
-  if (hostname === "nhentai.net" || hostname.endsWith(".nhentai.net")) {
-    return "https://nhentai.net/";
-  }
-  return "https://gelbooru.com/";
-}
-
 function mediaCdnHeaders(
   hostname: string,
   range?: string,
+  href?: string,
 ): Record<string, string> {
-  const headers: Record<string, string> = {
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    Accept: "*/*",
-    Referer: mediaProxyReferer(hostname),
-  };
-  if (range) headers.Range = range;
-  return headers;
+  return mediaCdnRequestHeaders(href ?? `https://${hostname}/`, range);
 }
 
 async function pipeWebBody(
@@ -223,12 +222,12 @@ async function proxyParallelRange(opts: {
           Math.max(1, opts.tailCount),
         ).map((part) =>
           watchFetchAbort(
-            fetch(opts.url, {
+            fetchMediaCdnIpv4(opts.url, {
               headers: mediaCdnHeaders(
                 opts.hostname,
                 `bytes=${part.start}-${part.end}`,
+                opts.url,
               ),
-              redirect: "follow",
               signal: opts.signal,
             }),
           ),
@@ -303,12 +302,12 @@ function mediaProxyMiddleware(): Connect.NextHandleFunction {
         parsedRange == null
           ? rangeHeader || undefined
           : `bytes=${start}-${headEndHint}`,
+        parsed.toString(),
       );
 
       const upstream = await watchFetchAbort(
-        fetch(parsed.toString(), {
+        fetchMediaCdnIpv4(parsed.toString(), {
           headers,
-          redirect: "follow",
           signal: ac.signal,
         }),
       );
@@ -585,6 +584,118 @@ function gtranslateProxyPlugin(): Plugin {
   };
 }
 
+function booruIpv4ViteProxy(opts: {
+  site: string;
+  origin: string;
+  accept: string;
+}) {
+  const { site, origin, accept } = opts;
+  return {
+    target: origin,
+    changeOrigin: true,
+    agent: booruIpv4Agent,
+    timeout: 20_000,
+    proxyTimeout: 20_000,
+    rewrite: (path: string) =>
+      path.replace(new RegExp(`^/api/booru/${site}`), "/index.php"),
+    configure(
+      proxy: {
+        on: (
+          event: string,
+          listener: (...args: unknown[]) => void,
+        ) => void;
+      },
+    ) {
+      proxy.on("proxyReq", (...args: unknown[]) => {
+        const proxyReq = args[0] as
+          | { setHeader?: (k: string, v: string) => void }
+          | undefined;
+        proxyReq?.setHeader?.(
+          "User-Agent",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        );
+        proxyReq?.setHeader?.("Referer", `${origin.replace(/\/+$/, "")}/`);
+        proxyReq?.setHeader?.("Accept", accept);
+      });
+      proxy.on("error", (err: unknown, _req: unknown, socket: unknown) => {
+        if (isBenignProxyDisconnect(err)) return;
+        const res = socket as ServerResponse | undefined;
+        if (res && "headersSent" in res && !res.headersSent) {
+          try {
+            res.statusCode = 502;
+            res.end(`${site} booru proxy error`);
+          } catch {
+            /* client gone */
+          }
+        }
+      });
+    },
+  };
+}
+
+function gelbooru01ViteProxy(site: "censored" | "blacked") {
+  return booruIpv4ViteProxy({
+    site,
+    origin: `https://${site}.booru.org`,
+    accept: "text/html,application/xhtml+xml,*/*",
+  });
+}
+
+function joidbIpv4ViteProxy() {
+  const origin = "https://www.the-joi-database.com";
+  return {
+    target: origin,
+    changeOrigin: true,
+    agent: booruIpv4Agent,
+    timeout: 20_000,
+    proxyTimeout: 20_000,
+    rewrite: (path: string) => path.replace(/^\/api\/joidb/, "") || "/",
+    configure(
+      proxy: {
+        on: (
+          event: string,
+          listener: (...args: unknown[]) => void,
+        ) => void;
+      },
+    ) {
+      proxy.on("proxyReq", (...args: unknown[]) => {
+        const proxyReq = args[0] as
+          | { setHeader?: (k: string, v: string) => void }
+          | undefined;
+        proxyReq?.setHeader?.(
+          "User-Agent",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        );
+        proxyReq?.setHeader?.("Referer", `${origin}/`);
+        proxyReq?.setHeader?.(
+          "Accept",
+          "application/vnd.apple.mpegurl,application/json,text/html,text/vtt,*/*",
+        );
+      });
+      proxy.on("error", (err: unknown, _req: unknown, socket: unknown) => {
+        if (isBenignProxyDisconnect(err)) return;
+        const res = socket as ServerResponse | undefined;
+        if (res && "headersSent" in res && !res.headersSent) {
+          try {
+            res.statusCode = 502;
+            res.end("joidb proxy error");
+          } catch {
+            /* client gone */
+          }
+        }
+      });
+    },
+  };
+}
+
+function gelbooruDapiViteProxy(site: "xbooru" | "hypnohub", origin: string) {
+  return booruIpv4ViteProxy({
+    site,
+    origin,
+    accept: "application/json,text/javascript,*/*",
+  });
+}
+
 export default defineConfig({
   plugins: [
     react(),
@@ -654,6 +765,19 @@ export default defineConfig({
           });
         },
       },
+      "/api/booru/censored": gelbooru01ViteProxy("censored"),
+      "/api/booru/blacked": gelbooru01ViteProxy("blacked"),
+      "/api/booru/xbooru": gelbooruDapiViteProxy("xbooru", "https://xbooru.com"),
+      "/api/booru/hypnohub": gelbooruDapiViteProxy(
+        "hypnohub",
+        "https://hypnohub.net",
+      ),
+      "/api/booru/realbooru": booruIpv4ViteProxy({
+        site: "realbooru",
+        origin: "https://realbooru.com",
+        accept: "text/html,application/xhtml+xml,*/*",
+      }),
+      "/api/joidb": joidbIpv4ViteProxy(),
       "/api/ollama": {
         target: "http://127.0.0.1:11434",
         changeOrigin: true,

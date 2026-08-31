@@ -259,6 +259,11 @@ export interface SessionState {
   index: number;
   elapsedSec: number;
   blockElapsedSec: number;
+  /**
+   * `performance.now()` when the current block was entered (or hold/breath
+   * phase reset). `blockElapsedSec` is derived from this, not a +1 tick.
+   */
+  blockEnteredAtPerf?: number | null;
   edgesDone: number;
   /** Confirmed hold endurance (goal === hold), separate from edges. */
   holdsDone?: number;
@@ -277,6 +282,11 @@ export interface SessionState {
    * Null = run until confirm/stop (edge/hold). Caps highway look-ahead past block end.
    */
   beatUntilAtMs?: number | null;
+  /**
+   * Sandbox lab: one practice block, not a real session.
+   * End is silent — no diary, debrief, achievements, or contract settle.
+   */
+  labPractice?: boolean;
   /** Discrete mood from moodScore (−3…+3). */
   mood: SessionMood;
   /** Obedience thermometer; maps to mood via moodEngine.moodFromScore. */
@@ -583,7 +593,8 @@ export type SessionEvent =
       /** Cinders granted on a clean complete (0 on abort). */
       cindersEarned?: number;
       /**
-       * Remount / HMR abort that keeps a checkpoint — skip diary & progress.
+       * Skip diary, debrief, achievements, and contract settle.
+       * Used for HMR/remount abort that keeps a checkpoint, and for lab practice.
        */
       silent?: boolean;
     }
@@ -596,6 +607,12 @@ export type SessionEvent =
       total: number;
     }
   | { type: "block_end"; blockId: string }
+  | {
+      type: "block_skip";
+      blockId: string;
+      reason: "missing_function" | "missing_pattern";
+      detail: string;
+    }
   | {
       type: "breath_prep";
       blockId: string;

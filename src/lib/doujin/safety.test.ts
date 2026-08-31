@@ -38,21 +38,20 @@ describe("parseBlacklistText", () => {
 });
 
 describe("tagIsBlocked / galleryIsBlocked", () => {
-  it("matches default underage tags", () => {
-    expect(tagIsBlocked("lolicon")).toBe(true);
-    expect(tagIsBlocked("shotacon")).toBe(true);
-    expect(tagIsBlocked("loli")).toBe(true);
+  it("matches the current default blocklist", () => {
+    expect(tagIsBlocked("child")).toBe(true);
+    expect(tagIsBlocked("Underage")).toBe(true);
     expect(tagIsBlocked("big breasts")).toBe(false);
   });
 
   it("matches a blocked token inside a compound tag", () => {
-    expect(tagIsBlocked("oppai loli", DEFAULT_BLOCKLIST)).toBe(true);
+    expect(tagIsBlocked("school child", DEFAULT_BLOCKLIST)).toBe(true);
   });
 
   it("flags a gallery when any tag hits the list", () => {
     expect(
       galleryIsBlocked(
-        [{ name: "sole female" }, { name: "lolicon" }],
+        [{ name: "sole female" }, { name: "underage" }],
         DEFAULT_BLOCKLIST,
       ),
     ).toBe(true);

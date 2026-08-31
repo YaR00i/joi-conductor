@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  installLocalStorageMock,
+  resetLocalStorage,
+} from "../../test/localStorageMock";
 import { DEFAULT_PARAMS } from "../types";
 import type { ContractInstance } from "./dailyBoard";
 import {
@@ -14,8 +18,16 @@ import {
   SEALED_FATE_PHRASES_RU,
   clearActiveSessionSeed,
   evaluateSessionSeed,
+  loadActiveSessionSeed,
+  saveActiveSessionSeed,
   type ActiveSessionSeed,
 } from "./sessionSeed";
+
+installLocalStorageMock();
+
+beforeEach(() => {
+  resetLocalStorage();
+});
 
 function makeContract(
   partial: Partial<ContractInstance> & Pick<ContractInstance, "defId">,
@@ -170,6 +182,24 @@ describe("session seal helpers", () => {
       completion: "auto",
     };
     expect(sealedFatePhraseForSeed(seed, "sparkle")).toBe("Судьба предрешена");
+  });
+
+  it("refreshes stale seed titles from the catalog", () => {
+    const seed: ActiveSessionSeed = {
+      instanceId: "stale-fr",
+      dayKey: "2026-07-22",
+      defId: "media_faproulette_deny",
+      titleRu: "Fap Roulette · deny",
+      bodyRu: "old",
+      startedAtMs: 1,
+      paramsPatch: {},
+      lockKeys: [],
+      verify: { kind: "honor" },
+      completion: "honor",
+    };
+    saveActiveSessionSeed(seed);
+    expect(loadActiveSessionSeed()?.titleRu).toBe("Отказ с экрана");
+    clearActiveSessionSeed();
   });
 
   it("builds oral_next_ruin_eat as live goal with finish/cumplay seals", () => {

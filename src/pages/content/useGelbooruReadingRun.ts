@@ -48,6 +48,7 @@ import {
   loadControlState,
   saveControlMood,
 } from "../../lib/soul/control/store";
+import type { BooruSiteId } from "../../lib/booruSites";
 
 type RunPrompt =
   | { kind: "start"; listId: string }
@@ -55,6 +56,7 @@ type RunPrompt =
   | null;
 
 type Opts = {
+  site: BooruSiteId;
   lists: GelbooruPlayList[];
   queueSize: MediaQueueSize;
   onOpenPlay: (listId: string, index: number) => void;
@@ -63,6 +65,7 @@ type Opts = {
 };
 
 export function useGelbooruReadingRun({
+  site,
   lists,
   queueSize,
   onOpenPlay,
@@ -70,7 +73,7 @@ export function useGelbooruReadingRun({
   onGoToListsOverview,
 }: Opts) {
   const [run, setRun] = useState<ReadingRunState | null>(() =>
-    loadReadingRunForSource("gelbooru"),
+    loadReadingRunForSource(site),
   );
   const [runLive, setRunLive] = useState(false);
   const [runPrompt, setRunPrompt] = useState<RunPrompt>(null);
@@ -82,8 +85,15 @@ export function useGelbooruReadingRun({
   const afterLeaveRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    saveReadingRunForSource(run, "gelbooru");
+    saveReadingRunForSource(run, site);
   }, [run]);
+
+  useEffect(() => {
+    const stored = loadReadingRunForSource(site);
+    runRef.current = stored;
+    setRun(stored);
+    setRunLive(false);
+  }, [site]);
 
   useEffect(() => {
     if (!run || run.status !== "running") return;
@@ -96,7 +106,7 @@ export function useGelbooruReadingRun({
     if (prev) {
       const delta = readingPlayStatsDelta(prev, patch.state);
       if (readingPlayStatsHasAny(delta)) {
-        void bumpGelbooruListPlayStats(prev.listId, delta).then(() => {
+        void bumpGelbooruListPlayStats(prev.listId, delta, site).then(() => {
           void onRefreshLists();
         });
       }
@@ -125,7 +135,7 @@ export function useGelbooruReadingRun({
     const reuse = Boolean(
       existing &&
         existing.listId === list.id &&
-        existing.source === "gelbooru" &&
+        existing.source === site &&
         !resetRun,
     );
     if (existing && !reuse) commitRun(existing, "abort");
@@ -144,7 +154,7 @@ export function useGelbooruReadingRun({
         listTotal: list.items.length,
         origin: gelbooruListOrigin(list),
         moodScore,
-        source: "gelbooru",
+        source: site,
       });
       runRef.current = next;
       setRun(next);
@@ -168,7 +178,7 @@ export function useGelbooruReadingRun({
     const list = lists.find((row) => row.id === listId);
     if (!list || list.items.length === 0) return;
     const canContinue =
-      readingRunCanResume(run, list.id, "gelbooru") ||
+      readingRunCanResume(run, list.id, site) ||
       gelbooruListCanResume(list);
     if (canContinue) {
       setRunPrompt({ kind: "start", listId });
@@ -190,7 +200,7 @@ export function useGelbooruReadingRun({
       runRef.current = null;
       setRun(null);
       setRunLive(false);
-      saveReadingRunForSource(null, "gelbooru");
+      saveReadingRunForSource(null, site);
       afterLeave?.();
       return;
     }
@@ -198,7 +208,7 @@ export function useGelbooruReadingRun({
     afterLeaveRef.current = afterLeave ?? null;
     runRef.current = paused;
     setRun(paused);
-    saveReadingRunForSource(paused, "gelbooru");
+    saveReadingRunForSource(paused, site);
     setRunPrompt({ kind: "leave" });
   }
 
@@ -259,7 +269,10 @@ export function useGelbooruReadingRun({
     const live = runRef.current;
     if (!live) return;
     try {
-      await assembleGelbooruMistressList(queueSize, { appendToId: live.listId });
+      await assembleGelbooruMistressList(queueSize, {
+        appendToId: live.listId,
+        site,
+      });
       await onRefreshLists();
     } catch (err) {
       setAssembleError(
@@ -314,7 +327,7 @@ export function useGelbooruReadingRun({
         },
         onAssembleAuto: () => {
           commitRun(run, "complete");
-          void assembleGelbooruMistressList(queueSize)
+          void assembleGelbooruMistressList(queueSize, { site })
             .then(async (list) => {
               await onRefreshLists();
               beginRun(list, 0, true);

@@ -5,6 +5,14 @@ import { MediaKindFilter } from "../../components/MediaKindFilter";
 import type { NavId } from "../../components/SideNav";
 import type { ContentUnlockLists } from "../../lib/contentUnlocks";
 import { gelbooruRecsQuery, type ContentTab } from "../../lib/contentHub";
+import {
+  booruFallbackTags,
+  booruNeedsKey,
+  booruNextPid,
+  booruWallHasMore,
+  fetchBooruPosts,
+} from "../../lib/booruFetch";
+import { booruSite, favoriteIdBelongsToBooruSite, type BooruSiteId } from "../../lib/booruSites";
 import { buildFavoriteTasteProfile } from "../../lib/favoriteTagTaste";
 import { useFavoriteSaveQueue, listDownloadJobId } from "../../lib/favoriteSaveQueue";
 import { assembleGelbooruMistressList } from "../../lib/gelbooruListBuild";
@@ -30,13 +38,11 @@ import {
   removeFavoriteForItem,
 } from "../../lib/mediaFavorites";
 import {
+  blobForFavoriteSave,
   ensureMediaCached,
   isMediaCached,
-  readCachedMediaBlob,
 } from "../../lib/mediaPreload";
 import {
-  DEFAULT_MEDIA_SETTINGS,
-  fetchGelbooru,
   filterMediaByKinds,
   hydrateGelbooruNativeTypes,
   loadMediaSettings,
@@ -62,19 +68,8 @@ import { DoujinReadingRunPrompt } from "../doujin/DoujinReadingRunPrompt";
 
 const PAGE_SIZE = 36;
 
-async function blobForFavoriteSave(
-  item: MediaItem,
-  report?: (progress: {
-    percent: number | null;
-    loadedBytes?: number;
-    totalBytes?: number | null;
-  }) => void,
-): Promise<Blob | null> {
-  await ensureMediaCached(item, report);
-  return readCachedMediaBlob(item.id);
-}
-
 type Props = {
+  site?: BooruSiteId;
   tab: ContentTab;
   onTabChange?: (tab: ContentTab) => void;
   onNavigate?: (id: NavId) => void;
@@ -89,6 +84,7 @@ function hasGelbooruCreds(): boolean {
 }
 
 export function GelbooruHub({
+  site = "gelbooru",
   tab,
   onTabChange,
   onNavigate,
@@ -127,7 +123,8 @@ export function GelbooruHub({
   const genRef = useRef(0);
   const pidRef = useRef(0);
 
-  const keyed = hasGelbooruCreds();
+  const keyed = !booruNeedsKey(site) || hasGelbooruCreds();
+  const siteLabel = booruSite(site).label;
 
   const refreshSaved = useCallback(async () => {
     const rows = await listFavoriteMetadata();
@@ -135,10 +132,11 @@ export function GelbooruHub({
   }, []);
 
   const refreshLists = useCallback(async () => {
-    setLists(await listGelbooruLists());
-  }, []);
+    setLists(await listGelbooruLists(site));
+  }, [site]);
 
   const reading = useGelbooruReadingRun({
+    site,
     lists,
     queueSize,
     onOpenPlay: (listId, index) => {
@@ -165,17 +163,21 @@ export function GelbooruHub({
 
   const tagsForTab = useCallback(async (): Promise<string> => {
     const media = loadMediaSettings();
-    const fallback = media.tags.trim() || DEFAULT_MEDIA_SETTINGS.tags;
+    const fallback = booruFallbackTags(site, media.tags);
     if (tab === "search") {
       return applyHubKindQuery(committed.trim() || fallback, kindFilter);
     }
     if (tab === "recs") {
       const rows = await listFavoriteMetadata();
-      const liked = buildFavoriteTasteProfile(rows).liked;
-      void hydrateGelbooruNativeTypes(
-        liked.map((row) => row.tag),
-        { autocompleteFallback: false },
-      );
+      const liked = buildFavoriteTasteProfile(
+        rows.filter((row) => favoriteIdBelongsToBooruSite(row.id, site)),
+      ).liked;
+      if (site === "gelbooru") {
+        void hydrateGelbooruNativeTypes(
+          liked.map((row) => row.tag),
+          { autocompleteFallback: false },
+        );
+      }
       const query = gelbooruRecsQuery(liked, recsTick, fallback);
       setRecsHint(
         liked.length > 0
@@ -186,7 +188,7 @@ export function GelbooruHub({
     }
     setRecsHint(null);
     return fallback;
-  }, [committed, kindFilter, recsTick, tab]);
+  }, [committed, kindFilter, recsTick, site, tab]);
 
   const loadPage = useCallback(
     async (reset: boolean) => {
@@ -201,14 +203,20 @@ export function GelbooruHub({
         const media = loadMediaSettings();
         const tags = await tagsForTab();
         const nextPid = reset ? 0 : pidRef.current;
-        const batch = await fetchGelbooru(tags, PAGE_SIZE, {
-          userId: media.gelbooruUserId,
-          apiKey: media.gelbooruApiKey,
-        }, { pid: nextPid });
+        const batch = await fetchBooruPosts(
+          site,
+          tags,
+          PAGE_SIZE,
+          {
+            userId: media.gelbooruUserId,
+            apiKey: media.gelbooruApiKey,
+          },
+          { pid: nextPid },
+        );
         if (gen !== genRef.current) return;
-        pidRef.current = nextPid + 1;
+        pidRef.current = booruNextPid(site, nextPid, batch.length);
         const shown = filterMediaByKinds(batch, kindsForHubKind(kindFilter));
-        setHasMore(batch.length >= PAGE_SIZE);
+        setHasMore(booruWallHasMore(site, batch.length, PAGE_SIZE));
         setItems((prev) => {
           if (reset) return shown;
           const have = new Set(prev.map((row) => row.id));
@@ -226,7 +234,7 @@ export function GelbooruHub({
         }
       }
     },
-    [keyed, kindFilter, tagsForTab],
+    [keyed, kindFilter, site, tagsForTab],
   );
 
   useEffect(() => {
@@ -253,7 +261,12 @@ export function GelbooruHub({
 
   useEffect(() => {
     setSelectedItems([]);
-  }, [tab, committed, kindFilter, recsTick]);
+  }, [tab, committed, kindFilter, recsTick, site]);
+
+  useEffect(() => {
+    setOpenListId(null);
+    setListTarget(null);
+  }, [site]);
 
   const onLoadMore = useCallback(() => {
     if (!hasMore || loadingRef.current) return;
@@ -373,16 +386,16 @@ export function GelbooruHub({
 
   const emptyHint = useMemo(() => {
     if (tab === "search" && !committed.trim()) {
-      return "Введи теги Gelbooru и нажми Enter.";
+      return `Введи теги ${siteLabel} и нажми Enter.`;
     }
     if (tab === "recs") return "Нет постов по связке вкуса.";
     return "Нет постов. Проверь теги в Настройках → Медиа.";
-  }, [committed, tab]);
+  }, [committed, siteLabel, tab]);
 
   const listedIds = useMemo(() => listedGelbooruIds(lists), [lists]);
 
   async function handleCreateList(name: string) {
-    await createGelbooruList(name);
+    await createGelbooruList(name, { site });
     await refreshLists();
   }
 
@@ -414,14 +427,14 @@ export function GelbooruHub({
   }
 
   async function handleCreatePackedList(name: string, pack?: MediaItem[]) {
-    const created = await createGelbooruList(name);
+    const created = await createGelbooruList(name, { site });
     const rows =
       pack && pack.length > 0
         ? pack
         : listTarget
           ? [listTarget.item]
           : [];
-    if (rows.length > 0) await addManyToGelbooruList(created.id, rows);
+    if (rows.length > 0) await addManyToGelbooruList(created.id, rows, site);
     await refreshLists();
   }
 
@@ -429,7 +442,7 @@ export function GelbooruHub({
     setAssembleBusy(true);
     setAssembleError(null);
     try {
-      const list = await assembleGelbooruMistressList(size);
+      const list = await assembleGelbooruMistressList(size, { site });
       await refreshLists();
       setOpenListId(list.id);
     } catch (err) {
@@ -460,11 +473,11 @@ export function GelbooruHub({
       lists={lists}
       onClose={() => setListTarget(null)}
       onToggle={async (listId) => {
-        await toggleInGelbooruList(listId, listTarget.item);
+        await toggleInGelbooruList(listId, listTarget.item, site);
         await refreshLists();
       }}
       onPack={async (listId, pack) => {
-        await addManyToGelbooruList(listId, pack);
+        await addManyToGelbooruList(listId, pack, site);
         if (listTarget.packExact) setSelectedItems([]);
         await refreshLists();
       }}
@@ -493,24 +506,24 @@ export function GelbooruHub({
           onOpenList={setOpenListId}
           onCreate={handleCreateList}
           onRename={(id, name) => {
-            void renameGelbooruList(id, name).then(() => refreshLists());
+            void renameGelbooruList(id, name, site).then(() => refreshLists());
           }}
           onNote={(id, note) => {
-            void setGelbooruListNote(id, note).then(() => refreshLists());
+            void setGelbooruListNote(id, note, site).then(() => refreshLists());
           }}
           onDelete={(id) => {
-            void deleteGelbooruList(id).then(() => {
+            void deleteGelbooruList(id, site).then(() => {
               if (openListId === id) setOpenListId(null);
               return refreshLists();
             });
           }}
           onRemoveItem={(listId, itemId) => {
-            void removeFromGelbooruList(listId, itemId).then(() =>
+            void removeFromGelbooruList(listId, itemId, site).then(() =>
               refreshLists(),
             );
           }}
           onMoveItem={(listId, from, to) => {
-            void moveInGelbooruList(listId, from, to).then(() => refreshLists());
+            void moveInGelbooruList(listId, from, to, site).then(() => refreshLists());
           }}
           onToggleSave={(item) => void toggleSave(item)}
           onDownloadList={(listId) => {
@@ -529,7 +542,7 @@ export function GelbooruHub({
           }}
           onStartRun={reading.requestStartRun}
           onCursor={(listId, index) => {
-            void setGelbooruListCursor(listId, index).then(() => refreshLists());
+            void setGelbooruListCursor(listId, index, site).then(() => refreshLists());
           }}
           listPlay={listPlay}
           runHud={
@@ -580,6 +593,7 @@ export function GelbooruHub({
       <div className="gelbooru-hub">
         <FavoritesPage
           embedded
+          booruSite={site}
           onNavigate={onNavigate}
           unlocks={unlocks}
           onFavoritesChanged={onFavoritesChanged}
@@ -641,8 +655,9 @@ export function GelbooruHub({
             <BooruTagInput
               value={search}
               onChange={setSearch}
-              placeholder="Теги Gelbooru — как в сессии"
-              ariaLabel="Поиск Gelbooru"
+              placeholder={`Теги ${siteLabel}`}
+              ariaLabel={`Поиск ${siteLabel}`}
+              useGelbooru={site === "gelbooru"}
               unlocks={unlocks}
             />
             <MediaKindFilter value={kindFilter} onChange={setKindFilter} />

@@ -265,7 +265,7 @@ describe("sessionContractLive", () => {
     expect(hit.settleDone).toBe(false);
     expect(hit.injectHandsOff).toBe(true);
     expect(hit.handsOffSec).toBe(15 * 60);
-    expect(hit.flash.ruleRu).toMatch(/hands-off/i);
+    expect(hit.flash.ruleRu).toMatch(/руки прочь/i);
     expect(hit.next.progress?.steps[hit.next.progress.currentStep]?.id).toBe(
       "hands_off",
     );
@@ -359,7 +359,7 @@ describe("sessionContractLive", () => {
       ),
     ).toEqual({
       result: "failed",
-      reasonRu: "Hands-off не выдержан",
+      reasonRu: "Руки прочь не выдержаны",
     });
   });
 

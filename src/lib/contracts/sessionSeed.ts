@@ -221,7 +221,7 @@ export function contractPlayLaneLabelRu(lane: ContractPlayLane): string {
     case "live":
       return "Вне сессии · таймер";
     case "task":
-      return "Вне сессии · задание";
+      return "Вне сессии · контракт";
     default: {
       const _exhaustive: never = lane;
       return _exhaustive;
@@ -438,7 +438,7 @@ export function buildSessionSeedFromContract(
             },
             {
               id: "hands_off",
-              labelRu: `Hands-off ${Math.round(handsOffMin)} мин`,
+              labelRu: `Руки прочь ${Math.round(handsOffMin)} мин`,
             },
           ],
           currentStep: 0,
@@ -680,10 +680,18 @@ export function loadActiveSessionSeed(): ActiveSessionSeed | null {
     ) {
       return null;
     }
-    return parsed;
+    return withCatalogTitle(parsed);
   } catch {
     return null;
   }
+}
+
+function withCatalogTitle(seed: ActiveSessionSeed): ActiveSessionSeed {
+  const nameRu = getContractDef(seed.defId)?.nameRu;
+  if (!nameRu || nameRu === seed.titleRu) return seed;
+  const next = { ...seed, titleRu: nameRu };
+  saveActiveSessionSeed(next);
+  return next;
 }
 
 export function saveActiveSessionSeed(seed: ActiveSessionSeed): void {
@@ -1196,7 +1204,7 @@ export function evaluateSessionSeed(
       if (seed.progress && seed.progress.steps.length > 1) {
         return {
           result: "failed",
-          reasonRu: "Hands-off не выдержан",
+          reasonRu: "Руки прочь не выдержаны",
         };
       }
       return { result: "done" };

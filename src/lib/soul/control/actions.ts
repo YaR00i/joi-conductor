@@ -12,6 +12,10 @@ import {
   normalizeSessionKind,
 } from "./catalog";
 import { clearCageLock, setCageLock } from "../../cageTimer";
+import {
+  bindDenialQuestToContract,
+  bindWearLockToContract,
+} from "../../contracts/liveObligation";
 import { clearDenialQuest, setDenialQuest } from "../../denialQuest";
 import { loadControlState, notifyControlChanged, saveControlState } from "./store";
 import type {
@@ -313,18 +317,22 @@ function applyOne(
   flags: { wear: boolean; denial: boolean },
 ): ControlState {
   switch (action.op) {
-    case "set_wear":
-      setCageLock(action.hours, { kind: action.kind });
+    case "set_wear": {
+      const lock = setCageLock(action.hours, { kind: action.kind });
+      bindWearLockToContract(lock);
       flags.wear = true;
       return state;
+    }
     case "clear_wear":
       clearCageLock();
       flags.wear = true;
       return state;
-    case "set_denial":
-      setDenialQuest(action.hours, action.edges);
+    case "set_denial": {
+      const quest = setDenialQuest(action.hours, action.edges);
+      bindDenialQuestToContract(quest);
       flags.denial = true;
       return state;
+    }
     case "clear_denial":
       clearDenialQuest();
       flags.denial = true;

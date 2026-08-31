@@ -4,7 +4,9 @@ import {
   resetLocalStorage,
 } from "../../../test/localStorageMock";
 import { loadCageLock } from "../../cageTimer";
+import { isAcceptedOpen, loadContractBoard } from "../../contracts/dailyBoard";
 import { loadDenialQuest } from "../../denialQuest";
+import { setActiveMistress } from "../../mistress/activeMistress";
 import { applyControlActions, splitControlReply, looksLikeControlIntent, filterControlActions } from "./actions";
 import { applyProposalToParams } from "./catalog";
 import { loadControlState } from "./store";
@@ -13,6 +15,7 @@ installLocalStorageMock();
 
 beforeEach(() => {
   resetLocalStorage();
+  setActiveMistress("hu_tao");
 });
 
 describe("mistress control actions", () => {
@@ -53,6 +56,17 @@ describe("mistress control actions", () => {
     expect(applied.state.checkIn?.note).toBe("напиши");
     expect(applied.wearChanged).toBe(true);
     expect(applied.denialChanged).toBe(true);
+    const board = loadContractBoard();
+    expect(
+      board?.contracts.some(
+        (c) => c.defId === "chastity_locked_hours" && isAcceptedOpen(c),
+      ),
+    ).toBe(true);
+    expect(
+      board?.contracts.some(
+        (c) => c.defId === "session_deny_tomorrow" && isAcceptedOpen(c),
+      ),
+    ).toBe(true);
   });
 
   it("stores a session proposal without leaking into speech", () => {

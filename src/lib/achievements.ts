@@ -1,5 +1,6 @@
 /** Lifetime session counters + leveled achievements showcase. */
 
+import { reportPersistFailure } from "./persistFailure";
 import {
   isMistressIdUnlocked,
   type MistressUnlockSnapshot,
@@ -821,7 +822,7 @@ export function saveAchievements(state: AchievementsState): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    /* ignore quota */
+    reportPersistFailure("прогресс достижений");
   }
 }
 

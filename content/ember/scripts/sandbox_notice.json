@@ -3,6 +3,7 @@
   "nameRu": "Табличка песочницы",
   "steps": [
     { "type": "talk", "dialogueId": "sandbox_notice_talk" },
+    { "type": "set_flag", "flag": "sandbox_notice_status", "value": "active" },
     { "type": "set_flag", "flag": "sandbox_notice_read", "value": true }
   ]
 }

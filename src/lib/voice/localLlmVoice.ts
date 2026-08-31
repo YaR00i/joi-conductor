@@ -259,11 +259,12 @@ export class LocalLlmVoice implements VoiceLayer {
     signal: AbortSignal,
   ): Promise<void> {
     const timeoutMs = this.opts.timeoutMs ?? 12000;
+    let raceTimer: number | undefined;
     try {
       const speech = await Promise.race([
         this.fetchSpeech(event, signal),
         new Promise<"timeout">((resolve) => {
-          window.setTimeout(() => resolve("timeout"), timeoutMs);
+          raceTimer = window.setTimeout(() => resolve("timeout"), timeoutMs);
         }),
       ]);
 
@@ -287,6 +288,9 @@ export class LocalLlmVoice implements VoiceLayer {
         detail: err instanceof Error ? err.message : "ошибка LLM",
       });
       for (const e of fallback) this.opts.emit(e);
+    } finally {
+      // The losing timeout timer must not keep the event closure alive.
+      window.clearTimeout(raceTimer);
     }
   }
 

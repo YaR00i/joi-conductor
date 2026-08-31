@@ -1,3 +1,7 @@
+import {
+  isBooruSiteId,
+  type BooruSiteId,
+} from "../booruSites";
 import { rollFinale } from "../conductor";
 import { applyMoodDelta, moodFromScore } from "../moodEngine";
 import { DEFAULT_PARAMS, type FinaleOutcome } from "../types";
@@ -15,7 +19,29 @@ import {
 } from "./readingRunTasks";
 import type { DoujinReadingListOrigin } from "./types";
 
-export type ReadingRunSource = "nhentai" | "gelbooru";
+export type ReadingRunSource = "nhentai" | BooruSiteId | "joidb";
+
+export function isBooruReadingRunSource(
+  v: unknown,
+): v is BooruSiteId {
+  return isBooruSiteId(v);
+}
+
+export function isJoidbReadingRunSource(v: unknown): v is "joidb" {
+  return v === "joidb";
+}
+
+/** Booru posts and joidb videos: queue index, not gallery pages. */
+export function isQueueReadingRunSource(
+  v: unknown,
+): v is BooruSiteId | "joidb" {
+  return isBooruReadingRunSource(v) || isJoidbReadingRunSource(v);
+}
+
+export function normalizeReadingRunSource(v: unknown): ReadingRunSource {
+  if (v === "joidb") return "joidb";
+  return isBooruSiteId(v) ? v : "nhentai";
+}
 
 export type ReadingRunMode = "mistress" | "self";
 
@@ -121,7 +147,7 @@ export function createReadingRun(opts: {
   const origin = opts.origin === "mistress" ? "mistress" : "user";
   return {
     id: newId(),
-    source: opts.source === "gelbooru" ? "gelbooru" : "nhentai",
+    source: normalizeReadingRunSource(opts.source),
     listId: opts.listId,
     listName: opts.listName,
     listTotal: Math.max(0, opts.listTotal),
@@ -282,6 +308,7 @@ function spawnTask(
   pageCount: number,
   rng: () => number,
 ): ReadingRunState {
+  if (state.source === "joidb") return state;
   if (state.mode !== "mistress") return state;
   if (state.activeTask) return state;
   if (state.overlay.kind !== "none") return state;
@@ -350,7 +377,7 @@ export function noteReadingPage(
     galleries: upsertGallery(next, galleryId, opts.title, content),
     finishedGalleryIds: finished,
     listTotal:
-      next.source === "gelbooru"
+      isQueueReadingRunSource(next.source)
         ? Math.max(next.listTotal, opts.pageCount)
         : next.listTotal,
     moodScore: applyMoodDelta(next.moodScore, moodDelta).score,
@@ -414,7 +441,7 @@ function pageIndexFromKey(key: string): number | null {
 
 export function queueProgress(state: ReadingRunState): number {
   if (state.listTotal <= 0) return 1;
-  if (state.source === "gelbooru") {
+  if (isQueueReadingRunSource(state.source)) {
     const page = pageIndexFromKey(state.lastPageKey);
     if (page == null) return 0;
     return Math.min(1, (page + 1) / state.listTotal);
@@ -574,7 +601,7 @@ export function shouldPrefetchRare(state: ReadingRunState): boolean {
 export function readingRunSource(
   run: Pick<ReadingRunState, "source"> | null | undefined,
 ): ReadingRunSource {
-  return run?.source === "gelbooru" ? "gelbooru" : "nhentai";
+  return normalizeReadingRunSource(run?.source);
 }
 
 export function readingRunCanResume(
@@ -587,6 +614,21 @@ export function readingRunCanResume(
       run.status !== "ended" &&
       run.listId === listId &&
       readingRunSource(run) === source,
+  );
+}
+
+/** HUD only while this list's run is live. A saved pause must not decorate other videos. */
+export function readingRunHudVisible(
+  run: ReadingRunState | null,
+  runLive: boolean,
+  listId: string | null | undefined,
+): boolean {
+  return Boolean(
+    runLive &&
+      run &&
+      run.status !== "ended" &&
+      listId &&
+      run.listId === listId,
   );
 }
 

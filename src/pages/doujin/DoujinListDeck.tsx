@@ -66,9 +66,10 @@ function cycleProgress(el: Element): number | null {
 type Props = {
   urls: string[];
   stagger?: string;
+  className?: string;
 };
 
-export function DoujinListDeck({ urls, stagger = "0s" }: Props) {
+export function DoujinListDeck({ urls, stagger = "0s", className }: Props) {
   const poolKey = urls.slice(0, CYCLE_CAP).join("\n");
   const pool = useMemo(
     () => (poolKey === "" ? [] : poolKey.split("\n")),
@@ -126,7 +127,9 @@ export function DoujinListDeck({ urls, stagger = "0s" }: Props) {
 
   return (
     <div
-      className="doujin-lists__deck"
+      className={
+        "doujin-lists__deck" + (className ? ` ${className}` : "")
+      }
       data-count={slots.length}
       style={
         {

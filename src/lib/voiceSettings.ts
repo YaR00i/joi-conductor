@@ -411,7 +411,11 @@ export function loadVoiceSettings(): VoiceSettings {
 }
 
 export function saveVoiceSettings(settings: VoiceSettings): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    /* ignore quota */
+  }
 }
 
 function resolveMistressRate(

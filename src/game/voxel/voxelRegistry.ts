@@ -89,7 +89,35 @@ export async function hydrateVoxelPrefab(
   }
 }
 
-export async function writeVoxelRegistry(
+// Editors fire saves fire-and-forget; overlapping read-disk/write cycles
+// could let an older snapshot overwrite a newer model's just-written file.
+// Serialize the whole cycle so each save sees the previous one on disk.
+let voxelWriteChain: Promise<unknown> = Promise.resolve();
+
+export function writeVoxelRegistry(
+  models: Record<string, EmberVoxelModel>,
+  scenes: Record<string, EmberVoxelScene>,
+  options?: {
+    deletedIds?: Iterable<string>;
+    dirtyIds?: Iterable<string>;
+    /** Do not overwrite MagicaVoxel `.vox` for these ids (JSON still updates). */
+    skipVoxWrite?: Iterable<string>;
+  },
+): Promise<
+  | { ok: true; libraryFiles: Record<string, string> }
+  | { ok: false; error: string }
+> {
+  const task = voxelWriteChain.then(() =>
+    runWriteVoxelRegistry(models, scenes, options),
+  );
+  voxelWriteChain = task.then(
+    () => undefined,
+    () => undefined,
+  );
+  return task;
+}
+
+async function runWriteVoxelRegistry(
   models: Record<string, EmberVoxelModel>,
   scenes: Record<string, EmberVoxelScene>,
   options?: {

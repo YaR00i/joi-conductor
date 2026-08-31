@@ -168,7 +168,11 @@ export function BrainPanel({
   const refreshPiper = useCallback(async () => {
     const api = desktopTts();
     if (!api?.piperStatus) return;
-    setPiper(await api.piperStatus());
+    try {
+      setPiper(await api.piperStatus());
+    } catch (err) {
+      setLine(desktopActionError(err));
+    }
   }, []);
 
   const refreshQwen = useCallback(async () => {

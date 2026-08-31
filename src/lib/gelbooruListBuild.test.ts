@@ -45,4 +45,21 @@ describe("saveTagPullAsGelbooruList", () => {
     expect(stored).toHaveLength(1);
     expect(stored[0]?.id).toBe(list.id);
   });
+
+  it("writes a tag pull into the chosen board store", async () => {
+    const list = await saveTagPullAsGelbooruList({
+      mediaTypeId: "all",
+      tags: "feet",
+      query: "rating:safe feet",
+      items: [post("9")],
+      want: 40,
+      site: "realbooru",
+    });
+    expect((await listGelbooruLists("gelbooru")).map((row) => row.id)).not.toContain(
+      list.id,
+    );
+    expect((await listGelbooruLists("realbooru")).map((row) => row.id)).toContain(
+      list.id,
+    );
+  });
 });

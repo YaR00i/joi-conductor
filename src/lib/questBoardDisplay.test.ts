@@ -25,5 +25,12 @@ describe("questBoardDisplay", () => {
     expect(rows.every((r) => r.nameRu.length > 0 && r.kindRu.length > 0)).toBe(
       true,
     );
+    expect(rows.every((r) => r.enabled)).toBe(true);
+  });
+
+  it("marks disabled ids as out of the pool", () => {
+    const rows = listQuestBoardRows(undefined, new Set(["hands_off"]));
+    expect(rows.find((r) => r.id === "hands_off")?.enabled).toBe(false);
+    expect(rows.filter((r) => r.enabled).length).toBe(rows.length - 1);
   });
 });

@@ -355,8 +355,8 @@ export function runChatCommand(
         kind: "refresh",
         textRu:
           pack.contracts.length > 0
-            ? `Задания вне сессии: ${titles}.`
-            : "Не удалось назначить задание.",
+            ? `Контракты: ${titles}.`
+            : "Не удалось назначить контракт.",
       };
     }
     case "punish": {

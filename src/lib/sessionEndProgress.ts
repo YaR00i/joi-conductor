@@ -8,6 +8,7 @@ import {
 } from "./achievements";
 import type { MistressId } from "./mistress/types";
 import { shouldRecordDiaryEntry } from "./sessionDiary";
+import { isLabPracticeRun } from "./sessionBlockLab";
 import type { SessionEvent, SessionState } from "./types";
 import {
   mistressUnlockSnapshotFromWallet,
@@ -26,8 +27,8 @@ export type SessionEndProgressInput = {
   /** Mid-session quest cinders to claw back on abort. */
   sessionQuestCinders: number;
   /**
-   * HMR / remount abort that keeps a checkpoint — skip diary, achievements,
-   * debrief, and cinder claw/credit so resume stays intact.
+   * HMR / remount abort that keeps a checkpoint, or a lab practice run —
+   * skip diary, achievements, debrief, and cinder claw/credit.
    */
   silent?: boolean;
 };
@@ -74,7 +75,7 @@ export function computeSessionEndProgress(
 ): SessionEndProgressResult {
   const st = input.state ?? null;
 
-  if (input.silent) {
+  if (input.silent || isLabPracticeRun(input.state)) {
     return {
       recordDiary: false,
       chaseDiarySouvenir: false,

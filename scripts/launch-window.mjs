@@ -203,7 +203,7 @@ function openBrowserFallback() {
   const appArgs = [
     `--app=${url}`,
     "--new-window",
-    "--window-size=1280,820",
+    "--window-size=1920,1080",
     "--window-position=60,40",
   ];
 

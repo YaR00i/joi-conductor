@@ -12,6 +12,7 @@
 
 import {
   CONTRACT_CATALOG,
+  CONTRACT_CATEGORY_LABELS,
   _registerUserContractLookup,
   type ContractDef,
 } from "./catalog";
@@ -263,7 +264,94 @@ export function cloneBuiltinToUser(builtinId: string): UserContractDef | null {
 
 /** Has this builtin already been cloned into the user catalog? */
 export function isBuiltinCloned(builtinId: string): boolean {
-  return loadUserContracts().some((c) => c.clonedFrom === builtinId);
+  return loadUserContracts().some(
+    (c) => c.clonedFrom === builtinId || c.id === builtinId,
+  );
+}
+
+export type ContractEditorOrigin = "builtin" | "override" | "user";
+
+export const CONTRACT_EDITOR_ORIGIN_RU: Record<ContractEditorOrigin, string> = {
+  builtin: "встроенный",
+  override: "изменён",
+  user: "свой",
+};
+
+export type ContractEditorRow = {
+  id: string;
+  def: ContractDef;
+  origin: ContractEditorOrigin;
+};
+
+export function contractEditorOrigin(id: string): ContractEditorOrigin {
+  const user = loadUserContracts().find((c) => c.id === id);
+  if (!user) return "builtin";
+  if (user.clonedFrom || CONTRACT_CATALOG.some((b) => b.id === id)) {
+    return "override";
+  }
+  return "user";
+}
+
+/** Merged catalog for the editor list: one row per live def, sorted. */
+export function listEditorCatalog(): ContractEditorRow[] {
+  const catOrder = Object.keys(CONTRACT_CATEGORY_LABELS);
+  return getMergedContractCatalog()
+    .map((def) => ({
+      id: def.id,
+      def,
+      origin: contractEditorOrigin(def.id),
+    }))
+    .sort((a, b) => {
+      const ca = catOrder.indexOf(a.def.category);
+      const cb = catOrder.indexOf(b.def.category);
+      if (ca !== cb) return ca - cb;
+      return a.def.nameRu.localeCompare(b.def.nameRu, "ru");
+    });
+}
+
+/**
+ * Save a draft over a built-in (creates/updates override, same id) or a user def.
+ */
+export function upsertUserOverride(
+  def: Omit<UserContractDef, "userCreated" | "createdAt" | "updatedAt">,
+): UserContractDef {
+  const existing = loadUserContracts().find((c) => c.id === def.id);
+  if (existing) {
+    const updated = updateUserContract(def.id, def);
+    if (updated) return updated;
+  }
+  const builtin = CONTRACT_CATALOG.find((b) => b.id === def.id);
+  return addUserContract({
+    ...def,
+    clonedFrom: def.clonedFrom ?? builtin?.id,
+  });
+}
+
+/** Drop the user override so the built-in text returns. */
+export function restoreBuiltinOverride(id: string): boolean {
+  const list = loadUserContracts();
+  const user = list.find((c) => c.id === id || c.clonedFrom === id);
+  if (!user) return false;
+  const builtinId = user.clonedFrom ?? user.id;
+  if (!CONTRACT_CATALOG.some((b) => b.id === builtinId)) return false;
+  const next = list.filter(
+    (c) => c.id !== user.id && c.clonedFrom !== builtinId,
+  );
+  if (next.length === list.length) return false;
+  saveUserContracts(next);
+  return true;
+}
+
+/** Copy any catalog def as a new user contract (does not replace the original). */
+export function duplicateToUserContract(source: ContractDef): UserContractDef {
+  const ids = loadUserContracts().map((c) => c.id);
+  const id = makeUserContractId(source.nameRu, ids);
+  return addUserContract({
+    ...source,
+    id,
+    nameRu: `${source.nameRu} (копия)`,
+    clonedFrom: undefined,
+  });
 }
 
 export function isUserContract(id: string): boolean {

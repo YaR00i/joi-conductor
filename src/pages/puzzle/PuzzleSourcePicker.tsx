@@ -66,7 +66,7 @@ export function PuzzleSourcePicker({ onPick, onBack }: Props) {
     return () => ro.disconnect();
   }, [mode]);
 
-  /** id → "loading" marker, prevents duplicate concurrent fetches. */
+  /** id → "loading" marker or its live URL; tracks URLs for unmount revoke. */
   const urlCacheRef = useRef<Map<string, string>>(new Map());
   /** Bumped on every page/filter change so stale fetches can self-cancel. */
   const genRef = useRef(0);
@@ -126,6 +126,7 @@ export function PuzzleSourcePicker({ onPick, onBack }: Props) {
       return;
     }
     const url = URL.createObjectURL(rec.blob);
+    urlCacheRef.current.set(id, url);
     setLoadedUrls((prev) => ({ ...prev, [id]: url }));
   }, []);
 
@@ -151,6 +152,18 @@ export function PuzzleSourcePicker({ onPick, onBack }: Props) {
       for (const t of timers) window.clearTimeout(t);
     };
   }, [pageMeta, loadCell]);
+
+  // Revoke live URLs on unmount; the gen bump cancels in-flight cells that
+  // would otherwise create URLs after this cleanup already ran.
+  useEffect(
+    () => () => {
+      genRef.current += 1;
+      for (const u of urlCacheRef.current.values()) {
+        if (u !== "loading") URL.revokeObjectURL(u);
+      }
+    },
+    [],
+  );
 
   // Tag chips: filter by search query (like Favorites), keep selected always visible.
   const selectedTagSet = useMemo(

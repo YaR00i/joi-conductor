@@ -1,3 +1,4 @@
+import { reportPersistFailure } from "./persistFailure";
 import { moveListItem, newReadingListId } from "./doujin/readingLists";
 import {
   addReadingListPlayStats,
@@ -8,6 +9,12 @@ import {
 } from "./doujin/readingListPlayStats";
 import { feedTakeCounts } from "./feedTake";
 import {
+  booruMediaId,
+  inferBooruSite,
+  isBooruSiteId,
+  type BooruSiteId,
+} from "./booruSites";
+import {
   masonryPreviewSrc,
   type MediaItem,
   type MediaKind,
@@ -17,6 +24,12 @@ import {
 export const GELBOORU_LISTS_KEY = "joi-gelbooru-lists-v1";
 export const DEFAULT_GELBOORU_LIST_NAME = "К просмотру";
 export const GELBOORU_LIST_NOTE_MAX = 4000;
+
+export function gelbooruListsKey(site: BooruSiteId = "gelbooru"): string {
+  return site === "gelbooru"
+    ? GELBOORU_LISTS_KEY
+    : `joi-booru-lists-${site}-v1`;
+}
 
 export type GelbooruListOrigin = "user" | "mistress";
 
@@ -45,9 +58,10 @@ export function itemToGelbooruListItem(
   const kind: MediaKind =
     item.kind === "video" || item.kind === "gif" ? item.kind : "image";
   const source: MediaSourceKind = "gelbooru";
+  const site = inferBooruSite(item);
   const gid = item.gelbooruId?.trim() || undefined;
   return {
-    id: gid ? `gb-${gid}` : item.id,
+    id: gid ? booruMediaId(site, gid) : item.id,
     url,
     previewUrl: item.previewUrl,
     sampleUrl: item.sampleUrl,
@@ -55,6 +69,7 @@ export function itemToGelbooruListItem(
     source,
     tags: item.tags,
     gelbooruId: gid,
+    booruSite: site,
     addedAt,
   };
 }
@@ -104,7 +119,8 @@ export function listedGelbooruIds(lists: GelbooruPlayList[]): Set<string> {
   for (const list of lists) {
     for (const item of list.items) {
       ids.add(item.id);
-      if (item.gelbooruId) ids.add(`gb-${item.gelbooruId}`);
+      const site = inferBooruSite(item);
+      if (item.gelbooruId) ids.add(booruMediaId(site, item.gelbooruId));
     }
   }
   return ids;
@@ -169,15 +185,20 @@ function parseItem(raw: unknown): GelbooruListItem | null {
   const sampleUrl = str(o.sampleUrl).trim() || undefined;
   const tags = str(o.tags).trim() || undefined;
   const gelbooruId = str(o.gelbooruId).trim() || undefined;
+  const site = inferBooruSite({
+    id,
+    booruSite: isBooruSiteId(o.booruSite) ? o.booruSite : undefined,
+  });
   return {
-    id: gelbooruId ? `gb-${gelbooruId}` : id,
+    id: gelbooruId ? booruMediaId(site, gelbooruId) : id,
     url,
     previewUrl,
     sampleUrl,
-    kind: parseKind(o.kind),
-    source: "gelbooru",
     tags,
     gelbooruId,
+    booruSite: site,
+    kind: parseKind(o.kind),
+    source: "gelbooru",
     addedAt: num(o.addedAt) ?? 0,
   };
 }
@@ -219,124 +240,164 @@ export function parseGelbooruListsJson(raw: string | null): GelbooruPlayList[] {
   }
 }
 
-function loadLists(): GelbooruPlayList[] {
+function loadLists(site: BooruSiteId = "gelbooru"): GelbooruPlayList[] {
   try {
-    return parseGelbooruListsJson(localStorage.getItem(GELBOORU_LISTS_KEY));
+    return parseGelbooruListsJson(localStorage.getItem(gelbooruListsKey(site)));
   } catch {
     return [];
   }
 }
 
-function saveLists(lists: GelbooruPlayList[]): void {
-  localStorage.setItem(GELBOORU_LISTS_KEY, JSON.stringify(lists));
+function saveLists(
+  lists: GelbooruPlayList[],
+  site: BooruSiteId = "gelbooru",
+): void {
+  try {
+    localStorage.setItem(gelbooruListsKey(site), JSON.stringify(lists));
+  } catch {
+    reportPersistFailure(site === "gelbooru" ? "списки Gelbooru" : `списки ${site}`);
+  }
 }
 
-function putList(list: GelbooruPlayList): GelbooruPlayList {
+function putList(
+  list: GelbooruPlayList,
+  site: BooruSiteId = "gelbooru",
+): GelbooruPlayList {
   const next: GelbooruPlayList = { ...list, updatedAt: Date.now() };
-  const lists = loadLists();
+  const lists = loadLists(site);
   const index = lists.findIndex((row) => row.id === next.id);
   if (index >= 0) lists[index] = next;
   else lists.push(next);
-  saveLists(lists);
+  saveLists(lists, site);
   return next;
 }
 
-export async function listGelbooruLists(): Promise<GelbooruPlayList[]> {
-  return loadLists();
+export async function listGelbooruLists(
+  site: BooruSiteId = "gelbooru",
+): Promise<GelbooruPlayList[]> {
+  return loadLists(site);
 }
 
 export async function getGelbooruList(
   id: string,
+  site: BooruSiteId = "gelbooru",
 ): Promise<GelbooruPlayList | undefined> {
-  return loadLists().find((row) => row.id === id);
+  return loadLists(site).find((row) => row.id === id);
 }
 
 export async function createGelbooruList(
   name: string,
-  opts?: { origin?: GelbooruListOrigin; items?: GelbooruListItem[]; note?: string },
+  opts?: {
+    origin?: GelbooruListOrigin;
+    items?: GelbooruListItem[];
+    note?: string;
+    site?: BooruSiteId;
+  },
 ): Promise<GelbooruPlayList> {
+  const site = opts?.site ?? "gelbooru";
   const trimmed = name.trim() || DEFAULT_GELBOORU_LIST_NAME;
   const now = Date.now();
-  return putList({
-    id: newReadingListId(),
-    name: trimmed,
-    createdAt: now,
-    updatedAt: now,
-    cursorIndex: 0,
-    origin: opts?.origin === "mistress" ? "mistress" : "user",
-    note: clipGelbooruListNote(opts?.note ?? ""),
-    items: opts?.items ?? [],
-    playStats: EMPTY_READING_LIST_PLAY_STATS,
-  });
+  return putList(
+    {
+      id: newReadingListId(),
+      name: trimmed,
+      createdAt: now,
+      updatedAt: now,
+      cursorIndex: 0,
+      origin: opts?.origin === "mistress" ? "mistress" : "user",
+      note: clipGelbooruListNote(opts?.note ?? ""),
+      items: opts?.items ?? [],
+      playStats: EMPTY_READING_LIST_PLAY_STATS,
+    },
+    site,
+  );
 }
 
 export async function bumpGelbooruListPlayStats(
   listId: string,
   delta: ReadingListPlayStats,
+  site: BooruSiteId = "gelbooru",
 ): Promise<GelbooruPlayList | undefined> {
-  const existing = await getGelbooruList(listId);
+  const existing = await getGelbooruList(listId, site);
   if (!existing) return undefined;
   if (!readingPlayStatsHasAny(delta)) return existing;
-  return putList({
-    ...existing,
-    playStats: addReadingListPlayStats(existing.playStats, delta),
-  });
+  return putList(
+    {
+      ...existing,
+      playStats: addReadingListPlayStats(existing.playStats, delta),
+    },
+    site,
+  );
 }
 
 export async function setGelbooruListNote(
   id: string,
   note: string,
+  site: BooruSiteId = "gelbooru",
 ): Promise<GelbooruPlayList | undefined> {
-  const existing = await getGelbooruList(id);
+  const existing = await getGelbooruList(id, site);
   if (!existing) return undefined;
-  return putList({ ...existing, note: clipGelbooruListNote(note) });
+  return putList({ ...existing, note: clipGelbooruListNote(note) }, site);
 }
 
 export async function renameGelbooruList(
   id: string,
   name: string,
+  site: BooruSiteId = "gelbooru",
 ): Promise<GelbooruPlayList | undefined> {
-  const existing = await getGelbooruList(id);
+  const existing = await getGelbooruList(id, site);
   if (!existing) return undefined;
   const trimmed = name.trim();
   if (!trimmed) return existing;
-  return putList({ ...existing, name: trimmed });
+  return putList({ ...existing, name: trimmed }, site);
 }
 
-export async function deleteGelbooruList(id: string): Promise<void> {
-  saveLists(loadLists().filter((list) => list.id !== id));
+export async function deleteGelbooruList(
+  id: string,
+  site: BooruSiteId = "gelbooru",
+): Promise<void> {
+  saveLists(
+    loadLists(site).filter((list) => list.id !== id),
+    site,
+  );
 }
 
 export async function setGelbooruListCursor(
   id: string,
   cursorIndex: number,
+  site: BooruSiteId = "gelbooru",
 ): Promise<void> {
-  const existing = await getGelbooruList(id);
+  const existing = await getGelbooruList(id, site);
   if (!existing) return;
   const max = Math.max(0, existing.items.length - 1);
-  putList({
-    ...existing,
-    cursorIndex: Math.min(max, Math.max(0, cursorIndex)),
-  });
+  putList(
+    {
+      ...existing,
+      cursorIndex: Math.min(max, Math.max(0, cursorIndex)),
+    },
+    site,
+  );
 }
 
 export async function addToGelbooruList(
   listId: string,
   item: MediaItem,
+  site: BooruSiteId = "gelbooru",
 ): Promise<GelbooruPlayList | undefined> {
-  const existing = await getGelbooruList(listId);
+  const existing = await getGelbooruList(listId, site);
   if (!existing) return undefined;
   const row = itemToGelbooruListItem(item);
   if (!row) return existing;
   if (existing.items.some((entry) => entry.id === row.id)) return existing;
-  return putList({ ...existing, items: [...existing.items, row] });
+  return putList({ ...existing, items: [...existing.items, row] }, site);
 }
 
 export async function addManyToGelbooruList(
   listId: string,
   items: readonly MediaItem[],
+  site: BooruSiteId = "gelbooru",
 ): Promise<GelbooruPlayList | undefined> {
-  const existing = await getGelbooruList(listId);
+  const existing = await getGelbooruList(listId, site);
   if (!existing) return undefined;
   const have = new Set(existing.items.map((row) => row.id));
   const extra: GelbooruListItem[] = [];
@@ -347,58 +408,66 @@ export async function addManyToGelbooruList(
     extra.push(row);
   }
   if (extra.length === 0) return existing;
-  return putList({ ...existing, items: [...existing.items, ...extra] });
+  return putList({ ...existing, items: [...existing.items, ...extra] }, site);
 }
 
 export async function removeFromGelbooruList(
   listId: string,
   itemId: string,
+  site: BooruSiteId = "gelbooru",
 ): Promise<GelbooruPlayList | undefined> {
-  const existing = await getGelbooruList(listId);
+  const existing = await getGelbooruList(listId, site);
   if (!existing) return undefined;
   const items = existing.items.filter((row) => row.id !== itemId);
   const cursorIndex = Math.min(
     existing.cursorIndex,
     Math.max(0, items.length - 1),
   );
-  return putList({ ...existing, items, cursorIndex });
+  return putList({ ...existing, items, cursorIndex }, site);
 }
 
 export async function toggleInGelbooruList(
   listId: string,
   item: MediaItem,
+  site: BooruSiteId = "gelbooru",
 ): Promise<GelbooruPlayList | undefined> {
-  const existing = await getGelbooruList(listId);
+  const existing = await getGelbooruList(listId, site);
   if (!existing) return undefined;
   const row = itemToGelbooruListItem(item);
   if (!row) return existing;
   if (existing.items.some((entry) => entry.id === row.id)) {
-    return removeFromGelbooruList(listId, row.id);
+    return removeFromGelbooruList(listId, row.id, site);
   }
-  return addToGelbooruList(listId, item);
+  return addToGelbooruList(listId, item, site);
 }
 
 export async function moveInGelbooruList(
   listId: string,
   from: number,
   to: number,
+  site: BooruSiteId = "gelbooru",
 ): Promise<GelbooruPlayList | undefined> {
-  const existing = await getGelbooruList(listId);
+  const existing = await getGelbooruList(listId, site);
   if (!existing) return undefined;
-  return putList({
-    ...existing,
-    items: moveListItem(existing.items, from, to),
-  });
+  return putList(
+    {
+      ...existing,
+      items: moveListItem(existing.items, from, to),
+    },
+    site,
+  );
 }
 
 export function gelbooruItemOnShelf(
-  item: Pick<GelbooruListItem, "id" | "gelbooruId">,
+  item: Pick<GelbooruListItem, "id" | "gelbooruId" | "booruSite">,
   savedIds: ReadonlySet<string>,
 ): boolean {
   if (savedIds.has(item.id)) return true;
   const gid = item.gelbooruId?.trim();
   if (!gid) return false;
-  return savedIds.has(gid) || savedIds.has(`gb-${gid}`);
+  const site = inferBooruSite(item);
+  if (savedIds.has(booruMediaId(site, gid))) return true;
+  return site === "gelbooru" && (savedIds.has(gid) || savedIds.has(`gb-${gid}`));
 }
 
 export function gelbooruListUnsavedItems(
@@ -421,7 +490,7 @@ export function gelbooruFeedItemIndex(
     if (item.id === needle) return true;
     const gid = item.gelbooruId?.trim();
     if (!gid) return false;
-    return needle === gid || needle === `gb-${gid}`;
+    return needle === gid || needle === booruMediaId(inferBooruSite(item), gid);
   });
 }
 

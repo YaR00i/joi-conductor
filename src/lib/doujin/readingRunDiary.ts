@@ -3,7 +3,12 @@ import { getActiveMistress } from "../mistress";
 import type { DiaryAteCum, DiaryCumFate, DiaryEntry } from "../sessionDiary";
 import { moodFromScore } from "../moodEngine";
 import { getActiveMoodLines } from "../voice/moodLines";
-import { readingRunElapsedSec, type ReadingRunState } from "./readingRun";
+import {
+  isBooruReadingRunSource,
+  isJoidbReadingRunSource,
+  readingRunElapsedSec,
+  type ReadingRunState,
+} from "./readingRun";
 
 const EAT = new Set([
   "swallow",
@@ -85,8 +90,9 @@ export function buildReadingDiaryEntry(opts: {
     moodScore: run.moodScore,
     mode: "stroke",
     modeNameRu: "Чтение",
-    tagsLabelRu:
-      run.source === "gelbooru"
+    tagsLabelRu: isJoidbReadingRunSource(run.source)
+      ? `${run.listName} · ${run.pagesShown} вид.`
+      : isBooruReadingRunSource(run.source)
         ? `${run.listName} · ${run.pagesShown} пост.`
         : `${run.listName} · ${run.galleries.length} раб.`,
     source: "reading",

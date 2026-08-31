@@ -140,6 +140,8 @@ import {
   loadContentHub,
   rememberFavoritesRedirect,
   saveContentHub,
+  isBooruContentSource,
+  isJoidbContentSource,
   type ContentSource,
   type ContentTab,
 } from "../../lib/contentHub";
@@ -147,6 +149,7 @@ import { useFavoriteSaveQueue } from "../../lib/favoriteSaveQueue";
 import { toggleSelectedById } from "../../lib/feedTake";
 import { ContentSourceKicker } from "../content/ContentSourceKicker";
 import { GelbooruHub } from "../content/GelbooruHub";
+import { JoidbHub } from "../content/JoidbHub";
 import { DoujinPager } from "./DoujinPager";
 import { DoujinDetail } from "./DoujinDetail";
 import { DoujinGrid } from "./DoujinGrid";
@@ -283,6 +286,8 @@ export function DoujinPage({
   );
   const genRef = useRef(0);
   const coverUrlsRef = useRef<string[]>([]);
+  // In-flight refreshSaved must not create cover URLs after unmount revoke.
+  const aliveRef = useRef(true);
   const gridWrapRef = useRef<HTMLDivElement>(null);
 
   const keyed = hasDoujinApiKey();
@@ -310,6 +315,7 @@ export function DoujinPage({
       setSavedIds(peekFavoriteIds());
     }
     const rows = await listLibrary();
+    if (!aliveRef.current) return;
     for (const url of coverUrlsRef.current) URL.revokeObjectURL(url);
     const next: Record<number, string> = {};
     const created: string[] = [];
@@ -412,6 +418,7 @@ export function DoujinPage({
     void refreshSaved();
     void refreshLists();
     return () => {
+      aliveRef.current = false;
       for (const url of coverUrlsRef.current) URL.revokeObjectURL(url);
     };
   }, [refreshLists, refreshSaved]);
@@ -830,7 +837,7 @@ export function DoujinPage({
         const reuse = Boolean(
           existing &&
             existing.listId === listId &&
-            existing.source !== "gelbooru" &&
+            existing.source === "nhentai" &&
             !runOpts.resetRun,
         );
         if (existing && !reuse) {
@@ -1265,9 +1272,20 @@ export function DoujinPage({
         </div>
       </header>
 
-      {source === "gelbooru" ? (
+      {isJoidbContentSource(source) ? (
+        <div className="doujin-hub">
+          <JoidbHub
+            tab={tab}
+            onTabChange={(next) => {
+              setTab(next);
+              setPage(1);
+            }}
+          />
+        </div>
+      ) : isBooruContentSource(source) ? (
         <div className="doujin-hub">
           <GelbooruHub
+            site={source}
             tab={tab}
             onTabChange={(next) => {
               setTab(next);

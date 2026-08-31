@@ -7,7 +7,7 @@ import {
   type ActiveSessionSeed,
 } from "./sessionSeed";
 
-export type AcceptSessionSeedNav = "contracts" | "roulette";
+export type AcceptSessionSeedNav = "stay" | "roulette";
 
 export type AcceptSessionSeedPlan = {
   seed: ActiveSessionSeed;
@@ -92,7 +92,7 @@ export function planAcceptSessionSeed(
     seed,
     denialHours,
     wear,
-    nav: wearOnly || honorOnly ? "contracts" : "roulette",
+    nav: wearOnly || honorOnly ? "stay" : "roulette",
     flashRu: acceptSessionSeedFlashRu(seed),
   };
 }

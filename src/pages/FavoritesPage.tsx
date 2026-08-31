@@ -13,6 +13,10 @@ import { TagTypePickerModal } from "../components/TagTypePickerModal";
 import { useTagTypeCatalog } from "../components/useTagTypeCatalog";
 import { gelbooruQueryFromFavoriteFilters } from "../lib/contentHub";
 import {
+  favoriteIdBelongsToBooruSite,
+  type BooruSiteId,
+} from "../lib/booruSites";
+import {
   tagPurchaseStatus,
   type ContentUnlockLists,
 } from "../lib/contentUnlocks";
@@ -62,6 +66,8 @@ interface FavoritesPageProps {
   unlocks?: ContentUnlockLists;
   /** Hide the standalone h1 when nested under Content chrome. */
   embedded?: boolean;
+  /** When set, the shelf only shows posts from this imageboard. */
+  booruSite?: BooruSiteId;
   listedIds?: Set<string>;
   selectedIds?: ReadonlySet<string>;
   onToggleSelect?: (item: MediaItem) => void;
@@ -177,6 +183,7 @@ export function FavoritesPage({
   onNavigate,
   unlocks = { ...emptyWallet().unlocks, pendingShopTags: [] },
   embedded = false,
+  booruSite,
   listedIds,
   selectedIds,
   onToggleSelect,
@@ -315,7 +322,7 @@ export function FavoritesPage({
   onClearSelectionRef.current = onClearSelection;
   useEffect(() => {
     onClearSelectionRef.current?.();
-  }, [kindFilter, search, selectedTags]);
+  }, [kindFilter, search, selectedTags, booruSite]);
   const enterIndexById = useMemo(() => {
     const map = new Map<string, number>();
     enterIds.forEach((id, index) => map.set(id, index));
@@ -387,8 +394,13 @@ export function FavoritesPage({
   }, []);
 
   const refreshFavoriteMetadata = useCallback(async (): Promise<void> => {
-    setFavoriteMetadata(await listFavoriteMetadata());
-  }, []);
+    const rows = await listFavoriteMetadata();
+    setFavoriteMetadata(
+      booruSite
+        ? rows.filter((row) => favoriteIdBelongsToBooruSite(row.id, booruSite))
+        : rows,
+    );
+  }, [booruSite]);
 
   useEffect(() => {
     void refreshFavoriteMetadata();
@@ -420,6 +432,9 @@ export function FavoritesPage({
 
   useEffect(() => {
     return () => {
+      // Invalidate in-flight loadPage so it revokes its own URLs instead of
+      // storing them after this cleanup already ran.
+      loadGenRef.current += 1;
       revokeViews(viewsRef.current);
     };
   }, []);

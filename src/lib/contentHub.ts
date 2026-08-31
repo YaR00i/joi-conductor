@@ -1,4 +1,8 @@
 import type { NavId } from "../components/SideNav";
+import {
+  isBooruSiteId,
+  type BooruSiteId,
+} from "./booruSites";
 import { recsShuffleIndex } from "./recsShuffle";
 import {
   getTagType,
@@ -9,7 +13,16 @@ import {
 
 export const CONTENT_HUB_KEY = "joi-content-hub-v1";
 
-export const CONTENT_SOURCES = ["nhentai", "gelbooru"] as const;
+export const CONTENT_SOURCES = [
+  "nhentai",
+  "gelbooru",
+  "censored",
+  "blacked",
+  "realbooru",
+  "xbooru",
+  "hypnohub",
+  "joidb",
+] as const;
 export type ContentSource = (typeof CONTENT_SOURCES)[number];
 
 export const CONTENT_TABS = [
@@ -46,7 +59,15 @@ const DEFAULT_STATE: ContentHubState = {
 };
 
 function isSource(v: unknown): v is ContentSource {
-  return v === "nhentai" || v === "gelbooru";
+  return (CONTENT_SOURCES as readonly string[]).includes(String(v));
+}
+
+export function isBooruContentSource(v: ContentSource): v is BooruSiteId {
+  return isBooruSiteId(v);
+}
+
+export function isJoidbContentSource(v: ContentSource): v is "joidb" {
+  return v === "joidb";
 }
 
 function isTab(v: unknown): v is ContentTab {

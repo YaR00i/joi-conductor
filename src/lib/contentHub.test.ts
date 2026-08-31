@@ -38,6 +38,19 @@ describe("contentHub", () => {
     });
   });
 
+  it("persists a gelbooru-family source", () => {
+    saveContentHub({ source: "blacked", tab: "newest" });
+    expect(loadContentHub().source).toBe("blacked");
+    saveContentHub({ source: "xbooru", tab: "search" });
+    expect(loadContentHub().source).toBe("xbooru");
+    saveContentHub({ source: "hypnohub", tab: "recs" });
+    expect(loadContentHub().source).toBe("hypnohub");
+    saveContentHub({ source: "realbooru", tab: "newest" });
+    expect(loadContentHub().source).toBe("realbooru");
+    saveContentHub({ source: "joidb", tab: "search" });
+    expect(loadContentHub().source).toBe("joidb");
+  });
+
   it("ignores junk stored values", () => {
     localStorage.setItem("joi-content-hub-v1", '{"source":"x","tab":"nope"}');
     expect(loadContentHub()).toEqual({

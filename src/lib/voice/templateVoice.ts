@@ -469,6 +469,7 @@ export class TemplateVoice implements VoiceLayer {
           ),
         ];
       case "session_end":
+        if (event.silent) return [];
         return [
           say(
             event.reason === "abort"
@@ -677,6 +678,7 @@ export class TemplateVoice implements VoiceLayer {
       }
       case "mistress_wager_media":
       case "block_end":
+      case "block_skip":
       case "beat":
       case "vibe_level":
       case "counters":

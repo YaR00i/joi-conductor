@@ -125,7 +125,7 @@ export function parseSpeechOffers(
         offers.push({
           kind,
           titleRu: spec.labelRu,
-          hintRu: "Вне сессии · denial до завтра.",
+          hintRu: "Вне сессии · отказ до завтра.",
           confirmRu: "Принять",
         });
         break;

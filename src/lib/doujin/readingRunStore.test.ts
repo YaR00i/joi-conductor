@@ -93,4 +93,20 @@ describe("reading run store", () => {
     expect(loadReadingRunForSource("gelbooru")?.listId).toBe("g1");
     expect(loadReadingRunForSource("nhentai")).toBeNull();
   });
+
+  it("does not clear a joidb run when gelbooru saves null", () => {
+    const row = createReadingRun({
+      listId: "j1",
+      listName: "JOI",
+      listTotal: 3,
+      origin: "user",
+      moodScore: 0,
+      source: "joidb",
+      now: 1,
+      rng: () => 0,
+    });
+    saveReadingRun(row);
+    saveReadingRunForSource(null, "gelbooru");
+    expect(loadReadingRunForSource("joidb")?.listId).toBe("j1");
+  });
 });

@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ContractFinishDebriefSheet } from "../components/ContractFinishDebriefSheet";
 import { ContractEditorPage } from "./ContractEditorPage";
-import { isUserContract } from "../lib/contracts/userCatalog";
+import {
+  CONTRACT_EDITOR_ORIGIN_RU,
+  contractEditorOrigin,
+} from "../lib/contracts/userCatalog";
 import { getActiveSaveSlot } from "../lib/saveSlots";
 import {
   requiresActivityDebrief,
@@ -206,7 +209,7 @@ export function ContractsPage({
 
   useEffect(() => {
     refresh();
-  }, [revision, mistress.id, drillRevision, seedRevision, refresh]);
+  }, [revision, mistress.id, drillRevision, seedRevision, refresh, mode]);
 
   useEffect(() => {
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);
@@ -460,15 +463,25 @@ export function ContractsPage({
 
   return (
     <div className="contracts-page">
-      <header className="contracts-page__hero">
+      <header
+        className={
+          mode === "editor"
+            ? "contracts-page__hero contracts-page__hero--editor"
+            : "contracts-page__hero"
+        }
+      >
         <div className="contracts-page__hero-top">
           <div className="contracts-page__hero-text">
             <p className="contracts-page__eyebrow">Доска дня · сессия и вне</p>
             <h1 className="contracts-page__title">Контракты</h1>
-            <p className="contracts-page__sub">
-              {mistress.displayNameRu} выложила задания на сегодня.
-            </p>
-            <p className="contracts-page__line">«{line}»</p>
+            {mode === "board" ? (
+              <>
+                <p className="contracts-page__sub">
+                  {mistress.displayNameRu} выложила контракты на сегодня.
+                </p>
+                <p className="contracts-page__line">«{line}»</p>
+              </>
+            ) : null}
             <div className="contracts-page__mode-toggle">
               <button
                 type="button"
@@ -490,22 +503,26 @@ export function ContractsPage({
                       : "contracts-page__mode-btn"
                   }
                   onClick={() => setMode("editor")}
-                  title="Доступно только в Песочнице"
+                  title="Песочница: править готовые и свои"
                 >
-                  Свои контракты
+                  Редактор
                 </button>
               ) : null}
             </div>
           </div>
-          <div className="contracts-page__avatar" aria-hidden>
-            <MistressImg
-              src={mistress.assets.shopAvatar}
-              alt=""
-              className="contracts-page__avatar-img"
-            />
-          </div>
+          {mode === "board" ? (
+            <div className="contracts-page__avatar" aria-hidden>
+              <MistressImg
+                src={mistress.assets.shopAvatar}
+                alt=""
+                className="contracts-page__avatar-img"
+              />
+            </div>
+          ) : null}
         </div>
 
+        {mode === "board" ? (
+          <>
         <div className="contracts-page__toolbar">
           <div className="contracts-page__mistress">
             <MistressPicker
@@ -606,6 +623,8 @@ export function ContractsPage({
             {flash}
           </p>
         ) : null}
+          </>
+        ) : null}
       </header>
 
       {mode === "editor" ? (
@@ -654,6 +673,7 @@ export function ContractsPage({
             : 0;
           const fromDebrief =
             pulseTitleRu != null && pulseTitleRu === c.titleRu;
+          const editorOrigin = contractEditorOrigin(c.defId);
           return (
             <li
               key={c.instanceId}
@@ -678,9 +698,16 @@ export function ContractsPage({
                 <span className={`contracts-card__status status-${c.status}`}>
                   {statusLabel(c)}
                 </span>
-                {isUserContract(c.defId) ? (
-                  <span className="contracts-card__user-tag" title="Свой контракт — можно удалить в «Свои контракты»">
-                    свой
+                {editorOrigin !== "builtin" ? (
+                  <span
+                    className="contracts-card__user-tag"
+                    title={
+                      editorOrigin === "override"
+                        ? "Правка встроенного — оригинал можно вернуть в Редакторе"
+                        : "Свой контракт — удалить можно в Редакторе"
+                    }
+                  >
+                    {CONTRACT_EDITOR_ORIGIN_RU[editorOrigin]}
                   </span>
                 ) : null}
               </div>

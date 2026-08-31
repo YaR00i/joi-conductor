@@ -28,7 +28,7 @@ export type ContractVerificationInput = {
   activeDrill?: ActiveMediaDrill | null;
 };
 
-/** Short badge copy — shared across ContractsPage / Daily brief / hub tasks. */
+/** Short badge copy — shared across ContractsPage / Daily brief. */
 export const CONTRACT_VERIFY_BADGE_RU: Record<ContractVerificationMode, string> =
   {
     honor: "на честности",
@@ -36,7 +36,7 @@ export const CONTRACT_VERIFY_BADGE_RU: Record<ContractVerificationMode, string> 
     auto: "авто",
     sealed: "печать",
     live: "в сессии",
-    drill: "drill",
+    drill: "колода",
     timer: "таймер",
   };
 
@@ -101,7 +101,7 @@ export function contractVerificationTitleRu(
     case "live":
       return "Прогресс в сессии — проверит Conductor";
     case "drill":
-      return "Медиа-drill — доложить в сессии";
+      return "Колода из Контента — доложить число триггеров";
     case "timer":
       return "Таймер клетки/пробки — проверит Conductor";
     default: {
@@ -160,7 +160,7 @@ export function contractVerificationPathHintRu(
       case "debrief":
         return "жду отчёт";
       case "drill":
-        return "drill активен";
+        return "колода идёт";
       default: {
         const _exhaustive: never = mode;
         return _exhaustive;
@@ -179,7 +179,7 @@ export function contractVerificationPathHintRu(
     case "live":
       return "в сессии";
     case "drill":
-      return "drill";
+      return "колода";
     case "timer":
       return "таймер";
     default: {
@@ -216,7 +216,7 @@ export function contractVerificationCloseHintRu(
     case "auto":
       return "закроется само, если условие выполнено";
     case "drill":
-      return "смотри в Сессии → «Доложить»";
+      return "смотри колоду → «Доложить»";
     default: {
       const _exhaustive: never = mode;
       return _exhaustive;

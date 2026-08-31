@@ -41,13 +41,13 @@ import {
 } from "./moodSessionBias";
 import type { SessionEventBus } from "./eventBus";
 import { getFunction, getPattern, getToy } from "./catalog";
-import { playBeatTick } from "./metronome";
 import { patternCycleEndAtMs } from "./beatSchedule";
 import {
   BEAT_BLOCK_GAP_MS,
   BEAT_LEAD_IN_MS,
 } from "./beatTiming";
 import {
+  appendUpcomingBlocks,
   dropUpcomingBlock,
   insertBlockAfter,
   moveUpcomingBlock,
@@ -91,6 +91,7 @@ import {
   cumplayEffectMoodDelta,
   type CumplayStepEffect,
 } from "./cumplayRitual";
+import { listEnabledQuestDefs } from "./questPool";
 import {
   buildForcedQuestOffer,
   buildQuestOffer,
@@ -167,6 +168,7 @@ import {
   type SessionCheckpoint,
   type SessionCheckpointMeta,
 } from "./sessionCheckpoint";
+import { isLabPracticeRun } from "./sessionBlockLab";
 
 export type RuntimeListener = (state: SessionState) => void;
 
@@ -213,6 +215,8 @@ export class SessionRuntime {
   /** Mistress edge-tax roulette spins this session. */
   private edgesTaxCount = 0;
   private lastEdgesTaxAtPerf = 0;
+  /** performance.now() when pause() last ran — shift blockEnteredAtPerf on resume. */
+  private pausedAtPerf = 0;
 
   constructor(bus: SessionEventBus, voice: VoiceLayer) {
     this.bus = bus;
@@ -222,7 +226,6 @@ export class SessionRuntime {
       if (!s || s.status !== "running") return;
       const block = s.queue[s.index];
       if (!block) return;
-      playBeatTick(payload.accent);
       this.emit({
         type: "beat",
         blockId: block.id,
@@ -305,6 +308,7 @@ export class SessionRuntime {
   /** Snapshot for crash / reload resume. */
   exportCheckpoint(): SessionCheckpoint | null {
     if (!this.state) return null;
+    if (this.state.labPractice) return null;
     if (this.state.status !== "running" && this.state.status !== "paused") {
       return null;
     }
@@ -389,6 +393,8 @@ export class SessionRuntime {
       begBonus?: number;
       equippedToyIds?: string[];
       idolBuzzHoldMode?: IdolBuzzHoldMode;
+      /** Sandbox lab queue — finish without diary / debrief. */
+      labPractice?: boolean;
     } = {},
   ): void {
     this.stopTimers();
@@ -403,12 +409,14 @@ export class SessionRuntime {
       index: 0,
       elapsedSec: 0,
       blockElapsedSec: 0,
+      blockEnteredAtPerf: null,
       edgesDone: 0,
       holdsDone: 0,
       ruinsDone: 0,
       seed,
       beatOriginPerf: null,
       beatUntilAtMs: null,
+      labPractice: opts.labPractice === true ? true : undefined,
       finaleOutcome: undefined,
       finalePhase: null,
       mood: moodFromScore(moodScore),
@@ -457,6 +465,7 @@ export class SessionRuntime {
     this.lastTimerTeaseAtPerf = 0;
     this.edgesTaxCount = 0;
     this.lastEdgesTaxAtPerf = 0;
+    this.pausedAtPerf = 0;
     this.emit({ type: "session_start", params, seed });
     this.notify();
     this.beatBlockCount = 0;
@@ -465,17 +474,21 @@ export class SessionRuntime {
   }
 
   /**
-   * Force a catalog quest offer (CBT contract bridge).
+   * Force a catalog quest offer (CBT contract bridge, lab picker).
    * Reward 0 when a linked contract pays cinders instead.
+   * `replaceOffer` swaps a visible offer; never interrupts an in-progress quest.
    */
   forceQuestOffer(
     questId: QuestId,
-    opts?: { rewardOverride?: number; contractRuleRu?: string },
+    opts?: {
+      rewardOverride?: number;
+      contractRuleRu?: string;
+      replaceOffer?: boolean;
+    },
   ): boolean {
     if (!this.state || this.state.status !== "running") return false;
-    if (this.state.questOffer || this.state.pendingQuest || this.state.activeQuest) {
-      return false;
-    }
+    if (this.state.pendingQuest || this.state.activeQuest) return false;
+    if (this.state.questOffer && !opts?.replaceOffer) return false;
     if (isPromptGate(this.state.promptPhase)) return false;
     const offer = buildForcedQuestOffer(this.rng, questId, {
       mood: this.state.mood,
@@ -746,6 +759,7 @@ export class SessionRuntime {
 
   pause(): void {
     if (!this.state || this.state.status !== "running") return;
+    this.pausedAtPerf = performance.now();
     this.state = { ...this.state, status: "paused" };
     this.clock.pause();
     this.vibeClock.pause();
@@ -756,6 +770,10 @@ export class SessionRuntime {
 
   resume(): void {
     if (!this.state || this.state.status !== "paused") return;
+    if (this.pausedAtPerf > 0) {
+      this.holdBlockElapsed(performance.now() - this.pausedAtPerf);
+      this.pausedAtPerf = 0;
+    }
     // Checkpoint restore clears beat origins — re-arm the current block.
     if (
       this.state.beatOriginPerf == null &&
@@ -778,13 +796,19 @@ export class SessionRuntime {
       if (block.drive === "vibe") {
         this.vibeClock.resume();
         resumeVibeHum();
-      } else this.clock.resume();
+      } else {
+        this.clock.resume();
+        this.state = {
+          ...this.state,
+          beatOriginPerf: this.clock.getOriginPerf(),
+        };
+      }
     }
     this.emit({ type: "session_resume" });
     this.notify();
   }
 
-  abort(opts?: { keepCheckpoint?: boolean }): void {
+  abort(opts?: { keepCheckpoint?: boolean; silent?: boolean }): void {
     if (!this.state || this.state.status === "ended") return;
     if (opts?.keepCheckpoint) {
       const cp = this.exportCheckpoint();
@@ -793,7 +817,10 @@ export class SessionRuntime {
     this.finishSession("abort", {
       clearCheckpoint: !opts?.keepCheckpoint,
       // Keep resume intact — do not write abort diary / claw quest cinders.
-      silent: opts?.keepCheckpoint === true,
+      silent:
+        opts?.silent === true ||
+        opts?.keepCheckpoint === true ||
+        isLabPracticeRun(this.state),
     });
   }
 
@@ -824,6 +851,7 @@ export class SessionRuntime {
         queue,
         holdArmed: true,
         blockElapsedSec: 0,
+        blockEnteredAtPerf: performance.now(),
         confirmRequestAtPerf: performance.now(),
         holdGraceUntilPerf: null,
         beatOriginPerf: null,
@@ -1300,6 +1328,22 @@ export class SessionRuntime {
     if (!next) return;
     this.state = { ...state, queue: next };
     this.notify();
+  }
+
+  appendUpcomingBlocks(blocks: Block[]): boolean {
+    const state = this.state;
+    if (!state || (state.status !== "running" && state.status !== "paused")) {
+      return false;
+    }
+    const next = appendUpcomingBlocks(
+      state.queue,
+      state.index,
+      blocks.slice(),
+    );
+    if (!next) return false;
+    this.state = { ...state, queue: next };
+    this.notify();
+    return true;
   }
 
   confirmFinaleEdge(): void {
@@ -2557,6 +2601,12 @@ export class SessionRuntime {
     }
     const pattern = getPattern(block.patternId);
     if (!pattern) {
+      this.emit({
+        type: "block_skip",
+        blockId: block.id,
+        reason: "missing_pattern",
+        detail: block.patternId,
+      });
       this.advanceBlock();
       return;
     }
@@ -3024,6 +3074,12 @@ export class SessionRuntime {
     }
     const pattern = getPattern(block.patternId);
     if (!pattern) {
+      this.emit({
+        type: "block_skip",
+        blockId: block.id,
+        reason: "missing_pattern",
+        detail: block.patternId,
+      });
       this.advanceBlock();
       return;
     }
@@ -3102,6 +3158,9 @@ export class SessionRuntime {
     const need = this.state.nextQuestAfter ?? 4;
     if (since < need) return;
 
+    const pool = listEnabledQuestDefs();
+    if (pool.length === 0) return;
+
     const prefs = this.state.fetishPrefs ?? {};
     const fetishKey =
       Object.entries(prefs)
@@ -3111,7 +3170,9 @@ export class SessionRuntime {
     const offer = buildQuestOffer(this.rng, {
       mood: this.state.mood,
       fetishKey,
+      pool,
     });
+    if (!offer) return;
     this.state = {
       ...this.state,
       questOffer: offer,
@@ -3150,10 +3211,52 @@ export class SessionRuntime {
     this.advanceBlock();
   }
 
+  private blockElapsedNow(now = performance.now()): number {
+    if (!this.state) return 0;
+    const t0 = this.state.blockEnteredAtPerf;
+    if (t0 == null) return this.state.blockElapsedSec;
+    return Math.max(0, Math.floor((now - t0) / 1000));
+  }
+
+  /** Keep blockElapsed frozen while wall-clock still advances (pause / prompt / tease). */
+  private holdBlockElapsed(ms: number): void {
+    if (!this.state || this.state.blockEnteredAtPerf == null) return;
+    this.state = {
+      ...this.state,
+      blockEnteredAtPerf: this.state.blockEnteredAtPerf + ms,
+    };
+  }
+
+  private skipUnstartableBlock(
+    index: number,
+    block: Block,
+    reason: "missing_function" | "missing_pattern",
+    detail: string,
+  ): void {
+    if (!this.state) return;
+    this.emit({
+      type: "block_skip",
+      blockId: block.id,
+      reason,
+      detail,
+    });
+    this.clock.stop();
+    this.vibeClock.stop();
+    stopVibeHum();
+    this.state = { ...this.state, index };
+    const next = index + 1;
+    if (next >= this.state.queue.length) {
+      this.finishSession("complete");
+      return;
+    }
+    this.enterBlock(next);
+  }
+
   private tickSecond(): void {
     if (!this.state || this.state.status !== "running") return;
 
     if (this.state.timerTease) {
+      this.holdBlockElapsed(1000);
       const tease = this.state.timerTease;
       const pauseLeftSec = tease.pauseLeftSec - 1;
       const activeTask = this.state.activeTask
@@ -3254,6 +3357,7 @@ export class SessionRuntime {
 
     // Prompt / dare gate: soft session clock, freeze block progress
     if (isPromptGate(this.state.promptPhase)) {
+      this.holdBlockElapsed(1000);
       const elapsedSec = this.state.elapsedSec + 1;
       if (
         this.state.promptPhase === "task_running" &&
@@ -3275,13 +3379,14 @@ export class SessionRuntime {
 
     if (current?.goal === "breath" && this.state.breathPhase === "prep") {
       const elapsedSec = this.state.elapsedSec + 1;
-      const blockElapsedSec = this.state.blockElapsedSec + 1;
+      const blockElapsedSec = this.blockElapsedNow();
       const prepSec = current.breathPrepSec ?? 4;
       if (blockElapsedSec >= prepSec) {
         this.state = {
           ...this.state,
           elapsedSec,
           blockElapsedSec: 0,
+          blockEnteredAtPerf: performance.now(),
           breathPhase: "holding",
         };
         this.emit({
@@ -3305,7 +3410,7 @@ export class SessionRuntime {
 
     if (current?.goal === "breath" && this.state.breathPhase === "holding") {
       const elapsedSec = this.state.elapsedSec + 1;
-      const blockElapsedSec = this.state.blockElapsedSec + 1;
+      const blockElapsedSec = this.blockElapsedNow();
       this.state = { ...this.state, elapsedSec, blockElapsedSec };
       this.emitCounters();
       if (blockElapsedSec >= current.durationSec) {
@@ -3321,7 +3426,7 @@ export class SessionRuntime {
     }
 
     const elapsedSec = this.state.elapsedSec + 1;
-    const blockElapsedSec = this.state.blockElapsedSec + 1;
+    const blockElapsedSec = this.blockElapsedNow();
     let nextState: SessionState = {
       ...this.state,
       elapsedSec,
@@ -3489,6 +3594,7 @@ export class SessionRuntime {
       ...this.state,
       queue,
       edgeRampOriginBpm: origin,
+      beatOriginPerf: this.clock.getOriginPerf(),
     };
   }
 
@@ -3520,8 +3626,12 @@ export class SessionRuntime {
 
     const fn = getFunction(block.functionId);
     const pattern = getPattern(block.patternId);
-    if (!fn || !pattern) {
-      this.advanceBlock();
+    if (!fn) {
+      this.skipUnstartableBlock(index, block, "missing_function", block.functionId);
+      return;
+    }
+    if (!pattern) {
+      this.skipUnstartableBlock(index, block, "missing_pattern", block.patternId);
       return;
     }
 
@@ -3552,6 +3662,7 @@ export class SessionRuntime {
       ...this.state,
       index,
       blockElapsedSec: 0,
+      blockEnteredAtPerf: performance.now(),
       status: "running",
       breathPhase: null,
       breathProgress: 0,
@@ -4445,8 +4556,10 @@ export class SessionRuntime {
       clearSessionCheckpoint();
     }
     if (!this.state) return;
+    const silent =
+      opts?.silent === true || isLabPracticeRun(this.state);
     const cindersEarned =
-      reason === "complete"
+      reason === "complete" && !silent
         ? calcSessionCompleteCinders({
             elapsedSec: this.state.elapsedSec,
             edgesDone: this.state.edgesDone,
@@ -4471,7 +4584,7 @@ export class SessionRuntime {
       type: "session_end",
       reason,
       cindersEarned,
-      silent: opts?.silent === true ? true : undefined,
+      silent: silent ? true : undefined,
     });
     this.notify();
   }

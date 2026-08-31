@@ -2,6 +2,7 @@
  * Explore progress saves: pack + slot, localStorage (play) or a JSON folder (CLI).
  * No cloud. Empty slot = do not apply; start inventory stays whatever play/sim uses.
  */
+import { reportPersistFailure } from "../../lib/persistFailure";
 import { compactEquipment, type EmberEquipment } from "./emberEquipment";
 import { compactInventory } from "./emberItem";
 import { parseFlagValue } from "./emberScript";
@@ -151,7 +152,7 @@ export function createLocalStorageSaveBackend(): EmberSaveBackend {
       try {
         localStorage.setItem(key, value);
       } catch {
-        /* quota */
+        reportPersistFailure("автосейв Ember");
       }
     },
     removeItem(key) {

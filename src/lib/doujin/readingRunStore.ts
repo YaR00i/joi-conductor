@@ -1,4 +1,5 @@
 import {
+  normalizeReadingRunSource,
   readingRunSource,
   type ReadingRunGalleryLog,
   type ReadingRunSource,
@@ -17,8 +18,7 @@ function normalizeReadingRun(raw: unknown): ReadingRunState | null {
   if (!raw || typeof raw !== "object") return null;
   const rec = raw as Record<string, unknown>;
   if (typeof rec.id !== "string" || typeof rec.listId !== "string") return null;
-  const source: ReadingRunSource =
-    rec.source === "gelbooru" ? "gelbooru" : "nhentai";
+  const source: ReadingRunSource = normalizeReadingRunSource(rec.source);
   const finished = Array.isArray(rec.finishedGalleryIds)
     ? rec.finishedGalleryIds
         .map(asId)

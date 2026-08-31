@@ -1,4 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+import {
+  booruPostIdFromMediaId,
+  booruPostViewUrl,
+  inferBooruSite,
+} from "../lib/booruSites";
 import { splitMediaTags, type MediaItem } from "../lib/media";
 import { revealFavoriteOnDisk } from "../lib/mediaFavorites";
 import { playUiClick, primeUiAudio } from "../lib/uiSound";
@@ -299,12 +304,14 @@ export function FavLightbox({
   );
 }
 
-export function openGelbooruSite(item: Pick<MediaItem, "gelbooruId">): void {
-  const gid = item.gelbooruId?.trim();
+export function openGelbooruSite(
+  item: Pick<MediaItem, "gelbooruId" | "id" | "booruSite">,
+): void {
+  const gid = item.gelbooruId?.trim() || booruPostIdFromMediaId(item.id);
   if (!gid) return;
   void primeUiAudio();
   playUiClick();
-  const url = `https://gelbooru.com/index.php?page=post&s=view&id=${gid}`;
+  const url = booruPostViewUrl(inferBooruSite(item), gid);
   const desktop = window.joiDesktop?.shell?.openExternal;
   if (desktop) {
     void desktop(url);

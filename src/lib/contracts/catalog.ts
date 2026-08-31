@@ -78,7 +78,7 @@ export const CONTRACT_CATEGORY_LABELS: Record<ContractCategory, string> = {
   media: "Медиа",
   cbt: "CBT",
   anal: "Анал",
-  oral_cei: "Oral / CEI",
+  oral_cei: "Рот / CEI",
   chastity: "Клетка",
   body: "Тело",
   life: "Быт",
@@ -95,16 +95,6 @@ const MEDIA_TAGS = [
   "bondage",
   "netorare",
   "femdom",
-];
-
-/** Quick filters on faproulette.co (English labels as on the site). */
-const FAPROULETTE_FILTERS = [
-  "Edging",
-  "Anal",
-  "Oral",
-  "Cum Lovers",
-  "Chastity",
-  "Straight",
 ];
 
 /** Out-of-session contract templates (honor + guided drills). */
@@ -141,10 +131,10 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "edge_hands_off",
     category: "edge",
-    nameRu: "Hands-off",
+    nameRu: "Руки прочь",
     briefRu: "После эджа — тишина",
     instructionRu:
-      "Прими условия: {n} эджей в сессии, после последнего — hands-off {minutes} минут. Никаких касаний. Квота эджей запечатана в плане.",
+      "Прими условия: {n} эджей в сессии, после последнего — руки прочь {minutes} минут. Никаких касаний. Квота эджей запечатана в плане.",
     difficulty: 2,
     durationHintMin: 40,
     rewardMin: 14,
@@ -181,14 +171,14 @@ export const CONTRACT_CATALOG: ContractDef[] = [
     biasHints: ["stroke", "slow"],
   },
 
-  // —— Media ——
+  // —— Media (JOI Content hub — not third-party roulette sites) ——
   {
     id: "media_porn_timer",
     category: "media",
-    nameRu: "Таймер порно",
-    briefRu: "Смотри, не кончай",
+    nameRu: "Таймер на кадры",
+    briefRu: "Смотри в Контенте, не кончай",
     instructionRu:
-      "Смотри порно {minutes} минут с тегом/темой «{tag}». Руки можно, но без оргазма. Таймер на виду.",
+      "Контент → стена или избранное. {minutes} минут с темой «{tag}». Руки можно, оргазм нельзя. Таймер на виду.",
     difficulty: 1,
     durationHintMin: 25,
     rewardMin: 8,
@@ -200,9 +190,9 @@ export const CONTRACT_CATALOG: ContractDef[] = [
     id: "media_doujin",
     category: "media",
     nameRu: "Додзинси",
-    briefRu: "Почитай по тегу",
+    briefRu: "Прогон в Контенте",
     instructionRu:
-      "Найди и прочитай {pages} страниц/глав додзинси или манги с тегом «{tag}». Кратко отметь в голове, что тебя задело.",
+      "Контент → додзинси. Прочитай {pages} страниц с тегом «{tag}». Запомни, что задело.",
     difficulty: 1,
     durationHintMin: 30,
     rewardMin: 10,
@@ -213,10 +203,10 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "media_hunt",
     category: "media",
-    nameRu: "Охота на картинки",
-    briefRu: "Собери подборку",
+    nameRu: "Охота на кадры",
+    briefRu: "В избранное",
     instructionRu:
-      "Найди и сохрани в избранное {n} картинок с тегом «{tag}». Без дрочки дольше 2 минут суммарно.",
+      "Контент: найди и сохрани в избранное {n} картинок с тегом «{tag}». Дрочка суммарно не дольше 2 минут. Оргазм = провал.",
     difficulty: 1,
     durationHintMin: 20,
     rewardMin: 8,
@@ -227,10 +217,10 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "media_eyes_closed_joi",
     category: "media",
-    nameRu: "JOI с закрытыми глазами",
-    briefRu: "Только слух",
+    nameRu: "Только голос",
+    briefRu: "Глаза закрыты",
     instructionRu:
-      "Закрой глаза (без повязок/ремней). Слушай JOI или аудио {minutes} минут. Дрочи только по голосу. Без оргазма.",
+      "Закрой глаза. Слушай голос госпожи или JOI {minutes} минут. Дрочи только по голосу. Без оргазма.",
     difficulty: 2,
     durationHintMin: 25,
     rewardMin: 12,
@@ -244,7 +234,7 @@ export const CONTRACT_CATALOG: ContractDef[] = [
     nameRu: "Капшены",
     briefRu: "Читай вслух",
     instructionRu:
-      "{minutes} минут читай femdom/CEI-капшены или captions вслух. После каждого — «Спасибо, госпожа».",
+      "{minutes} минут читай femdom/CEI-капшены вслух. После каждого — «Спасибо, госпожа».",
     difficulty: 2,
     durationHintMin: 20,
     rewardMin: 10,
@@ -255,10 +245,10 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "media_cache_triggers",
     category: "media",
-    nameRu: "Кэш и триггеры",
-    briefRu: "Смотри колоду — наказывай себя",
+    nameRu: "Колода и триггеры",
+    briefRu: "Слайды из Контента — наказывай себя",
     instructionRu:
-      "Нажми «Начать»: загрузится кэш {limit} с тегом «{tag}». В Сессии без старта смотри слайды. За каждый кадр с «{trigger}» — {actionLabel}. У тебя {timerMin} мин. В конце доложи число триггеров.",
+      "Нажми «Начать»: колода {limit} кадров с тегом «{tag}» из Контента. Смотри слайды. За каждый кадр с «{trigger}» — {actionLabel}. {timerMin} мин. В конце доложи число триггеров.",
     difficulty: 2,
     durationHintMin: 25,
     rewardMin: 14,
@@ -270,10 +260,10 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "media_cache_triggers_hard",
     category: "media",
-    nameRu: "Длинный кэш",
+    nameRu: "Длинная колода",
     briefRu: "Больше кадров — жёстче таймер",
     instructionRu:
-      "Нажми «Начать»: кэш {limit}, тег «{tag}». Без старта сессии. За каждый «{trigger}» — {actionLabel}. Таймер {timerMin} мин. В конце — число триггеров.",
+      "Нажми «Начать»: колода {limit}, тег «{tag}». За каждый «{trigger}» — {actionLabel}. Таймер {timerMin} мин. В конце — число триггеров.",
     difficulty: 3,
     durationHintMin: 40,
     rewardMin: 18,
@@ -285,10 +275,10 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "media_faproulette_spins",
     category: "media",
-    nameRu: "Fap Roulette · броски",
-    briefRu: "Крути — дрочи по картинке",
+    nameRu: "Колода кадров",
+    briefRu: "Пост за постом — дрочи",
     instructionRu:
-      "Открой faproulette.co, выбери любую рулетку. Сделай {n} бросков (Roll). На каждый кадр: читай инструкцию и дрочи по картинке, пока не выполнишь. Между бросками — короткая пауза. Оргазм = провал.",
+      "Контент → стена или избранное. Открой {n} разных кадров. На каждый: посмотри и дрочи, пока не отпустит желание листануть. Между кадрами — короткая пауза. Оргазм = провал.",
     difficulty: 1,
     durationHintMin: 25,
     rewardMin: 10,
@@ -299,10 +289,10 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "media_faproulette_timer",
     category: "media",
-    nameRu: "Fap Roulette · таймер",
-    briefRu: "Минуты на рулетке",
+    nameRu: "Сеанс в Контенте",
+    briefRu: "Минуты на стене",
     instructionRu:
-      "Открой faproulette.co в браузере. {minutes} минут: Roll → читай инструкцию кадра → дрочи по картинке. Нельзя залипать на одном кадре дольше 2 минут — новый бросок. Оргазм / руин = провал. Таймер на виду.",
+      "Контент: {minutes} минут листать стену или избранное. Не залипай на одном кадре дольше 2 минут — следующий. Руки можно, оргазм / руин = провал. Таймер на виду.",
     difficulty: 1,
     durationHintMin: 30,
     rewardMin: 10,
@@ -313,24 +303,24 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "media_faproulette_filter",
     category: "media",
-    nameRu: "Fap Roulette · фильтр",
-    briefRu: "Тема с сайта",
+    nameRu: "Тема дня",
+    briefRu: "Один тег — вся колода",
     instructionRu:
-      "На faproulette.co включи фильтр «{tag}» (или рулетку с этой темой). {n} бросков: каждый кадр — инструкция + дрочка по картинке. Сменить фильтр нельзя до конца. Оргазм = провал.",
+      "В Контенте или на вкладке Медиа оставь только тему «{tag}». {n} кадров: каждый — взгляд + дрочка. Сменить тему нельзя до конца. Оргазм = провал.",
     difficulty: 2,
     durationHintMin: 30,
     rewardMin: 12,
     rewardMax: 22,
-    rolls: { n: [6, 8, 10], tag: FAPROULETTE_FILTERS },
+    rolls: { n: [6, 8, 10], tag: MEDIA_TAGS },
     biasHints: ["media", "stroke"],
   },
   {
     id: "media_faproulette_edge",
     category: "media",
-    nameRu: "Fap Roulette · эджи",
-    briefRu: "Эдж с каждого кадра",
+    nameRu: "Эдж с кадра",
+    briefRu: "Граница по картинке",
     instructionRu:
-      "faproulette.co: крути рулетку. На каждый бросок доведи себя почти до грани по картинке (эдж), потом руки прочь {sec} сек. Нужно {n} таких эджей. Если инструкция кадра говорит «кончай» — игнорируй финиш, только эдж. Оргазм = провал.",
+      "Контент: на каждый новый кадр доведи себя почти до грани, потом руки прочь {sec} сек. Нужно {n} таких эджей. Если очень хочется кончить — только эдж. Оргазм = провал.",
     difficulty: 2,
     durationHintMin: 35,
     rewardMin: 14,
@@ -341,10 +331,10 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "media_faproulette_pace",
     category: "media",
-    nameRu: "Fap Roulette · темп",
-    briefRu: "Hands-off между бросками",
+    nameRu: "Пауза между кадрами",
+    briefRu: "Руки прочь после каждого",
     instructionRu:
-      "faproulette.co: {n} бросков. После каждого кадра — hands-off {sec} секунд (смотри на картинку, не трогай). Потом следующий Roll. Дрочи только пока выполняешь инструкцию кадра. Без оргазма.",
+      "Контент: {n} кадров. После каждого — руки прочь {sec} секунд (смотри, не трогай). Дрочи только пока смотришь кадр. Без оргазма.",
     difficulty: 2,
     durationHintMin: 30,
     rewardMin: 12,
@@ -355,10 +345,10 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "media_faproulette_deny",
     category: "media",
-    nameRu: "Fap Roulette · deny",
-    briefRu: "Финиш с кадра — отказ",
+    nameRu: "Отказ с экрана",
+    briefRu: "Хочется кончить — отказ",
     instructionRu:
-      "faproulette.co: играй {minutes} минут или минимум {n} бросков (что позже). Дрочи по картинкам. Если выпало «кончай / cum / finish» — руки прочь, скажи «отказ, госпожа», и закончи контракт без оргазма. Если кончил — провал. Руин тоже запрещён.",
+      "Контент: {minutes} минут или минимум {n} кадров (что позже). Дрочи по картинкам. Когда подкатит финал — руки прочь, скажи «отказ, госпожа», закрой контракт без оргазма. Руин тоже запрещён.",
     difficulty: 3,
     durationHintMin: 35,
     rewardMin: 16,
@@ -369,10 +359,10 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "media_faproulette_finish",
     category: "media",
-    nameRu: "Fap Roulette · право финала",
-    briefRu: "Отыграл — можно кончить",
+    nameRu: "Право после колоды",
+    briefRu: "Отыграл кадры — можно кончить",
     instructionRu:
-      "faproulette.co: честно отыграй {n} бросков, дроча по картинкам. После последнего — право кончить или руинить (на твой выбор). Потом «Доложить финал»: как кончил, съел ли вкусняшку. Награда от нуля до бонуса — по ответам.",
+      "Контент: честно отыграй {n} кадров, дроча по картинкам. После последнего — право кончить или руинить. Потом «Доложить финал». Награда — по ответам.",
     difficulty: 2,
     durationHintMin: 35,
     rewardMin: 12,
@@ -385,10 +375,10 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "media_hypnotube_timer",
     category: "media",
-    nameRu: "Hypnotube · таймер",
-    briefRu: "Ролик на сайте, не в приложении",
+    nameRu: "Ролик госпожи",
+    briefRu: "joidb в Контенте",
     instructionRu:
-      "Открой hypnotube.com (или зеркало). Выбери одно hypno/JOI-видео. {minutes} минут смотри и дрочи по инструкции ролика. Пауза = руки прочь. Оргазм / руин = провал. Потом доложи, сколько эджей удержал.",
+      "Контент → joidb. Одно видео. {minutes} минут смотри и дрочи по ритму ролика. Пауза = руки прочь. Оргазм / руин = провал. Потом доложи, сколько эджей удержал.",
     difficulty: 2,
     durationHintMin: 30,
     rewardMin: 12,
@@ -400,10 +390,10 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "media_hypnotube_loop",
     category: "media",
-    nameRu: "Hypnotube · петля",
-    briefRu: "Один ролик {n} раз",
+    nameRu: "Один ролик по кругу",
+    briefRu: "Тот же joidb {n} раз",
     instructionRu:
-      "hypnotube.com: одно видео. Прокрути его {n} раз подряд (или {minutes} мин, что позже). Каждый проход — полный follow голосовых команд, без перемотки «скучных» кусков. Финиш с ролика игнорируй. Оргазм = провал.",
+      "Контент → joidb: одно видео. Прокрути его {n} раз подряд (или {minutes} мин, что позже). Каждый проход — до конца, без перемотки «скучных» кусков. Финиш с ролика игнорируй. Оргазм = провал.",
     difficulty: 2,
     durationHintMin: 35,
     rewardMin: 14,
@@ -415,10 +405,10 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "media_joi_site_follow",
     category: "media",
-    nameRu: "JOI-сайт · следовать",
-    briefRu: "Голос с сайта — закон",
+    nameRu: "Голос с ролика",
+    briefRu: "Делай, что говорит",
     instructionRu:
-      "Открой JOI на hypnotube / joi.how / похожем сайте (не плейлист в приложении). {minutes} минут делай ровно то, что говорит голос: темп, hands-off, край. Если велит кончить — только эдж, финиш запрещён. Оргазм = провал.",
+      "Контент → joidb (или голос в приложении). {minutes} минут делай ровно то, что говорит: темп, руки прочь, край. Если велит кончить — только эдж. Оргазм = провал.",
     difficulty: 2,
     durationHintMin: 30,
     rewardMin: 12,
@@ -430,10 +420,10 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "media_joi_site_finish",
     category: "media",
-    nameRu: "JOI-сайт · право финала",
-    briefRu: "Отыграл ролик — можно кончить",
+    nameRu: "Финал с ролика",
+    briefRu: "Отыграл joidb — можно кончить",
     instructionRu:
-      "Полный JOI-ролик на hypnotube / joi.how до титров, без перемотки финала. Честно следуй голосу. После — «Доложить финал»: как кончил. Награда от нуля до бонуса — по ответам.",
+      "Контент → joidb: один ролик до титров, без перемотки финала. Честно следуй голосу. После — «Доложить финал».",
     difficulty: 2,
     durationHintMin: 35,
     rewardMin: 12,
@@ -681,7 +671,7 @@ export const CONTRACT_CATALOG: ContractDef[] = [
     nameRu: "Право кончить",
     briefRu: "Заслужил полный финал",
     instructionRu:
-      "Сначала {n} честных эджей (hands-off ≥30 сек после каждого). Потом — право на полный оргазм. Когда закончишь, отметь «Доложить финал» и ответь на вопросы. Награда зависит от честности отчёта.",
+      "Сначала {n} честных эджей (руки прочь ≥30 сек после каждого). Потом — право на полный оргазм. Когда закончишь, отметь «Доложить финал» и ответь на вопросы. Награда зависит от честности отчёта.",
     difficulty: 2,
     durationHintMin: 30,
     rewardMin: 10,
@@ -747,7 +737,7 @@ export const CONTRACT_CATALOG: ContractDef[] = [
     nameRu: "Утренний осмотр",
     briefRu: "Ритуал клетки",
     instructionRu:
-      "Утром (или сейчас): осмотри клетку, протри, скажи вслух «Клетка на месте, госпожа». {n} минут тишины hands-off после.",
+      "Утром (или сейчас): осмотри клетку, протри, скажи вслух «Клетка на месте, госпожа». {n} минут тишины, руки прочь после.",
     difficulty: 1,
     durationHintMin: 10,
     rewardMin: 6,
@@ -918,7 +908,7 @@ export const CONTRACT_CATALOG: ContractDef[] = [
     nameRu: "Эдж в душе",
     briefRu: "Гигиена + контроль",
     instructionRu:
-      "В душе доведи до грани {n} раз. Вода может быть тёплой. Кончать нельзя — выключи воду и hands-off 1 минуту после каждого.",
+      "В душе доведи до грани {n} раз. Вода может быть тёплой. Кончать нельзя — выключи воду и руки прочь 1 минуту после каждого.",
     difficulty: 1,
     durationHintMin: 15,
     rewardMin: 8,
@@ -1030,7 +1020,7 @@ export const CONTRACT_CATALOG: ContractDef[] = [
     nameRu: "Перед сном",
     briefRu: "Лёгкий ритуал",
     instructionRu:
-      "Лёжа в постели: {n} медленных эджа (или почти-эджа), потом hands-off и сон. Оргазм = провал. Можно без экрана.",
+      "Лёжа в постели: {n} медленных эджа (или почти-эджа), потом руки прочь и сон. Оргазм = провал. Можно без экрана.",
     difficulty: 2,
     durationHintMin: 20,
     rewardMin: 10,
@@ -1127,8 +1117,8 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "role_brat_pushups",
     category: "role",
-    nameRu: "Brat-штраф",
-    briefRu: "Отжимания за дерзость",
+    nameRu: "Штраф за дерзость",
+    briefRu: "Отжимания за мысль ослушаться",
     instructionRu:
       "Сделай {n} отжиманий (или приседаний, если колени). Считай вслух. Это плата за мысль «а вдруг можно ослушаться».",
     difficulty: 1,
@@ -1185,10 +1175,10 @@ export const CONTRACT_CATALOG: ContractDef[] = [
   {
     id: "session_deny_tomorrow",
     category: "session_mod",
-    nameRu: "Deny до завтра",
-    briefRu: "Финал = deny",
+    nameRu: "Отказ до завтра",
+    briefRu: "Финал = отказ",
     instructionRu:
-      "Прими условия: до обновления доски — без оргазма (даже руина). Шансы финала запечатаны под deny. Сессии можно, финал — стоп. Честно отметь, если сорвался.",
+      "Прими условия: до обновления доски — без оргазма (даже руина). Шансы финала запечатаны под отказ. Сессии можно, финал — стоп. Честно отметь, если сорвался.",
     difficulty: 3,
     durationHintMin: 5,
     rewardMin: 16,
@@ -1238,17 +1228,19 @@ export const CONTRACT_CATALOG: ContractDef[] = [
 ];
 
 /**
- * Categories whose contracts represent a timed «go do X» activity (not a
- * session modifier). For these, when the def defines a durationHintMin but no
- * explicit perform-window limit, we promote the hint to a live countdown timer
- * (durationLimitMin). Session-mod / edge / cbt / anal / oral_cei / chastity
- * contracts stay untimed (they resolve inside a session or via self-report).
+ * Timed «go do X» homework gets a live countdown from durationHintMin.
+ * Session seals, wear-hours, CBT and in-session edge/anal/oral stay untimed.
  */
+const PERFORM_WINDOW_CATEGORIES: ReadonlySet<ContractCategory> = new Set([
+  "media",
+  "life",
+  "body",
+  "role",
+]);
+
 for (const def of CONTRACT_CATALOG) {
-  if (
-    def.durationHintMin != null &&
-    def.durationLimitMin == null
-  ) {
+  if (!PERFORM_WINDOW_CATEGORIES.has(def.category)) continue;
+  if (def.durationHintMin != null && def.durationLimitMin == null) {
     def.durationLimitMin = def.durationHintMin;
   }
 }

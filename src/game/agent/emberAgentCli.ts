@@ -2,7 +2,7 @@
  * JSON CLI for the headless explore sim.
  * Usage: npm run ember-agent -- state
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -82,10 +82,9 @@ function loadPersisted(): EmberAgentPersisted | undefined {
 
 function savePersisted(session: EmberAgentSession): void {
   mkdirSync(SESSION_DIR, { recursive: true });
-  writeFileSync(
-    SESSION_FILE,
-    JSON.stringify(persistEmberAgentSession(session)),
-  );
+  const tmp = `${SESSION_FILE}.tmp-${process.pid}-${Date.now()}`;
+  writeFileSync(tmp, JSON.stringify(persistEmberAgentSession(session)));
+  renameSync(tmp, SESSION_FILE);
 }
 
 const CLI_COMMANDS = [

@@ -51,6 +51,7 @@ function nearestEnabledIndex<T extends string | number>(
 }
 
 let measureCtx: CanvasRenderingContext2D | null = null;
+const TAP_SLOP_PX = 10;
 
 function measureSlotWidth(labels: string[], minWidth: number): number {
   if (typeof document === "undefined") return minWidth;
@@ -97,6 +98,7 @@ export function WheelPicker<T extends string | number>({
   const tapIndexRef = useRef<number | null>(null);
   const scrollEndRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTickIndexRef = useRef<number | null>(null);
+  const suppressScrollCommitUntilRef = useRef(0);
   const [edgePad, setEdgePad] = useState(0);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
@@ -197,6 +199,7 @@ export function WheelPicker<T extends string | number>({
 
   const handleScroll = useCallback(() => {
     if (syncingRef.current) return;
+    if (performance.now() < suppressScrollCommitUntilRef.current) return;
     const next = readIndexFromScroll();
     setPreviewIndex(next);
     if (
@@ -210,6 +213,8 @@ export function WheelPicker<T extends string | number>({
     if (scrollEndRef.current) clearTimeout(scrollEndRef.current);
     scrollEndRef.current = setTimeout(() => {
       scrollEndRef.current = null;
+      if (performance.now() < suppressScrollCommitUntilRef.current) return;
+      if (dragRef.current.active) return;
       commitIndex(readIndexFromScroll());
     }, 120);
   }, [commitIndex, readIndexFromScroll]);
@@ -225,16 +230,30 @@ export function WheelPicker<T extends string | number>({
     if (!track) return;
     const onScrollEnd = () => {
       if (syncingRef.current || dragRef.current.active) return;
+      if (performance.now() < suppressScrollCommitUntilRef.current) return;
       commitIndex(readIndexFromScroll());
     };
     track.addEventListener("scrollend", onScrollEnd);
     return () => track.removeEventListener("scrollend", onScrollEnd);
   }, [commitIndex, readIndexFromScroll]);
 
+  function indexFromClientX(clientX: number): number | null {
+    const track = trackRef.current;
+    if (!track) return null;
+    const hit = document.elementFromPoint(clientX, track.getBoundingClientRect().top + track.clientHeight / 2);
+    const itemEl = hit instanceof Element ? hit.closest(".wheel-picker__item") : null;
+    if (!(itemEl instanceof HTMLElement)) return null;
+    const index = Number(itemEl.dataset.index);
+    return Number.isNaN(index) ? null : index;
+  }
+
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (locked || event.button !== 0) return;
     const track = trackRef.current;
     if (!track) return;
+    // Stop the option from taking focus — focus scrolls the drum and
+    // the first click looks like it did nothing.
+    event.preventDefault();
     void primeUiAudio();
 
     const itemBtn = (event.target as HTMLElement).closest(
@@ -242,7 +261,7 @@ export function WheelPicker<T extends string | number>({
     );
     tapIndexRef.current = itemBtn
       ? Number((itemBtn as HTMLElement).dataset.index)
-      : null;
+      : indexFromClientX(event.clientX);
 
     dragRef.current = {
       active: true,
@@ -260,7 +279,8 @@ export function WheelPicker<T extends string | number>({
     const track = trackRef.current;
     if (!track) return;
     const delta = event.clientX - dragRef.current.startX;
-    if (Math.abs(delta) > 3) dragRef.current.moved = true;
+    if (!dragRef.current.moved && Math.abs(delta) <= TAP_SLOP_PX) return;
+    dragRef.current.moved = true;
     track.scrollLeft = dragRef.current.startScroll - delta;
     setPreviewIndex(readIndexFromScroll());
   }
@@ -270,7 +290,8 @@ export function WheelPicker<T extends string | number>({
     if (!track || !dragRef.current.active) return;
 
     const wasMoved = dragRef.current.moved;
-    const tapped = tapIndexRef.current;
+    const tapped =
+      tapIndexRef.current ?? indexFromClientX(event.clientX);
 
     dragRef.current.active = false;
     dragRef.current.moved = false;
@@ -283,6 +304,11 @@ export function WheelPicker<T extends string | number>({
     }
 
     if (!wasMoved && tapped != null && !Number.isNaN(tapped)) {
+      if (scrollEndRef.current) {
+        clearTimeout(scrollEndRef.current);
+        scrollEndRef.current = null;
+      }
+      suppressScrollCommitUntilRef.current = performance.now() + 280;
       commitIndex(tapped);
       return;
     }
@@ -329,7 +355,7 @@ export function WheelPicker<T extends string | number>({
                 aria-selected={selected}
                 aria-disabled={locked || item.disabled || undefined}
                 disabled={locked || item.disabled}
-                tabIndex={locked ? -1 : undefined}
+                tabIndex={-1}
                 className={[
                   "wheel-picker__item",
                   selected ? "wheel-picker__item--active" : "",

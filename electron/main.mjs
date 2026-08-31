@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, shell } from "electron";
+import { app, BrowserWindow, ipcMain, screen, session, shell } from "electron";
 import {
   appendFileSync,
   copyFileSync,
@@ -175,9 +175,12 @@ function handleIpc(channel, listener) {
 }
 
 function createWindow() {
+  // Layout is authored for Full HD. Clamp to the work area so a 1080p
+  // desktop with a taskbar still fits; agents check UI at 1920×1080.
+  const work = screen.getPrimaryDisplay().workAreaSize;
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 820,
+    width: Math.min(1920, work.width),
+    height: Math.min(1080, work.height),
     minWidth: 980,
     minHeight: 640,
     show: false,
@@ -275,12 +278,42 @@ const MEDIA_CDN_UA =
 
 function mediaCdnReferer(url) {
   try {
-    const host = new URL(url).hostname;
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
     if (host === "nhentai.net" || host.endsWith(".nhentai.net")) {
       return "https://nhentai.net/";
     }
+    if (
+      host === "the-joi-database.com" ||
+      host.endsWith(".the-joi-database.com")
+    ) {
+      return "https://www.the-joi-database.com/";
+    }
     if (host === "gelbooru.com" || host.endsWith(".gelbooru.com")) {
       return "https://gelbooru.com/";
+    }
+    if (host === "xbooru.com" || host.endsWith(".xbooru.com")) {
+      return "https://xbooru.com/";
+    }
+    if (host === "hypnohub.net" || host.endsWith(".hypnohub.net")) {
+      return "https://hypnohub.net/";
+    }
+    if (host === "realbooru.com" || host.endsWith(".realbooru.com")) {
+      return "https://realbooru.com/";
+    }
+    if (host === "thumbs.booru.org" || host === "img.booru.org") {
+      const slug = parsed.pathname.split("/").filter(Boolean)[0]?.toLowerCase();
+      if (slug === "censored" || slug === "blacked") {
+        return `https://${slug}.booru.org/`;
+      }
+    }
+    if (
+      host.endsWith(".booru.org") &&
+      host !== "booru.org" &&
+      host !== "thumbs.booru.org" &&
+      host !== "img.booru.org"
+    ) {
+      return `https://${host}/`;
     }
   } catch {
     return null;
@@ -294,8 +327,20 @@ function configureMediaCdnHeaders() {
     urls: [
       "https://*.gelbooru.com/*",
       "https://gelbooru.com/*",
+      "https://*.xbooru.com/*",
+      "https://xbooru.com/*",
+      "https://*.hypnohub.net/*",
+      "https://hypnohub.net/*",
+      "https://*.realbooru.com/*",
+      "https://realbooru.com/*",
       "https://*.nhentai.net/*",
       "https://nhentai.net/*",
+      "https://www.the-joi-database.com/*",
+      "https://the-joi-database.com/*",
+      "https://*.the-joi-database.com/*",
+      "https://thumbs.booru.org/*",
+      "https://img.booru.org/*",
+      "https://*.booru.org/*",
     ],
   };
   session.defaultSession.webRequest.onBeforeSendHeaders(

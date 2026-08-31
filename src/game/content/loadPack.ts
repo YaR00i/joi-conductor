@@ -105,6 +105,78 @@ function isMissingOptionalCatalog(error: string): boolean {
   return /:\s*404\b/.test(error) || /\bnot found\b/i.test(error);
 }
 
+/**
+ * Core catalogs must not brick the whole pack: a wrong-shape JSON (parses, but
+ * `null`/`{}`/missing key) degrades to the fallback plus an error issue
+ * instead of a raw TypeError or a "undefined" record key.
+ */
+async function loadJsonShapeReported<T>(
+  rel: string,
+  isValidShape: (value: unknown) => boolean,
+  fallback: T,
+): Promise<{ data: T; issue?: ValidationIssue }> {
+  const res = await readEmberJson<T>(rel);
+  if (res.ok) {
+    if (!isValidShape(res.data)) {
+      return {
+        data: fallback,
+        issue: {
+          level: "error",
+          path: rel,
+          message:
+            "Структура файла не совпадает с ожидаемой — каталог загружен пустым",
+        },
+      };
+    }
+    return res.source === "backup"
+      ? {
+          data: res.data,
+          issue: {
+            level: "warn",
+            path: rel,
+            message:
+              "Основной JSON повреждён — загружена последняя корректная резервная копия",
+          },
+        }
+      : { data: res.data };
+  }
+  return {
+    data: fallback,
+    issue: {
+      level: "error",
+      path: rel,
+      message: `Ресурс не загружен: ${res.error}`,
+    },
+  };
+}
+
+function isPoolShape(value: unknown): boolean {
+  return (
+    value != null &&
+    typeof value === "object" &&
+    typeof (value as EmberPool).id === "string" &&
+    Array.isArray((value as EmberPool).entries)
+  );
+}
+
+function isKeyedArrayShape(value: unknown, key: string): boolean {
+  return (
+    value != null &&
+    typeof value === "object" &&
+    Array.isArray((value as Record<string, unknown>)[key])
+  );
+}
+
+function isPortraitRegistryShape(value: unknown): boolean {
+  return (
+    value != null &&
+    typeof value === "object" &&
+    typeof (value as EmberPortraitRegistry).mistressId === "string" &&
+    (value as EmberPortraitRegistry).expressions != null &&
+    typeof (value as EmberPortraitRegistry).expressions === "object"
+  );
+}
+
 async function loadJsonDir<T extends { id: string }>(
   dir: string,
 ): Promise<Record<string, T>> {
@@ -248,15 +320,15 @@ export async function loadEmberPack(): Promise<{
     tilesetsRaw,
     stagesRaw,
     spawnsRaw,
-    poolW,
-    poolC,
-    weaponsFile,
-    enemiesFile,
+    poolWLoad,
+    poolCLoad,
+    weaponsLoad,
+    enemiesLoad,
     scenes,
     scriptsRaw,
     events,
-    artsFile,
-    portraits,
+    artsLoad,
+    portraitsLoad,
     spritesLoad,
     voxelLibs,
     lightsLoad,
@@ -271,15 +343,39 @@ export async function loadEmberPack(): Promise<{
     ]),
     loadJsonDirWithFallback<EmberStage>("stages", ["stages/hu_tao_p1.json"]),
     loadJsonDirWithFallback<EmberSpawnTable>("spawns", ["spawns/hu_tao_p1.json"]),
-    loadJson<EmberPool>("pools/p1_weapons.json"),
-    loadJson<EmberPool>("pools/p1_chests.json"),
-    loadJson<{ weapons: EmberWeaponDef[] }>("weapons.json"),
-    loadJson<{ enemies: EmberEnemyDef[] }>("enemies.json"),
+    loadJsonShapeReported<EmberPool>(
+      "pools/p1_weapons.json",
+      isPoolShape,
+      { id: "p1_weapons", entries: [] },
+    ),
+    loadJsonShapeReported<EmberPool>(
+      "pools/p1_chests.json",
+      isPoolShape,
+      { id: "p1_chests", entries: [] },
+    ),
+    loadJsonShapeReported<{ weapons: EmberWeaponDef[] }>(
+      "weapons.json",
+      (v) => isKeyedArrayShape(v, "weapons"),
+      { weapons: [] },
+    ),
+    loadJsonShapeReported<{ enemies: EmberEnemyDef[] }>(
+      "enemies.json",
+      (v) => isKeyedArrayShape(v, "enemies"),
+      { enemies: [] },
+    ),
     loadJsonDir<EmberScene>("scenes"),
     loadJsonDir<EmberActionScript>("scripts"),
     loadJsonDir<EmberEvent>("events"),
-    loadJson<{ arts: EmberArt[] }>("arts/registry.json"),
-    loadJson<EmberPortraitRegistry>("portraits/hu_tao/registry.json"),
+    loadJsonShapeReported<{ arts: EmberArt[] }>(
+      "arts/registry.json",
+      (v) => isKeyedArrayShape(v, "arts"),
+      { arts: [] },
+    ),
+    loadJsonShapeReported<EmberPortraitRegistry>(
+      "portraits/hu_tao/registry.json",
+      isPortraitRegistryShape,
+      { mistressId: "hu_tao", expressions: {} },
+    ),
     loadJsonOptionalReported<EmberSpritesFile>("sprites/registry.json", {
       paletteFavorites: [],
       sprites: [],
@@ -304,6 +400,12 @@ export async function loadEmberPack(): Promise<{
   ]);
 
   const spritesFile = spritesLoad.data;
+  const poolW = poolWLoad.data;
+  const poolC = poolCLoad.data;
+  const weaponsFile = weaponsLoad.data;
+  const enemiesFile = enemiesLoad.data;
+  const artsFile = artsLoad.data;
+  const portraits = portraitsLoad.data;
   const voxelsFile = voxelLibs.file;
   const lightsFile = lightsLoad.data;
   const looksFile = looksLoad.data;
@@ -401,6 +503,12 @@ export async function loadEmberPack(): Promise<{
   };
 
   const loadIssues = [
+    poolWLoad.issue,
+    poolCLoad.issue,
+    weaponsLoad.issue,
+    enemiesLoad.issue,
+    artsLoad.issue,
+    portraitsLoad.issue,
     spritesLoad.issue,
     ...voxelLibs.issues,
     lightsLoad.issue,

@@ -46,6 +46,7 @@ describe("contractVerificationMode", () => {
     });
     expect(contractVerificationMode(c)).toBe("drill");
     expect(contractHonorReportCtaRu("drill")).toBe("Отметил вручную");
+    expect(contractVerificationBadgeRu("drill")).toBe("колода");
   });
 
   it("labels finish-permission contracts as debrief", () => {

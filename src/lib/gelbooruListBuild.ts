@@ -4,6 +4,8 @@ import {
   tagPullQueueName,
 } from "./doujin/readingRunBuild";
 import { buildFavoriteTasteProfile } from "./favoriteTagTaste";
+import { booruPagePid, fetchBooruPosts } from "./booruFetch";
+import type { BooruSiteId } from "./booruSites";
 import {
   ASSEMBLE_MAX_FETCHES,
   assembleQuotas,
@@ -26,7 +28,6 @@ import {
 import { mediaTypeEntry } from "./mediaTypeFilter";
 import {
   DEFAULT_MEDIA_SETTINGS,
-  fetchGelbooru,
   hydrateGelbooruNativeTypes,
   loadMediaSettings,
   shuffleMediaItems,
@@ -46,14 +47,15 @@ function tasteTags(
 
 export async function assembleGelbooruMistressList(
   size: MediaQueueSize,
-  opts?: { appendToId?: string },
+  opts?: { appendToId?: string; site?: BooruSiteId },
 ): Promise<GelbooruPlayList> {
+  const site = opts?.site ?? "gelbooru";
   const want = snapMediaQueueSize(size);
   const media = loadMediaSettings();
   const pack = getActiveMistress();
   const character = pack.characterTags[0]?.trim() ?? "";
   const fallback =
-    media.tags.trim() ||
+    (site === "gelbooru" ? media.tags.trim() : "") ||
     pack.media.primaryDefaultTags ||
     DEFAULT_MEDIA_SETTINGS.tags;
   const credentials = {
@@ -101,7 +103,7 @@ export async function assembleGelbooruMistressList(
       return 0;
     }
     fetches += 1;
-    const batch = await fetchGelbooru(query, 100, credentials, { pid: 0 });
+    const batch = await fetchBooruPosts(site, query, 100, credentials, { pid: 0 });
     const remainBucket = Math.max(0, target - got[bucket]);
     const remainTotal = Math.max(0, want - collected.length);
     const take = Math.min(remainTotal, remainBucket, perQueryCap(target));
@@ -153,7 +155,7 @@ export async function assembleGelbooruMistressList(
     fetches < ASSEMBLE_MAX_FETCHES
   ) {
     fetches += 1;
-    const batch = await fetchGelbooru(rescue, 100, credentials, { pid: 0 });
+    const batch = await fetchBooruPosts(site, rescue, 100, credentials, { pid: 0 });
     const before = collected.length;
     collected = mergeUniqueMedia(collected, batch, want);
     pulls.push({
@@ -170,7 +172,9 @@ export async function assembleGelbooruMistressList(
   ) {
     fetches += 1;
     const tags = gelbooruRecsQuery(taste.liked, page, fallback);
-    const batch = await fetchGelbooru(tags, 100, credentials, { pid: page });
+    const batch = await fetchBooruPosts(site, tags, 100, credentials, {
+      pid: booruPagePid(site, page),
+    });
     const before = collected.length;
     collected = mergeUniqueMedia(collected, batch, want);
     pulls.push({
@@ -184,7 +188,7 @@ export async function assembleGelbooruMistressList(
   collected = shuffleMediaItems(collected).slice(0, want);
 
   if (opts?.appendToId) {
-    const next = await addManyToGelbooruList(opts.appendToId, collected);
+    const next = await addManyToGelbooruList(opts.appendToId, collected, site);
     if (!next) throw new Error("Список не найден");
     return next;
   }
@@ -199,6 +203,7 @@ export async function assembleGelbooruMistressList(
       pulls,
     }),
     items: collected,
+    site,
   });
 }
 
@@ -207,13 +212,16 @@ export async function saveGelbooruQueueList(opts: {
   origin: GelbooruListOrigin;
   note: string;
   items: readonly MediaItem[];
+  site?: BooruSiteId;
 }): Promise<GelbooruPlayList> {
+  const site = opts.site ?? "gelbooru";
   const list = await createGelbooruList(opts.name, {
     origin: opts.origin,
     note: opts.note,
+    site,
   });
   return (
-    (await addManyToGelbooruList(list.id, opts.items)) ?? {
+    (await addManyToGelbooruList(list.id, opts.items, site)) ?? {
       ...list,
       items: [],
     }
@@ -228,6 +236,7 @@ export async function saveTagPullAsGelbooruList(opts: {
   attempted?: readonly string[];
   items: readonly MediaItem[];
   want: number;
+  site?: BooruSiteId;
 }): Promise<GelbooruPlayList> {
   const typeLabel = mediaTypeEntry(opts.mediaTypeId).labelRu;
   return saveGelbooruQueueList({
@@ -243,5 +252,6 @@ export async function saveTagPullAsGelbooruList(opts: {
       want: opts.want,
     }),
     items: opts.items,
+    site: opts.site,
   });
 }

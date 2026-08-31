@@ -3,6 +3,8 @@ import { getActiveMoodLines } from "../../lib/voice/moodLines";
 import { formatReadingPlayStats } from "../../lib/doujin/readingListPlayStats";
 import {
   canAskPermission,
+  isBooruReadingRunSource,
+  isJoidbReadingRunSource,
   readingRunElapsedSec,
   type ReadingRunState,
 } from "../../lib/doujin/readingRun";
@@ -191,10 +193,14 @@ export function DoujinReadingRunHud({
         <div className="doujin-reader__task-card">
           <div className="doujin-reader__task-name">{task.nameRu}</div>
           <p>{task.ruleRu}</p>
-          <p className="muted">
-            {run.source === "gelbooru" ? "посты" : "стр."}{" "}
-            {task.startPage + 1}–{task.endPage + 1}
-          </p>
+          {isJoidbReadingRunSource(run.source) ? (
+            <p className="muted">по ролику</p>
+          ) : (
+            <p className="muted">
+              {isBooruReadingRunSource(run.source) ? "посты" : "стр."}{" "}
+              {task.startPage + 1}–{task.endPage + 1}
+            </p>
+          )}
           <div className="doujin-reader__task-actions">
             <button type="button" className="btn-primary" onClick={onTaskDone}>
               Сделал

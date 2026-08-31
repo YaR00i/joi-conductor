@@ -12,7 +12,7 @@ import {
 } from "./contentRoulette";
 import { buildCumplayTierStep, resolveCumplayPick } from "./cumplayTiers";
 import type { ContentMediaTypeId } from "./contentCatalog";
-import type { MediaKind } from "./media";
+import { loadMediaSettings, type MediaKind } from "./media";
 import { modeWeightMultiplier } from "./mistress/playBias";
 import { mistressAllowsCumFinale } from "./mistress/playBias";
 import {
@@ -24,6 +24,11 @@ import { isModeAllowedForMistress } from "./mistress/mistressUnlocks";
 import { scoreFromMood, moodFromScore, isHarshMood } from "./moodEngine";
 import { filterOptionsByLiveMode, readLiveWearGate } from "./sessionLiveGates";
 import { loadControlState } from "./soul/control/store";
+import {
+  DEFAULT_BOORU_RATING,
+  type BooruRatingId,
+} from "./booruRating";
+import type { BooruSiteId } from "./booruSites";
 import {
   countBandFromOption,
   filterByEnabled,
@@ -312,6 +317,7 @@ export function applyRoulettePicks(
   base: SessionParams = DEFAULT_PARAMS,
   rng: () => number = Math.random,
   inventoryToys: ToyDef[] = catalogToys,
+  content?: { site?: BooruSiteId; rating?: BooruRatingId },
 ): PlanRouletteResult {
   const mood =
     (picks.mood?.id as SessionMood) ||
@@ -394,7 +400,12 @@ export function applyRoulettePicks(
     ruinsTarget: floors.ruinsTarget,
   };
 
-  const composed = composeContentQuery(picks);
+  const media = loadMediaSettings();
+  const composed = composeContentQuery(
+    picks,
+    content?.site ?? media.booruSite,
+    content?.rating ?? media.rating ?? DEFAULT_BOORU_RATING,
+  );
 
   const toysResolved = picks.toys_count != null;
   const rawToyIds: string[] = [];

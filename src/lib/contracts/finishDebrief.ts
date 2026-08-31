@@ -299,14 +299,14 @@ function buildQuestions(preset: FinishDebriefPreset): FinishDebriefQuestion[] {
     return [
       {
         id: "spins_done",
-        promptRu: "Сколько бросков честно отыграл?",
+        promptRu: "Сколько кадров честно отыграл?",
         options: [
           { id: "all", labelRu: "Все по контракту", delta: 4 },
           { id: "most", labelRu: "Почти все", hintRu: "Чуть срезал", delta: 0 },
           { id: "few", labelRu: "Мало", hintRu: "Схалтурил", delta: -8 },
         ],
       },
-      howQuestion(HOW_OPTIONS_FULL, "Как закончил на рулетке?"),
+      howQuestion(HOW_OPTIONS_FULL, "Как закончил после колоды?"),
       where,
       ate,
       feel,
@@ -437,7 +437,7 @@ export function finishDebriefTitleRu(preset: FinishDebriefPreset): string {
     case "choice":
       return "Как воспользовался правом?";
     case "faproulette":
-      return "Fap Roulette · финал";
+      return "Колода · финал";
     default: {
       const _exhaustive: never = preset;
       return _exhaustive;

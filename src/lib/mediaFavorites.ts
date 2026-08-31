@@ -3,6 +3,11 @@ import {
   mapWithConcurrency,
   stillBlobToWallThumb,
 } from "./favoriteWallThumb";
+import {
+  booruMediaId,
+  booruPostIdFromMediaId,
+  inferBooruSite,
+} from "./booruSites";
 import { downloadMediaUrl, type MediaItem, type MediaKind } from "./media";
 import type { HubKindFilter } from "./mediaTypeFilter";
 import { isJunkBooruTag } from "./shopTagNoise";
@@ -147,10 +152,9 @@ export function normalizeRemoteUrl(url: string | undefined | null): string | nul
   }
 }
 
-/** Parse `gb-123` / legacy `gb-123-7` → `123`. */
+/** Parse `gb-123` / `blacked-123` / legacy `gb-123-7` → `123`. */
 export function gelbooruIdFromMediaId(id: string): string | null {
-  const m = /^gb-(\d+)(?:-\d+)?$/.exec(id);
-  return m?.[1] ?? null;
+  return booruPostIdFromMediaId(id);
 }
 
 export function resolveGelbooruId(item: {
@@ -187,10 +191,14 @@ export function buildFavoritesIndex(records: FavoriteRecord[]): FavoritesIndex {
   const remoteUrls = new Set<string>();
   for (const r of records) {
     ids.add(r.id);
+    const site = inferBooruSite(r);
     const gid = r.gelbooruId?.trim() || gelbooruIdFromMediaId(r.id);
     if (gid) {
-      gelbooruIds.add(gid);
-      ids.add(`gb-${gid}`);
+      ids.add(booruMediaId(site, gid));
+      if (site === "gelbooru") {
+        gelbooruIds.add(gid);
+        ids.add(`gb-${gid}`);
+      }
     }
     const nu = normalizeRemoteUrl(r.remoteUrl);
     if (nu) remoteUrls.add(nu);
@@ -204,7 +212,11 @@ export function mediaMatchesFavorite(
 ): boolean {
   if (index.ids.has(item.id)) return true;
   const gid = resolveGelbooruId(item);
-  if (gid && index.gelbooruIds.has(gid)) return true;
+  const site = inferBooruSite(item);
+  if (gid) {
+    if (index.ids.has(booruMediaId(site, gid))) return true;
+    if (site === "gelbooru" && index.gelbooruIds.has(gid)) return true;
+  }
   const nu = normalizeRemoteUrl(item.url);
   if (nu && index.remoteUrls.has(nu)) return true;
   if (item.previewUrl) {
@@ -219,12 +231,20 @@ export function findMatchingFavorite(
   records: FavoriteRecord[],
 ): FavoriteRecord | null {
   const gid = resolveGelbooruId(item);
+  const site = inferBooruSite(item);
   const nu = normalizeRemoteUrl(item.url);
   const pu = normalizeRemoteUrl(item.previewUrl);
   for (const r of records) {
     if (r.id === item.id) return r;
     const rg = r.gelbooruId?.trim() || gelbooruIdFromMediaId(r.id);
-    if (gid && rg && gid === rg) return r;
+    if (
+      gid &&
+      rg &&
+      gid === rg &&
+      inferBooruSite(r) === site
+    ) {
+      return r;
+    }
     const ru = normalizeRemoteUrl(r.remoteUrl);
     if (nu && ru && nu === ru) return r;
     if (pu && ru && pu === ru) return r;
@@ -322,12 +342,14 @@ export function favoriteLookupPlan(item: {
   url?: string;
   previewUrl?: string;
   gelbooruId?: string;
+  booruSite?: string | null;
 }): { ids: string[]; gelbooruId: string | null; remoteUrls: string[] } {
   const gid = resolveGelbooruId(item);
+  const site = inferBooruSite(item);
   const ids = [item.id];
   if (gid) {
-    const gb = `gb-${gid}`;
-    if (gb !== item.id) ids.push(gb);
+    const namespaced = booruMediaId(site, gid);
+    if (namespaced !== item.id) ids.push(namespaced);
   }
   const remoteUrls: string[] = [];
   const seen = new Set<string>();
@@ -443,6 +465,7 @@ export function favoriteRecordToMedia(r: FavoriteRecord): MediaItem {
   const gid = r.gelbooruId?.trim() || gelbooruIdFromMediaId(r.id) || undefined;
   const url = URL.createObjectURL(r.blob);
   const previewUrl = r.thumbBlob ? URL.createObjectURL(r.thumbBlob) : undefined;
+  const site = inferBooruSite(r);
   return {
     id: r.id,
     url,
@@ -451,6 +474,7 @@ export function favoriteRecordToMedia(r: FavoriteRecord): MediaItem {
     source: "favorites" as const,
     tags: r.tags,
     gelbooruId: gid,
+    booruSite: site,
   };
 }
 
@@ -461,13 +485,15 @@ export function favoriteRecordToListItem(r: FavoriteRecord): MediaItem | null {
     return null;
   }
   const gid = r.gelbooruId?.trim() || gelbooruIdFromMediaId(r.id) || undefined;
+  const site = inferBooruSite(r);
   return {
-    id: gid ? `gb-${gid}` : r.id,
+    id: gid ? booruMediaId(site, gid) : r.id,
     url: remote,
     kind: r.kind,
     source: "gelbooru",
     tags: r.tags,
     gelbooruId: gid,
+    booruSite: site,
   };
 }
 
@@ -598,7 +624,8 @@ export async function listFavoriteRecordsByIds(
 
 async function fetchFavoriteBlob(item: MediaItem): Promise<Blob> {
   const fetchUrl = downloadMediaUrl(item);
-  const res = await fetch(fetchUrl);
+  // The heart button stays disabled for the duration — never let it hang.
+  const res = await fetch(fetchUrl, { signal: AbortSignal.timeout(180_000) });
   if (!res.ok) {
     throw new Error(`Не удалось скачать медиа (${res.status})`);
   }
@@ -646,7 +673,8 @@ export async function addFavoriteFromItem(
   const mime = blob.type || guessMime(item);
   const ext = extFromMime(mime, item.kind);
   const gid = resolveGelbooruId(item) ?? undefined;
-  const stableId = gid ? `gb-${gid}` : item.id;
+  const site = inferBooruSite(item);
+  const stableId = gid ? booruMediaId(site, gid) : item.id;
   const thumbBlob = await resolveFavoriteThumbBlob(item, blob);
   const record: FavoriteRecord = {
     id: stableId,
@@ -747,7 +775,9 @@ async function resolveFavoriteThumbBlob(
   const sampleUrl = item.sampleUrl?.trim();
   if (sampleUrl && sampleUrl !== item.url) {
     try {
-      const res = await fetch(downloadMediaUrl({ ...item, url: sampleUrl }));
+      const res = await fetch(downloadMediaUrl({ ...item, url: sampleUrl }), {
+        signal: AbortSignal.timeout(20_000),
+      });
       if (res.ok) {
         const sample = await res.blob();
         if (

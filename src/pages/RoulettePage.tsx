@@ -70,6 +70,7 @@ import {
   type FavoriteTasteProfile,
 } from "../lib/favoriteTagTaste";
 import { MODE_LABELS } from "../lib/labels";
+import { MEDIA_TYPE_CATALOG } from "../lib/contentCatalog";
 import type { MediaSettings } from "../lib/media";
 import type { PlaylistPreloadStatus } from "../lib/mediaPreload";
 import {
@@ -113,6 +114,18 @@ function resolveRouletteMode(
   return SESSION_MODES.includes(id as SessionMode)
     ? (id as SessionMode)
     : fallback;
+}
+
+function idlePlanChips(
+  params: SessionParams,
+): { k: string; v: string }[] {
+  const mins = Math.max(1, Math.round(params.durationSec / 60));
+  return [
+    { k: "Длительность", v: `${mins} мин` },
+    { k: "Режим", v: MODE_LABELS[params.mode]?.nameRu ?? params.mode },
+    { k: "Эджи", v: String(params.edgesTarget) },
+    { k: "Темп", v: `${params.bpmMin}–${params.bpmMax}` },
+  ];
 }
 
 function resolveRouletteMood(
@@ -180,6 +193,7 @@ interface RoulettePageProps {
   onOpenSession?: () => void;
   onOpenShop?: () => void;
   onOpenFavorites?: () => void;
+  onOpenContentLists?: () => void;
 }
 
 const IDLE_WAIT_MIN = 16_000;
@@ -189,7 +203,7 @@ const HUB_TABS: { id: RouletteHubTab; label: string }[] = [
   { id: "plan", label: "План" },
   { id: "media", label: "Медиа" },
   { id: "toys", label: "Игрушки" },
-  { id: "tasks", label: "Задания" },
+  { id: "tasks", label: "Квесты" },
 ];
 
 export function RoulettePage({
@@ -236,6 +250,7 @@ export function RoulettePage({
   onOpenSession,
   onOpenShop,
   onOpenFavorites,
+  onOpenContentLists,
 }: RoulettePageProps) {
   const [hubTab, setHubTab] = useState<RouletteHubTab>("plan");
   const [settings, setSettings] = useState<RouletteSettings>(() =>
@@ -255,6 +270,9 @@ export function RoulettePage({
   >({});
   const [targetId, setTargetId] = useState<string | null>(null);
   const [result, setResult] = useState<PlanRouletteResult | null>(null);
+  const [openMeterHint, setOpenMeterHint] = useState<
+    "heat" | "control" | "chaos" | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const [line, setLine] = useState<RouletteLine>(() => pickRouletteIdleLine());
   const [commentKey, setCommentKey] = useState(0);
@@ -639,6 +657,7 @@ export function RoulettePage({
         baseParams,
         Math.random,
         toys,
+        { site: media.booruSite, rating: media.rating },
       );
       if (contractSeed) {
         draft.params = applySessionSeedToParams(draft.params, contractSeed);
@@ -787,19 +806,25 @@ export function RoulettePage({
         ]
       : [];
 
-  const summaryExtras = [
-    ...history.filter(
-      (h) =>
-        !["mood", "mode", "duration", "edges", "bpm", "finaleOdds"].includes(
-          h.id,
-        ),
-    ),
-    {
-      id: "finaleOdds" as const,
-      title: "Финал",
-      label: "ГОТОВ КОНЧИТЬ · 10 сек · колесо",
-    },
-  ];
+  const summaryExtras = history.filter(
+    (h) =>
+      !["mood", "mode", "duration", "edges", "bpm"].includes(h.id),
+  );
+  if (
+    result &&
+    !summaryExtras.some((h) => h.id === "media_type")
+  ) {
+    const mediaLabel = MEDIA_TYPE_CATALOG.find(
+      (row) => row.id === result.mediaTypeId,
+    )?.labelRu;
+    if (mediaLabel) {
+      summaryExtras.push({
+        id: "media_type",
+        title: "Очередь",
+        label: mediaLabel,
+      });
+    }
+  }
 
   const [mistress, setMistress] = useState(() => getActiveMistress());
   useEffect(() => subscribeActiveMistress(setMistress), []);
@@ -826,8 +851,7 @@ export function RoulettePage({
             </p>
             <h1>Рулетка</h1>
             <p className="roulette-stage__sub">
-              Сегодняшняя точка входа: контракты, задания и старт с её крутки
-              или без.
+              Старт с её крутки или с текущего плана.
             </p>
           </div>
           {phase !== "idle" && phase !== "ready" && phase !== "error" ? (
@@ -878,9 +902,12 @@ export function RoulettePage({
           </div>
         ) : null}
 
-        <div className="roulette-layout">
+        <div
+          className={`roulette-layout${phase === "idle" ? " is-idle" : ""}`}
+        >
+          {phase !== "idle" ? (
           <aside
-            className={`roulette-rail${phase !== "idle" ? " is-live" : ""}`}
+            className="roulette-rail is-live"
             aria-label="Ход рулетки"
             data-phase={phase}
           >
@@ -941,6 +968,7 @@ export function RoulettePage({
               })}
             </ol>
           </aside>
+          ) : null}
 
           <div className="roulette-main">
             {phase === "idle" ? (
@@ -951,16 +979,21 @@ export function RoulettePage({
                   <h2 className="roulette-idle-card__title">
                     Отдай выбор {mistress.displayNameDativeRu}
                   </h2>
-                  <p className="roulette-idle-card__lead">
-                    Одна кнопка — mood, режим, темп и фетиши. Пулы колёс
-                    подкручиваются в Настройках.
-                  </p>
+                  <ul className="roulette-idle-card__plan" aria-label="Текущий план">
+                    {idlePlanChips(baseParams).map((chip) => (
+                      <li key={chip.k} className="roulette-idle-card__chip">
+                        <span>{chip.k}</span>
+                        <strong>{chip.v}</strong>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
                 <div className="roulette-idle-card__actions">
                   <button
                     type="button"
                     className="btn-primary btn-lg roulette-idle-card__cta"
                     disabled={busy}
+                    title="Крутить — она выберет сама"
                     onClick={() => startSequence("start")}
                   >
                     Пусть {mistress.displayNameRu} решает
@@ -1062,11 +1095,8 @@ export function RoulettePage({
                     onRefreshWd14={onRefreshWd14}
                     onToyOwned={onToyOwned}
                     contractSeed={contractSeed}
-                    contractsRevision={contractsRevision}
-                    onStartSessionSeed={onStartSessionSeed}
-                    onStartMediaDrill={onStartMediaDrill}
-                    onOpenContracts={onOpenContracts}
                     onOpenSession={onOpenSession}
+                    onOpenContentLists={onOpenContentLists}
                   />
                 </div>
               </section>
@@ -1131,14 +1161,6 @@ export function RoulettePage({
                     <section className="roulette-summary__verdict">
                       <p className="roulette-summary__section-k">Её приговор</p>
                       <div className="roulette-summary__verdict-face">
-                        <div className="roulette-summary__verdict-portrait">
-                          <img
-                            className="roulette-summary__verdict-portrait-img"
-                            src={verdictPack.portraitSrc}
-                            alt={verdictPack.faceLabel}
-                            draggable={false}
-                          />
-                        </div>
                         <div className="roulette-summary__verdict-face-text">
                           <span className="roulette-summary__verdict-react">
                             {verdictPack.faceLabel}
@@ -1165,12 +1187,50 @@ export function RoulettePage({
                         {verdictPack.meters.map((m) => (
                           <div
                             key={m.id}
-                            className={`roulette-summary__meter is-${m.id}`}
+                            className={`roulette-summary__meter is-${m.id}${
+                              openMeterHint === m.id ? " is-hint" : ""
+                            }`}
                           >
                             <div className="roulette-summary__meter-top">
-                              <span>{m.label}</span>
+                              <span className="roulette-summary__meter-name">
+                                {m.label}
+                                <button
+                                  type="button"
+                                  className="roulette-summary__meter-info"
+                                  aria-expanded={openMeterHint === m.id}
+                                  aria-label={`${m.label}. ${m.hint}`}
+                                  aria-describedby={`roulette-meter-hint-${m.id}`}
+                                  onFocus={() => setOpenMeterHint(m.id)}
+                                  onBlur={() => {
+                                    window.setTimeout(() => {
+                                      setOpenMeterHint((cur) => {
+                                        const active = document.activeElement;
+                                        if (
+                                          active instanceof HTMLElement &&
+                                          active.classList.contains(
+                                            "roulette-summary__meter-info",
+                                          )
+                                        ) {
+                                          return cur;
+                                        }
+                                        return null;
+                                      });
+                                    }, 0);
+                                  }}
+                                  onClick={() => setOpenMeterHint(m.id)}
+                                >
+                                  i
+                                </button>
+                              </span>
                               <em>{m.value}/5</em>
                             </div>
+                            <span
+                              id={`roulette-meter-hint-${m.id}`}
+                              role="tooltip"
+                              className="roulette-summary__meter-tip"
+                            >
+                              {m.hint}
+                            </span>
                             <div
                               className="roulette-summary__meter-track"
                               aria-hidden
@@ -1216,8 +1276,14 @@ export function RoulettePage({
                     ["--cell-i" as string]: summaryExtras.length + 6,
                   }}
                 >
-                  <span className="roulette-summary__k">Теги booru</span>
-                  <code className="roulette-summary__tags">{result.tags}</code>
+                  <span className="roulette-summary__k">Очередь медиа</span>
+                  <strong className="roulette-summary__tags-label">
+                    {result.tagsLabelRu}
+                  </strong>
+                  {result.tags.trim() &&
+                  result.tags.trim() !== result.tagsLabelRu.trim() ? (
+                    <code className="roulette-summary__tags">{result.tags}</code>
+                  ) : null}
                 </div>
 
                 <div className="roulette-summary__actions">
@@ -1234,14 +1300,35 @@ export function RoulettePage({
                       Соберу сессию и запущу
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    className="btn-ghost roulette-summary__reroll"
-                    disabled={busy}
-                    onClick={() => startSequence("restart")}
-                  >
-                    Крутить заново
-                  </button>
+                  <div className="roulette-summary__alts">
+                    <button
+                      type="button"
+                      className="roulette-summary__alt"
+                      disabled={busy}
+                      onClick={() => {
+                        if (busy) return;
+                        void primeUiAudio();
+                        playUiDeny();
+                        setError(null);
+                        setResult(null);
+                        setPicks({});
+                        setTargetId(null);
+                        setStepIndex(0);
+                        setPhase("idle");
+                        say(pickRouletteIdleLine());
+                      }}
+                    >
+                      Назад
+                    </button>
+                    <button
+                      type="button"
+                      className="roulette-summary__alt"
+                      disabled={busy}
+                      onClick={() => startSequence("restart")}
+                    >
+                      Крутить заново
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : null}
@@ -1249,7 +1336,7 @@ export function RoulettePage({
             {phase === "building" ? (
               <div className="roulette-building">
                 <div className="roulette-building__spinner" aria-hidden />
-                <p>Собираю блоки и тяну контент с booru…</p>
+                <p>Собираю сессию…</p>
               </div>
             ) : null}
 

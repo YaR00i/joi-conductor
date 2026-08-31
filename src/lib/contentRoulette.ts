@@ -9,6 +9,14 @@ import {
 import { resolveFetishTagPick } from "./fetishTiers";
 import type { MediaKind } from "./media";
 import {
+  booruEmptyComposeQuery,
+  booruRatingToken,
+  booruRatingUsesMediaMeta,
+  DEFAULT_BOORU_RATING,
+  type BooruRatingId,
+} from "./booruRating";
+import type { BooruSiteId } from "./booruSites";
+import {
   filterByEnabled,
   loadRouletteSettings,
   type RouletteSettings,
@@ -182,7 +190,7 @@ export function extractFetishContentTags(raw: string): {
     const bare = t.startsWith("-") ? t.slice(1) : t;
     if (PERSON_CONTENT_TAGS.has(bare)) continue;
     if (MEDIA_META_TAGS.has(bare)) continue;
-    if (bare === "furry") continue;
+    if (bare === "furry" && !t.startsWith("-")) continue;
     content.push(t);
   }
 
@@ -198,26 +206,30 @@ export type ComposedContentQuery = {
 };
 
 /**
- * Compose final Gelbooru query from fetish + character + media-type picks.
+ * Compose the session query from fetish + character + media-type picks.
+ * Rating comes from the Media tab, not from fetish strings or a hardcoded explicit.
  */
 export function composeContentQuery(
   picks: Partial<
     Record<string, { payload?: Record<string, unknown>; labelRu?: string }>
   >,
+  site: BooruSiteId = "gelbooru",
+  rating: BooruRatingId = DEFAULT_BOORU_RATING,
 ): ComposedContentQuery {
   const fetishPick = resolveFetishTagPick(picks);
   const fetishRaw =
     typeof fetishPick?.payload?.tags === "string"
       ? fetishPick.payload.tags
       : "";
-  const { rating: fetishRating, content } = extractFetishContentTags(fetishRaw);
+  const { content } = extractFetishContentTags(fetishRaw);
 
   const characterTags =
     typeof picks.character?.payload?.characterTags === "string"
       ? (picks.character.payload.characterTags as string).trim()
-      : "1girl";
+      : "";
 
   const mediaQueryTags =
+    booruRatingUsesMediaMeta(site) &&
     typeof picks.media_type?.payload?.mediaQueryTags === "string"
       ? (picks.media_type.payload.mediaQueryTags as string).trim()
       : "";
@@ -236,16 +248,17 @@ export function composeContentQuery(
       ) as MediaKind[])
     : [];
 
-  const rating = fetishRating ?? "rating:explicit";
   const parts = [
-    rating,
+    booruRatingToken(site, rating),
     characterTags,
     ...content,
     mediaQueryTags,
-    "-furry",
   ].filter(Boolean);
 
-  const tags = parts.join(" ").replace(/\s+/g, " ").trim();
+  let tags = parts.join(" ").replace(/\s+/g, " ").trim();
+  if (!tags) {
+    tags = booruEmptyComposeQuery(site, rating);
+  }
 
   const labelParts = [
     fetishPick?.labelRu,

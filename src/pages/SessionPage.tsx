@@ -8,6 +8,7 @@ import { InstructionPanel } from "../components/InstructionPanel";
 import { MoveAnnounce } from "../components/MoveAnnounce";
 import { MediaCachePanel } from "../components/MediaCachePanel";
 import { SessionQueuePanel } from "../components/SessionQueuePanel";
+import { SessionBlockLab } from "../components/session/SessionBlockLab";
 import {
   MediaStage,
   unlockMediaStageAudio,
@@ -204,11 +205,13 @@ function mediaKindLabelRu(kind: MediaLoadStatus["kind"]): string {
 
 export function SessionPage({
   state,
+  planQueue,
   currentBlock,
   currentFn,
   currentPat,
   pulse,
   lastAccent,
+  lastBeat = null,
   vibeHud,
   vibeHudDevice = null,
   avatarSnap,
@@ -229,6 +232,7 @@ export function SessionPage({
     currentMedia,
     mediaFavorited,
     favoriteBusy,
+    favoriteError,
     playlistPreload,
     onCurrentMediaChange,
     onSlideLeave,
@@ -269,6 +273,9 @@ export function SessionPage({
     onDropUpcoming,
     onMoveUpcoming,
     onInsertRestAfter,
+    onStartLabBlock,
+    onAppendLabBlock,
+    onForceLabQuest,
     onForceFinale,
     onAnswerPrompt,
     onReportDare,
@@ -835,6 +842,24 @@ export function SessionPage({
               onMoveUpcoming={onMoveUpcoming}
               onInsertRestAfter={onInsertRestAfter}
             />
+            {getActiveSaveSlot() === "sandbox" && onStartLabBlock ? (
+              <SessionBlockLab
+                state={state}
+                currentBlock={currentBlock}
+                currentPat={currentPat}
+                inPreflight={inPreflight}
+                promptGate={promptGate || Boolean(choiceSpinning)}
+                lastBeat={lastBeat}
+                planQueue={planQueue}
+                onStartLabBlock={onStartLabBlock}
+                onAppendLabBlock={onAppendLabBlock}
+                onForceLabQuest={onForceLabQuest}
+                onPause={onPause}
+                onResume={onResume}
+                onSkip={onSkip}
+                onAbort={onAbort}
+              />
+            ) : null}
             {mediaLoad.kind ? (
               <div
                 className={`session__media-chip session__media-chip--${mediaLoad.kind}${
@@ -1064,13 +1089,16 @@ export function SessionPage({
                 "fab--heart",
                 mediaFavorited ? "is-loved" : "",
                 favoriteBusy ? "is-busy" : "",
+                favoriteError ? "is-error" : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
               title={
-                mediaFavorited
-                  ? "Убрать из избранного"
-                  : "В избранное (скачать локально)"
+                favoriteError
+                  ? favoriteError
+                  : mediaFavorited
+                    ? "Убрать из избранного"
+                    : "В избранное (скачать локально)"
               }
               disabled={favoriteBusy}
               onClick={onToggleFavorite}

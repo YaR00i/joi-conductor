@@ -42,6 +42,10 @@ import {
 } from "./lib/soul/control";
 import { moodFromScore, scoreFromMood } from "./lib/moodEngine";
 import { setCageLock } from "./lib/cageTimer";
+import {
+  bindDenialQuestToContract,
+  bindWearLockToContract,
+} from "./lib/contracts/liveObligation";
 import { notifyCageLockChanged } from "./components/CageLockPill";
 import { notifyDenialQuestChanged } from "./components/DenialQuestPill";
 import { setDenialQuest } from "./lib/denialQuest";
@@ -69,9 +73,9 @@ import { rememberHubNav } from "./lib/hubNav";
 import {
   isContentNav,
   rememberFavoritesRedirect,
+  saveContentHub,
 } from "./lib/contentHub";
 import {
-  fetchGelbooruFlexible,
   filterMediaByKinds,
   filterMediaByTagsStrict,
   namespaceMediaItems,
@@ -85,6 +89,8 @@ import {
   type MediaItem,
   type MediaSettings,
 } from "./lib/media";
+import { booruNeedsKey, fetchBooruFlexible } from "./lib/booruFetch";
+import { applyBooruRatingToQuery, booruRatingUsesMediaMeta } from "./lib/booruRating";
 import {
   getWd14Status,
   startWd14Server,
@@ -93,6 +99,7 @@ import {
   type Wd14Status,
 } from "./lib/wd14Tagger";
 import {
+  blobForFavoriteSave,
   preloadEntirePlaylist,
   releaseMediaPreloadIds,
   retainMediaPreloadIds,
@@ -173,6 +180,8 @@ import {
   type SessionMood,
   type SessionParams,
   type SessionState,
+  type Block,
+  type QuestId,
   type ToyDef,
   type VibeLevel,
 } from "./lib/types";
@@ -197,6 +206,7 @@ import {
   syncMistressUnlockAchievements,
 } from "./lib/achievements";
 import { computeSessionEndProgress } from "./lib/sessionEndProgress";
+import { isLabPracticeRun, canAppendToLiveLab } from "./lib/sessionBlockLab";
 import { AchievementsPage } from "./pages/AchievementsPage";
 import { ContractMediaDrillHud } from "./components/ContractMediaDrillHud";
 import { ContractsPage } from "./pages/ContractsPage";
@@ -209,6 +219,8 @@ import { SessionPage, type SessionSpeech } from "./pages/SessionPage";
 import { ShopPage } from "./pages/ShopPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { MinigamesPage } from "./pages/MinigamesPage";
+import { PageErrorBoundary } from "./components/PageErrorBoundary";
+import { subscribePersistFailure } from "./lib/persistFailure";
 import { FavoriteSaveToastHost } from "./pages/doujin/FavoriteSaveToast";
 import { SessionDebriefSheet } from "./components/SessionDebriefSheet";
 import { AbortDebriefSheet } from "./components/AbortDebriefSheet";
@@ -529,6 +541,11 @@ export function App() {
   });
   const [pulse, setPulse] = useState(0);
   const [lastAccent, setLastAccent] = useState(2);
+  const [labLastBeat, setLabLastBeat] = useState<{
+    atMs: number;
+    firedPerf: number;
+  } | null>(null);
+  const labStartGenRef = useRef(0);
   const [vibeHud, setVibeHud] = useState<VibeHudState | null>(null);
   const [vibeHudDevice, setVibeHudDevice] = useState<VibeHudDeviceInfo | null>(
     null,
@@ -667,10 +684,14 @@ export function App() {
   );
   const [favoritesCount, setFavoritesCount] = useState(0);
   const [favoriteBusy, setFavoriteBusy] = useState(false);
+  const [favoriteError, setFavoriteError] = useState<string | null>(null);
   const mediaItemsRef = useRef(mediaItems);
   mediaItemsRef.current = mediaItems;
   const mediaSettingsRef = useRef(mediaSettings);
   mediaSettingsRef.current = mediaSettings;
+  // A drill pull can race a manual "Подтянуть"; only the latest load may
+  // commit items/settings, or the slower response desyncs the saved playlist.
+  const mediaLoadGenRef = useRef(0);
 
   const [preflight, setPreflight] = useState<Preflight>(null);
   const [activePresetId, setActivePresetId] = useState<string | null>("medium");
@@ -726,6 +747,11 @@ export function App() {
     return () => window.clearTimeout(t);
   }, [cinderGain]);
   const [unlockNotice, setUnlockNotice] = useState<string | null>(null);
+  const [persistNotice, setPersistNotice] = useState<string | null>(null);
+  useEffect(
+    () => subscribePersistFailure(setPersistNotice),
+    [],
+  );
   const [shopFavoritesHasMore, setShopFavoritesHasMore] = useState(false);
 
   async function refreshShopOffers() {
@@ -974,11 +1000,16 @@ export function App() {
 
       const batch = Math.max(16, Math.min(40, settings.limit || 24));
       const typeId = resolveMediaTypeId(settings);
-      const queryTags = applyMediaTypeQuery(
+      const site = settings.booruSite ?? "gelbooru";
+      const rated = applyBooruRatingToQuery(
         sessionMediaTagsRef.current || settings.tags,
-        typeId,
+        site,
+        settings.rating,
       );
-      const flex = await fetchGelbooruFlexible(queryTags, batch, {
+      const queryTags = booruRatingUsesMediaMeta(site)
+        ? applyMediaTypeQuery(rated, typeId)
+        : rated;
+      const flex = await fetchBooruFlexible(site, queryTags, batch, {
         userId: settings.gelbooruUserId,
         apiKey: settings.gelbooruApiKey,
       });
@@ -1384,10 +1415,19 @@ export function App() {
         try {
           let exclusive: MediaItem[] = [];
           try {
-            const flex = await fetchGelbooruFlexible(tags, 12, {
-              userId: settings.gelbooruUserId,
-              apiKey: settings.gelbooruApiKey,
-            });
+            const flex = await fetchBooruFlexible(
+              settings.booruSite ?? "gelbooru",
+              applyBooruRatingToQuery(
+                tags,
+                settings.booruSite ?? "gelbooru",
+                settings.rating,
+              ),
+              12,
+              {
+                userId: settings.gelbooruUserId,
+                apiKey: settings.gelbooruApiKey,
+              },
+            );
             exclusive = flex.items;
           } catch {
             exclusive = [];
@@ -1482,6 +1522,7 @@ export function App() {
       if (event.type === "beat") {
         setPulse((n) => n + 1);
         setLastAccent(event.accent);
+        setLabLastBeat({ atMs: event.atMs, firedPerf: performance.now() });
       }
       if (event.type === "vibe_level") {
         const profile = getVibeProfile(event.profileId);
@@ -1507,6 +1548,7 @@ export function App() {
           };
         }
         setLastAccent(2);
+        setLabLastBeat(null);
         setVibeHud(null);
         setSessionMediaOverlay(null);
         setQuestMediaOverlay(null);
@@ -1588,7 +1630,10 @@ export function App() {
       }
       if (event.type === "session_end") {
         // Snapshot the on-screen frame before tearing down the media stage.
-        if (!diaryMetaRef.current?.resultImageUrl?.startsWith("data:image/")) {
+        if (
+          !event.silent &&
+          !diaryMetaRef.current?.resultImageUrl?.startsWith("data:image/")
+        ) {
           const still = captureSouvenirFromStageDom();
           if (still) {
             diaryMetaRef.current = {
@@ -1616,6 +1661,7 @@ export function App() {
         setSessionPlaylist(null);
         setSessionActiveBuffs({ begBonus: 0, cumBoost: 0 });
         const st = runtimeRef.current?.getState();
+        const labRun = isLabPracticeRun(st);
         const progress = computeSessionEndProgress({
           reason: event.reason,
           state: st,
@@ -1625,9 +1671,9 @@ export function App() {
           achievements: achievementsRef.current,
           wallet: walletRef.current,
           sessionQuestCinders: sessionQuestCindersRef.current,
-          silent: event.silent === true,
+          silent: event.silent === true || labRun,
         });
-        if (!event.silent) {
+        if (!event.silent && !labRun) {
           sessionQuestCindersRef.current = 0;
         }
 
@@ -1677,15 +1723,19 @@ export function App() {
         }
 
         if (progress.pendingCageHours != null) {
-          setCageLock(progress.pendingCageHours);
+          const lock = setCageLock(progress.pendingCageHours);
+          bindWearLockToContract(lock);
           notifyCageLockChanged();
+          setContractsRevision((n) => n + 1);
         }
         if (progress.pendingDenialHours != null) {
-          setDenialQuest(
+          const quest = setDenialQuest(
             progress.pendingDenialHours,
             progress.pendingDenialEdges,
           );
+          bindDenialQuestToContract(quest);
           notifyDenialQuestChanged();
+          setContractsRevision((n) => n + 1);
         }
 
         if (progress.clawQuestCinders > 0) {
@@ -1697,18 +1747,22 @@ export function App() {
 
         const showDebrief = progress.showDebrief;
         const showAbortDebrief = progress.showAbortDebrief;
-        const contractSettle = settleSessionSeedAfterEnd(
-          event.reason,
-          st
-            ? {
-                edgesDone: st.edgesDone,
-                ruinsDone: st.ruinsDone,
-                finaleOutcome: st.finaleOutcome,
-                params: st.params,
-              }
-            : null,
-          { announce: !showDebrief && !showAbortDebrief },
-        );
+        const skipContractSettle =
+          event.silent === true || isLabPracticeRun(st);
+        const contractSettle = skipContractSettle
+          ? null
+          : settleSessionSeedAfterEnd(
+              event.reason,
+              st
+                ? {
+                    edgesDone: st.edgesDone,
+                    ruinsDone: st.ruinsDone,
+                    finaleOutcome: st.finaleOutcome,
+                    params: st.params,
+                  }
+                : null,
+              { announce: !showDebrief && !showAbortDebrief },
+            );
         if (showDebrief && st) {
           const mistress = getActiveMistress();
           const mood = st.mood;
@@ -1880,10 +1934,16 @@ export function App() {
         const settings = mediaSettingsRef.current;
         void (async () => {
           try {
-            const { items } = await fetchGelbooruFlexible(tags, 40, {
-              userId: settings.gelbooruUserId,
-              apiKey: settings.gelbooruApiKey,
-            });
+            const site = settings.booruSite ?? "gelbooru";
+            const { items } = await fetchBooruFlexible(
+              site,
+              applyBooruRatingToQuery(tags, site, settings.rating),
+              40,
+              {
+                userId: settings.gelbooruUserId,
+                apiKey: settings.gelbooruApiKey,
+              },
+            );
             if (items.length === 0) {
               runtimeRef.current?.emitExternal({ type: "mistress_media_fail" });
               return;
@@ -1959,6 +2019,16 @@ export function App() {
           setActiveSessionSeed(done);
         }
       }
+      if (event.type === "block_skip") {
+        const kind =
+          event.reason === "missing_pattern" ? "паттерна" : "функции";
+        window.clearTimeout(punishNoticeTimerRef.current);
+        setPunishNotice(`Блок пропущен: нет ${kind} ${event.detail}`);
+        punishNoticeTimerRef.current = window.setTimeout(
+          () => setPunishNotice(null),
+          4500,
+        );
+      }
       if (event.type === "unauthorized") {
         const seed = loadActiveSessionSeed();
         // Hands-off rest: exclusive fail path (do not also tax/fail below).
@@ -1967,7 +2037,7 @@ export function App() {
           window.clearTimeout(punishNoticeTimerRef.current);
           setPunishNotice(
             event.punishmentRu ||
-              "Hands-off нарушен — контракт провален.",
+              "Руки прочь нарушены — контракт провален.",
           );
           punishNoticeTimerRef.current = window.setTimeout(
             () => setPunishNotice(null),
@@ -2059,7 +2129,7 @@ export function App() {
   useEffect(() => {
     const live =
       state?.status === "running" || state?.status === "paused";
-    if (!live) return;
+    if (!live || state?.labPractice) return;
     const write = () => {
       const cp = runtimeRef.current?.exportCheckpoint();
       if (cp) {
@@ -2086,13 +2156,14 @@ export function App() {
   }, []);
 
   const refreshMediaLists = useCallback(async () => {
-    const rows = await listGelbooruLists();
+    const site = mediaSettingsRef.current.booruSite ?? "gelbooru";
+    const rows = await listGelbooruLists(site);
     setMediaLists(rows.map(gelbooruListOption));
   }, []);
 
   useEffect(() => {
     void refreshMediaLists();
-  }, [refreshMediaLists, nav]);
+  }, [refreshMediaLists, nav, mediaSettings.booruSite]);
 
   useEffect(() => {
     if (mediaSettings.source === "favorites") {
@@ -2196,8 +2267,9 @@ export function App() {
       setFavoriteIndex(index);
       setFavoritesCount(n);
       void refreshTasteFromFavorites();
-    } catch {
-      // IndexedDB unavailable — favorites disabled quietly
+    } catch (err) {
+      // IndexedDB blocked/corrupted — favorites stay disabled, but leave a trace.
+      console.warn("Избранное недоступно (IndexedDB):", err);
     }
   }
 
@@ -2268,7 +2340,8 @@ export function App() {
       setMediaError("Сначала выбери список в Медиа");
       return;
     }
-    const list = await getGelbooruList(id);
+    const site = mediaSettingsRef.current.booruSite ?? "gelbooru";
+    const list = await getGelbooruList(id, site);
     if (!list || list.items.length === 0) {
       setMediaError(
         "Список пуст — собери автоочередь кнопкой «Выбор» на этой вкладке",
@@ -2280,7 +2353,8 @@ export function App() {
 
   async function assembleMediaList(): Promise<void> {
     const media = mediaSettingsRef.current;
-    if (!media.gelbooruUserId.trim() || !media.gelbooruApiKey.trim()) {
+    const site = media.booruSite ?? "gelbooru";
+    if (booruNeedsKey(site) && (!media.gelbooruUserId.trim() || !media.gelbooruApiKey.trim())) {
       setMediaError("Ключи Gelbooru — в Настройках");
       return;
     }
@@ -2289,10 +2363,15 @@ export function App() {
     try {
       const list = await assembleGelbooruMistressList(
         snapMediaQueueSize(media.limit),
+        { site },
       );
       await refreshMediaLists();
       if (list.items.length === 0) {
-        setMediaError("Автоочередь пуста — проверь теги и ключ Gelbooru");
+        setMediaError(
+          booruNeedsKey(site)
+            ? "Автоочередь пуста — проверь теги и ключ Gelbooru"
+            : "Автоочередь пуста — проверь теги",
+        );
         return;
       }
       await loadGelbooruListPlaylist(list.items, list.id);
@@ -2311,6 +2390,7 @@ export function App() {
     if (item.source !== "gelbooru" && item.source !== "favorites") return;
 
     setFavoriteBusy(true);
+    setFavoriteError(null);
     try {
       const loved = mediaMatchesFavorite(item, favoriteIndex);
       if (loved) {
@@ -2322,15 +2402,16 @@ export function App() {
           setMediaItems((prev) => prev.filter((m) => m.id !== item.id));
         }
       } else {
-        await addFavoriteFromItem(item);
+        await addFavoriteFromItem(item, await blobForFavoriteSave(item));
         runtimeRef.current?.emitExternal({ type: "user_like" });
       }
       await refreshFavoriteMeta();
       void refreshShopOffers();
     } catch (err) {
-      setMediaError(
-        err instanceof Error ? err.message : "Не удалось обновить избранное",
-      );
+      const msg =
+        err instanceof Error ? err.message : "Не удалось обновить избранное";
+      setFavoriteError(msg);
+      setMediaError(msg);
     } finally {
       setFavoriteBusy(false);
     }
@@ -2532,6 +2613,8 @@ export function App() {
     try {
       const res = await fetch(voiceSettings.endpoint, {
         method: "POST",
+        // Cold-loading a local model can take a while — but never forever.
+        signal: AbortSignal.timeout(60_000),
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: voiceSettings.model,
@@ -2569,7 +2652,8 @@ export function App() {
   ): Promise<string | undefined> {
     if (items.length === 0) return undefined;
     try {
-      const list = await saveTagPullAsGelbooruList({ ...pull, items });
+      const site = mediaSettingsRef.current.booruSite ?? "gelbooru";
+      const list = await saveTagPullAsGelbooruList({ ...pull, items, site });
       await refreshMediaLists();
       return list.id;
     } catch {
@@ -2578,6 +2662,7 @@ export function App() {
   }
 
   async function loadGelbooru(opts?: { tags?: string; limit?: number }) {
+    const gen = ++mediaLoadGenRef.current;
     const base = mediaSettingsRef.current;
     if (isListMediaType(resolveMediaTypeId(base))) {
       await applyMediaList(base.listId ?? undefined);
@@ -2611,11 +2696,18 @@ export function App() {
         rebuild(sanitized.params);
       }
       const typeId = resolveMediaTypeId(base);
-      const query = applyMediaTypeQuery(sanitized.tags, typeId);
-      const flex = await fetchGelbooruFlexible(query, limit, {
+      const site = base.booruSite ?? "gelbooru";
+      const rated = applyBooruRatingToQuery(sanitized.tags, site, base.rating);
+      const query = booruRatingUsesMediaMeta(site)
+        ? applyMediaTypeQuery(rated, typeId)
+        : rated;
+      const flex = await fetchBooruFlexible(site, query, limit, {
         userId: mediaSettingsRef.current.gelbooruUserId,
         apiKey: mediaSettingsRef.current.gelbooruApiKey,
       });
+      // Superseded by a newer pull (e.g. a media drill): drop this response
+      // before it saves a list or overwrites items/settings.
+      if (gen !== mediaLoadGenRef.current) return;
       const items = filterPlaylistByMediaType(flex.items, typeId);
       if (items.length === 0) {
         setMediaError("Пусто — попробуй другие теги или другой тип контента");
@@ -2642,9 +2734,12 @@ export function App() {
       // Background-download the whole queue (progress on Today / Session)
       preloadEntirePlaylist(items);
     } catch (err) {
+      if (gen !== mediaLoadGenRef.current) return;
       setMediaError(err instanceof Error ? err.message : "Ошибка загрузки");
     } finally {
-      setMediaLoading(false);
+      // Only the latest load owns the spinner; an older finish must not
+      // re-enable the button while the newer pull is still running.
+      if (gen === mediaLoadGenRef.current) setMediaLoading(false);
     }
   }
 
@@ -2716,7 +2811,7 @@ export function App() {
     setContractsRevision((n) => n + 1);
     rebuild(applySessionSeedToParams(params, seed));
     setActivePresetId(null);
-    if (opts?.navigate !== false) {
+    if (opts?.navigate !== false && plan.nav !== "stay") {
       setNav(plan.nav);
     }
     setContractSessionFlash(plan.flashRu);
@@ -2932,8 +3027,18 @@ export function App() {
       saveMediaSettings(patched);
       if (patched.source === "gelbooru" && !isListMediaType(patched.mediaTypeId)) {
         try {
-          const flex = await fetchGelbooruFlexible(
-            applyMediaTypeQuery(sanitized.tags, patched.mediaTypeId ?? "all"),
+          const site = patched.booruSite ?? "gelbooru";
+          const rated = applyBooruRatingToQuery(
+            sanitized.tags,
+            site,
+            patched.rating,
+          );
+          const query = booruRatingUsesMediaMeta(site)
+            ? applyMediaTypeQuery(rated, patched.mediaTypeId ?? "all")
+            : rated;
+          const flex = await fetchBooruFlexible(
+            site,
+            query,
             patched.limit,
             {
               userId: patched.gelbooruUserId,
@@ -2948,10 +3053,7 @@ export function App() {
             if (items.length > 0) {
               const listId = await rememberTagPullAsList(items, {
                 tags: sanitized.tags,
-                query: applyMediaTypeQuery(
-                  sanitized.tags,
-                  patched.mediaTypeId ?? "all",
-                ),
+                query,
                 usedTags: flex.usedTags,
                 attempted: flex.attempted,
                 mediaTypeId: patched.mediaTypeId ?? "all",
@@ -3088,10 +3190,11 @@ export function App() {
       let mediaWithTags: MediaSettings;
       if (isListMediaType(result.mediaTypeId)) {
         const listId = nextMedia.listId;
-        const list = listId ? await getGelbooruList(listId) : undefined;
+        const site = nextMedia.booruSite ?? "gelbooru";
+        const list = listId ? await getGelbooruList(listId, site) : undefined;
         if (!list || list.items.length === 0) {
           throw new Error(
-            "Нет списка — собери автоочередь или выбери список в Медиа",
+            "Нет списка — собери автоочередь или выбери список в Контенте / Медиа",
           );
         }
         playlistItems = list.items.slice();
@@ -3101,8 +3204,18 @@ export function App() {
           listId: list.id,
         };
       } else {
-        const { items, usedTags, attempted } = await fetchGelbooruFlexible(
+        const site = nextMedia.booruSite ?? "gelbooru";
+        const rated = applyBooruRatingToQuery(
           sanitized.tags,
+          site,
+          nextMedia.rating,
+        );
+        const query = booruRatingUsesMediaMeta(site)
+          ? applyMediaTypeQuery(rated, result.mediaTypeId)
+          : rated;
+        const { items, usedTags, attempted } = await fetchBooruFlexible(
+          site,
+          query,
           nextMedia.limit,
           {
             userId: nextMedia.gelbooruUserId,
@@ -3112,13 +3225,16 @@ export function App() {
         const filtered = filterMediaByKinds(items, result.mediaKinds ?? []);
         playlistItems = filtered.length > 0 ? filtered : items;
         if (playlistItems.length === 0) {
+          const keyHint = booruNeedsKey(site)
+            ? " Проверь API key или крути заново"
+            : " Крути заново или смени теги";
           throw new Error(
-            `Booru пуст (пробовал ${attempted.length} запросов, от «${sanitized.tags}» до упрощённых). Проверь API key или крути заново`,
+            `Booru пуст (пробовал ${attempted.length} запросов, от «${query}» до упрощённых).${keyHint}`,
           );
         }
         const listId = await rememberTagPullAsList(playlistItems, {
           tags: sanitized.tags,
-          query: sanitized.tags,
+          query,
           usedTags,
           attempted,
           mediaTypeId: result.mediaTypeId,
@@ -3303,7 +3419,61 @@ export function App() {
     });
   }
 
+  async function startLabBlock(blocks: Block[]): Promise<boolean> {
+    const queue = blocks.filter((b) => b);
+    if (queue.length === 0) return false;
+    if (
+      state?.status === "running" ||
+      state?.status === "paused" ||
+      preflight != null
+    ) {
+      if (
+        (state?.status === "running" || state?.status === "paused") &&
+        typeof window !== "undefined" &&
+        !window.confirm(
+          "Остановить текущую сессию и запустить очередь лаборатории?",
+        )
+      ) {
+        return false;
+      }
+      abortAll();
+    }
+    setSessionDebrief(null);
+    setAbortDebrief(null);
+    const gen = ++labStartGenRef.current;
+    await primeMetronome();
+    setNav("session");
+    for (const n of [3, 2, 1] as const) {
+      if (labStartGenRef.current !== gen) return false;
+      setPreflight({ kind: "countdown", n });
+      await new Promise((r) => setTimeout(r, 450));
+    }
+    if (labStartGenRef.current !== gen) return false;
+    setPreflight(null);
+    const moodFix = sanitizeMoodForUnlocks(
+      moodFromScore(loadControlState(getActiveMistress().id).moodScore),
+      walletRef.current.unlocks,
+    );
+    runtimeRef.current?.start(params, queue.slice(), undefined, {
+      moodScore: scoreFromMood(moodFix.mood),
+      labPractice: true,
+    });
+    return true;
+  }
+
+  function appendLabBlock(block: Block) {
+    const rt = runtimeRef.current;
+    const st = rt?.getState() ?? null;
+    if (!canAppendToLiveLab(st)) return;
+    rt?.appendUpcomingBlocks([block]);
+  }
+
+  function forceLabQuest(questId: QuestId) {
+    runtimeRef.current?.forceQuestOffer(questId, { replaceOffer: true });
+  }
+
   function abortAll() {
+    labStartGenRef.current += 1;
     setPreflight(null);
     pendingStartRef.current = null;
     clearSessionSkipWagers();
@@ -3313,7 +3483,12 @@ export function App() {
     translateAbortRef.current?.abort();
     translateAbortRef.current = null;
     ttsRef.current.stop();
-    runtimeRef.current?.abort();
+    const labRun = isLabPracticeRun(runtimeRef.current?.getState() ?? null);
+    runtimeRef.current?.abort({ silent: labRun });
+    if (labRun) {
+      setSessionDebrief(null);
+      setAbortDebrief(null);
+    }
     clearSessionCheckpoint();
     setPendingCheckpoint(null);
     setPunishNotice(null);
@@ -3510,6 +3685,7 @@ export function App() {
               </div>
             </div>
           ) : null}
+          <PageErrorBoundary key={nav} onExit={() => goNav("roulette")}>
           {nav === "settings" ? (
             <SettingsPage
               queue={queue}
@@ -3596,6 +3772,11 @@ export function App() {
               onOpenSession={() => setNav("session")}
               onOpenShop={() => setNav("shop")}
               onOpenFavorites={() => goNav("favorites")}
+              onOpenContentLists={() => {
+                const site = mediaSettings.booruSite ?? "gelbooru";
+                saveContentHub({ source: site, tab: "lists" });
+                setNav("doujin");
+              }}
             />
           ) : nav === "ember" ? (
             <EmberLazyBoundary>
@@ -3809,11 +3990,13 @@ export function App() {
           ) : (
             <SessionPage
               state={state}
+              planQueue={queue}
               currentBlock={currentBlock}
               currentFn={currentFn}
               currentPat={currentPat}
               pulse={pulse}
               lastAccent={lastAccent}
+              lastBeat={labLastBeat}
               vibeHud={vibeHud}
               vibeHudDevice={vibeHudDevice}
               avatarSnap={avatarSnap}
@@ -3841,6 +4024,7 @@ export function App() {
                   ? mediaMatchesFavorite(currentMedia, favoriteIndex)
                   : false,
                 favoriteBusy: favoriteBusy,
+                favoriteError: favoriteError,
                 playlistPreload: playlistPreload,
                 onCurrentMediaChange: setCurrentMedia,
                 onSlideLeave: onSessionSlideLeave,
@@ -3919,6 +4103,9 @@ export function App() {
                   runtimeRef.current?.moveUpcomingBlock(i, dir),
                 onInsertRestAfter: (i) =>
                   runtimeRef.current?.insertRestAfter(i),
+                onStartLabBlock: (blocks) => startLabBlock(blocks),
+                onAppendLabBlock: (block) => appendLabBlock(block),
+                onForceLabQuest: (questId) => forceLabQuest(questId),
                 onForceFinale: () => runtimeRef.current?.forceFinale(),
                 onAnswerPrompt: (optionId) =>
                   runtimeRef.current?.answerPrompt(optionId),
@@ -4083,6 +4270,7 @@ export function App() {
               }}
             />
           )}
+          </PageErrorBoundary>
           <ContractMediaDrillHud
             sessionLive={sessionLive}
             mediaLoading={mediaLoading}
@@ -4194,6 +4382,31 @@ export function App() {
           void refreshShopOffers();
         }}
       />
+      {persistNotice && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 16,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 60,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            background: "#3a1d1d",
+            color: "#ffd9d9",
+            padding: "10px 16px",
+            borderRadius: 8,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+            fontSize: 13,
+          }}
+        >
+          <span>{persistNotice}</span>
+          <button type="button" onClick={() => setPersistNotice(null)}>
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   );
 }

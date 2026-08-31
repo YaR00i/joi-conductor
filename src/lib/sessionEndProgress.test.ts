@@ -53,6 +53,59 @@ describe("computeSessionEndProgress", () => {
     expect(result.achievements.counters.edges).toBe(before.counters.edges);
   });
 
+  it("skips all progress on lab practice even without silent flag", () => {
+    const before = emptyAchievements();
+    const result = computeSessionEndProgress({
+      reason: "complete",
+      state: minimalState({ labPractice: true, elapsedSec: 20 }),
+      events: [],
+      cindersEarned: 4,
+      mistressId: "hu_tao",
+      achievements: before,
+      wallet: emptyWallet(),
+      sessionQuestCinders: 0,
+    });
+    expect(result.recordDiary).toBe(false);
+    expect(result.showDebrief).toBe(false);
+    expect(result.showAbortDebrief).toBe(false);
+    expect(result.creditCinders).toBe(0);
+    expect(result.syncAchievements).toBe(false);
+    expect(result.achievements).toBe(before);
+  });
+
+  it("skips abort overlay and diary when the queue is a lab block", () => {
+    const before = emptyAchievements();
+    const result = computeSessionEndProgress({
+      reason: "abort",
+      state: minimalState({
+        labPractice: undefined,
+        elapsedSec: 8,
+        queue: [
+          {
+            id: "lab-stroke-1",
+            durationSec: 20,
+            functionId: "stroke_left",
+            patternId: "meter_straight",
+            bpm: 80,
+            mode: "stroke",
+            modifiers: [],
+            goal: "stroke",
+            drive: "beat",
+          },
+        ],
+      }),
+      events: [],
+      cindersEarned: 0,
+      mistressId: "hu_tao",
+      achievements: before,
+      wallet: emptyWallet(),
+      sessionQuestCinders: 0,
+    });
+    expect(result.recordDiary).toBe(false);
+    expect(result.showAbortDebrief).toBe(false);
+    expect(result.showDebrief).toBe(false);
+  });
+
   it("skips all progress on silent remount abort", () => {
     const before = emptyAchievements();
     const result = computeSessionEndProgress({

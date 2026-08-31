@@ -18,6 +18,7 @@ import type {
   Block,
   Emotion,
   FunctionDef,
+  QuestId,
   SessionMode,
   SessionState,
 } from "../../lib/types";
@@ -53,6 +54,7 @@ export type SessionMediaBundle = {
   currentMedia: MediaItem | null;
   mediaFavorited: boolean;
   favoriteBusy: boolean;
+  favoriteError?: string | null;
   playlistPreload: PlaylistPreloadStatus;
   onCurrentMediaChange: (item: MediaItem | null) => void;
   onSlideLeave?: (info: {
@@ -103,6 +105,9 @@ export type SessionControlsBundle = {
   onDropUpcoming?: (queueIndex: number) => void;
   onMoveUpcoming?: (queueIndex: number, dir: -1 | 1) => void;
   onInsertRestAfter?: (queueIndex: number) => void;
+  onStartLabBlock?: (blocks: Block[]) => boolean | Promise<boolean>;
+  onAppendLabBlock?: (block: Block) => void;
+  onForceLabQuest?: (questId: QuestId) => void;
   onForceFinale: () => void;
   onAnswerPrompt: (optionId: string) => void;
   onReportDare: (success: boolean) => void;
@@ -155,11 +160,14 @@ export type SessionMetaBundle = {
 
 export type SessionPageProps = {
   state: SessionState | null;
+  /** Roulette-built plan; lab clones these into its own queue. */
+  planQueue?: Block[];
   currentBlock: Block | undefined;
   currentFn: FunctionDef | undefined;
   currentPat: BeatPatternDef | undefined;
   pulse: number;
   lastAccent: number;
+  lastBeat?: { atMs: number; firedPerf: number } | null;
   vibeHud: VibeHudState | null;
   vibeHudDevice?: VibeHudDeviceInfo | null;
   avatarSnap: AvatarSnapshot | null;

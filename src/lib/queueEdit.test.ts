@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  appendUpcomingBlocks,
   dropUpcomingBlock,
   insertBlockAfter,
   isUpcomingEditable,
@@ -55,5 +56,17 @@ describe("queueEdit", () => {
       "rest",
       "next",
     ]);
+  });
+
+  it("appends after the last upcoming block, before finale", () => {
+    const extra = [block("lab-a"), block("lab-b")];
+    const q = [block("now"), block("next"), block("fin", "finale")];
+    expect(
+      appendUpcomingBlocks(q, 0, extra)?.map((b) => b.id),
+    ).toEqual(["now", "next", "lab-a", "lab-b", "fin"]);
+    expect(
+      appendUpcomingBlocks([block("now")], 0, extra)?.map((b) => b.id),
+    ).toEqual(["now", "lab-a", "lab-b"]);
+    expect(appendUpcomingBlocks(q, 0, [])).toBeNull();
   });
 });

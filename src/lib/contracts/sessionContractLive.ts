@@ -544,7 +544,7 @@ export function buildHandsOffFlash(
   const m = Math.max(1, Math.round(minutes));
   return {
     titleRu: seed.titleRu,
-    ruleRu: `Hands-off ${m} мин — руки прочь`,
+    ruleRu: `Руки прочь ${m} мин`,
     metaRu: "Печать · пауза",
     reward: Math.max(0, Math.floor(reward)),
   };

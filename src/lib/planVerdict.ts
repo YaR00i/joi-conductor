@@ -23,6 +23,15 @@ export type VerdictHeatMeter = {
   id: "heat" | "control" | "chaos";
   label: string;
   value: number;
+  hint: string;
+};
+
+const VERDICT_METER_HINT: Record<VerdictHeatMeter["id"], string> = {
+  heat: "Горячность расклада: эджи, похоть или злость, быстрый темп. Добрая и медленный ритм чуть снижают. Исход финала не считается.",
+  control:
+    "Насколько она держит: длина сессии, клетка, CBT, анал, спокойная или злая, много эджей. Хаотичная снижает.",
+  chaos:
+    "Непредсказуемость: хаотичная или скучающая, широкий разброс BPM, плюс спрятанный финал. Спокойная снижает.",
 };
 
 export type VerdictPack = {
@@ -493,9 +502,24 @@ export function buildVerdictHeat(
   if (p.bpmMax - p.bpmMin >= 60) chaos += 0.8;
 
   return [
-    { id: "heat", label: "Жара", value: clampHeat(heat) },
-    { id: "control", label: "Контроль", value: clampHeat(control) },
-    { id: "chaos", label: "Хаос", value: clampHeat(chaos) },
+    {
+      id: "heat",
+      label: "Жара",
+      value: clampHeat(heat),
+      hint: VERDICT_METER_HINT.heat,
+    },
+    {
+      id: "control",
+      label: "Контроль",
+      value: clampHeat(control),
+      hint: VERDICT_METER_HINT.control,
+    },
+    {
+      id: "chaos",
+      label: "Хаос",
+      value: clampHeat(chaos),
+      hint: VERDICT_METER_HINT.chaos,
+    },
   ];
 }
 

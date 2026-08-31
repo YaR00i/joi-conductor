@@ -123,10 +123,14 @@ export function PuzzleGame({ onReward, onExit }: Props) {
     return () => window.clearInterval(id);
   }, [phase, startMs]);
 
-  // revoke object url on change/unmount
+  // revoke object url on change/unmount; ghost timers stop with the page
   useEffect(() => {
     return () => {
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      if (ghostHintTimerRef.current) {
+        window.clearTimeout(ghostHintTimerRef.current);
+      }
+      if (ghostTickRef.current) window.clearInterval(ghostTickRef.current);
     };
   }, []);
 

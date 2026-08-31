@@ -8,6 +8,7 @@ type Props = {
   onDownload?: () => void;
   onRead: () => void;
   onResume?: () => void;
+  readTitle?: string;
 };
 
 export function DoujinListTileActions({
@@ -18,6 +19,7 @@ export function DoujinListTileActions({
   onDownload,
   onRead,
   onResume,
+  readTitle = "Читать",
 }: Props) {
   return (
     <div className="doujin-lists__tile-actions">
@@ -41,8 +43,8 @@ export function DoujinListTileActions({
         type="button"
         className="doujin-lists__tile-icon is-read"
         disabled={!canRead}
-        title="Читать"
-        aria-label="Читать"
+        title={readTitle}
+        aria-label={readTitle}
         onClick={onRead}
       >
         <ReadIcon />

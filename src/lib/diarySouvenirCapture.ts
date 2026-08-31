@@ -84,9 +84,17 @@ async function captureFromMediaItem(item: MediaItem): Promise<string | null> {
       video.preload = "auto";
       video.src = playUrl;
       await new Promise<void>((resolve, reject) => {
-        video.onloadeddata = () => resolve();
-        video.onerror = () => reject(new Error("video load failed"));
-        window.setTimeout(() => reject(new Error("video timeout")), 8000);
+        const timer = window.setTimeout(
+          () => reject(new Error("video timeout")),
+          8000,
+        );
+        const settle = (err?: Error) => {
+          window.clearTimeout(timer);
+          if (err) reject(err);
+          else resolve();
+        };
+        video.onloadeddata = () => settle();
+        video.onerror = () => settle(new Error("video load failed"));
       });
       try {
         await video.play();

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type TransitionEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type TransitionEvent } from "react";
 import type { RouletteOption } from "../lib/planRoulette";
 import {
   ROULETTE_SPIN_EASE,
@@ -118,6 +118,8 @@ function fitArcLabel(
   return `${label.slice(0, Math.max(3, maxChars - 1))}…`;
 }
 
+const MIN_LABEL_SPAN_DEG = 16;
+
 interface ParamRouletteProps {
   titleRu: string;
   options: RouletteOption[];
@@ -145,6 +147,7 @@ export function ParamRoulette({
   landedLabel = null,
   sealedPhraseRu = null,
 }: ParamRouletteProps) {
+  const svgId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const sealed = Boolean(sealedPhraseRu) && options.length <= 1;
   const slices = useMemo(() => buildSlices(options), [options]);
   const slicesRef = useRef(slices);
@@ -220,9 +223,9 @@ export function ParamRoulette({
   const cy = 200;
   const rOuter = 172;
   const rInner = 48;
-  const rLabel = rOuter - 22;
+  const rLabel = rOuter - 28;
   const rimR = 188;
-  const labelFontSize = 12;
+  const labelFontSize = 13;
   const ticks = useMemo(
     () => Array.from({ length: 48 }, (_, i) => -90 + (i * 360) / 48),
     [],
@@ -290,12 +293,12 @@ export function ParamRoulette({
               aria-label={titleRu}
             >
               <defs>
-                <radialGradient id="pr-rim" cx="50%" cy="40%" r="60%">
+                <radialGradient id={`${svgId}-rim`} cx="50%" cy="40%" r="60%">
                   <stop offset="0%" stopColor="var(--bg2)" />
                   <stop offset="55%" stopColor="var(--bg1)" />
                   <stop offset="100%" stopColor="var(--bg0)" />
                 </radialGradient>
-                <linearGradient id="pr-metal" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient id={`${svgId}-metal`} x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="var(--soft)" />
                   <stop offset="45%" stopColor="var(--accent)" />
                   <stop
@@ -303,12 +306,12 @@ export function ParamRoulette({
                     stopColor="color-mix(in srgb, var(--accent) 55%, #000)"
                   />
                 </linearGradient>
-                <radialGradient id="pr-hub" cx="40%" cy="35%" r="65%">
+                <radialGradient id={`${svgId}-hub`} cx="40%" cy="35%" r="65%">
                   <stop offset="0%" stopColor="var(--bg2)" />
                   <stop offset="70%" stopColor="var(--bg1)" />
                   <stop offset="100%" stopColor="var(--bg0)" />
                 </radialGradient>
-                <filter id="pr-soft" x="-15%" y="-15%" width="130%" height="130%">
+                <filter id={`${svgId}-soft`} x="-15%" y="-15%" width="130%" height="130%">
                   <feDropShadow
                     dx="0"
                     dy="2"
@@ -320,7 +323,7 @@ export function ParamRoulette({
                 {slices.map((s) => (
                   <path
                     key={`arc-${s.id}`}
-                    id={`pr-arc-${s.id}`}
+                    id={`${svgId}-arc-${s.id}`}
                     d={labelArcPath(cx, cy, rLabel, s.startDeg, s.spanDeg)}
                     fill="none"
                   />
@@ -328,13 +331,13 @@ export function ParamRoulette({
               </defs>
 
               {/* Outer rim disc */}
-              <circle cx={cx} cy={cy} r={rimR} fill="url(#pr-rim)" />
+              <circle cx={cx} cy={cy} r={rimR} fill={`url(#${svgId}-rim)`} />
               <circle
                 cx={cx}
                 cy={cy}
                 r={rimR - 1}
                 fill="none"
-                stroke="url(#pr-metal)"
+                stroke={`url(#${svgId}-metal)`}
                 strokeWidth="5"
               />
               <circle
@@ -389,10 +392,11 @@ export function ParamRoulette({
               {slices.map((s) => {
                 const base = s.color ?? "#444";
                 const locked = s.unlocked === false;
+                const hit = !spinning && targetId === s.id;
                 return (
                   <g
                     key={s.id}
-                    filter="url(#pr-soft)"
+                    filter={`url(#${svgId}-soft)`}
                     opacity={locked ? 0.38 : 1}
                   >
                     <path
@@ -414,15 +418,16 @@ export function ParamRoulette({
                     <path
                       d={slicePath(cx, cy, rOuter, rInner, s.startDeg, s.spanDeg)}
                       fill="none"
-                      stroke="rgba(8,6,10,0.55)"
-                      strokeWidth="1.8"
+                      stroke={hit ? "var(--soft)" : "rgba(8,6,10,0.55)"}
+                      strokeWidth={hit ? 3.2 : 1.8}
                     />
                   </g>
                 );
               })}
 
-              {/* Curved labels along outer arc */}
+              {/* Curved labels — skip crumbs that would read as «…» */}
               {slices.map((s) => {
+                if (s.spanDeg < MIN_LABEL_SPAN_DEG) return null;
                 const label = fitArcLabel(
                   s.labelRu,
                   rLabel,
@@ -442,7 +447,7 @@ export function ParamRoulette({
                     }}
                   >
                     <textPath
-                      href={`#pr-arc-${s.id}`}
+                      href={`#${svgId}-arc-${s.id}`}
                       startOffset="50%"
                       textAnchor="middle"
                     >
@@ -453,13 +458,13 @@ export function ParamRoulette({
               })}
 
               {/* Hub disc only — label sits fixed above the wheel */}
-              <circle cx={cx} cy={cy} r={rInner + 4} fill="url(#pr-hub)" />
+              <circle cx={cx} cy={cy} r={rInner + 4} fill={`url(#${svgId}-hub)`} />
               <circle
                 cx={cx}
                 cy={cy}
                 r={rInner + 4}
                 fill="none"
-                stroke="url(#pr-metal)"
+                stroke={`url(#${svgId}-metal)`}
                 strokeWidth="3"
               />
               <circle
@@ -479,30 +484,60 @@ export function ParamRoulette({
         </div>
       </div>
 
-      <div
-        className={[
-          "param-roulette__result",
-          spinning ? "param-roulette__result--spin" : "",
-          !spinning && landedLabel ? "param-roulette__result--land" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        aria-live="polite"
-      >
-        {spinning ? (
-          <span className="param-roulette__result-spin">
-            <span className="param-roulette__dots" aria-hidden>
-              <i />
-              <i />
-              <i />
+      <div className="param-roulette__foot">
+        <div
+          className={[
+            "param-roulette__result",
+            spinning ? "param-roulette__result--spin" : "",
+            !spinning && landedLabel ? "param-roulette__result--land" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          aria-live="polite"
+        >
+          {spinning ? (
+            <span className="param-roulette__result-spin">
+              <span className="param-roulette__dots" aria-hidden>
+                <i />
+                <i />
+                <i />
+              </span>
+              Крутит…
             </span>
-            Крутит…
-          </span>
-        ) : landedLabel ? (
-          <>
-            Выпало: <strong>{landedLabel}</strong>
-          </>
-        ) : null}
+          ) : landedLabel ? (
+            <>
+              Выпало: <strong>{landedLabel}</strong>
+            </>
+          ) : (
+            <span className="param-roulette__result-spin">&nbsp;</span>
+          )}
+        </div>
+
+        {slices.length > 1 ? (
+          <ul className="param-roulette__legend" aria-label="Варианты на колесе">
+            {slices.map((s) => {
+              const hit = !spinning && targetId === s.id;
+              return (
+                <li
+                  key={s.id}
+                  className={
+                    hit
+                      ? "param-roulette__legend-item is-hit"
+                      : "param-roulette__legend-item"
+                  }
+                >
+                  <i
+                    aria-hidden
+                    style={{ background: s.color ?? "#666" }}
+                  />
+                  {s.labelRu}
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="param-roulette__legend" aria-hidden />
+        )}
       </div>
     </div>
   );

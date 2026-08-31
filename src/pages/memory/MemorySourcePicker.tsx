@@ -51,7 +51,7 @@ export function MemorySourcePicker({
   const [files, setFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
 
-  /** id → "loading" marker, prevents duplicate concurrent fetches. */
+  /** id → "loading" marker or its live URL; tracks URLs for unmount revoke. */
   const urlCacheRef = useRef<Map<string, string>>(new Map());
   /** Bumped on every pool change so stale fetches can self-cancel. */
   const genRef = useRef(0);
@@ -109,6 +109,7 @@ export function MemorySourcePicker({
       return;
     }
     const url = URL.createObjectURL(rec.blob);
+    urlCacheRef.current.set(id, url);
     setPreviewUrls((prev) => ({ ...prev, [id]: url }));
   }, []);
 
@@ -134,10 +135,11 @@ export function MemorySourcePicker({
     };
   }, [previewMeta, loadPreviewCell]);
 
-  // revoke whatever is left on unmount
+  // revoke whatever is left on unmount; the gen bump cancels in-flight cells
   useEffect(
     () => () => {
-      for (const u of Object.values(urlCacheRef.current)) {
+      genRef.current += 1;
+      for (const u of urlCacheRef.current.values()) {
         if (u !== "loading") URL.revokeObjectURL(u);
       }
     },

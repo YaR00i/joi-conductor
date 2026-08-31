@@ -128,6 +128,38 @@ describe("ensureDailyContractBoard day rollover", () => {
     );
   });
 
+  it("refreshes open contract titles from the catalog", () => {
+    const now = atLocal(2026, 7, 22, 12);
+    const dayKey = contractsTodayKey(now);
+    localStorage.setItem("joi-contracts-mig-media-drill-1", "1");
+    const board: DailyContractBoard = {
+      dayKey,
+      mistressId: "hu_tao",
+      contracts: [
+        {
+          instanceId: `${dayKey}-stale-1`,
+          defId: "media_faproulette_deny",
+          dayKey,
+          mistressId: "hu_tao",
+          category: "media",
+          titleRu: "Fap Roulette · deny",
+          bodyRu: "old",
+          reward: 16,
+          deadlineMs: endOfLocalDayMs(dayKey),
+          status: "open",
+          params: { minutes: 20, n: 8 },
+          difficulty: 3,
+        } satisfies ContractInstance,
+      ],
+    };
+    saveContractBoard(board);
+    const next = ensureDailyContractBoard(now);
+    const row = next.contracts.find((c) => c.instanceId === `${dayKey}-stale-1`);
+    expect(row?.titleRu).toBe("Отказ с экрана");
+    expect(row?.bodyRu).toContain("Контент");
+    expect(row?.bodyRu).not.toContain("faproulette");
+  });
+
   it("re-rolls when the calendar day changes", () => {
     const day1 = ensureDailyContractBoard(atLocal(2026, 7, 22));
     const day2 = ensureDailyContractBoard(atLocal(2026, 7, 23));

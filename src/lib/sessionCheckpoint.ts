@@ -79,6 +79,7 @@ export function sanitizeStateForCheckpoint(state: SessionState): SessionState {
     status: "paused",
     beatOriginPerf: null,
     beatUntilAtMs: null,
+    blockEnteredAtPerf: null,
     confirmRequestAtPerf: null,
     holdGraceUntilPerf: null,
     timerTease: null,

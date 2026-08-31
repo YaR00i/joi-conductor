@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   masonryPreviewSrc,
   masonryStillUrl,
-  masonryUpgradeSrc,
+  masonryUpgradeCandidates,
   type MediaItem,
 } from "../lib/media";
 
@@ -49,7 +49,8 @@ function ProgressiveStill({ item }: Props) {
   const [hiFailed, setHiFailed] = useState(false);
   const [hiSrc, setHiSrc] = useState<string | null>(null);
   const lo = masonryPreviewSrc(item);
-  const upgrade = masonryUpgradeSrc(item);
+  const candidates = masonryUpgradeCandidates(item);
+  const upgrade = candidates[0] ?? null;
 
   useEffect(() => {
     setLoReady(false);
@@ -133,13 +134,21 @@ function ProgressiveStill({ item }: Props) {
             });
           }}
           onError={() => {
-            if (retriesRef.current < 1 && upgrade) {
+            if (retriesRef.current < 1 && hiSrc) {
               retriesRef.current += 1;
+              const retry = hiSrc;
               setHiReady(false);
               setHiSrc(null);
               retryTimerRef.current = window.setTimeout(() => {
-                setHiSrc(upgrade);
+                setHiSrc(retry);
               }, 450);
+              return;
+            }
+            const next = candidates[candidates.indexOf(hiSrc ?? "") + 1];
+            if (next) {
+              retriesRef.current = 0;
+              setHiReady(false);
+              setHiSrc(next);
               return;
             }
             setHiFailed(true);

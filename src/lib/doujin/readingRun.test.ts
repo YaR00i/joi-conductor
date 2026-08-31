@@ -11,6 +11,7 @@ import {
   readingFinaleOdds,
   readingRunCanResume,
   readingRunElapsedSec,
+  readingRunHudVisible,
   readingRunHasProgress,
   reportCum,
   reportEdge,
@@ -226,6 +227,16 @@ describe("readingRunCanResume", () => {
   });
 });
 
+describe("readingRunHudVisible", () => {
+  it("hides a saved paused run on other videos", () => {
+    const saved = run({ status: "paused" });
+    expect(readingRunHudVisible(saved, true, "l1")).toBe(true);
+    expect(readingRunHudVisible(saved, false, "l1")).toBe(false);
+    expect(readingRunHudVisible(saved, true, undefined)).toBe(false);
+    expect(readingRunHudVisible(saved, true, "other")).toBe(false);
+  });
+});
+
 describe("gelbooru playlist volume", () => {
   it("treats the queue as one gallery and spawns on a middle post", () => {
     const { state } = noteReadingPage(
@@ -268,6 +279,26 @@ describe("gelbooru playlist volume", () => {
     });
     expect(topped.state.listTotal).toBe(20);
     expect(queueProgress(topped.state)).toBe(0.55);
+  });
+
+  it("does not spawn page tasks on a joidb run", () => {
+    const { state } = noteReadingPage(
+      run({
+        source: "joidb",
+        nextTaskGap: 0,
+        contentSinceTask: 8,
+        mode: "mistress",
+        origin: "mistress",
+      }),
+      {
+        galleryId: "list-1",
+        title: "T",
+        pageIndex: 5,
+        pageCount: 20,
+        rng: () => 0,
+      },
+    );
+    expect(state.activeTask).toBeNull();
   });
 });
 

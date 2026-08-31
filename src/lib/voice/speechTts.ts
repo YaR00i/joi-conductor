@@ -432,7 +432,11 @@ export class SpeechTts {
       await audio.play();
       if (gen !== this.generation) return;
       await new Promise<void>((resolve) => {
+        let poll = 0;
         const done = () => {
+          // Both the "ended" and "error" paths must stop the poll, otherwise
+          // the interval ticks for the rest of the app's lifetime.
+          window.clearInterval(poll);
           audio.removeEventListener("ended", done);
           audio.removeEventListener("error", done);
           resolve();
@@ -440,17 +444,9 @@ export class SpeechTts {
         audio.addEventListener("ended", done);
         audio.addEventListener("error", done);
         // If stop() bumped generation, bail soon.
-        const poll = window.setInterval(() => {
-          if (gen !== this.generation) {
-            window.clearInterval(poll);
-            done();
-          }
+        poll = window.setInterval(() => {
+          if (gen !== this.generation) done();
         }, 120);
-        audio.addEventListener(
-          "ended",
-          () => window.clearInterval(poll),
-          { once: true },
-        );
       });
     } catch (err) {
       this.lastError =

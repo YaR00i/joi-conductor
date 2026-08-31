@@ -1,3 +1,15 @@
+import {
+  DEFAULT_BOORU_RATING,
+  isBooruRatingId,
+  type BooruRatingId,
+} from "./booruRating";
+import {
+  booruDapiProxyPath,
+  booruMediaId,
+  booruSite,
+  isBooruSiteId,
+  type BooruSiteId,
+} from "./booruSites";
 import { snapMediaQueueSize } from "./mediaQueue";
 import {
   loadGelbooruNativeMap,
@@ -32,8 +44,10 @@ export interface MediaItem {
   source: MediaSourceKind;
   /** Space-separated booru tags (prefer post tags, not the search query). */
   tags?: string;
-  /** Stable Gelbooru post id when known */
+  /** Stable Gelbooru / booru post id when known */
   gelbooruId?: string;
+  /** Which imageboard this post came from. Missing = gelbooru (legacy). */
+  booruSite?: BooruSiteId;
   /** Per-tag confidence scores when produced by an auto-tagger. */
   tagScores?: MediaTagScore[];
   /** Origin of `tags` — controls re-tagging and UI hints. */
@@ -68,6 +82,10 @@ export interface MediaSettings {
   mediaTypeId: "photo" | "gifs" | "video" | "photo_gifs" | "all" | "list";
   /** Saved Gelbooru play-list when mediaTypeId is `list`. */
   listId: string | null;
+  /** Which imageboard remote pulls use (`source: gelbooru`). */
+  booruSite: BooruSiteId;
+  /** Heat for compose / fetch. Fetish `rating:` does not override. */
+  rating: BooruRatingId;
 }
 
 export const DEFAULT_MEDIA_SETTINGS: MediaSettings = {
@@ -84,6 +102,8 @@ export const DEFAULT_MEDIA_SETTINGS: MediaSettings = {
   wd14Threshold: 0.35,
   mediaTypeId: "all",
   listId: null,
+  booruSite: "gelbooru",
+  rating: DEFAULT_BOORU_RATING,
 };
 
 const SETTINGS_KEY = "joi-conductor-media-settings";
@@ -140,6 +160,12 @@ export function loadMediaSettings(): MediaSettings {
     parsed.limit = snapMediaQueueSize(
       typeof parsed.limit === "number" ? parsed.limit : DEFAULT_MEDIA_SETTINGS.limit,
     );
+    parsed.booruSite = isBooruSiteId(parsed.booruSite)
+      ? parsed.booruSite
+      : DEFAULT_MEDIA_SETTINGS.booruSite;
+    parsed.rating = isBooruRatingId(parsed.rating)
+      ? parsed.rating
+      : DEFAULT_MEDIA_SETTINGS.rating;
     return parsed;
   } catch {
     return { ...DEFAULT_MEDIA_SETTINGS };
@@ -147,7 +173,11 @@ export function loadMediaSettings(): MediaSettings {
 }
 
 export function saveMediaSettings(settings: MediaSettings): void {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    /* ignore quota */
+  }
 }
 
 /** Persist Gelbooru playlist (stable URLs). Local blob URLs are skipped. */
@@ -163,8 +193,13 @@ export function saveMediaPlaylist(items: MediaItem[]): void {
       source: "gelbooru" as const,
       tags: item.tags,
       gelbooruId: item.gelbooruId,
+      booruSite: item.booruSite,
     }));
-  localStorage.setItem(PLAYLIST_KEY, JSON.stringify(persistable));
+  try {
+    localStorage.setItem(PLAYLIST_KEY, JSON.stringify(persistable));
+  } catch {
+    /* ignore quota */
+  }
 }
 
 export function loadMediaPlaylist(): MediaItem[] {
@@ -298,19 +333,22 @@ function isGelbooruNetworkFailure(err: unknown): boolean {
   );
 }
 
-function gelbooruUnavailableMessage(lastErr: unknown): string {
+function gelbooruUnavailableMessage(lastErr: unknown, label = "Gelbooru"): string {
   const detail =
     lastErr instanceof Error && lastErr.message
       ? ` (${lastErr.message.slice(0, 120)})`
       : "";
-  return `Gelbooru недоступен после ${GELBOORU_FETCH_ATTEMPTS} попыток${detail}. Включи VPN и повтори.`;
+  return `${label} недоступен после ${GELBOORU_FETCH_ATTEMPTS} попыток${detail}. Включи VPN и повтори.`;
 }
 
 /**
  * fetch via Vite proxy with timeout + retries (VPN / flaky route).
  * Does not retry hard auth failures (401).
  */
-async function fetchGelbooruResilient(url: string): Promise<Response> {
+async function fetchGelbooruResilient(
+  url: string,
+  label = "Gelbooru",
+): Promise<Response> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < GELBOORU_FETCH_ATTEMPTS; attempt++) {
     if (attempt > 0) await awaitGelbooruSlot();
@@ -340,7 +378,7 @@ async function fetchGelbooruResilient(url: string): Promise<Response> {
       );
     }
   }
-  throw new Error(gelbooruUnavailableMessage(lastErr));
+  throw new Error(gelbooruUnavailableMessage(lastErr, label));
 }
 
 /** Wait so we never exceed 10 req / 1s (sliding window). */
@@ -591,17 +629,20 @@ async function hydrateGelbooruNativeTypesNow(
   return rememberGelbooruNativeTypes(hits);
 }
 
-/** Fetch posts via Vite proxy. Requires api_key + user_id on every query. */
+/** Fetch posts via Vite proxy. Gelbooru requires api_key + user_id; family dapi sites do not. */
 export async function fetchGelbooru(
   tags: string,
   limit = 40,
   credentials?: { userId: string; apiKey: string },
-  opts?: { pid?: number },
+  opts?: { pid?: number; site?: BooruSiteId },
 ): Promise<MediaItem[]> {
+  const site = opts?.site ?? "gelbooru";
+  const def = booruSite(site);
+  const label = def.label;
   const userId = credentials?.userId?.trim() ?? "";
   const apiKey = credentials?.apiKey?.trim() ?? "";
 
-  if (!userId || !apiKey) {
+  if (def.needsKey && (!userId || !apiKey)) {
     throw new Error(
       "Нужны Gelbooru user_id и api_key (Account → Options → API Access Credentials)",
     );
@@ -617,32 +658,35 @@ export async function fetchGelbooru(
     q: "index",
     json: "1",
     limit: String(Math.min(100, Math.max(1, limit))),
-    tags: tags.trim() || "rating:explicit",
-    user_id: userId,
-    api_key: apiKey,
+    tags: tags.trim() || (site === "gelbooru" ? "rating:explicit" : def.defaultTags),
   });
+  if (def.needsKey) {
+    params.set("user_id", userId);
+    params.set("api_key", apiKey);
+  }
   const pid = opts?.pid;
   if (pid != null && pid > 0) {
     params.set("pid", String(Math.floor(pid)));
   }
 
   const res = await fetchGelbooruResilient(
-    `/api/gelbooru?${params.toString()}`,
+    `${booruDapiProxyPath(site)}?${params.toString()}`,
+    label,
   );
   if (res.status === 401) {
     throw new Error(
-      "Gelbooru 401 — проверь user_id и api_key (оба обязательны в каждом запросе)",
+      `${label} 401 — проверь user_id и api_key (оба обязательны в каждом запросе)`,
     );
   }
   if (res.status === 429) {
     throw new Error(
-      "Gelbooru 429 — лимит 10 запросов/сек. Подожди секунду и повтори.",
+      `${label} 429 — лимит 10 запросов/сек. Подожди секунду и повтори.`,
     );
   }
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(
-      `Gelbooru HTTP ${res.status}${body ? `: ${body.slice(0, 160)}` : ""}`,
+      `${label} HTTP ${res.status}${body ? `: ${body.slice(0, 160)}` : ""}`,
     );
   }
 
@@ -658,7 +702,9 @@ export async function fetchGelbooru(
       p.id != null && String(p.id).trim() !== "" ? String(p.id) : undefined;
     const postTags = (p.tags && p.tags.trim()) || tags;
     items.push({
-      id: gelbooruId ? `gb-${gelbooruId}` : `gb-url-${simpleHash(url)}`,
+      id: gelbooruId
+        ? booruMediaId(site, gelbooruId)
+        : `${def.idPrefix}-url-${simpleHash(url)}`,
       url,
       previewUrl: p.preview_url || p.sample_url || url,
       sampleUrl: p.sample_url || undefined,
@@ -667,6 +713,7 @@ export async function fetchGelbooru(
       // Prefer post tags from API (booru-style); fall back to search query
       tags: postTags,
       gelbooruId,
+      booruSite: site,
     });
   }
   return items;
@@ -1215,17 +1262,36 @@ export function masonryPreviewSrc(item: MediaItem): string {
   });
 }
 
+function masonryStillCandidate(item: MediaItem, raw: string | undefined): string | null {
+  const hi = raw?.trim();
+  if (!hi || mediaUrlLooksLikeVideo(hi)) return null;
+  const lo = (item.previewUrl || hi).trim();
+  if (hi === lo) return null;
+  return displayMediaUrl({ ...item, kind: "image", url: hi });
+}
+
+/**
+ * Sharper wall sources: sample first, then a still original if the sample 404s.
+ * Never includes webm/mp4. Empty when preview is already best.
+ */
+export function masonryUpgradeCandidates(item: MediaItem): string[] {
+  if (!isRemoteBooruCard(item)) return [];
+  const out: string[] = [];
+  const sample = masonryStillCandidate(item, item.sampleUrl);
+  if (sample) out.push(sample);
+  if (item.kind !== "video" && sample) {
+    const orig = masonryStillCandidate(item, item.url);
+    if (orig && !out.includes(orig)) out.push(orig);
+  }
+  return out;
+}
+
 /**
  * Sharper wall source (Gelbooru sample). Null when preview is already best
  * or when upgrading would pull a video original.
  */
 export function masonryUpgradeSrc(item: MediaItem): string | null {
-  if (!isRemoteBooruCard(item)) return null;
-  const hi = item.sampleUrl?.trim();
-  if (!hi || mediaUrlLooksLikeVideo(hi)) return null;
-  const lo = (item.previewUrl || hi).trim();
-  if (hi === lo) return null;
-  return displayMediaUrl({ ...item, kind: "image", url: hi });
+  return masonryUpgradeCandidates(item)[0] ?? null;
 }
 
 /** How long to keep a slide on screen / whether video should HTML-loop. */

@@ -1,5 +1,6 @@
 /** Cinders (Угольки) wallet + shop unlocks. */
 
+import { reportPersistFailure } from "./persistFailure";
 import {
   findFetishById,
   fetishTierCost,
@@ -604,7 +605,7 @@ export function saveWallet(state: WalletState): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    // ignore quota
+    reportPersistFailure("кошелёк (искры и разблокировки)");
   }
 }
 

@@ -158,6 +158,50 @@ describe("findMatchingFavorite", () => {
     });
     expect(findMatchingFavorite(feed, [saved])?.id).toBe("gb-42");
   });
+
+  it("does not treat the same numeric id on another booru as a match", () => {
+    const saved = rec({ id: "gb-42", gelbooruId: "42" });
+    const feed = item({
+      id: "blacked-42",
+      url: "https://img.booru.org/blacked//images/1/x.png",
+      gelbooruId: "42",
+      booruSite: "blacked",
+    });
+    expect(findMatchingFavorite(feed, [saved])).toBeNull();
+    expect(
+      findMatchingFavorite(
+        item({
+          id: "xb-42",
+          url: "https://img.xbooru.com/images/1/x.jpg",
+          gelbooruId: "42",
+          booruSite: "xbooru",
+        }),
+        [saved],
+      ),
+    ).toBeNull();
+    expect(
+      findMatchingFavorite(
+        item({
+          id: "hh-42",
+          url: "https://hypnohub.net/images/1/x.jpg",
+          gelbooruId: "42",
+          booruSite: "hypnohub",
+        }),
+        [saved, rec({ id: "xb-42", gelbooruId: "42" })],
+      ),
+    ).toBeNull();
+    expect(
+      findMatchingFavorite(
+        item({
+          id: "rb-42",
+          url: "https://realbooru.com/images/1/x.jpg",
+          gelbooruId: "42",
+          booruSite: "realbooru",
+        }),
+        [saved],
+      ),
+    ).toBeNull();
+  });
 });
 
 describe("favoriteRecordToListItem", () => {

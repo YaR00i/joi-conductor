@@ -2,12 +2,12 @@
   "id": "hu_tao_clear_demo",
   "nameRu": "После двора",
   "startStepId": "cg",
-  "defaultBgArtId": "49bd31e4-b1e2-495d-b57d-eb01994be362",
+  "defaultBgArtId": "hu_tao_clear_placeholder",
   "steps": [
     {
       "id": "cg",
       "type": "splash",
-      "artId": "49bd31e4-b1e2-495d-b57d-eb01994be362",
+      "artId": "20260114174616_1",
       "captionRu": "Защита измерения дрогнула…",
       "next": "intro"
     },
@@ -18,7 +18,6 @@
       "portraitKey": "bunny_tease",
       "portraitSide": "right",
       "nameRu": "Ху Тао",
-      "bgArtId": "49bd31e4-b1e2-495d-b57d-eb01994be362",
       "textRu": "Ого, живой? А я уже почти заказывала тебе гроб со скидкой директора~",
       "actors": [
         {
@@ -39,7 +38,6 @@
       "id": "choice",
       "type": "choice",
       "promptRu": "Что ответишь?",
-      "bgArtId": "49bd31e4-b1e2-495d-b57d-eb01994be362",
       "actors": [
         {
           "id": "main",
@@ -71,7 +69,6 @@
       "portraitKey": "bunny_smirk",
       "portraitSide": "right",
       "nameRu": "Ху Тао",
-      "bgArtId": "49bd31e4-b1e2-495d-b57d-eb01994be362",
       "textRu": "Хе-хе. Тогда ломай мои порталы дальше — мне любопытно, когда ты сдашься.",
       "actors": [
         {
@@ -96,7 +93,6 @@
       "portraitKey": "bunny_shy",
       "portraitSide": "right",
       "nameRu": "Ху Тао",
-      "bgArtId": "49bd31e4-b1e2-495d-b57d-eb01994be362",
       "textRu": "Пачкала? Это же атмосфера заведения! …Ладно, чуть-чуть специально.",
       "actors": [
         {
@@ -135,20 +131,20 @@
       "y": -80.0
     },
     "choice": {
-      "x": 820.0,
-      "y": -20.0
+      "x": 780.0,
+      "y": 380.0
     },
     "brave_reply": {
       "x": 1240.0,
-      "y": -20.0
+      "y": -60.0
     },
     "fluster_reply": {
       "x": 1240.0,
       "y": 360.0
     },
     "reward": {
-      "x": 1640.0,
-      "y": 120.0
+      "x": 1820.0,
+      "y": 220.0
     },
     "end": {
       "x": 2060.0,
