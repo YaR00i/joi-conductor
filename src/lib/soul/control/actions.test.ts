@@ -10,6 +10,7 @@ import { setActiveMistress } from "../../mistress/activeMistress";
 import { applyControlActions, splitControlReply, looksLikeControlIntent, filterControlActions } from "./actions";
 import { applyProposalToParams } from "./catalog";
 import { loadControlState } from "./store";
+import { loadMediaCensorLive } from "../../mediaCensor";
 
 installLocalStorageMock();
 
@@ -138,6 +139,7 @@ describe("mistress control actions", () => {
       true,
     );
     expect(looksLikeControlIntent("ок", "Клетка на три часа. Не ной.")).toBe(true);
+    expect(looksLikeControlIntent("включи цензор", "Как скажешь.")).toBe(true);
     expect(looksLikeControlIntent("привет", "Сессия будет.")).toBe(true);
   });
 
@@ -170,5 +172,20 @@ describe("mistress control actions", () => {
         "Тогда клетка.",
       ),
     ).toEqual([]);
+  });
+
+  it("locks session media censor from a control action", () => {
+    const applied = applyControlActions("hu_tao", [
+      { op: "set_censor", style: "mosaic", coverage: "bands", strength: 4 },
+    ]);
+    expect(applied.state).toBeTruthy();
+    const live = loadMediaCensorLive();
+    expect(live.lock.locked).toBe(true);
+    expect(live.active).toBe(true);
+    expect(live.settings.style).toBe("mosaic");
+    expect(live.settings.strength).toBe(4);
+
+    applyControlActions("hu_tao", [{ op: "clear_censor" }]);
+    expect(loadMediaCensorLive().active).toBe(false);
   });
 });

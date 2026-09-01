@@ -1,4 +1,5 @@
 import { UiCheck } from "../UiCheck";
+import { MediaCensorSessionCheck } from "../MediaCensorToggle";
 import {
   playUiClick,
   playUiDeny,
@@ -124,6 +125,7 @@ export function SessionToolbar({
         >
           автоплей контента
         </UiCheck>
+        <MediaCensorSessionCheck />
       </div>
 
       <div className="session__toolbar-group session__toolbar-group--audio">

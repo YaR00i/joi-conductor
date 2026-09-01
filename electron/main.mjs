@@ -1,4 +1,13 @@
-import { app, BrowserWindow, ipcMain, screen, session, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  net,
+  protocol,
+  screen,
+  session,
+  shell,
+} from "electron";
 import {
   appendFileSync,
   copyFileSync,
@@ -14,7 +23,7 @@ import {
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   getOllamaStatus,
   listOllamaModels,
@@ -60,6 +69,17 @@ import {
 } from "./wd14Process.mjs";
 import { tagImageViaServer } from "./wd14Client.mjs";
 import {
+  CENSOR_DETECT_ORT_FILES,
+  censorDetectOrtDir,
+  getCensorDetectStatus,
+  installCensorDetect,
+  readCensorDetectAnimeModel,
+  readCensorDetectBooruModel,
+  readCensorDetectHandModel,
+  readCensorDetectModel,
+  readCensorDetectPpModel,
+} from "./censorDetectInstall.mjs";
+import {
   getSovitsProcessStatus,
   startSovitsProcess,
   stopSovitsOnQuit,
@@ -98,6 +118,19 @@ const root = path.resolve(__dirname, "..");
 const port = Number(process.env.PORT || 5173);
 const startUrl =
   process.env.JOI_CONDUCTOR_URL || `http://127.0.0.1:${port}`;
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "joi-censor",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+]);
 
 // One window owns the pack and the dev server; a second launch focuses the
 // existing window instead of racing it for content/ember writes.
@@ -271,6 +304,18 @@ function configureSessionPermissions() {
     callback(allow(permission));
   });
   ses.setPermissionCheckHandler((_wc, permission) => allow(permission));
+
+  protocol.handle("joi-censor", (request) => {
+    const name = path.basename(new URL(request.url).pathname);
+    if (!CENSOR_DETECT_ORT_FILES.includes(name)) {
+      return new Response("not found", { status: 404 });
+    }
+    const file = path.join(censorDetectOrtDir(), name);
+    if (!existsSync(file)) {
+      return new Response("missing", { status: 404 });
+    }
+    return net.fetch(pathToFileURL(file).href);
+  });
 }
 
 const MEDIA_CDN_UA =
@@ -879,6 +924,32 @@ ipcMain.handle("media:wd14-tag", async (_e, payload) => {
     maxTags: payload.maxTags,
   });
 });
+
+handleIpc("media:censor-detect-status", async () => getCensorDetectStatus());
+
+handleIpc("media:censor-detect-install", async (event) => {
+  return installCensorDetect((p) => {
+    event.sender.send("media:censor-detect-progress", p);
+  });
+});
+
+handleIpc("media:censor-detect-model", async () => readCensorDetectModel());
+
+handleIpc("media:censor-detect-anime-model", async () =>
+  readCensorDetectAnimeModel(),
+);
+
+handleIpc("media:censor-detect-booru-model", async () =>
+  readCensorDetectBooruModel(),
+);
+
+handleIpc("media:censor-detect-hand-model", async () =>
+  readCensorDetectHandModel(),
+);
+
+handleIpc("media:censor-detect-pp-model", async () =>
+  readCensorDetectPpModel(),
+);
 
 /** Monotonic id so overlapping tts:speak calls don't stack host playback. */
 let ttsSpeakEpoch = 0;

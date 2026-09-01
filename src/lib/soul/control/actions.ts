@@ -17,6 +17,14 @@ import {
   bindWearLockToContract,
 } from "../../contracts/liveObligation";
 import { clearDenialQuest, setDenialQuest } from "../../denialQuest";
+import {
+  applyMistressCensor,
+  clearMistressCensor,
+  isMediaCensorCoverage,
+  isMediaCensorStyle,
+  type MediaCensorCoverage,
+  type MediaCensorStyle,
+} from "../../mediaCensor";
 import { loadControlState, notifyControlChanged, saveControlState } from "./store";
 import type {
   AppliedControlResult,
@@ -39,6 +47,8 @@ const CONTROL_OPS = [
   "note_trigger",
   "propose_session",
   "patch_queue",
+  "set_censor",
+  "clear_censor",
 ] as const;
 
 type ControlOp = (typeof CONTROL_OPS)[number];
@@ -116,10 +126,10 @@ const SESSION_INVITE =
   /сесси[яию]|сессия будет|начинаем|запускай|запусти\b|давай\s+(играть|эдж|hump|сесс)|хочу\s+(сесс|эдж)|her session|вот твоя сесс|заходи\b.{0,16}сесс/i;
 
 const USER_ASKS_ORDER =
-  /надень|сними|запир|запрети|клетк\w{0,8}\s+на|пробк\w{0,8}\s+на|давай\s+(сесс|эдж|hump|играть)|хочу\s+(сесс|эдж)|запусти|check-?in|поставь\s+(клет|проб|таймер)|руки прочь|отчёт по|отчет по/i;
+  /надень|сними|запир|запрети|клетк\w{0,8}\s+на|пробк\w{0,8}\s+на|давай\s+(сесс|эдж|hump|играть)|хочу\s+(сесс|эдж)|запусти|check-?in|поставь\s+(клет|проб|таймер)|руки прочь|отчёт по|отчет по|цензор|закрой.{0,12}(кадр|картин|медиа)|мозаик/i;
 
 const SPEECH_ISSUES_ORDER =
-  /(надень|запир|ставь клет|ставь проб|держи клет|запрещаю|руки прочь|не снимай|не вынимай)|((клетк|пробк)\w{0,8}\s+на\s+(?:\d+|полтора|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять))|(на\s+(?:\d+|два|три|четыре|пять)\s*(час|мин))|(пиши.{0,16}через\s+\d)|(сесси[яию].{0,40}(минут|час|начина|запуск))/i;
+  /(надень|запир|ставь клет|ставь проб|держи клет|запрещаю|руки прочь|не снимай|не вынимай|цензор|мозаик|закрываю.{0,16}(кадр|картин|медиа))|((клетк|пробк)\w{0,8}\s+на\s+(?:\d+|полтора|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять))|(на\s+(?:\d+|два|три|четыре|пять)\s*(час|мин))|(пиши.{0,16}через\s+\d)|(сесси[яию].{0,40}(минут|час|начина|запуск))/i;
 
 export function looksLikeSessionInvite(text: string): boolean {
   return SESSION_INVITE.test(text.trim());
@@ -157,6 +167,21 @@ export function filterControlActions(
     }
     return true;
   });
+}
+
+function readCensorStyle(v: unknown): MediaCensorStyle | undefined {
+  if (isMediaCensorStyle(v)) return v;
+  if (v === "pixel" || v === "pixelated" || v === "pixels") return "mosaic";
+  if (v === "bar" || v === "black" || v === "box") return "bars";
+  if (v === "text" || v === "label" || v === "censored") return "sticker";
+  return undefined;
+}
+
+function readCensorCoverage(v: unknown): MediaCensorCoverage | undefined {
+  if (isMediaCensorCoverage(v)) return v;
+  if (v === "all" || v === "frame" || v === "whole") return "full";
+  if (v === "parts" || v === "zones" || v === "body") return "bands";
+  return undefined;
 }
 
 export function parseControlAction(raw: unknown): ControlAction | null {
@@ -242,6 +267,24 @@ export function parseControlAction(raw: unknown): ControlAction | null {
     }
     case "patch_queue":
       return isQueuePatchEdit(rec.edit) ? { op, edit: rec.edit } : null;
+    case "set_censor": {
+      const style = readCensorStyle(rec.style ?? rec.kind);
+      const coverage = readCensorCoverage(rec.coverage);
+      const strengthRaw = rec.strength ?? rec.level;
+      const strength =
+        typeof strengthRaw === "number" ||
+        (typeof strengthRaw === "string" && /^-?\d+$/.test(strengthRaw.trim()))
+          ? asInt(strengthRaw, 3, 1, 5)
+          : undefined;
+      return {
+        op,
+        ...(style ? { style } : {}),
+        ...(coverage ? { coverage } : {}),
+        ...(strength != null ? { strength } : {}),
+      };
+    }
+    case "clear_censor":
+      return { op };
     default: {
       const _exhaustive: never = op;
       return _exhaustive;
@@ -414,6 +457,16 @@ function applyOne(
     }
     case "patch_queue":
       queueEdits.push(action.edit === "pause" ? "insert_rest" : action.edit);
+      return state;
+    case "set_censor":
+      applyMistressCensor({
+        style: action.style,
+        coverage: action.coverage,
+        strength: action.strength,
+      });
+      return state;
+    case "clear_censor":
+      clearMistressCensor();
       return state;
     default: {
       const _exhaustive: never = action;

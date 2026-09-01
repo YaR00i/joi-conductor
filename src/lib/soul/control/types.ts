@@ -178,7 +178,14 @@ export type ControlAction =
       finalePolicy: FinalePolicy;
       noteRu: string;
     }
-  | { op: "patch_queue"; edit: QueuePatchEdit };
+  | { op: "patch_queue"; edit: QueuePatchEdit }
+  | {
+      op: "set_censor";
+      style?: "mosaic" | "blur" | "bars" | "sticker";
+      coverage?: "bands" | "full";
+      strength?: number;
+    }
+  | { op: "clear_censor" };
 
 export type AppliedControlResult = {
   state: ControlState;

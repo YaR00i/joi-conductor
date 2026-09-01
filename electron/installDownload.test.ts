@@ -29,6 +29,24 @@ beforeAll(async () => {
       res.end();
       return;
     }
+    if (req.url === "/redirect-trickle") {
+      res.writeHead(302, { location: `${baseUrl}/trickle` });
+      res.end();
+      return;
+    }
+    if (req.url === "/trickle") {
+      res.writeHead(200, { "content-length": 8 });
+      let n = 0;
+      const t = setInterval(() => {
+        res.write("x");
+        n += 1;
+        if (n >= 8) {
+          clearInterval(t);
+          res.end();
+        }
+      }, 80);
+      return;
+    }
     res.writeHead(404);
     res.end("nope");
   });
@@ -67,6 +85,12 @@ describe("downloadFile", () => {
     await expect(
       downloadFile(`${baseUrl}/missing`, dest, undefined, 5000),
     ).rejects.toThrow(/HTTP 404/);
+  });
+
+  it("does not abort a slow CDN hop because the 302 socket went idle", async () => {
+    const dest = path.join(tmpDir, "trickle.bin");
+    await downloadFile(`${baseUrl}/redirect-trickle`, dest, undefined, 200);
+    expect(readFileSync(dest, "utf8")).toBe("xxxxxxxx");
   });
 
   it("rejects when the connection stalls instead of hanging forever", async () => {

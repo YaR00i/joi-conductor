@@ -89,6 +89,7 @@ import {
   type MediaItem,
   type MediaSettings,
 } from "./lib/media";
+import { clearMediaCensorLock } from "./lib/mediaCensor";
 import { booruNeedsKey, fetchBooruFlexible } from "./lib/booruFetch";
 import { applyBooruRatingToQuery, booruRatingUsesMediaMeta } from "./lib/booruRating";
 import {
@@ -2102,6 +2103,7 @@ export function App() {
       if (event.type === "session_end") {
         setPendingCheckpoint(null);
         setPunishNotice(null);
+        clearMediaCensorLock();
       }
     });
     return () => {
@@ -3477,6 +3479,7 @@ export function App() {
     setPreflight(null);
     pendingStartRef.current = null;
     clearSessionSkipWagers();
+    clearMediaCensorLock();
     setSessionMediaOverlay(null);
     setSessionPlaylist(null);
     setSessionActiveBuffs({ begBonus: 0, cumBoost: 0 });

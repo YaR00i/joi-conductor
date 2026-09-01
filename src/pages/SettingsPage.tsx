@@ -225,7 +225,7 @@ export function SettingsPage({
           { id: "brain", label: "ИИ ресурсы", hint: "LLM · TTS веса · что говорит" },
           { id: "voice", label: "Голос", hint: "озвучка · как звучит" },
           { id: "media", label: "Медиа", hint: "Gelbooru · nhentai" },
-          { id: "gameplay", label: "Геймплей", hint: "Рулетка, игрушка, CBT" },
+          { id: "gameplay", label: "Геймплей", hint: "Рулетка, CBT, цензор, эффекты" },
           { id: "debug", label: "Отладка", hint: "Очередь блоков" },
         ] satisfies SettingsTab[]}
       >
@@ -673,7 +673,7 @@ export function SettingsPage({
           id="gameplay"
           title="Геймплей"
           wide
-          sub="Рулетка, типы тегов, проверка CBT/plapping и игрушка."
+          sub="Рулетка, типы тегов, проверка CBT/plapping, цензор кадра, эффекты Искорки и игрушка."
         >
           <GameplayPanel
             settings={rouletteSettings}

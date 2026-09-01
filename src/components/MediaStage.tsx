@@ -7,6 +7,8 @@ import {
   type MediaKind,
 } from "../lib/media";
 import { startMediaPlaySrc } from "../lib/mediaPlaySrc";
+import { mediaCensorMotionFull, MEDIA_CENSOR_BLUR_IN_MS } from "../lib/mediaCensor";
+import { MediaCensorOverlay } from "./MediaCensorOverlay";
 import {
   getFilePreloadPhase,
   markMediaPlaybackError,
@@ -25,6 +27,41 @@ export type MediaLoadStatus = {
 
 /** After a user gesture (Ready / click), unmuted autoplay is allowed. */
 let mediaAudioUnlocked = false;
+
+type ShownSlide = {
+  id: string;
+  kind: MediaKind;
+  src: string;
+};
+
+function waitDecoded(kind: MediaKind, src: string): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    if (kind === "video") {
+      const video = document.createElement("video");
+      video.muted = true;
+      video.preload = "auto";
+      video.playsInline = true;
+      video.addEventListener("loadeddata", done, { once: true });
+      video.addEventListener("error", done, { once: true });
+      video.src = src;
+      return;
+    }
+    const image = new Image();
+    image.addEventListener("error", done, { once: true });
+    image.src = src;
+    if (typeof image.decode === "function") {
+      void image.decode().then(done, done);
+      return;
+    }
+    image.addEventListener("load", done, { once: true });
+  });
+}
 
 /** Call from a click handler (e.g. «Готов») so later slides can autoplay with sound. */
 export function unlockMediaStageAudio(): void {
@@ -96,14 +133,17 @@ export function MediaStage({
   );
   const initialIndexRef = useRef(initialIndex);
   initialIndexRef.current = initialIndex;
-  const [fade, setFade] = useState(true);
   const [failed, setFailed] = useState(false);
   const [videoLoop, setVideoLoop] = useState(true);
   const [playSrc, setPlaySrc] = useState("");
+  const [shown, setShown] = useState<ShownSlide | null>(null);
+  const [slideBlur, setSlideBlur] = useState(false);
+  const [viewportEl, setViewportEl] = useState<HTMLDivElement | null>(null);
   const [videoCue, setVideoCue] = useState<VideoCue>("none");
 
   const holdTimerRef = useRef(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const mediaElRef = useRef<HTMLImageElement | HTMLVideoElement | null>(null);
   const playSrcRef = useRef("");
   const pendingSeekRef = useRef<number | null>(null);
   const loadGenRef = useRef(0);
@@ -172,36 +212,33 @@ export function MediaStage({
     if (list.length === 0) return;
     if (delta !== 0) emitSlideLeave(reason);
     clearHoldTimer();
-    setFade(false);
-    window.setTimeout(() => {
-      if (delta > 0) {
-        setIndex((cur) => {
-          const at = Math.min(Math.max(0, cur), list.length - 1);
-          const next = at + delta;
-          if (next < list.length) return next;
-          // Cycle exhausted → new shuffle, don't start with the slide just shown
-          const avoidId = list[at]?.id ?? null;
-          const nextDeck = reshuffleMediaCycle(itemsRef.current, avoidId);
-          deckRef.current = nextDeck;
-          setDeck(nextDeck);
-          preloadEntirePlaylist(nextDeck);
-          const deckLength = nextDeck.length;
-          onDeckProgressRef.current?.({
-            index: 0,
-            deckLength,
-            unviewedRemaining: deckLength,
-            unviewedRatio: deckLength === 0 ? 0 : 1,
-            itemId: nextDeck[0]?.id ?? null,
-            cycled: true,
-          });
-          return 0;
+    if (playSrcRef.current) setSlideBlur(true);
+    if (delta > 0) {
+      setIndex((cur) => {
+        const at = Math.min(Math.max(0, cur), list.length - 1);
+        const next = at + delta;
+        if (next < list.length) return next;
+        // Cycle exhausted → new shuffle, don't start with the slide just shown
+        const avoidId = list[at]?.id ?? null;
+        const nextDeck = reshuffleMediaCycle(itemsRef.current, avoidId);
+        deckRef.current = nextDeck;
+        setDeck(nextDeck);
+        preloadEntirePlaylist(nextDeck);
+        const deckLength = nextDeck.length;
+        onDeckProgressRef.current?.({
+          index: 0,
+          deckLength,
+          unviewedRemaining: deckLength,
+          unviewedRatio: deckLength === 0 ? 0 : 1,
+          itemId: nextDeck[0]?.id ?? null,
+          cycled: true,
         });
-      } else {
-        setIndex((cur) => (cur + delta + list.length) % list.length);
-      }
-      slideShownAtRef.current = performance.now();
-      setFade(true);
-    }, 160);
+        return 0;
+      });
+    } else {
+      setIndex((cur) => (cur + delta + list.length) % list.length);
+    }
+    slideShownAtRef.current = performance.now();
   }
 
   const advanceRef = useRef(advance);
@@ -267,7 +304,6 @@ export function MediaStage({
 
   useEffect(() => {
     setFailed(false);
-    setFade(true);
     setVideoCue("none");
     userPausedRef.current = false;
     slideShownAtRef.current = performance.now();
@@ -395,6 +431,7 @@ export function MediaStage({
   useEffect(() => {
     if (!autoplay || !running || videoCue === "none") return;
     if (userPausedRef.current) return;
+    if (shown?.id !== current?.id) return;
 
     const gen = ++autoPressGenRef.current;
     const timers: number[] = [];
@@ -424,6 +461,7 @@ export function MediaStage({
   useEffect(() => {
     if (!autoplay || !running) return;
     if (current?.kind !== "video" || !playSrc) return;
+    if (shown?.id !== current.id) return;
     if (userPausedRef.current) return;
     const gen = ++autoPressGenRef.current;
     const timers = [40, 200, 500, 1200].map((ms) =>
@@ -442,14 +480,19 @@ export function MediaStage({
   // Load current (from cache if warm) + preload neighbors
   useEffect(() => {
     const gen = ++loadGenRef.current;
-    setPlaySrc("");
-    playSrcRef.current = "";
     pendingSeekRef.current = null;
 
     if (!current) {
+      setShown(null);
+      setPlaySrc("");
+      playSrcRef.current = "";
+      setSlideBlur(false);
       reportLoad({ kind: null, percent: null, phase: "idle" });
       return;
     }
+
+    if (playSrcRef.current) setSlideBlur(true);
+    const blurStartedAt = playSrcRef.current ? performance.now() : 0;
 
     reportLoad({
       kind: current.kind,
@@ -468,21 +511,47 @@ export function MediaStage({
       autoRetriedIdsRef.current.delete(current.id);
     }
 
+    let blurHoldTimer = 0;
     const stop = startMediaPlaySrc(current, {
       onSrc: (src) => {
         if (loadGenRef.current !== gen) return;
-        const video = videoRef.current;
-        if (
-          video &&
-          playSrcRef.current &&
-          playSrcRef.current !== src &&
-          Number.isFinite(video.currentTime) &&
-          video.currentTime > 0.25
-        ) {
-          pendingSeekRef.current = video.currentTime;
-        }
-        setPlaySrc(src);
-        playSrcRef.current = src;
+        void (async () => {
+          await waitDecoded(current.kind, src);
+          if (loadGenRef.current !== gen) return;
+          if (blurStartedAt > 0) {
+            const reduced =
+              typeof window.matchMedia === "function" &&
+              window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            const left = reduced
+              ? 0
+              : MEDIA_CENSOR_BLUR_IN_MS - (performance.now() - blurStartedAt);
+            if (left > 0) {
+              await new Promise<void>((resolve) => {
+                blurHoldTimer = window.setTimeout(resolve, left);
+              });
+              if (loadGenRef.current !== gen) return;
+            }
+          }
+          const video = videoRef.current;
+          if (
+            video &&
+            playSrcRef.current &&
+            playSrcRef.current !== src &&
+            Number.isFinite(video.currentTime) &&
+            video.currentTime > 0.25
+          ) {
+            pendingSeekRef.current = video.currentTime;
+          }
+          setShown({ id: current.id, kind: current.kind, src });
+          setPlaySrc(src);
+          playSrcRef.current = src;
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (loadGenRef.current !== gen) return;
+              setSlideBlur(false);
+            });
+          });
+        })();
       },
       onProgress: (p) => {
         if (loadGenRef.current !== gen) return;
@@ -496,6 +565,7 @@ export function MediaStage({
         if (loadGenRef.current !== gen) return;
         reportLoad({ kind: current.kind, percent: null, phase: "error" });
         setFailed(true);
+        setSlideBlur(false);
       },
     });
 
@@ -503,12 +573,14 @@ export function MediaStage({
 
     return () => {
       stop();
+      window.clearTimeout(blurHoldTimer);
     };
   }, [current?.id, current?.kind, index]);
 
   // Video buffer progress (extra signal while decoding)
   useEffect(() => {
     if (!current || current.kind !== "video" || !playSrc) return;
+    if (shown?.id !== current.id) return;
     const video = videoRef.current;
     if (!video) return;
 
@@ -550,7 +622,7 @@ export function MediaStage({
       video.removeEventListener("canplay", update);
       video.removeEventListener("canplaythrough", onReady);
     };
-  }, [current?.id, current?.kind, playSrc]);
+  }, [current?.id, current?.kind, playSrc, shown?.id]);
 
   // Hold / loop scheduling once media is playable
   useEffect(() => {
@@ -571,9 +643,11 @@ export function MediaStage({
       finishSlide();
     };
 
-    if (!running || !current || !playSrc) {
-      videoEl?.pause();
-      if (current?.kind === "video") setVideoCue("play");
+    if (!running || !current || !playSrc || shown?.id !== current.id) {
+      if (!running) {
+        videoEl?.pause();
+        if (current?.kind === "video") setVideoCue("play");
+      }
       return () => {
         cancelled = true;
         clearHoldTimer();
@@ -639,11 +713,12 @@ export function MediaStage({
       videoRef.current?.removeEventListener("ended", handleEnded);
       videoRef.current?.pause();
     };
-  }, [running, current?.id, current?.kind, playSrc, slideSec, index, slideAutoplay]);
+  }, [running, current?.id, current?.kind, playSrc, shown?.id, slideSec, index, slideAutoplay]);
 
   // Resume after tab focus; retry autoplay when buffer becomes ready
   useEffect(() => {
     if (!current || current.kind !== "video" || !playSrc) return;
+    if (shown?.id !== current.id) return;
     const video = videoRef.current;
     if (!video) return;
 
@@ -667,7 +742,7 @@ export function MediaStage({
       video.removeEventListener("loadeddata", retryIfNeeded);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [current?.id, current?.kind, playSrc]);
+  }, [current?.id, current?.kind, playSrc, shown?.id]);
 
   function onMediaError() {
     if (current?.source === "gelbooru") {
@@ -694,50 +769,60 @@ export function MediaStage({
       ? "Нажми для звука"
       : "Нажми, чтобы играть со звуком";
 
+  const view = shown;
+  const viewKind = view?.kind ?? current?.kind ?? null;
+  const stillKey = viewKind === "video" ? "video" : "still";
+
   return (
     <div className="media-stage">
       {current ? (
-        <div className={`media-stage__frame ${fade ? "is-in" : "is-out"}`}>
-          <div className="media-stage__viewport">
-            {current.kind === "video" ? (
-              playSrc ? (
-                <video
-                  key={current.id}
-                  ref={videoRef}
-                  className="media-stage__media media-stage__media--video"
-                  src={playSrc}
-                  autoPlay
-                  muted
-                  loop={videoLoop}
-                  playsInline
-                  preload="auto"
-                  controls={false}
-                  onClick={onVideoClick}
-                  onError={onMediaError}
-                  onLoadedMetadata={() => {
-                    const seek = pendingSeekRef.current;
-                    const video = videoRef.current;
-                    if (
-                      seek != null &&
-                      video &&
-                      Number.isFinite(video.duration) &&
-                      video.duration > 0
-                    ) {
-                      video.currentTime = Math.min(seek, video.duration - 0.05);
-                      pendingSeekRef.current = null;
-                    }
-                  }}
-                />
-              ) : (
-                <div className="media-stage__loading" aria-hidden>
-                  Загрузка…
-                </div>
-              )
-            ) : playSrc ? (
+        <div className="media-stage__frame">
+          <div
+            ref={setViewportEl}
+            className={
+              "media-stage__viewport" + (slideBlur ? " is-media-blur" : "")
+            }
+          >
+            <div className="media-stage__shot">
+            {view && viewKind === "video" ? (
+              <video
+                key={stillKey}
+                ref={(el) => {
+                  videoRef.current = el;
+                  mediaElRef.current = el;
+                }}
+                className="media-stage__media media-stage__media--video"
+                src={view.src}
+                autoPlay
+                muted
+                loop={videoLoop}
+                playsInline
+                preload="auto"
+                controls={false}
+                onClick={onVideoClick}
+                onError={onMediaError}
+                onLoadedMetadata={() => {
+                  const seek = pendingSeekRef.current;
+                  const video = videoRef.current;
+                  if (
+                    seek != null &&
+                    video &&
+                    Number.isFinite(video.duration) &&
+                    video.duration > 0
+                  ) {
+                    video.currentTime = Math.min(seek, video.duration - 0.05);
+                    pendingSeekRef.current = null;
+                  }
+                }}
+              />
+            ) : view ? (
               <img
-                key={current.id}
+                key={stillKey}
+                ref={(el) => {
+                  mediaElRef.current = el;
+                }}
                 className="media-stage__media"
-                src={playSrc}
+                src={view.src}
                 alt=""
                 draggable={false}
                 referrerPolicy="no-referrer"
@@ -749,8 +834,17 @@ export function MediaStage({
                 Загрузка…
               </div>
             )}
+            <MediaCensorOverlay
+              sourceRef={mediaElRef}
+              itemId={view?.id ?? current.id}
+              pendingId={current.id}
+              playSrc={view?.src ?? ""}
+              animated={mediaCensorMotionFull(viewKind ?? "image")}
+              veilHost={viewportEl}
+            />
+            </div>
           </div>
-          {current.kind === "video" && playSrc && videoCue !== "none" ? (
+          {viewKind === "video" && view && videoCue !== "none" ? (
             <button
               type="button"
               className="media-stage__play-cue"

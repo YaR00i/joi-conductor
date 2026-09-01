@@ -55,7 +55,8 @@
 
 - **3.0 CBT / plapping · проверка ударов** — **готово.** Переключатель Честь (метроном считает акценты) / Микрофон (Keuwlsoft-стиль: порог, гистерезис, пауза; тихий удар не считается). Док в сессии + Настройки → Геймплей.
 - **3.1 Чат + Soul Memory** — **в работе.** Свободный чат (не очередь сессии). Память как в Soul of Waifu: MEMORY.md / USER.md / темы / дневник, роутер после пачки реплик. Селфи и Whisper — позже.
-- HotScreen (цензор медиа на сцене сессии) — после 3.1.
+- **3.1b HotScreen-цензор медиа** — **сделано.** Оверлей на кадре сессии: мозаика / размытие / плашки / надпись. Вкл сам (тулбар сессии) или госпожа из чата (`set_censor`). Зоны: грудь / пах / **член** / зад / **живот** / **подмышки** / **стопы** / **руки** / лицо. Новые зоны по умолчанию выкл. Член по умолчанию выкл: сеть всё равно ловит и **вырезает дырку** в цензоре паха (сила дырки 1–5, шаг 0,1, по умолчанию 2). Класс поз `orl` (рот) идёт в лицо, не в дырку члена — иначе на орале вырезались головы. Головки как отдельного класса нет: дырка чуть длиннее коробки ствола, без лишней ширины. На наклоне овал считается на прогоне сети (не на отрисовке) и копируется в дырку; слежение работает и на «весь кадр». Вкл зоны — закрывать как остальные. Отдельный тогл **слежение нейросетью**: аниме тело (deepghs/booru_yolo nano) + соски/пах/член (`anime_censor_detection`) на одном кадре 640; руки и позы (`anime_hand_detection` + `yolov8s_pp12`) **докачиваются отдельно** и не валят тело, если не вышло; четыре YOLOv8 крутятся **параллельно**. YOLOX-real для фото, если аниме-проход пустой. **Один прогон на фото-слайд**. Видео и гифки — полный блюр. Не YOLO11/AGPL. Нет детекта — снова зоны. Настройки → Геймплей → Цензор.
+- **3.1c Эффекты сессии Искорки** — **сделано.** Слои поверх живой сессии (не захват рабочего стола): гипноспираль, VHS-артефакты, глитч, мантра по центру, всплывашки. Темы надписей: Искра / goon / бета / сисси / BBC, можно смешать. Список фраз правится в Настройках (одна строка — одна надпись). Сила 1–5. Вспышки по умолчанию выкл. Настройки → Геймплей → Эффекты. В песочнице те же тоглы сверху **Лаборатории** (кадр показывает слои сразу, даже без прогона). У других госпож на живом слоте пак как раньше (`pack.fx`).
 
 ### Парковка (не трогать, пока не скажешь)
 
@@ -91,6 +92,8 @@
 - SoVITS: `electron/sovitsProcess.mjs`, `docs/GPT_SOVITS_SETUP.md`
 - WD14: `electron/wd14Process.mjs`, `electron/wd14Install.mjs`, `docs/WD14_TAGGER.md`
 - Сессия: `src/pages/SessionPage.tsx`, `src/components/SessionQueuePanel.tsx`, `src/lib/queueEdit.ts`, `src/lib/sessionRuntime.ts`, `src/components/BeatBar.tsx`
+- Цензор медиа: `src/lib/mediaCensor.ts`, `src/lib/mediaCensorDetect.ts`, `src/lib/mediaCensorYolox.ts`, `src/components/MediaCensorOverlay.tsx`, `src/components/MediaCensorPanel.tsx`. Модели: `%APPDATA%/joi-conductor/censor-detect/` (`yolov8n_as01.onnx` тело + `censor_detect_v1.0_n.onnx` соски + YOLOX-real)
+- Эффекты Искорки: `src/lib/sessionFx.ts`, `src/components/SessionFxOverlay.tsx`, `src/components/SessionFxPanel.tsx`, `src/components/sessionFx.css`
 - Чат / Soul Memory: `src/pages/ChatPage.tsx`, `src/lib/soul/`
 - Контракты: `src/lib/contracts/catalog.ts`, `src/lib/contracts/dailyBoard.ts`
 - Дейлики: `HABIT_CONTRACT_IDS` в `catalog.ts`; `listOpenContractsToday` в `src/lib/dailyBrief.ts`

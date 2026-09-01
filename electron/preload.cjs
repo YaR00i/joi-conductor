@@ -135,6 +135,25 @@ contextBridge.exposeInMainWorld("joiDesktop", {
         ipcRenderer.removeListener("media:wd14-progress", handler);
     },
     tagImage: (payload) => ipcRenderer.invoke("media:wd14-tag", payload),
+    censorDetectStatus: () =>
+      ipcRenderer.invoke("media:censor-detect-status"),
+    censorDetectInstall: () =>
+      ipcRenderer.invoke("media:censor-detect-install"),
+    censorDetectModel: () => ipcRenderer.invoke("media:censor-detect-model"),
+    censorDetectAnimeModel: () =>
+      ipcRenderer.invoke("media:censor-detect-anime-model"),
+    censorDetectBooruModel: () =>
+      ipcRenderer.invoke("media:censor-detect-booru-model"),
+    censorDetectHandModel: () =>
+      ipcRenderer.invoke("media:censor-detect-hand-model"),
+    censorDetectPpModel: () =>
+      ipcRenderer.invoke("media:censor-detect-pp-model"),
+    onCensorDetectProgress: (cb) => {
+      const handler = (_e, payload) => cb(payload);
+      ipcRenderer.on("media:censor-detect-progress", handler);
+      return () =>
+        ipcRenderer.removeListener("media:censor-detect-progress", handler);
+    },
   },
   device: {
     status: () => ipcRenderer.invoke("device:status"),

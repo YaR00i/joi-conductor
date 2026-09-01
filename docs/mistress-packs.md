@@ -23,7 +23,7 @@
 4. Оба магазин-ключа: **Маска Искорки** (`sparkle_mask`) + **Клык Искры** (`iskra_fang`)
 5. ≥1 завершённая сессия в режиме клетки
 
-При разблоке авто-выдаются флаги `sparkle_phantom` + `sparkle_session_fx`, включаются secondary censored/blacked. Логика: [`mistressUnlocks.ts`](../src/lib/mistress/mistressUnlocks.ts).
+При разблоке авто-выдаются флаги `sparkle_phantom` + `sparkle_session_fx`, включаются secondary censored/blacked. Логика: [`mistressUnlocks.ts`](../src/lib/mistress/mistressUnlocks.ts). Настройки эффектов сессии (спираль, артефакты, темы надписей): [`sessionFx.ts`](../src/lib/sessionFx.ts), Настройки → Геймплей → Эффекты.
 
 ## Furina Tide (готово)
 

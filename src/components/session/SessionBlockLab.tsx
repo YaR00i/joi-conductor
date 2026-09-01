@@ -32,6 +32,7 @@ import type {
   SessionState,
 } from "../../lib/types";
 import { playUiClick, primeUiAudio } from "../../lib/uiSound";
+import { SessionFxLabStrip } from "../SessionFxLabStrip";
 
 type Props = {
   state: SessionState | null;
@@ -248,6 +249,8 @@ export function SessionBlockLab({
               </span>
             </div>
           </div>
+
+          <SessionFxLabStrip />
 
           <div className="session__lab-form">
             <label>

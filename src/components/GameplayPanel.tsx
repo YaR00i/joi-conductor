@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { DeviceSettingsPanel } from "./DeviceSettingsPanel";
+import { MediaCensorPanel } from "./MediaCensorPanel";
 import { RouletteSettingsPanel } from "./RouletteSettingsPanel";
+import { SessionFxPanel } from "./SessionFxPanel";
 import { TagTypesSettingsPanel } from "./TagTypesSettingsPanel";
 import { TideHitVerifyPanel } from "./TideHitVerifyPanel";
 import type { ContentUnlockLists } from "../lib/contentUnlocks";
@@ -8,7 +10,7 @@ import type { RouletteSettings } from "../lib/rouletteSettings";
 
 const STORAGE_KEY = "joi-settings-gameplay-pane-v1";
 
-const GAMEPLAY_PANES = ["roulette", "tags", "tide", "device"] as const;
+const GAMEPLAY_PANES = ["roulette", "tags", "tide", "censor", "fx", "device"] as const;
 
 export type GameplayPaneId = (typeof GAMEPLAY_PANES)[number];
 
@@ -34,6 +36,10 @@ function paneLabelRu(id: GameplayPaneId): string {
       return "Теги";
     case "tide":
       return "CBT";
+    case "censor":
+      return "Цензор";
+    case "fx":
+      return "Эффекты";
     case "device":
       return "Игрушка";
     default: {
@@ -51,6 +57,10 @@ function paneHintRu(id: GameplayPaneId): string {
       return "типы библиотеки";
     case "tide":
       return "проверка ударов";
+    case "censor":
+      return "кадр сессии";
+    case "fx":
+      return "Искорка";
     case "device":
       return "Lovense / Buttplug";
     default: {
@@ -68,6 +78,10 @@ function paneDotRu(id: GameplayPaneId): string {
       return "купленные теги";
     case "tide":
       return "честь / микрофон";
+    case "censor":
+      return "фото сеть / видео блюр";
+    case "fx":
+      return "гипноз / надписи";
     case "device":
       return "device bridge";
     default: {
@@ -154,6 +168,26 @@ export function GameplayPanel({ settings, onChange, unlocks }: Props) {
             только если достаточно громкий.
           </p>
           <TideHitVerifyPanel />
+        </>
+      ) : null}
+
+      {pane === "censor" ? (
+        <>
+          <p className="brain-panel__hint">
+            Закрывает кадр сессии: мозаика, размытие или плашки. Госпожа может
+            включить из чата и запретить снимать до конца сессии.
+          </p>
+          <MediaCensorPanel />
+        </>
+      ) : null}
+
+      {pane === "fx" ? (
+        <>
+          <p className="brain-panel__hint">
+            Слои Искорки на всю сессию: спираль, глитч, манты. Не цензор кадра —
+            он рядом, во вкладке Цензор.
+          </p>
+          <SessionFxPanel />
         </>
       ) : null}
 

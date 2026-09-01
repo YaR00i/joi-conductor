@@ -695,10 +695,15 @@ export function SessionPage({
     }
   }, [idolMissPending, state?.index]);
 
+  const sandboxSlot = getActiveSaveSlot() === "sandbox";
+
   return (
     <div className={`session${questLive ? " session--quest" : ""}`}>
       <div className="session__stage">
-        <SessionFxOverlay active={sessionLive} />
+        <SessionFxOverlay
+          active={sessionLive || sandboxSlot}
+          previewUser={sandboxSlot}
+        />
         <MediaStage
           key={mediaDeckKey}
           items={mediaItems}

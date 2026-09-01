@@ -358,6 +358,36 @@ interface JoiDesktopMediaApi {
     tags: string[];
     scores: { tag: string; score: number }[];
   }>;
+  censorDetectStatus: () => Promise<{
+    ready: boolean;
+    onnxReady?: boolean;
+    animeReady?: boolean;
+    booruReady?: boolean;
+    handReady?: boolean;
+    ppReady?: boolean;
+    engineReady?: boolean;
+    bytes: number;
+    path: string;
+  }>;
+  censorDetectInstall: () => Promise<{
+    ready: boolean;
+    onnxReady?: boolean;
+    animeReady?: boolean;
+    booruReady?: boolean;
+    handReady?: boolean;
+    ppReady?: boolean;
+    engineReady?: boolean;
+    bytes: number;
+    path: string;
+  }>;
+  censorDetectModel: () => Promise<ArrayBuffer | Uint8Array>;
+  censorDetectAnimeModel: () => Promise<ArrayBuffer | Uint8Array>;
+  censorDetectBooruModel: () => Promise<ArrayBuffer | Uint8Array>;
+  censorDetectHandModel: () => Promise<ArrayBuffer | Uint8Array>;
+  censorDetectPpModel: () => Promise<ArrayBuffer | Uint8Array>;
+  onCensorDetectProgress: (
+    cb: (payload: { phase: string; pct: number }) => void,
+  ) => () => void;
 }
 
 interface JoiDesktopShellApi {
