@@ -772,3 +772,179 @@ World-marker presentation живёт только в sibling `ember-godot`: `Emb
 С v1.54 marker presentation/actionability выводятся из конкретного quest event в action chain: status active = start, objective flag = цель, status done = сдача. Не добавлять отдельный marker-role enum или второй save-key. Future/locked/completed события скрыты и не принимают F; последняя оставшаяся обязательная objective получает done/check presentation. `EmberQuestCatalog.projection()` сохраняет одновременно `explicitStatus` и derived `status`, а общий pure owner решения — `EmberQuestState.marker_projection()`.
 
 С v1.55 `EmberInteractEditor` является guided projection прежних scene fields: частые type-specific поля и итог в игре видны сразу, launch rules/quest overrides живут под `Дополнительно`. Dropdown text может быть локализованным `nameRu · id`, но metadata и serialization остаются canonical IDs. Не возвращать плоскую техническую форму, не создавать отдельный simplified Interact contract и не предлагать новый `chest` shell без map-owned loot. Узкая карточка использует wrapping actions; owners разделены как `Настройки` / `Действия` / `Описание задания` / `Событие задания`.
+
+С v1.56 Quest Graph начинает unified authoring view через editor-only `EmberQuestUsageIndex`: реальные `set_flag` writers из native-first action/dialogue catalogs показываются фиолетовыми source nodes и ведут к root/objective. Это backlink projection, не новое поле Quest Resource и не вложенный runtime-граф. Source открывает свой canonical document; производные ноды и их позиции не сериализуются в quest `editorLayout`. Следующее безопасное расширение — scene-owned Interact/Area3D backlinks и drag-to-bind через существующий action save/Undo owner, а не NodePath внутри Quest Resource.
+
+С v1.57 source-ноды Quest Flow имеют bounded geometry: не использовать autowrap для технических ID внутри GraphNode, иначе Godot 4.7 вычисляет огромную minimum height. Canvas показывает ellipsis с tooltip. `GraphEditorScroll` не участвует в horizontal expand, а selected-node label клипуется, поэтому правая колонка не скачет от длины имени; пользователь по-прежнему может двигать штатный split divider.
+
+С v1.58 вычисляемые Quest Flow backlinks снова draggable. Их положение принадлежит `_view_states` редактора и может переживать rebuild вкладки, но `_apply_cached_quest_layout()` сериализует только `quest_root`/`objective:*`. Не блокировать drag ради защиты Resource: защита уже находится на правильной serialization boundary.
+
+С v1.59 `EmberQuestUsageIndex.scene_entries()` добавляет зелёные backlinks только из текущего edited scene root: `EmberInteract.resolved_action_script_id()` сопоставляется с фиолетовыми action/dialogue writer nodes. Кнопка передаёт относительный NodePath плагину, который повторно разрешает target и выбирает voxel owner/standalone Interact через штатный EditorSelection. Scene path остаётся editor navigation data и не сериализуется. Следующий срез — guided bind выбранного объекта к objective через существующий `save_chain`/Editor Undo owner, не через прямое редактирование визуального провода.
+
+С v1.60 Quest Flow принимает текущий `EditorSelection` только как editor target и показывает bind-кнопки start/complete на quest root и objective-complete на цели. `EmberObjectInspectorActions.bind_quest_event()` разрешает editor-only token через `EmberQuestStore.action_for_event()`, добавляет прежний canonical `set_flag` и делегирует `save_chain()`/`save_standalone_chain()`, поэтому Action Resource + scene binding имеют один Undo snapshot. Voxel без Interact получает `quest_marker`; существующий kind не преобразуется. Одинаковый event не дублируется, перед terminal `change_map` вставляется до перехода. `scene_binding_changed` обновляет зелёную проекцию на do/undo/redo. Не добавлять второй writer для будущего drag gesture и не сериализовать selection/NodePath в Quest Resource.
+
+С v1.61 bind обязан работать с новой целью до отдельного Save. Graph передаёт текущий валидированный Quest draft, `EmberQuestStore.action_for_event_in_document()` компилирует token относительно него, а optional Quest snapshot входит в ту же Undo operation, что Action Resource и Interact. После успешного commit workspace reload считает draft сохранённым. Не возвращать lookup только через disk catalog: он воспроизводит ошибку `quest event could not be bound`, когда objective уже видна в Graph, но ещё отсутствует в `.tres`.
+
+С v1.62 выбранный несвязанный scene owner проецируется session-only `scene_candidate` нодой. Её зелёный output и output существующей scene-ноды можно тянуть к раздельным зелёным input root start/complete либо objective complete. `_on_connection_request()` только строит editor event token и вызывает тот же v1.61 signal/writer; сам прямой провод не сериализуется. После commit вид должен показывать фактическую двухступенчатую связь через canonical purple writer. Не создавать отдельный drag mutation path и не убирать bind-кнопки как доступную альтернативу.
+
+С v1.63 зелёный scene → action-writer провод поддерживает disconnect и явную кнопку для выбранного scene owner. `EmberQuestUsageIndex` передаёт `writerIndex`, но mutation дополнительно сверяет `set_flag` по flag/value; `EmberObjectInspectorActions.unbind_quest_event()` удаляет один шаг с единым Undo snapshot. Для action chain с несколькими scene consumers обязателен copy-on-write: выбранный объект получает отдельный Resource, остальные сохраняют исходный. Пустая неразделяемая цепочка удаляется, пустая разделяемая только отвязывается от выбранного объекта. Dialogue writers из Quest Flow не мутировать: они редактируются в Dialogue Graph, иначе локальный жест незаметно меняет общую ветку.
+
+С v1.64 Quest Flow по умолчанию является compact overview: root/objective cards + dependency wires, а action/dialogue/scene backlinks не создаются до drill-down выбранного target. Карточка агрегирует counts и сохраняет bind-кнопки; `Открыть события и объекты` переключает session-only `_quest_focus_target`, где работают прежние canonical open/bind/unbind paths. `Все связи` (`__all__`) оставляет полную диагностику. `_view_key()` разделяет overview/focus/all camera state; `_on_end_node_move()` переносит позиции в Quest `editorLayout` только из overview. Не заменять это GraphFrame collapse и не сериализовать focus, backlinks либо compound-node state в Quest Resource.
+## Godot Ember Graph v1.65 — GraphNode port-index hotfix (2026-09-01)
+
+- Исправлена регрессия compact Quest Flow: Godot индексирует порты GraphNode среди включённых входов, а не по номеру slot. Когда overview скрывает золотой membership-вход, синий dependency-вход имеет индекс `0`; в focus/all-links — `1`.
+- `_quest_dependency_input_port()` теперь единый owner этого отображения для render/connect/disconnect. Не использовать номер slot как port index напрямую при условно скрываемых слотах.
+- `test_graph_workspace.gd` проверяет границы всех отрисованных GraphEdit connections и оба режима индексации. Сигнатура предотвращённой регрессии: `graph_node.cpp ... p_port_idx = 1 is out of bounds (left_port_cache.size() = 1)`.
+
+## Quest stop-line и следующий продуктовый срез (2026-09-01)
+
+- Пользователь вручную принял текущие Quest Resource/Flow, зависимости целей, object/event binding, динамические маркеры и компактный graph UX. Считать это стабильным stop-line, а не поводом продолжать универсальный quest editor.
+- Типы `kill/count`, `collect/have/deliver`, `discover/clear`, relationship и escort не добавлять как пустые поля. Вернуться к ним только после появления соответствующего единственного runtime event owner; ворота и ожидаемые authoring-проекции перечислены в [`EMBER_COMBAT_D1.md`](EMBER_COMBAT_D1.md).
+- Активный продуктовый этап — D1 Combat Paper Prototype. До его решения не создавать battle manager/schema/editor. D1 сравнивает позиционные области с маленькой сеткой на одинаковом encounter, фиксирует четыре стихии, минимальные реакции, восемь действий и три тестовых боя.
+
+## Godot Ember Migration v1.66 — D1 Combat Lab skeleton (2026-09-01)
+
+- `res://scripts/prototypes/ember_combat_prototype.gd` — единственный pure owner правил лаборатории: snapshot, action catalog, timeline, valid targets, preview/commit, deterministic enemy command и outcome. Он намеренно не является autoload/Resource/save owner.
+- `res://scenes/combat_lab.tscn` + `ember_combat_lab.gd` отображают E1 через Control UI. Preview и commit вызывают один resolver; action delay заранее перестраивает predicted timeline. Четыре области проверяют zonal-кандидат до grid.
+- Source translation: Trails → открытая очередь/задержка; Magicka → новая стихия × существующее состояние с явным preview; Disgaea → правило области и forced movement; duo gate → отдельный situational verb вместо relationship multiplier. Не переносить AT bonuses, пятиэлементный input, full SRPG grid или grind до их собственного теста.
+- Editor entry — только `Project → Tools → Ember: Open/Run Combat Lab`. Lab не меняет main scene, save, quests, inventory и legacy arena. E2 zones/grid comparison и E3 boss field mutation остаются D1, не production D2.
+- Gates: `test_combat_prototype.gd` и `test_combat_lab.gd`. Любая следующая боевая правка сначала расширяет pure resolver и preview test, затем UI/commit; формулы в Control не копировать.
+
+## Godot Ember Migration v1.67 — D1 E2 grid comparison (2026-09-01)
+
+- Combat Lab по умолчанию открывает E2 на сетке 7×5, но E1 areas остался в верхнем selector для сравнения. `ember_combat_grid.gd` — pure owner топологии, BFS reachability, blockers/occupancy, panel groups и staged movement; он не копирует damage/reaction формулы из `EmberCombatPrototype`.
+- Команда героя двухфазная в UI, но атомарная в state: `M` ставит destination в preview snapshot, action/target считаются из этой позиции, `F` один раз коммитит movement + consequences. Cancel не мутирует source snapshot.
+- Disgaea Geo Effects переведены в две явные linked panel groups: tide несёт Wet/conduction, ember + фиксированный Жар-фокус даёт fire +2. Movable/destructible focus, heights, Lift/Throw, Geo-chain и полный SRPG не приняты.
+- Враги пока используют deterministic ranged response без движения: AI movement — отдельная гипотеза, а не скрытый пропуск. Production Resource/save/editor по-прежнему отсутствуют.
+- Gates: `test_combat_prototype.gd`, `test_combat_grid.gd`, `test_combat_lab.gd`. Визуальная приёмка делается на 1600×900; цвета панелей должны оставаться видимыми даже на disabled cells.
+
+## Godot Ember Migration v1.68 — universal Defend command (2026-09-01)
+
+- `defend` — общая self-target команда в прежнем pure action catalog: ноль урона, delay 85, ход завершается, следующий входящий урон сокращается вдвое. Self-status ставится на 2 в preview, чтобы после общего actor-turn decay остался 1 и не исчез в свой commit.
+- UI показывает `G. Защита`; hotkey `G` выбирает её на ходу любого героя. В E2 она совмещается со staged movement и тем же одним `F` commit. Не смешивать с `guard` / «Прикрытие» Орика, которое target'ит союзника.
+- `test_combat_prototype.gd` закрепляет purity, self-target, turn advance, persistence и consumption защиты; `test_combat_lab.gd` — доступную без врага кнопку и прежний staged move + attack route.
+
+## Godot Ember Migration v1.69 — staged movement projection (2026-09-01)
+
+- `EmberCombatGridView` рисует план перемещения из уже существующей `_pending_cell`, не мутируя snapshot и не вводя второй position owner. Destination показывает героя, HP, `план / ждёт F` и янтарную рамку; origin показывает стрелку к destination.
+- Hit projection тоже использует display occupant: self-target/Защита кликается на destination, origin больше не выглядит занятым. Movement legality по-прежнему считается по actual occupants/reachability из pure grid.
+- `test_combat_lab.gd` закрепляет обе метки и доказывает, что canonical клетка до `F` остаётся origin. Визуальная приёмка 1600×900 подтвердила читаемость D2/B3 без сдвига layout.
+
+## Combat terrain / 3D tool decision (2026-09-01)
+
+- Переход к 3D не означает новый battle owner. Canonical клетка/высота/проходимость/панель/временное состояние остаются в pure combat snapshot; Godot scene является projection и отправляет commands.
+- Базовый штатный инструмент D2.0 — `GridMap + MeshLibrary`: он подходит для 3D tile palette и graybox, но не владеет BFS, reaction rules или runtime mutation. `NavigationMesh` для маленького пошагового поля не нужен.
+- Перед 3D projection обязателен ограниченный D1.5: используемая resolver-ом высота + единое правило перехода и один E3 `cellChanges` preview/commit. Не добавлять неиспользуемую универсальную terrain schema заранее.
+- D2.0 затем добавляет orthographic/isometric view, grid↔world adapter, mouse pick и visual states. Юниты/Geo symbols/destructibles остаются отдельными сценами; GridMap — только статические/заменяемые ground tiles.
+- Terrain3D отложен для крупных exploration zones, Cyclops — только возможный UX/blockout reference, Voxel Tools — тяжёлый отдельный terrain owner. Ничего из них не устанавливать до отдельного acceptance spike; аудит находится в `../ember-godot/docs/EMBER_ADDONS.md`.
+
+## Godot Ember Migration v1.70 — D1.5 semantic terrain (2026-09-01)
+
+- `EmberCombatTerrain` — pure leaf owner `cell_key/elevation/can_step/apply_cell_changes`. Grid BFS и `EmberCombatPrototype._set_push()` обязаны читать один `MAX_STEP_HEIGHT = 1`; не копировать правило в 3D view, AI или editor.
+- E2 cells теперь содержат используемый `elevation`: верхняя терраса +1, тестовый высокий уступ +2. Это пока одна top surface (`Vector2i + elevation`), не преждевременная multi-floor `Vector3i` schema.
+- E3 `field_mutation_state()` начинает с Орика: Cold по Wet tide-group возвращает preview `cellChanges` для шести панелей (`Wet → Frozen`), Fire по Frozen возвращает Wet. `Combat.commit()` применяет те же patches; cancel/preview сохраняют source snapshot.
+- `EmberCombatGridView` проецирует pending cellChanges голубой рамкой, `Frozen · прогноз`, высотой и tooltip до `F`. Это reference parity для следующего `GridMap` adapter, а не второй terrain renderer.
+- Gates `test_combat_prototype.gd`, `test_combat_grid.gd`, `test_combat_lab.gd` проходят на Godot 4.7.2. Этот semantic contract использован следующим D2.0/v1.71 без production Resource/editor/save.
+
+## Godot Ember Migration v1.71 — D2.0 native GridMap projection (2026-09-01)
+
+- `EmberCombatGrid3DView` — `SubViewportContainer` с orthographic `Camera3D`, native `GridMap` и generated graybox `MeshLibrary`. `configure()` принимает тот же state/selection/pending/preview, что 2D projection; lab сохраняет viewport между refresh вместо пересоздания GPU/world resources.
+- Semantic `Vector2i + elevation` преобразуется только adapter-ом в `Vector3i(x, elevation, z)`. Units, labels и Geo focus — отдельные Node3D; reachable/pending/target/cellChanges — visual overlays. GridMap/collision не вычисляют legality.
+- Mouse input: camera ray → MeshLibrary collision → `GridMap.local_to_map()` → прежний `cell_chosen`. Staged hit projection переносит active occupant на destination и освобождает origin, поэтому self-target/attack selection совпадает с видимой позицией до commit.
+- E2/E3 default view — 3D; `Вид · 2D диагностика` возвращает прежний `EmberCombatGridView` без сброса encounter state. E1 zones остаётся Control comparison.
+- `test_combat_lab.gd` закрепляет 35 native cells, настоящий physics ray на D2, staged Node3D/occupant, E3 projected Frozen item/overlay, atomic state и возврат 2D. Все три combat gates проходят Godot 4.7.2.
+- Не добавлены NavigationMesh, production battle Resource/editor/save и external addons. Cyclops оценивается только после ручного D2.0 UX, Terrain3D остаётся кандидатом D3 large zones, Voxel Tools — отдельным R&D при свободном volumetric destruction.
+
+## Godot Ember Migration v1.72 — standard Node3D Combat Lab boundary (2026-09-01)
+
+- Основная `scenes/combat_lab.tscn` больше не является полноэкранным Control с миром внутри `SubViewport`. Корень — обычный `Node3D`; `GridMap`, `Actors`, `Overlays`, `CameraRig/Camera3D`, свет и `WorldEnvironment` являются scene-owned узлами, а прежний controller/UI живёт в `CanvasLayer` как HUD.
+- `EmberCombatGrid3DWorld` извлечён как одна переиспользуемая сцена-проекция. Main lab использует её напрямую; `EmberCombatGrid3DView` теперь только compatibility `SubViewportContainer` и инстанцирует ту же сцену. Правила, ray-pick и visual state не скопированы.
+- Внешний HUD передаёт тому же миру `state/selection/pending/preview`; в 3D центральная область HUD прозрачна для основной камеры. `Вид · 2D диагностика` и E1 скрывают 3D-мир, не меняя snapshot.
+- `test_combat_lab.gd` требует root `Node3D`, scene-owned GridMap/Camera3D, отсутствие embedded viewport в main scene, 35 cells, physics ray, staged actor, E3 mutation и 2D parity.
+- Это исправление scene boundary перед authoring, не завершённый редактор. Generated graybox `MeshLibrary` пока transient; следующий D2.1-срез — authored `.tres` palette, layout Resource/validation, Undo/Redo и save/reopen.
+
+## Godot Ember Migration v1.73 — authored combat camera (2026-09-01)
+
+- Не создан отдельный camera manager: расширен прежний `OrbitCamera`. Он умеет использовать scene-authored дочерний `Camera3D` через `camera_path`, сохраняя legacy fallback для `spike.gd`.
+- `CameraRig` в battle scene хранит target, distance, yaw/pitch в градусах, min/max, orthographic/perspective, orthographic size, FOV, near/far и sensitivities. Скрипт `@tool`, поэтому Inspector-параметры видны и применяются в editor viewport; runtime не сериализует отдельный camera JSON.
+- Управление: RMB orbit, MMB planar pan, wheel zoom, WASD/arrows pan, Q/E yaw, Home reset к authored launch snapshot. В orthographic режиме wheel меняет size; в perspective — distance, а FOV применяется только перспективной камерой.
+- Main HUD field surface передаёт mouse events в `EmberCombatGrid3DWorld.handle_camera_input()`, который делегирует тому же CameraRig. Кнопки вне поля не вращают камеру; embedded compatibility view использует тот же маршрут.
+- `test_combat_lab.gd` закрепляет wheel/orbit/pan, projection/FOV, Home reset и ray-pick alignment вместе с прежним staged/terrain контрактом.
+
+## Godot Ember Migration v1.74 — separate arena scenes + editor preview (2026-09-01)
+
+- Принят гибридный authoring-контракт: каждая battle arena — отдельная `.tscn`, владеющая визуальной композицией, scene-owned GridMap, светом, CameraRig, декором и будущими spawn anchors. Будущий battle `.tres` владеет semantic cells/groups/encounter refs; pure resolver остаётся владельцем legality/preview/commit.
+- Первые сцены: `res://scenes/combat/arenas/colored_crossing.tscn` (E2) и `thaw_keeper.tscn` (E3). `combat_lab.tscn` инстанцирует E2 arena вместо prototype world напрямую.
+- `EmberCombatGrid3DWorld` теперь `@tool` и имеет `Editor Preview Enabled/Mode`. В editor он строит 35 cells, elevation, blockers, actors/focus и E2/E3 preview из тех же `Grid.initial_state/field_mutation_state + Grid.command_preview`; отдельной editor-формулы нет.
+- Плагин добавляет `Open Battle Arena · E2/E3`. Открытая arena и main Combat Lab больше не пусты в 3D viewport до Play. Camera/light/decor overrides можно сохранять в конкретной `.tscn`.
+- Текущие preview cells transient и ещё не являются production paint workflow. D2.1 продолжает authored MeshLibrary `.tres`, semantic battle Resource, validation, Undo/Redo и save/reopen; не разрешать визуальному GridMap стать вторым gameplay owner.
+- `test_combat_arena_scenes.gd` закрепляет открываемость обеих сцен, mode, 35 cells, camera/actors и E3 Frozen preview без state leak.
+
+## Godot Ember Migration v1.75 — CameraRig Inspector live-preview (2026-09-01)
+
+- Штатный Godot показывает camera preview только при выборе самого `Camera3D`. `EmberCameraRigInspectorPlugin` добавляет такой же author-facing кадр при выборе `OrbitCamera/CameraRig`, чтобы ракурс и параметры объектива настраивались в одном Inspector.
+- `EmberCameraRigPreview` создаёт только editor-only `SubViewport + Camera3D`, подключает viewport к `World3D` открытой arena-сцены и копирует transform/projection/keep-aspect/size/FOV/clip/cull дочерней камеры. Не дублировать сцену, GridMap, свет или runtime rig внутри preview.
+- `OrbitCamera._validate_property()` делает неактивный объектив read-only: orthographic projection читает `orthographic_size` и игнорирует FOV по контракту Godot; perspective читает FOV и игнорирует orthographic size. Preview status обязан называть активное значение, чтобы это не выглядело сломанным параметром.
+- Preview существует только пока показан Inspector, при сворачивании перестаёт обновляться; кнопка выбирает реальную дочернюю камеру для редких штатных свойств. Никакие preview nodes не сериализуются в `.tscn` и не появляются в Play.
+- Gate `test_combat_camera_rig_preview.gd` проверяет общий World3D, pose/lens sync после изменения authored rig и наличие навигации к дочерней камере; headless editor startup проверяет регистрацию/снятие Inspector plugin.
+
+## Godot Ember Migration v1.76 — authored semantic Battlefield Resource (2026-09-01)
+
+- `EmberBattlefieldResource` стал единственным authored owner размеров, row-major terrain kinds/elevations/blocked/groups и Geo focus. `EmberCombatGrid.initial_state(field)` преобразует его в прежний snapshot; combat/terrain/resolver API не получили параллельной схемы.
+- E2 `colored_crossing.tres` и E3 `thaw_keeper.tres` назначены соответствующим arena `.tscn`. Два файла намеренно независимы для будущего изменения карт; presentation scene по-прежнему владеет камерой/светом/декором, Resource — semantic cells, GridMap — transient projection.
+- `EmberBattlefieldInspectorPlugin` показывает сохранённую 7×5 мини-карту, высоты, focus, tooltips, counts и validation. Raw PackedArrays — временный storage UI; не улучшать их как финальный authoring flow. Следующий срез — одна paint-палитра поверх этого же Resource с Editor Undo/Redo, без сериализации GridMap как gameplay data.
+- `test_battlefield_resource.gd` закрепляет validation, arena references, Inspector preview и save/reopen signature; grid/arena/lab gates проверяют parity прежнего боя.
+
+## Godot Ember Migration v1.77 — Battlefield paint palette (2026-09-01)
+
+- `EmberBattlefieldEditorActions` — единственный editor mutation owner для cell painting. Он получает pure `edited_cell_snapshot()` от Resource и одной Undo/Redo action меняет terrain/elevation/blocked/group/focus PackedArrays; do/undo вызывают `emit_changed()` для Inspector и arena preview.
+- Guided palette живёт в существующем `EmberBattlefieldInspectorPanel`: Neutral/Wet/Ember/Frozen/Blocked/Height ±/Focus. Пустой group ID нормализуется только при paint (`tide`/`ember`); runtime schema остаётся прежней. Обычная кисть очищает terrain/block/group, но не высоту.
+- `EmberCombatGrid3DWorld` видит новый `content_signature()` в editor process и перестраивает projection из того же Resource. Не сохранять визуальный GridMap и не добавлять второй editor-state файл.
+- Один клик является одной штатной Undo operation; Ctrl+S сохраняет внешний `.tres`. Drag-stroke batching и изменение размеров палитрой не входят в этот срез — не обещать их как готовые до отдельного lifecycle/Undo gate.
+
+## Godot Ember Migration v1.78 — native 3D Battlefield Paint Mode (2026-09-01)
+
+- `EmberBattlefield3DPainter` встроен в существующий `Ember Migration` через штатные `EditorPlugin._forward_3d_gui_input()` и viewport overlay. При выбранном корне валидной arena верхняя 3D-панель включает восемь тех же semantic-кистей; ЛКМ рисует непрерывный штрих, `Alt+ЛКМ` берёт surface/group, ПКМ/СКМ остаются за CameraRig/editor navigation.
+- Во время drag Resource и GridMap не мутируют на каждом mouse motion: painter хранит только уникальные canonical cells и preview-outline, а на release передаёт их единственному mutation owner `EmberBattlefieldEditorActions.paint_cells()`. Весь штрих — одна Editor Undo/Redo action и один `emit_changed()`; save продолжает писать исходный `.tres`.
+- Editor и runtime используют один camera-ray → GridMap picker. Если physics shapes ещё не зарегистрированы сразу после открытия сцены, общий adapter выбирает ближайшую верхнюю semantic surface клетки; это lifecycle fallback, а не альтернативная grid/schema. Контур учитывает elevation и верх blocker.
+- `test_battlefield_resource.gd` закрепляет toolbar/8 brushes/непрерывный stroke/atomic three-cell Undo; `test_combat_arena_scenes.gd` — общий picker и hover corners. Combat grid/lab/camera/resolver gates проходят. Следующий authoring-вопрос — resize/fill и visual MeshLibrary, не второй runtime/editor owner.
+
+## Godot Ember Migration v1.79 — rectangle, guided fill и shared visual palette (2026-09-01)
+
+- 3D painter имеет orthogonal shape selector: Brush соединяет редкие mouse events дискретной линией, Rectangle получает canonical cells между anchor/hover, Fill делает four-neighbor flood только по совпадающим terrain/blocking/elevation/group. Эти selector-методы принадлежат `EmberBattlefieldResource` authoring API и не меняют runtime snapshot/schema.
+- Rectangle/Fill до release существуют только как overlay cell list и затем вызывают прежний `paint_cells()` один раз. Один Undo отменяет весь набор; Esc отменяет preview. Focus принудительно использует одиночный Brush, чтобы массовый selector не создавал зависимость от порядка cells.
+- `EmberBattlefieldEditorPalette` является общей visual metadata для Inspector и 3D: восемь label/color/icon больше не дублируются, icon textures кэшируются. Swatches обозначают semantic brushes и не являются production battle meshes.
+- `test_battlefield_resource.gd` проверяет rectangle 2×3, guided fill на synthetic fixture с elevation boundary, три shape mode, Focus lock, shared icons и прежний atomic Undo/save gate; форма пользовательской E2-карты тестом не фиксируется. Все combat/arena/camera tests проходят. Следующий срез — visual MeshLibrary/tiles; resize поля остаётся отдельным data migration gate.
+
+## Godot Ember Migration v1.80 — authored visual Battlefield MeshLibrary (2026-09-01)
+
+- `content/combat/tiles/ember_battlefield_tiles.tres` — единый visual owner items 0 Neutral, 1 Wet, 2 Ember, 3 Frozen, 4 Blocked. Base arena, E2/E3 и Combat Lab ссылаются на этот внешний Resource; `EmberCombatGrid3DWorld` больше не генерирует MeshLibrary, а при пустой scene link загружает тот же default path.
+- Primitive meshes сохраняют прежние размеры/collision и поэтому ray-pick parity; общий shader различает surface каменной рамкой, water bands, emissive ember cracks, ice facets и blocked hazard bands. Это стилизованный graybox, а не schema: будущие voxel meshes заменяют item mesh под тем же ID.
+- `EmberBattlefieldTileLibrary` централизует path/ID/name/mesh/collision validation. Arena configuration warnings используют тот же контракт. Кнопка `Тайлы…` открывает Resource, а `EmberBattlefieldTileLibraryPanel` показывает пять real meshes в одном editor-only SubViewport и зелёную/точную ошибочную диагностику.
+- Новый `test_battlefield_tile_library.gd` проверяет resource sharing base/E2/E3/Lab, пять IDs, collision, distinct shader pattern и Inspector preview. Battlefield/grid/arena/lab/camera/resolver gates проходят. Старые height/fill tests больше не фиксируют форму пользовательской E2-карты: точные rule fixtures строятся только в памяти.
+
+## Unified voxel Tile Kit + battle flow decision (2026-09-01)
+
+- Подробный план: `docs/EMBER_VOXEL_TILE_AND_BATTLE_FLOW.md`. Новая art-плотность environment tiles — 32×32 voxel на один gameplay block; legacy models без metadata остаются 16. Добавляется явный `voxelsPerBlock`, а `sizeBlocks` не меняет смысл footprint.
+- Нельзя менять глобальный `VOXELS_PER_BLOCK` с 16 на 32: все 10 текущих maps имеют `tileSize=16`, а 176 models не хранят resolution. Mesh строится в normalized block units; exploration (`tileSize=16`) и battle (`cell=1.2`) используют placement adapters. Текущий `EmberVoxelPrefab` кэш по одному `model_id` не подходит для двух физических размеров без этой нормализации.
+- Автор получает один Godot Tile Kit/library UX с preview/search/tags/favorites и общими Brush/Rectangle/Fill/Pipette/Undo, но два режима layout: World и Battlefield. JOI остаётся source voxel sculptor; Godot — placement/scene/collision/diagnostics. `EmberBattlefieldResource` не владеет world layout, а будущий world pilot не копирует battle semantics.
+- Первый battle plan ещё не закрыт: v1.81/D2.1h сделал safe resize/remap и deployment anchors; v1.82/D2.2a+b добавил Encounter Resource/library и terminal `talk → start_battle` с отдельной outcome chain после возврата. Session хранит только строки/ID, потому что SceneTree уничтожает outgoing Nodes. Остались retry/fade и идемпотентная result transaction.
+- После encounter result gate добавляются reward transaction и combat quest events. Только затем моделируются enemy/tag/count objectives, loot и data-driven action/AI content. Voxel battle kit заменяет MeshLibrary items под прежними semantic ID; world-mode проверяется только на одной sandbox-карте до массовой миграции.
+
+## Godot Ember Migration v1.81 — safe resize + deployment authoring (2026-09-01)
+
+- `EmberBattlefieldResource` теперь владеет ordered `party_deployment_cells` / `enemy_deployment_cells`; `to_grid_dictionary()` проецирует их, а `EmberCombatGrid.initial_state()` размещает текущих lab units по canonical order. Удалены скрытые E2/E3 placement dictionaries. Будущий Encounter Resource свяжет явные unit slots, не создавая второй набор координат.
+- `resize_preview()` является pure remap owner: девять anchors вычисляют offset, row-major terrain/elevation/blocked/groups переносятся в новые arrays, focus ищет ближайшую walkable клетку, deployments remap/crop. Отчёт содержит kept/lost/new cells и потерянные точки; Apply запрещён, если исчезает последняя сторона.
+- `EmberBattlefieldEditorActions.resize_field()` коммитит width/height, четыре cell arrays, focus и обе стороны одной Editor Undo/Redo operation. Inspector показывает dimensions, anchor и loss-preview до Apply; кнопка `Размер…` в 3D toolbar открывает тот же Resource, не второй resize path.
+- Общая палитра расширена с 8 до 10 инструментов: `Точка героев` / `Точка врагов` — single-cell toggle, видимый как Гn/Вn в мини-карте и editor arena. Нельзя ставить start на blocker/focus, накладывать стороны или удалить последнюю точку; Blocked/Focus также не могут незаметно удалить последний deployment.
+- E2/E3 `.tres` получили прежние стартовые позиции как authored data. `content_signature`, validation и save/reopen включают deployments; изменение точки сразу перестраивает editor preview и передвигает lab actor.
+- Gates: `test_battlefield_resource.gd` проверяет centered expansion, counts/offset, safe crop warning, atomic undo/redo, 10 tools, runtime placements и round-trip. Tile library, grid, resolver, arena, camera и Combat Lab tests проходят; headless editor регистрирует/снимает plugin без ошибок. Следующий срез — D2.2a Encounter Resource + visual library.
+
+## Godot Ember Migration v1.82 — Encounter Resource + battle return (2026-09-01)
+
+- Canonical encounters: sibling `../ember-godot/content/combat/encounters/*.tres`, class `EmberEncounterResource`, catalog `EmberEncounterCatalog`. Battlefield Resource остаётся owner cell/deployment data; Encounter хранит ссылки и ordered prototype unit IDs.
+- Action schema расширена восьмым типом `start_battle { encounterId }`. Он terminal; post-result продолжение задаётся `victory_action_script_id` / `defeat_action_script_id`. Store, inline Inspector editor, Ember Graph, runtime normalizer и visual picker используют один тип.
+- `EmberCombatTransition` process-local: pending/active encounter ID, return scene path, outcome action ID. Между сценами нельзя добавлять Node/UI references. Explore save остаётся v1; `arm_saved_spawn_restore()` переиспользует прежний spawn restore после возврата.
+- `combat_lab.tscn` остаётся единственным runtime. HUD может выбрать Encounter из каталога или потребить transition; внешний `EmberCombatGrid3DWorld` получает Battlefield той же встречи. После результата мир создаёт новый InteractionUI и потребляет строковый outcome action.
+- Fixture: `colored_crossing_demo.tres`, start chain `colored_crossing_start`, victory chain `colored_crossing_victory`. Gates: `test_encounter_resource.gd` и реальная смена сцен в `test_combat_encounter_transition.gd`; action/graph/combat/battlefield gates сохраняют parity.
+- Не считать готовыми fade, retry/escape, idempotent reward transaction, полноценные unit/enemy/job/loot Resources или combat quest counters. Следующий срез — result/retry lifecycle, затем quest/reward bridge.
