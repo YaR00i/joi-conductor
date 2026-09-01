@@ -2847,12 +2847,6 @@ body:has(.app-frame--fullscreen) .gelbooru-hub__recs-overlay {
   background: var(--accent);
 }
 
-.doujin-reader:not(.is-chrome) .doujin-run-fab,
-.doujin-reader:not(.is-chrome) .doujin-reader__task-card {
-  opacity: 0;
-  pointer-events: none;
-}
-
 .doujin-lists__cache {
   width: 72%;
   height: 0.35rem;
