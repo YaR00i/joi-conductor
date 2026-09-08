@@ -10,7 +10,11 @@ import type {
 } from "../content/types";
 import { blockStoryHeight } from "../tile/extruded";
 import { VOXELS_PER_BLOCK } from "./constants";
-import { isVoxelModelPhysical, voxelGridSize } from "./voxelModel";
+import {
+  isVoxelModelPhysical,
+  voxelDensity,
+  voxelGridSize,
+} from "./voxelModel";
 import { sceneFootprintVoxels } from "./voxelModelApply";
 import { normalizeVoxelRot } from "./voxelPlacement";
 
@@ -43,7 +47,7 @@ function placementFromWorldCenter(
   scale = 1,
 ): EmberVoxelPlacement {
   const { sx, sz } = voxelGridSize(model);
-  const vw = tileSize / VOXELS_PER_BLOCK;
+  const vw = tileSize / voxelDensity(model);
   return {
     id,
     modelId: model.id,

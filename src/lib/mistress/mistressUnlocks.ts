@@ -172,6 +172,8 @@ export function isModeAllowedForMistress(
   mode: string,
   mistressId: MistressId,
 ): boolean {
+  // Circus: any mask while Sparkle is active.
+  if (mistressId === "sparkle") return true;
   if (isModeBannedForMistress(mode, mistressId)) return false;
   const exclusive = isModeExclusiveToMistress(mode);
   if (!exclusive) return true;
@@ -273,12 +275,14 @@ export function mistressUnlockProgress(
 
 /**
  * Modes / flags to auto-grant when a mistress unlocks.
- * Sparkle: phantom rules live on the pack; no extra mode id yet.
+ * Sparkle: circus wears every mask — exclusive modes of the others + onahole.
  */
 export function modesGrantedWithMistress(id: MistressId): string[] {
-  // onahole stays shop-gated but exclusive to Hu Tao while she is active.
   if (id === "furina") return ["cbt", "prone"];
   if (id === "sunna") return ["oral", "plapping"];
+  if (id === "sparkle") {
+    return ["cbt", "prone", "oral", "plapping", "onahole"];
+  }
   return [];
 }
 

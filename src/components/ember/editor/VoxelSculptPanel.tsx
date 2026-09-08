@@ -97,6 +97,7 @@ import {
   setVoxelTransparency,
   setVoxelTransmittance,
   stampSolidBlock,
+  voxelDensity,
   voxelGridSize,
   voxelTransmittanceLeak,
   voxelTransmittanceShadowParams,
@@ -133,7 +134,11 @@ import {
   fitVoxelPalette,
   replaceVoxelPaletteIndex,
 } from "../../../game/voxel/voxelPaletteOps";
-import { VOXELS_PER_BLOCK, MAX_VOXEL_PALETTE } from "../../../game/voxel/constants";
+import {
+  MAX_VOXEL_PALETTE,
+  NEW_ENVIRONMENT_VOXELS_PER_BLOCK,
+  VOXELS_PER_BLOCK,
+} from "../../../game/voxel/constants";
 import { readEmberBytes } from "../../../game/content/io";
 import {
   packWithVoxels,
@@ -5702,7 +5707,13 @@ export function VoxelSculptPanel({
     }
     const id = `vox_${Date.now().toString(36)}`;
     const created = stampSolidBlock(
-      createEmptyVoxelModel(id, { x: 1, y: 1, z: 1 }, "Новый блок"),
+      createEmptyVoxelModel(
+        id,
+        { x: 1, y: 1, z: 1 },
+        "Новый блок",
+        undefined,
+        NEW_ENVIRONMENT_VOXELS_PER_BLOCK,
+      ),
       1,
     );
     const scene = sceneFromSingleModel(id, "Новый блок", id);
@@ -6334,10 +6345,11 @@ export function VoxelSculptPanel({
 
   const resizeHeightVoxels = (voxels: number) => {
     if (!draft) return;
-    const hv = Math.max(1, Math.min(64, Math.round(voxels)));
+    const density = voxelDensity(draft);
+    const hv = Math.max(1, Math.min(4 * density, Math.round(voxels)));
     const sizeBlocks = {
       ...draft.sizeBlocks,
-      y: Math.max(1, Math.ceil(hv / VOXELS_PER_BLOCK)),
+      y: Math.max(1, Math.ceil(hv / density)),
     };
     applyEdit(resizeVoxelModel(draft, sizeBlocks, hv));
   };

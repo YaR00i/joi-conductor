@@ -1,0 +1,12 @@
+.groq-settings { display: grid; gap: 12px; padding: 18px; border: 1px solid #8aa9b833; border-radius: 16px; background: #718da00b; }
+.groq-settings p, .groq-mode p { margin: 0; font-size: 12px; line-height: 1.55; color: #b7becb; }
+.groq-settings a { color: #a9d8df; }
+.groq-mode { display: grid; gap: 8px; margin-bottom: 10px; }
+.groq-mode__choices { display: flex; gap: 8px; flex-wrap: wrap; }
+.groq-mode__choices button { padding: 9px 14px; border-radius: 10px; border: 1px solid #929db333; background: #ffffff06; color: #c4cad7; cursor: pointer; }
+.groq-mode__choices button[aria-pressed="true"] { background: #99c4cf1c; color: #d7f3f7; border-color: #99c4cf77; }
+.groq-mode__choices button:disabled { opacity: .5; cursor: default; }
+.groq-mode__choices button:focus-visible { outline: 2px solid #99c4cf; outline-offset: 2px; }
+.groq-mode--compact { margin: 0; }
+.groq-mode--compact .groq-mode__choices { gap: 2px; padding: 2px; flex-wrap: nowrap; border: 1px solid var(--line); border-radius: 9px; }
+.groq-mode--compact .groq-mode__choices button { padding: 5px 10px; border-radius: 6px; border-color: transparent; font-size: 12px; line-height: 1.2; }

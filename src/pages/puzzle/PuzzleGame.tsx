@@ -18,7 +18,15 @@ import { PuzzleBoard, type PuzzleBoardHandle } from "./PuzzleBoard";
 import { PuzzleSourcePicker, type PickedImage } from "./PuzzleSourcePicker";
 import { PuzzleTaskRunner, type TaskRunnerMode } from "./PuzzleTaskRunner";
 import { CindersGlyph } from "../../components/CindersGlyph";
+import { MinigameStimToggles } from "../../components/MinigameStimToggles";
 import { UiCheck } from "../../components/UiCheck";
+import { recordMinigameClear } from "../../lib/achievements";
+import {
+  filterTasksForRunner,
+  loadRunnerSettings,
+  saveRunnerSettings,
+  stimVibeMode,
+} from "../../lib/runnerSettings";
 import { getActiveSaveSlot } from "../../lib/saveSlots";
 
 interface Props {
@@ -57,6 +65,7 @@ export function PuzzleGame({ onReward, onExit }: Props) {
   const [rotateEnabled, setRotateEnabled] = useState(false);
   /** Pre-game option: whether the ghost may be earned/used at all. */
   const [showGhost, setShowGhost] = useState(true);
+  const [feel, setFeel] = useState(loadRunnerSettings);
   /** Whether the ghost is actually visible right now (always off at start). */
   const [ghostOn, setGhostOn] = useState(false);
   /** Seconds left of an earned ghost hint (null = no active hint). */
@@ -69,6 +78,7 @@ export function PuzzleGame({ onReward, onExit }: Props) {
   const [startMs, setStartMs] = useState<number | null>(null);
   const [result, setResult] = useState<PuzzleRewardResult | null>(null);
 
+  const claimedRef = useRef(false);
   const startMsRef = useRef<number | null>(null);
   startMsRef.current = startMs;
   const boardRef = useRef<PuzzleBoardHandle>(null);
@@ -107,7 +117,10 @@ export function PuzzleGame({ onReward, onExit }: Props) {
     [difficulty.targetPieces, imgAspect],
   );
 
-  const tasks = useMemo(() => loadPuzzleTasks(), []);
+  const tasks = useMemo(
+    () => filterTasksForRunner(loadPuzzleTasks(), feel),
+    [feel],
+  );
   useEffect(() => {
     const m = new Map<string, PuzzleTask>();
     for (const t of tasks) m.set(t.id, t);
@@ -315,6 +328,8 @@ export function PuzzleGame({ onReward, onExit }: Props) {
       taskPenalty: penaltyRef.current,
     });
     setResult(res);
+    recordMinigameClear("puzzle");
+    claimedRef.current = false;
     setPhase("result");
   }, [result, elapsed, difficulty]);
 
@@ -439,16 +454,6 @@ export function PuzzleGame({ onReward, onExit }: Props) {
             ) : null}
           </div>
 
-          <button
-            type="button"
-            className={`puzzle-btn ${showGhost ? "is-active" : ""}`}
-            onClick={() => setShowGhost((v) => !v)}
-            title="Разрешить призрак: в игре он включается кнопкой (за задание) или особым кусочком"
-            aria-pressed={showGhost}
-          >
-            Призрак
-          </button>
-
           <div className="ember-menubar__current puzzle-config__toolbar-info">
             <CindersGlyph className="puzzle-config__toolbar-glyph" />
             <span>{difficulty.specialPieces} особых</span>
@@ -466,6 +471,14 @@ export function PuzzleGame({ onReward, onExit }: Props) {
             </button>
           </div>
         </nav>
+
+        <MinigameStimToggles
+          settings={feel}
+          onChange={(next) => {
+            setFeel(next);
+            saveRunnerSettings(next);
+          }}
+        />
 
         <div className="puzzle-config__stage">
           <div className="puzzle-config__frame">
@@ -530,14 +543,27 @@ export function PuzzleGame({ onReward, onExit }: Props) {
               type="button"
               className="puzzle-config__start"
               onClick={() => {
-                onReward(result.total);
+                if (!claimedRef.current) {
+                  claimedRef.current = true;
+                  onReward(result.total);
+                }
                 onExit();
               }}
             >
               <CindersGlyph className="puzzle-result__btn-glyph" />
               Забрать {result.total}
             </button>
-            <button type="button" className="puzzle-btn" onClick={() => setPhase("source")}>
+            <button
+              type="button"
+              className="puzzle-btn"
+              onClick={() => {
+                if (!claimedRef.current) {
+                  claimedRef.current = true;
+                  onReward(result.total);
+                }
+                setPhase("source");
+              }}
+            >
               Новый пазл
             </button>
           </div>
@@ -583,7 +609,7 @@ export function PuzzleGame({ onReward, onExit }: Props) {
             onClick={() => (ghostOn ? setGhostOn(false) : requestGhost())}
             title={
               !showGhost
-                ? "Призрак отключён в опциях (перед игной включи «Призрак»)"
+                ? "Призрак отключён в опциях (перед игрой включи «Призрак»)"
                 : ghostOn
                   ? "Скрыть призрак"
                   : "Заработать призрак: выполни задание — подсказка на 30 секунд"
@@ -650,6 +676,7 @@ export function PuzzleGame({ onReward, onExit }: Props) {
           mode={overlay.mode as TaskRunnerMode}
           task={overlay.task}
           remaining={perTouch?.remaining}
+          vibeMode={stimVibeMode(feel)}
           allowCancel={getActiveSaveSlot() === "sandbox"}
           onComplete={onOverlayComplete}
         />

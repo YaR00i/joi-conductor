@@ -14,6 +14,7 @@ import {
   markSectionBriefingCompleted,
   markSectionBriefingDismissed,
   reopenAllSectionBriefings,
+  dismissAllSectionBriefings,
   reopenSectionBriefing,
   sectionBriefingCopy,
   shouldShowSectionBriefing,
@@ -89,6 +90,13 @@ describe("sectionBriefings", () => {
     for (const id of BRIEFABLE_NAV_IDS) {
       expect(sectionBriefingCopy(id).id).toBe(id);
       expect(sectionBriefingCopy(id).titleRu.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("dismisses every first-visit overlay at once", () => {
+    dismissAllSectionBriefings();
+    for (const id of BRIEFABLE_NAV_IDS) {
+      expect(shouldShowSectionBriefing(id)).toBe(false);
     }
   });
 });

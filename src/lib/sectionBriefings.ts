@@ -220,6 +220,13 @@ export function reopenAllSectionBriefings(): void {
   saveSectionBriefingsState(defaultSectionBriefingsState());
 }
 
+/** Hide every first-visit overlay (agent smoke / «не мешай играть»). */
+export function dismissAllSectionBriefings(): void {
+  const byId: SectionBriefingsState["byId"] = {};
+  for (const id of BRIEFABLE_NAV_IDS) byId[id] = "dismissed";
+  saveSectionBriefingsState({ byId });
+}
+
 export function reopenSectionBriefing(id: BriefableNavId): void {
   const state = loadSectionBriefingsState();
   state.byId[id] = "pending";

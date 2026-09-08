@@ -255,6 +255,22 @@
         "finishId": "hand",
         "cumplayId": "none"
       }
+    },
+    {
+      "id": "madness",
+      "nameRu": "Безумие",
+      "descriptionRu": "Circus: хаос и гипноз — высокий BPM, мало cum. Режим любой.",
+      "params": {
+        "durationSec": 900,
+        "edgesTarget": 8,
+        "ruinsTarget": 2,
+        "pCum": 0.18,
+        "pRuin": 0.4,
+        "bpmMin": 80,
+        "bpmMax": 140,
+        "blockSecMin": 18,
+        "blockSecMax": 36
+      }
     }
   ]
 }

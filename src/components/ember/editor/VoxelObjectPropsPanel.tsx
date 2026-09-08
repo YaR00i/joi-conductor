@@ -20,7 +20,6 @@ import {
   resolveEmissiveLightRange,
   resolveEmissiveStrength,
 } from "../../../game/tile/emissivePaint";
-import { VOXELS_PER_BLOCK } from "../../../game/voxel/constants";
 import {
   addVoxelEmissiveLamp,
   clusterVoxelEmissiveLamps,
@@ -36,6 +35,7 @@ import {
   paletteGroupHitsSelection,
   setPaletteGroupChannel,
   setPaletteSlotColors,
+  voxelDensity,
   voxelGridSize,
   type VoxelPaintChannel,
   type VoxelPaletteGroup,
@@ -357,10 +357,11 @@ export function VoxelObjectPropsPanel({
   }
 
   const grid = model ? voxelGridSize(model) : null;
+  const density = model ? voxelDensity(model) : 16;
   const families = model ? listPaletteGroupFamilies(model) : [];
   const heightVoxels =
     model?.heightVoxels ??
-    (model ? model.sizeBlocks.y * VOXELS_PER_BLOCK : 1);
+    (model ? model.sizeBlocks.y * density : 1);
   const hasEmit = model ? modelHasEmissiveVoxels(model) : false;
   const castsLight = model?.emissiveCastsLight === true;
   const lightShadows = model?.emissiveLightShadows === true;
@@ -467,7 +468,7 @@ export function VoxelObjectPropsPanel({
         <>
           <div className="ember-voxel-objprops__canvas">
             <span className="ember-voxel-objprops__sub">
-              Холст · {grid.sx}×{grid.sy}×{grid.sz} вокс
+              Холст · {grid.sx}×{grid.sy}×{grid.sz} вокс · {density}/блок
             </span>
             <label>
               <span>Ширина</span>
@@ -495,7 +496,7 @@ export function VoxelObjectPropsPanel({
               <span>Высота</span>
               <EnterCommitIntegerInput
                 min={1}
-                max={64}
+                max={4 * density}
                 value={heightVoxels}
                 title="Высота в вокселях"
                 onCommit={onResizeHeight}

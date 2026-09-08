@@ -14,6 +14,12 @@ import {
   HU_TAO_MOOD_PORTRAIT,
   HU_TAO_SHOP_AVATAR_SRC,
 } from "../huTaoEmoji";
+import {
+  SPARKLE_AVATAR_SRC,
+  SPARKLE_MOOD_AVATAR,
+  SPARKLE_MOOD_PORTRAIT,
+  SPARKLE_SHOP_AVATAR_SRC,
+} from "../sparkleArt";
 import type { SessionMood } from "../types";
 import type { MoodLinesPack } from "../voice/moodLines";
 import type { AssembleTag, MistressPack, MistressId } from "./types";
@@ -365,14 +371,12 @@ export const SPARKLE_PACK: MistressPack = {
   },
   bible: sparkleBible,
   moodLines: sparkleMoodLines,
-  assets: packMoodAssets("sparkle", {
-    sweet: "Искорка",
-    calm: "Маска",
-    bored: "Пустая",
-    cruel: "Искра",
-    chaotic: "Хаос",
-    horny: "Глючная",
-  }),
+  assets: {
+    avatarFull: SPARKLE_AVATAR_SRC,
+    shopAvatar: SPARKLE_SHOP_AVATAR_SRC,
+    moodPortrait: SPARKLE_MOOD_PORTRAIT,
+    moodAvatar: SPARKLE_MOOD_AVATAR,
+  },
   media: {
     primaryDefaultTags: "sparkle_(honkai:_star_rail) rating:explicit",
     focusTags: [
@@ -392,14 +396,15 @@ export const SPARKLE_PACK: MistressPack = {
     ),
   },
   play: {
-    summaryRu: "Анал в клетке, phantom stroke, глюки",
+    summaryRu: "Анал в клетке, phantom stroke, безумие",
     hardnessRu: "Максимум",
     preferredModes: ["anal", "chastity"],
     functionWeightHints: ["anal", "cbt", "vibe"],
     notesRu: [
       "Разблок: Tide+Idol · anal+клетка · оба пака · Маска+Клык · 1 сессия в клетке",
+      "Пока она активна — все режимы сессии (цирк надевает любую маску)",
       "Phantom stroke + orgasm gate: anal/chastity only",
-      "SessionFx + флаги sparkle_phantom / sparkle_session_fx при разблоке",
+      "Тема эффектов «Безумие» + флаги sparkle_phantom / sparkle_session_fx",
     ],
     phantomStroke: true,
     analOrgasmOnly: true,

@@ -9,9 +9,11 @@ import {
 } from "../ollamaCatalog";
 
 export const CHAT_LLM_STORAGE_KEY = "joi-chat-llm-v1";
+export const CHAT_LLM_CHANGED_EVENT = "joi-chat-llm-changed";
 
 export const CHAT_LLM_PROVIDERS = [
   "ollama",
+  "groq",
   "openrouter",
   "openai",
   "custom",
@@ -31,12 +33,37 @@ export type ChatLlmSampling = {
   timeoutMs: number;
 };
 
+export const SOUL_MODEL_ROLES = ["chat", "router", "extractor", "planner"] as const;
+export type SoulModelRole = (typeof SOUL_MODEL_ROLES)[number];
+
+export const CHAT_GENERATION_PRESETS = [
+  "stable",
+  "balanced",
+  "expressive",
+] as const;
+export type ChatGenerationPreset = (typeof CHAT_GENERATION_PRESETS)[number];
+
+export type SoulRoleModels = {
+  router: string;
+  extractor: string;
+  planner: string;
+};
+
 export type ChatLlmSettings = {
   provider: ChatLlmProvider;
   model: string;
   endpoint: string;
   apiKey: string;
   sampling: ChatLlmSampling;
+  generationPreset?: ChatGenerationPreset;
+  roleModels?: Partial<SoulRoleModels>;
+  /** Program-first by default; model planning runs only after explicit acceptance. */
+  sessionPlanner?: "program" | "model";
+  voiceExamples?: boolean;
+  turnDebug?: boolean;
+  /** Explicit cloud conversation; empty means private/local. Rotated on entry. */
+  groqConversationId?: string;
+  groqLocalModel?: string;
 };
 
 /** SoW main_settings: temperature 0.8, top_p 0.7, max_tokens 1000, min_p 0.07, freq 0.4, presence 0.3. */
@@ -52,9 +79,89 @@ export const DEFAULT_CHAT_SAMPLING: ChatLlmSampling = {
   timeoutMs: 90000,
 };
 
+export const CHAT_GENERATION_PRESET_SAMPLING: Record<
+  ChatGenerationPreset,
+  Omit<ChatLlmSampling, "timeoutMs" | "maxTokens">
+> = {
+  stable: {
+    temperature: 0.58,
+    topP: 0.8,
+    minP: 0.06,
+    topK: 40,
+    frequencyPenalty: 0.5,
+    presencePenalty: 0.2,
+    repeatPenalty: 1.18,
+  },
+  balanced: {
+    temperature: DEFAULT_CHAT_SAMPLING.temperature,
+    topP: DEFAULT_CHAT_SAMPLING.topP,
+    minP: DEFAULT_CHAT_SAMPLING.minP,
+    topK: DEFAULT_CHAT_SAMPLING.topK,
+    frequencyPenalty: DEFAULT_CHAT_SAMPLING.frequencyPenalty,
+    presencePenalty: DEFAULT_CHAT_SAMPLING.presencePenalty,
+    repeatPenalty: DEFAULT_CHAT_SAMPLING.repeatPenalty,
+  },
+  expressive: {
+    temperature: 0.9,
+    topP: 0.92,
+    minP: 0.04,
+    topK: 50,
+    frequencyPenalty: 0.35,
+    presencePenalty: 0.4,
+    repeatPenalty: 1.12,
+  },
+};
+
+export const ROUTER_ROLE_SAMPLING: ChatLlmSampling = {
+  temperature: 0.15,
+  topP: 0.8,
+  minP: 0.05,
+  topK: 20,
+  maxTokens: 1400,
+  frequencyPenalty: 0.15,
+  presencePenalty: 0,
+  repeatPenalty: 1.05,
+  timeoutMs: DEFAULT_CHAT_SAMPLING.timeoutMs,
+};
+
+export const EXTRACTOR_ROLE_SAMPLING: ChatLlmSampling = {
+  temperature: 0.05,
+  topP: 0.7,
+  minP: 0.02,
+  topK: 20,
+  maxTokens: 400,
+  frequencyPenalty: 0,
+  presencePenalty: 0,
+  repeatPenalty: 1.05,
+  timeoutMs: DEFAULT_CHAT_SAMPLING.timeoutMs,
+};
+
+export const PLANNER_ROLE_SAMPLING: ChatLlmSampling = {
+  temperature: 0.1,
+  topP: 0.75,
+  minP: 0.03,
+  topK: 20,
+  maxTokens: 900,
+  frequencyPenalty: 0,
+  presencePenalty: 0,
+  repeatPenalty: 1.05,
+  timeoutMs: DEFAULT_CHAT_SAMPLING.timeoutMs,
+};
+
+export const DEFAULT_ROLE_MODELS: SoulRoleModels = {
+  router: "",
+  extractor: "",
+  planner: "",
+};
+
 export const OPENROUTER_CHAT_URL =
   "https://openrouter.ai/api/v1/chat/completions";
 export const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
+export const GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions";
+export const CHAT_GROQ_PRESETS: readonly ChatModelPreset[] = [
+  { id: "openai/gpt-oss-120b", hint: "Обычный разговор · основной" },
+  { id: "openai/gpt-oss-20b", hint: "Быстрый ответ" },
+];
 export const CUSTOM_CHAT_URL_DEFAULT =
   "http://127.0.0.1:1234/v1/chat/completions";
 
@@ -64,6 +171,11 @@ export const DEFAULT_CHAT_LLM: ChatLlmSettings = {
   endpoint: "",
   apiKey: "",
   sampling: { ...DEFAULT_CHAT_SAMPLING },
+  generationPreset: "balanced",
+  roleModels: { ...DEFAULT_ROLE_MODELS },
+  sessionPlanner: "program",
+  voiceExamples: true,
+  turnDebug: false,
 };
 
 export type ChatModelPreset = OllamaModelPreset;
@@ -84,10 +196,49 @@ export const CHAT_OPENAI_PRESETS: readonly ChatModelPreset[] = [
   { id: "gpt-4o-mini", hint: "дешевле" },
 ];
 
+export function chatGenerationPresetLabelRu(preset: ChatGenerationPreset): string {
+  switch (preset) {
+    case "stable":
+      return "Спокойный";
+    case "balanced":
+      return "Сбалансированный";
+    case "expressive":
+      return "Выразительный";
+    default: {
+      const _exhaustive: never = preset;
+      return _exhaustive;
+    }
+  }
+}
+
+export function isChatGenerationPreset(v: unknown): v is ChatGenerationPreset {
+  return (
+    typeof v === "string" &&
+    (CHAT_GENERATION_PRESETS as readonly string[]).includes(v)
+  );
+}
+
+export function applyChatGenerationPreset(
+  settings: ChatLlmSettings,
+  preset: ChatGenerationPreset,
+): ChatLlmSettings {
+  const base = CHAT_GENERATION_PRESET_SAMPLING[preset];
+  return {
+    ...settings,
+    generationPreset: preset,
+    sampling: {
+      ...settings.sampling,
+      ...base,
+    },
+  };
+}
+
 export function chatLlmProviderLabelRu(provider: ChatLlmProvider): string {
   switch (provider) {
     case "ollama":
       return "Ollama";
+    case "groq":
+      return "Groq + Ollama";
     case "openrouter":
       return "OpenRouter";
     case "openai":
@@ -114,6 +265,8 @@ export function chatPresetsFor(
   switch (provider) {
     case "ollama":
       return CHAT_OLLAMA_PRESETS;
+    case "groq":
+      return CHAT_GROQ_PRESETS;
     case "openrouter":
       return CHAT_OPENROUTER_PRESETS;
     case "openai":
@@ -137,6 +290,8 @@ export function endpointForProvider(
       return customEndpoint.trim() || ollamaFallback;
     case "openrouter":
       return OPENROUTER_CHAT_URL;
+    case "groq":
+      return GROQ_CHAT_URL;
     case "openai":
       return OPENAI_CHAT_URL;
     case "custom":
@@ -186,10 +341,26 @@ export function sanitizeChatSampling(
   };
 }
 
+function sanitizeRoleModels(raw: Partial<SoulRoleModels> | undefined): SoulRoleModels {
+  return {
+    router: typeof raw?.router === "string" ? raw.router.trim() : "",
+    extractor: typeof raw?.extractor === "string" ? raw.extractor.trim() : "",
+    planner: typeof raw?.planner === "string" ? raw.planner.trim() : "",
+  };
+}
+
+export function emptyChatLlmSettings(): ChatLlmSettings {
+  return {
+    ...DEFAULT_CHAT_LLM,
+    sampling: { ...DEFAULT_CHAT_SAMPLING },
+    roleModels: { ...DEFAULT_ROLE_MODELS },
+  };
+}
+
 export function loadChatLlmSettings(): ChatLlmSettings {
   try {
     const raw = localStorage.getItem(CHAT_LLM_STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_CHAT_LLM, sampling: { ...DEFAULT_CHAT_SAMPLING } };
+    if (!raw) return emptyChatLlmSettings();
     const parsed = JSON.parse(raw) as Partial<ChatLlmSettings>;
     const provider = isChatLlmProvider(parsed.provider)
       ? parsed.provider
@@ -200,26 +371,46 @@ export function loadChatLlmSettings(): ChatLlmSettings {
       endpoint: typeof parsed.endpoint === "string" ? parsed.endpoint : "",
       apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : "",
       sampling: sanitizeChatSampling(parsed.sampling),
+      generationPreset: isChatGenerationPreset(parsed.generationPreset)
+        ? parsed.generationPreset
+        : "balanced",
+      roleModels: sanitizeRoleModels(parsed.roleModels),
+      sessionPlanner: parsed.sessionPlanner === "model" ? "model" : "program",
+      voiceExamples: parsed.voiceExamples !== false,
+      turnDebug: parsed.turnDebug === true,
+      groqConversationId: typeof parsed.groqConversationId === "string" ? parsed.groqConversationId.slice(0, 100) : "",
+      groqLocalModel: typeof parsed.groqLocalModel === "string" ? parsed.groqLocalModel.trim() : "",
     };
   } catch {
-    return { ...DEFAULT_CHAT_LLM, sampling: { ...DEFAULT_CHAT_SAMPLING } };
+    return emptyChatLlmSettings();
   }
+}
+
+export function notifyChatLlmChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(CHAT_LLM_CHANGED_EVENT));
 }
 
 export function saveChatLlmSettings(next: ChatLlmSettings): void {
   try {
     localStorage.setItem(CHAT_LLM_STORAGE_KEY, JSON.stringify(next));
+    notifyChatLlmChanged();
   } catch {
     /* quota */
   }
 }
 
 export type ResolvedChatLlm = {
+  localFallback?: ResolvedChatLlm;
   provider: ChatLlmProvider;
   model: string;
   endpoint: string;
   apiKey: string;
   sampling: ChatLlmSampling;
+  generationPreset?: ChatGenerationPreset;
+  roleModels?: SoulRoleModels;
+  sessionPlanner?: "program" | "model";
+  voiceExamples?: boolean;
 };
 
 export function resolveChatLlm(
@@ -242,11 +433,73 @@ export function resolveChatLlm(
     endpoint,
     apiKey: chat.apiKey.trim(),
     sampling,
+    generationPreset: isChatGenerationPreset(chat.generationPreset)
+      ? chat.generationPreset
+      : "balanced",
+    roleModels: sanitizeRoleModels(chat.roleModels),
+    sessionPlanner: chat.sessionPlanner === "model" ? "model" : "program",
+    voiceExamples: chat.voiceExamples !== false,
+    ...(chat.provider === "groq" ? {
+      localFallback: resolveChatLlm({
+        ...chat, provider: "ollama", model: chat.groqLocalModel || "",
+        endpoint: "", apiKey: "",
+      }, voice),
+    } : {}),
   };
+}
+
+export function modelForRole(
+  resolved: Pick<ResolvedChatLlm, "model" | "roleModels">,
+  role: SoulModelRole,
+): string {
+  switch (role) {
+    case "chat":
+      return resolved.model;
+    case "router":
+      return resolved.roleModels?.router?.trim() || resolved.model;
+    case "extractor":
+      return resolved.roleModels?.extractor?.trim() || resolved.model;
+    case "planner":
+      return resolved.roleModels?.planner?.trim() || resolved.model;
+    default: {
+      const _exhaustive: never = role;
+      return _exhaustive;
+    }
+  }
+}
+
+export function samplingForRole(
+  resolved: Pick<ResolvedChatLlm, "sampling">,
+  role: SoulModelRole,
+): ChatLlmSampling {
+  switch (role) {
+    case "chat":
+      return resolved.sampling;
+    case "router":
+      return {
+        ...ROUTER_ROLE_SAMPLING,
+        timeoutMs: resolved.sampling.timeoutMs,
+      };
+    case "extractor":
+      return {
+        ...EXTRACTOR_ROLE_SAMPLING,
+        timeoutMs: resolved.sampling.timeoutMs,
+      };
+    case "planner":
+      return {
+        ...PLANNER_ROLE_SAMPLING,
+        timeoutMs: resolved.sampling.timeoutMs,
+      };
+    default: {
+      const _exhaustive: never = role;
+      return _exhaustive;
+    }
+  }
 }
 
 export function chatProviderNeedsKey(provider: ChatLlmProvider): boolean {
   switch (provider) {
+    case "groq":
     case "openrouter":
     case "openai":
       return true;
@@ -261,6 +514,10 @@ export function chatProviderNeedsKey(provider: ChatLlmProvider): boolean {
   }
 }
 
+export type ChatCompletionJsonFormat = {
+  type: "json_object";
+};
+
 export type ChatCompletionBody = {
   model: string;
   temperature: number;
@@ -271,20 +528,30 @@ export type ChatCompletionBody = {
   messages: Array<{ role: string; content: string }>;
   stop?: string[];
   think?: boolean;
+  response_format?: ChatCompletionJsonFormat;
   options?: Record<string, number | boolean>;
+  reasoning_effort?: "low";
+};
+
+export type ChatCompletionOverride = {
+  maxTokens?: number;
+  temperature?: number;
+  think?: boolean;
+  role?: SoulModelRole;
 };
 
 export function buildChatCompletionBody(
   resolved: ResolvedChatLlm,
   messages: Array<{ role: string; content: string }>,
-  override?: { maxTokens?: number; temperature?: number; think?: boolean },
+  override?: ChatCompletionOverride,
 ): ChatCompletionBody {
-  const sampling = resolved.sampling;
+  const role = override?.role ?? "chat";
+  const sampling = samplingForRole(resolved, role);
   const temperature = override?.temperature ?? sampling.temperature;
-  const think = Boolean(override?.think);
+  const think = role === "chat" ? Boolean(override?.think) : false;
   const maxTokens = override?.maxTokens ?? sampling.maxTokens;
   const body: ChatCompletionBody = {
-    model: resolved.model,
+    model: modelForRole(resolved, role),
     temperature,
     top_p: sampling.topP,
     max_tokens: maxTokens,
@@ -296,6 +563,11 @@ export function buildChatCompletionBody(
     stop: ["<|im_end|>", "<|endoftext|>"],
   };
   if (think) body.think = true;
+  if (resolved.provider === "groq") {
+    delete body.think;
+    delete body.stop;
+    if (resolved.model.startsWith("openai/gpt-oss-")) body.reasoning_effort = "low";
+  }
   if (resolved.provider === "ollama") {
     if (!think) body.think = false;
     body.options = {
@@ -308,6 +580,9 @@ export function buildChatCompletionBody(
         : sampling.repeatPenalty,
       num_predict: maxTokens,
     };
+    if (role === "router" || role === "extractor" || role === "planner") {
+      body.response_format = { type: "json_object" };
+    }
   }
   return body;
 }
@@ -578,12 +853,8 @@ export function harvestChatCompletion(data: unknown): {
       }
     }
   }
-  let think = collapseRepeatedSpeech(uniqueJoin(thinkBits));
-  let speech = clipSpokenReply(uniqueJoin(speechBits));
-  if (!speech && think) {
-    speech = clipSpokenReply(think);
-  }
-  if (think && speech && think === speech) think = "";
+  const think = collapseRepeatedSpeech(uniqueJoin(thinkBits));
+  const speech = clipSpokenReply(uniqueJoin(speechBits));
   return { think, speech };
 }
 

@@ -1,5 +1,13 @@
-/** Voxels along one axis of a single world block. */
+/** Legacy/default art density and gameplay-voxel unit. Do not change globally. */
 export const VOXELS_PER_BLOCK = 16;
+
+/** New environment art uses a denser grid without changing its world footprint. */
+export const NEW_ENVIRONMENT_VOXELS_PER_BLOCK = 32;
+export const VOXEL_DENSITIES = [16, 32] as const;
+
+export function normalizeVoxelsPerBlock(value: unknown): 16 | 32 {
+  return Number(value) === NEW_ENVIRONMENT_VOXELS_PER_BLOCK ? 32 : 16;
+}
 
 /** Palette array length cap (index 0 = air). */
 export const MAX_VOXEL_PALETTE = 256;

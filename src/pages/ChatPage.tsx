@@ -1,11 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type SetStateAction } from "react";
+import "./chatPage.css";
 import { ChatLlmPanel } from "../components/ChatLlmPanel";
+import { GroqConversationSwitch } from "../components/GroqSettings";
 import { ChatMessageActions } from "../components/ChatMessageActions";
 import { ChatCommandPalette } from "../components/ChatCommandPalette";
 import { ChatSpeechOffers } from "../components/ChatSpeechOffers";
 import { ChatThinkFold } from "../components/ChatThinkFold";
+import { ChatTurnDebugFold } from "../components/ChatTurnDebugFold";
 import { MistressImg } from "../components/MistressImg";
 import { UiCheck } from "../components/UiCheck";
+import { useChatProposals } from "./useChatProposals";
 import {
   getActiveMistress,
   subscribeActiveMistress,
@@ -18,7 +22,7 @@ import {
   saveSoulState,
   sendSoulChatTurn,
   soulNeedsSync,
-  syncSoulMemory,
+  syncSoulMemoryDetailed,
   soulMemoryModeLabelRu,
   SOUL_MEMORY_MODES,
   regenerateSoulReply,
@@ -27,15 +31,28 @@ import {
   loadChatLlmSettings,
   saveChatLlmSettings,
   resolveChatLlm,
+  CHAT_LLM_CHANGED_EVENT,
   newSoulMessage,
+  lastSoulSessionEvent,
+  formatIntentLabelRu,
+  stanceMemoryView,
+  clearSoulDiary,
+  clearSoulTopics,
   type SoulMemoryMode,
   type SoulMistressState,
   type ChatLlmSettings,
 } from "../lib/soul";
+import type { SoulTurnDebugSnapshot } from "../lib/soul/turnDebug";
+import {
+  mergePlannerDebug,
+  mergeProposalLifecycleDebug,
+  mergeRouterDebug,
+  type SoulProposalLifecycleState,
+} from "../lib/soul/turnDebug";
 import { getActiveSaveSlot } from "../lib/saveSlots";
 import {
-  applyControlActions,
   assembleProgramSession,
+  buildAcceptedSession,
   clearPendingProposal,
   CONTROL_CHANGED_EVENT,
   controlLiveSnapshot,
@@ -50,8 +67,8 @@ import {
   dropTaskOffer,
   matchChatCommands,
   parseChatCommand,
-  parseSpeechOffers,
   refuseSessionOffer,
+  recordControlSessionKind,
   reportMorningPack,
   runChatCommand,
   sessionKindLabelRu,
@@ -61,21 +78,21 @@ import {
   type ChatChip,
   type ChatCommandId,
   type ChatContractOffer,
-  type SpeechOffer,
-  type SpeechOfferKind,
-  type ControlAction,
+  type ChatProposal,
   type ControlLiveSnapshot,
   type ControlState,
   type MistressSessionProposal,
   type QueuePatchEdit,
 } from "../lib/soul/control";
+import {
+  acceptChatProposal,
+  refuseChatProposal,
+} from "../lib/soul/control/proposalApply";
 import type { PlanRouletteResult } from "../lib/planRoulette";
 import {
-  assignProgramContract,
   findContract,
   type ContractInstance,
 } from "../lib/contracts/dailyBoard";
-import { denyPunishSpec } from "../lib/progressN";
 import { playUiClick, playUiConfirm, primeUiAudio } from "../lib/uiSound";
 import {
   clampTtsVolume,
@@ -112,7 +129,9 @@ type Props = {
   ttsVolume?: number;
   onTtsVolume?: (volume: number) => void;
   onStartHerSession?: (proposal: MistressSessionProposal) => void;
-  onStartAssembledSession?: (result: PlanRouletteResult) => void;
+  onStartAssembledSession?: (
+    result: PlanRouletteResult,
+  ) => void | Promise<void>;
   onAcceptContract?: (contract: ContractInstance) => void;
   onPatchQueue?: (edit: QueuePatchEdit) => boolean;
 };
@@ -126,6 +145,10 @@ function loadSpeakPref(): boolean {
 }
 
 type SheetTab = "control" | "memory" | "model";
+
+type RetryTurn =
+  | { kind: "send"; messageId: string; skipSpeechOffers?: boolean }
+  | { kind: "regenerate"; messageId: string };
 
 const SHEET_TABS: { id: SheetTab; labelRu: string }[] = [
   { id: "control", labelRu: "Власть" },
@@ -149,42 +172,6 @@ function wearKindRu(kind: "cage" | "plug"): string {
       return "Пробка";
     default: {
       const _exhaustive: never = kind;
-      return _exhaustive;
-    }
-  }
-}
-
-type TimedOrder =
-  | Extract<ControlAction, { op: "set_wear" }>
-  | Extract<ControlAction, { op: "set_denial" }>;
-
-function isTimedOrder(action: ControlAction): action is TimedOrder {
-  return action.op === "set_wear" || action.op === "set_denial";
-}
-
-function timedOrderTitleRu(order: TimedOrder): string {
-  switch (order.op) {
-    case "set_wear":
-      return order.kind === "cage"
-        ? `Надень клетку · ${order.hours} ч`
-        : `Вставь пробку · ${order.hours} ч`;
-    case "set_denial":
-      return `Denial · ${order.hours} ч${order.edges ? ` · эджи ${order.edges}` : ""}`;
-    default: {
-      const _exhaustive: never = order;
-      return _exhaustive;
-    }
-  }
-}
-
-function timedOrderConfirmRu(order: TimedOrder): string {
-  switch (order.op) {
-    case "set_wear":
-      return order.kind === "cage" ? "Надел" : "Поставил";
-    case "set_denial":
-      return "Принял";
-    default: {
-      const _exhaustive: never = order;
       return _exhaustive;
     }
   }
@@ -216,19 +203,31 @@ function lastUserReceipt(
 function chatEmptyHint(mode: SoulMemoryMode): string {
   switch (mode) {
     case 0:
-      return "Напиши ей или /помощь. После пары реплик роутер обновит MEMORY.md, USER.md, темы и дневник.";
+      return "Расскажи, что сейчас занимает голову. Важное останется в памяти разговора.";
     case 1:
-      return "Напиши ей. После пары реплик обновится индекс и дневник — без отдельных тем.";
+      return "Начни с любого места — она сохранит нить разговора и вернётся к ней позже.";
     case 2:
-      return "Напиши ей. После пары реплик обновится индекс памяти, без дневника.";
+      return "Можно говорить без предисловий. Главное из разговора не потеряется.";
     case 3:
-      return "Напиши ей. После пары реплик она допишет дневник, без роутера тем.";
+      return "Расскажи, как прошёл день, или сразу попроси помочь с выбором.";
     default: {
       const _exhaustive: never = mode;
       return _exhaustive;
     }
   }
 }
+
+const CHAT_STARTERS = [
+  "Помоги собраться с мыслями",
+  "Разбери со мной сегодняшний день",
+  "Предложи короткую сессию",
+] as const;
+
+type TurnDebugMap = Record<string, SoulTurnDebugSnapshot>;
+
+// Dev-only continuity across Chat → Session → Chat navigation. This deliberately
+// never enters Soul/localStorage and is discarded with the renderer process.
+let volatileTurnDebug: TurnDebugMap = {};
 
 function saveSpeakPref(on: boolean): void {
   try {
@@ -253,6 +252,9 @@ function chatLlmGate(
   ollama: OllamaStatus | null,
 ): { ready: boolean; detailRu: string } {
   const resolved = resolveChatLlm(chat, loadVoiceSettings());
+  if (chat.provider === "groq" && !chat.groqConversationId) {
+    return chatLlmGate({ ...chat, provider: "ollama", model: chat.groqLocalModel || "", endpoint: "", apiKey: "" }, ollama);
+  }
   switch (chat.provider) {
     case "ollama": {
       if (!ollama) return { ready: false, detailRu: "Проверяю ИИ…" };
@@ -275,6 +277,7 @@ function chatLlmGate(
     }
     case "openrouter":
     case "openai":
+    case "groq":
       if (!resolved.apiKey) {
         return {
           ready: false,
@@ -325,6 +328,9 @@ export function ChatPage({
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deliveryNotice, setDeliveryNotice] = useState<string | null>(null);
+  const [retryTurn, setRetryTurn] = useState<RetryTurn | null>(null);
+  const [streamPreview, setStreamPreview] = useState("");
   const [speakOn, setSpeakOn] = useState(loadSpeakPref);
   const [volume, setVolume] = useState(
     () => ttsVolume ?? loadVoiceSettings().ttsVolume,
@@ -341,18 +347,31 @@ export function ChatPage({
   const [cmdNotes, setCmdNotes] = useState<Array<{ id: string; text: string }>>(
     [],
   );
-  const [timedOrders, setTimedOrders] = useState<TimedOrder[]>([]);
-  const [dismissedSpeech, setDismissedSpeech] = useState<
-    Record<string, SpeechOfferKind[]>
-  >({});
-  const [quietSpeechIds, setQuietSpeechIds] = useState<string[]>([]);
+  const proposals = useChatProposals();
+  const [turnDebug, setTurnDebugState] = useState<TurnDebugMap>(
+    () => volatileTurnDebug,
+  );
+  const turnDebugMountedRef = useRef(true);
   const listRef = useRef<HTMLDivElement>(null);
   const soulRef = useRef(soul);
   const packRef = useRef(pack);
+
+  function setTurnDebug(next: SetStateAction<TurnDebugMap>) {
+    volatileTurnDebug =
+      typeof next === "function" ? next(volatileTurnDebug) : next;
+    if (turnDebugMountedRef.current) setTurnDebugState(volatileTurnDebug);
+  }
+
+  useEffect(() => {
+    turnDebugMountedRef.current = true;
+    return () => {
+      turnDebugMountedRef.current = false;
+    };
+  }, []);
   const chatLlmRef = useRef(chatLlm);
   const ollamaStatusRef = useRef<OllamaStatus | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const syncingRef = useRef(false);
+  const syncingRef = useRef<AbortController | null>(null);
   soulRef.current = soul;
   packRef.current = pack;
   chatLlmRef.current = chatLlm;
@@ -367,13 +386,18 @@ export function ChatPage({
       abortRef.current?.abort();
       abortRef.current = null;
       setPack(next);
+      setDeliveryNotice(null);
+      setRetryTurn(null);
+      setStreamPreview("");
       setSoul(loadSoulState(next.id, next.bible));
+      setTurnDebug({});
       refreshControl(next.id);
+      proposals.clearAll();
       setError(null);
       setBusy(false);
       setSyncing(false);
       setEditingId(null);
-      syncingRef.current = false;
+      syncingRef.current = null;
     });
   }, []);
 
@@ -382,6 +406,13 @@ export function ChatPage({
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [soul.messages.length, busy, cmdNotes.length]);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 140) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [streamPreview]);
 
   useEffect(() => {
     return () => {
@@ -406,11 +437,12 @@ export function ChatPage({
   }
 
   useEffect(() => {
-    if (chatLlm.provider !== "ollama") {
+    if (chatLlm.provider !== "ollama" && chatLlm.provider !== "groq") {
       setOllamaStatus(null);
       return;
     }
-    const model = resolveChatLlm(chatLlm, loadVoiceSettings()).model;
+    const config = resolveChatLlm(chatLlm, loadVoiceSettings());
+    const model = config.localFallback?.model ?? config.model;
     let cancelled = false;
     const tick = async () => {
       try {
@@ -450,55 +482,38 @@ export function ChatPage({
     setSoul(next);
   }
 
-  function applyTurnActions(actions: ControlAction[]) {
-    if (actions.length === 0) return;
-    const immediate: ControlAction[] = [];
-    const timed: TimedOrder[] = [];
-    for (const action of actions) {
-      if (isTimedOrder(action)) timed.push(action);
-      else immediate.push(action);
-    }
-    if (immediate.length > 0) {
-      const applied = applyControlActions(packRef.current.id, immediate);
-      setControl(applied.state);
-      setLive(controlLiveSnapshot(applied.state));
-      for (const edit of applied.queueEdits) {
-        onPatchQueue?.(edit);
-      }
-    }
-    if (timed.length > 0) {
-      setTimedOrders((prev) => [...prev, ...timed]);
-    }
-  }
-
-  function confirmTimedOrder(index: number) {
-    const order = timedOrders[index];
-    if (!order) return;
-    void primeUiAudio();
-    playUiConfirm();
-    const applied = applyControlActions(packRef.current.id, [order]);
-    setControl(applied.state);
-    setLive(controlLiveSnapshot(applied.state));
-    setTimedOrders((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  function dismissTimedOrder(index: number) {
-    void primeUiAudio();
-    playUiClick();
-    setTimedOrders((prev) => prev.filter((_, i) => i !== index));
+  function attachTurnProposals(
+    messages: SoulMistressState["messages"],
+    next: ChatProposal[],
+  ) {
+    const lastAsst = [...messages].reverse().find((row) => row.role === "assistant");
+    if (lastAsst && next.length > 0) proposals.attach(lastAsst.id, next);
   }
 
   function persistLlm(next: ChatLlmSettings) {
+    setDeliveryNotice(null);
+    setRetryTurn(null);
+    chatLlmRef.current = next;
     saveChatLlmSettings(next);
     setChatLlm(next);
   }
+
+  useEffect(() => {
+    const sync = () => {
+      setChatLlm(loadChatLlmSettings());
+      setRetryTurn(null);
+    };
+    window.addEventListener(CHAT_LLM_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(CHAT_LLM_CHANGED_EVENT, sync);
+  }, []);
 
   async function startChatLlm() {
     if (llmStarting) return;
     setLlmStarting(true);
     setError(null);
     try {
-      const model = resolveChatLlm(chatLlmRef.current, loadVoiceSettings()).model;
+      const config = resolveChatLlm(chatLlmRef.current, loadVoiceSettings());
+      const model = config.localFallback?.model ?? config.model;
       const next = await startOllama(model);
       setOllamaStatus(next);
     } catch (err) {
@@ -509,46 +524,124 @@ export function ChatPage({
   }
 
   function beginRequest() {
+    setStreamPreview("");
     abortRef.current?.abort();
     const abort = new AbortController();
     abortRef.current = abort;
     return abort;
   }
 
+  function isCurrentRequest(abort: AbortController) {
+    return abortRef.current === abort && !abort.signal.aborted;
+  }
+
+  function stopReply() {
+    setStreamPreview("");
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setBusy(false);
+    setRegenId(null);
+    setError(null);
+    setDeliveryNotice("Ответ остановлен. Можно повторить запрос или написать новое сообщение.");
+  }
+
+  async function retryReply() {
+    if (!retryTurn || busy) return;
+    if (retryTurn.kind === "regenerate") return regenerate(retryTurn.messageId);
+    const last = soulRef.current.messages.at(-1);
+    if (last?.id !== retryTurn.messageId || last.role !== "user") return;
+    await sendText(last.text, { ...retryTurn, retryMessageId: last.id });
+  }
+
+  function previewForRequest(abort: AbortController) {
+    return (text: string) => {
+      if (isCurrentRequest(abort)) setStreamPreview(text);
+    };
+  }
+
+  function rememberTurnDebug(snapshot: SoulTurnDebugSnapshot | undefined) {
+    if (!snapshot) return;
+    setTurnDebug((prev) => {
+      const next = { ...prev, [snapshot.turnId]: snapshot };
+      const ids = Object.keys(next);
+      if (ids.length <= 24) return next;
+      const drop = ids.slice(0, ids.length - 24);
+      for (const id of drop) delete next[id];
+      return next;
+    });
+  }
+
+  function markProposalLifecycle(
+    messageId: string,
+    offer: ChatProposal,
+    state: SoulProposalLifecycleState,
+    detail?: string,
+  ) {
+    setTurnDebug((prev) => {
+      const current = prev[messageId];
+      if (!current) return prev;
+      return {
+        ...prev,
+        [messageId]: mergeProposalLifecycleDebug(
+          current,
+          offer,
+          state,
+          detail,
+        ),
+      };
+    });
+  }
+
   async function runBackgroundSync(snapshot: SoulMistressState) {
     if (!soulNeedsSync(snapshot) || syncingRef.current) return;
+    const abort = abortRef.current;
+    if (!abort || !isCurrentRequest(abort)) return;
     const pendingAtStart = snapshot.pendingSinceRouter;
     const { client } = makeClient(chatLlmRef.current);
-    syncingRef.current = true;
+    syncingRef.current = abort;
     setSyncing(true);
     try {
-      const synced = await syncSoulMemory(
+      const synced = await syncSoulMemoryDetailed(
         snapshot,
         packRef.current.bible,
         client,
-        abortRef.current?.signal,
+        abort.signal,
       );
+      if (!isCurrentRequest(abort)) return;
       const cur = soulRef.current;
       persist({
         ...cur,
-        character: synced.character,
-        user: synced.user,
-        memoryMd: synced.memoryMd,
-        userMd: synced.userMd,
-        diaryMd: synced.diaryMd,
-        topics: synced.topics,
+        character: synced.state.character,
+        user: synced.state.user,
+        memoryMd: synced.state.memoryMd,
+        userMd: synced.state.userMd,
+        diaryMd: synced.state.diaryMd,
+        topics: synced.state.topics,
         pendingSinceRouter: Math.max(
           0,
           cur.pendingSinceRouter - pendingAtStart,
         ),
       });
+      const lastAsst = [...cur.messages]
+        .reverse()
+        .find((row) => row.role === "assistant");
+      if (lastAsst) {
+        setTurnDebug((prev) => {
+          const current = prev[lastAsst.id];
+          if (!current) return prev;
+          return { ...prev, [lastAsst.id]: mergeRouterDebug(current, synced.router) };
+        });
+      }
       refreshControl();
     } catch (err) {
+      if (!isCurrentRequest(abort)) return;
       if ((err as { name?: string }).name === "AbortError") return;
       setError(err instanceof Error ? err.message : "не удалось обновить память");
     } finally {
-      syncingRef.current = false;
-      setSyncing(false);
+      if (syncingRef.current === abort) {
+        syncingRef.current = null;
+        setSyncing(false);
+      }
     }
   }
 
@@ -567,10 +660,12 @@ export function ChatPage({
 
   async function sendText(
     text: string,
-    opts?: { skipSpeechOffers?: boolean },
+    opts?: { skipSpeechOffers?: boolean; retryMessageId?: string },
   ) {
     const trimmed = text.trim();
     if (!trimmed || busy) return;
+    const last = soulRef.current.messages.at(-1);
+    if (opts?.retryMessageId && (last?.id !== opts.retryMessageId || last.role !== "user")) return;
     const gate = chatLlmGate(chatLlmRef.current, ollamaStatusRef.current);
     if (!gate.ready) {
       setError(gate.detailRu);
@@ -578,48 +673,55 @@ export function ChatPage({
     }
     void primeUiAudio();
     playUiConfirm();
-    setDraft("");
+    if (!opts?.retryMessageId) setDraft("");
     setError(null);
+    setDeliveryNotice(null);
     setBusy(true);
     const nowMs = Date.now();
     setRegenId(null);
-    persist({
-      ...soulRef.current,
-      messages: [...soulRef.current.messages, newSoulMessage("user", trimmed, nowMs)],
-    });
+    const userMessage = opts?.retryMessageId ? last! : newSoulMessage("user", trimmed, nowMs);
+    if (!opts?.retryMessageId) {
+      persist({ ...soulRef.current, messages: [...soulRef.current.messages, userMessage] });
+    }
+    setRetryTurn({ kind: "send", messageId: userMessage.id, skipSpeechOffers: opts?.skipSpeechOffers });
     const abort = beginRequest();
-    const { voice, client } = makeClient(chatLlmRef.current);
+    const { voice, client, resolved } = makeClient(chatLlmRef.current);
     try {
       const result = await sendSoulChatTurn({
         state: soulRef.current,
         bible: pack.bible,
         userText: trimmed,
+        onSpeechPreview: previewForRequest(abort),
         client,
         signal: abort.signal,
         nowMs,
+        voiceExamples: chatLlmRef.current.voiceExamples !== false,
+        llm: resolved,
+        cloudConversationId: chatLlmRef.current.provider === "groq" ? chatLlmRef.current.groqConversationId : undefined,
       });
+      if (!isCurrentRequest(abort)) return;
       persist(result.state);
-      if (opts?.skipSpeechOffers) {
-        const lastAsst = [...result.state.messages]
-          .reverse()
-          .find((row) => row.role === "assistant");
-        if (lastAsst) {
-          setQuietSpeechIds((prev) => [...prev.slice(-20), lastAsst.id]);
-        }
-      } else {
-        applyTurnActions(result.actions);
+      setDeliveryNotice(result.delivery?.notice ?? null);
+      rememberTurnDebug(result.debug);
+      if (!opts?.skipSpeechOffers) {
+        attachTurnProposals(result.state.messages, result.proposals);
       }
       if (result.error) {
         setError(result.error);
         return;
       }
+      setRetryTurn(null);
       maybeSpeak(result.reply, voice.ttsEnabled);
       void runBackgroundSync(result.state);
     } catch (err) {
+      if (!isCurrentRequest(abort)) return;
       if ((err as { name?: string }).name === "AbortError") return;
       setError(err instanceof Error ? err.message : "модель не ответила");
     } finally {
-      setBusy(false);
+      if (isCurrentRequest(abort)) {
+        setStreamPreview("");
+        setBusy(false);
+      }
     }
   }
 
@@ -746,82 +848,133 @@ export function ChatPage({
     });
   }
 
-  async function acceptSpeechOffer(offer: SpeechOffer) {
+  async function acceptBubbleProposal(messageId: string, offer: ChatProposal) {
     if (busy) return;
-    switch (offer.kind) {
-      case "cage":
-      case "plug": {
-        const hours = offer.hours ?? (offer.kind === "cage" ? 8 : 2);
-        const applied = applyControlActions(packRef.current.id, [
-          {
-            op: "set_wear",
-            kind: offer.kind === "cage" ? "cage" : "plug",
-            hours,
-          },
-        ]);
-        setControl(applied.state);
-        setLive(controlLiveSnapshot(applied.state));
-        break;
+    const accepted = acceptChatProposal({
+      mistressId: packRef.current.id,
+      proposal: offer,
+      soul: soulRef.current,
+    });
+    if (accepted.blockedReason === "hard_boundary") {
+      markProposalLifecycle(messageId, offer, "blocked", "hard_boundary");
+      setError("Это предложение теперь запрещено жёсткой границей.");
+      return;
+    }
+    markProposalLifecycle(messageId, offer, "accepted");
+    proposals.dismiss(messageId, offer.id);
+    persist(accepted.soul);
+    if (accepted.applied) {
+      setControl(accepted.applied.state);
+      setLive(controlLiveSnapshot(accepted.applied.state));
+      for (const edit of accepted.applied.queueEdits) {
+        onPatchQueue?.(edit);
       }
-      case "deny": {
-        const spec = denyPunishSpec();
-        const row = assignProgramContract(spec.defId, spec.params);
-        if (row) onAcceptContract?.(row);
-        refreshControl();
-        break;
+    }
+    if (accepted.contract) onAcceptContract?.(accepted.contract);
+    refreshControl();
+    if (accepted.session) {
+      setRetryTurn(null);
+      setError(null);
+      setBusy(true);
+      const abort = beginRequest();
+      const { client, resolved } = makeClient(chatLlmRef.current);
+      try {
+        const built = await buildAcceptedSession({
+          mistressId: packRef.current.id,
+          proposal: accepted.session,
+          stances: accepted.soul.user.stances ?? [],
+          ...(chatLlmRef.current.sessionPlanner === "model"
+            ? { planner: { client, resolved, signal: abort.signal } }
+            : {}),
+        });
+        setTurnDebug((prev) => {
+          const current = prev[messageId];
+          return current
+            ? { ...prev, [messageId]: mergePlannerDebug(current, built.debug) }
+            : prev;
+        });
+        await onStartAssembledSession?.(built.result);
+        markProposalLifecycle(messageId, offer, "started", built.debug.source);
+        recordControlSessionKind(
+          packRef.current.id,
+          accepted.session.sessionKind,
+        );
+      } catch (err) {
+        const detail =
+          (err as { name?: string }).name === "AbortError"
+            ? "aborted"
+            : err instanceof Error
+              ? err.message
+              : "session build failed";
+        markProposalLifecycle(messageId, offer, "failed", detail);
+        if ((err as { name?: string }).name !== "AbortError") {
+          setError(
+            err instanceof Error ? err.message : "не удалось собрать сессию",
+          );
+        }
+      } finally {
+        setBusy(false);
       }
-      case "session":
-        await startAssembledSession();
-        return;
-      default: {
-        const _exhaustive: never = offer.kind;
-        return _exhaustive;
-      }
+      return;
     }
     await sendText(`Принимаю: ${offer.titleRu}.`, {
       skipSpeechOffers: true,
     });
   }
 
-  function dismissSpeechOffer(messageId: string, kind: SpeechOfferKind) {
-    setDismissedSpeech((prev) => ({
-      ...prev,
-      [messageId]: [...(prev[messageId] ?? []), kind],
-    }));
+  function refuseBubbleProposal(messageId: string, offer: ChatProposal) {
+    proposals.dismiss(messageId, offer.id);
+    persist(refuseChatProposal(soulRef.current, offer));
+    markProposalLifecycle(messageId, offer, "refused");
   }
 
   async function regenerate(messageId: string) {
     if (busy) return;
     setError(null);
+    setDeliveryNotice(null);
+    setRetryTurn({ kind: "regenerate", messageId });
     setRegenId(messageId);
     setBusy(true);
     const abort = beginRequest();
-    const { voice, client } = makeClient(chatLlmRef.current);
+    const { voice, client, resolved } = makeClient(chatLlmRef.current);
     try {
       const result = await regenerateSoulReply({
         state: soulRef.current,
         bible: pack.bible,
         messageId,
         client,
+        onSpeechPreview: previewForRequest(abort),
         signal: abort.signal,
+        voiceExamples: chatLlmRef.current.voiceExamples !== false,
+        llm: resolved,
+        cloudConversationId: chatLlmRef.current.provider === "groq" ? chatLlmRef.current.groqConversationId : undefined,
       });
+      if (!isCurrentRequest(abort)) return;
       persist(result.state);
-      applyTurnActions(result.actions);
+      setDeliveryNotice(result.delivery?.notice ?? null);
+      rememberTurnDebug(result.debug);
+      attachTurnProposals(result.state.messages, result.proposals);
       if (result.error) {
         setError(result.error);
         return;
       }
+      setRetryTurn(null);
       maybeSpeak(result.reply, voice.ttsEnabled);
     } catch (err) {
+      if (!isCurrentRequest(abort)) return;
       if ((err as { name?: string }).name === "AbortError") return;
       setError(err instanceof Error ? err.message : "модель не ответила");
     } finally {
-      setRegenId(null);
-      setBusy(false);
+      if (isCurrentRequest(abort)) {
+        setStreamPreview("");
+        setRegenId(null);
+        setBusy(false);
+      }
     }
   }
 
   function commitEdit(messageId: string) {
+    setRetryTurn(null);
     persist(editSoulMessage(soulRef.current, messageId, editDraft));
     setEditingId(null);
     setEditDraft("");
@@ -840,14 +993,40 @@ export function ChatPage({
   }
 
   function clearThread() {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setRetryTurn(null);
+    setError(null);
+    setDeliveryNotice(null);
     void primeUiAudio();
     playUiClick();
     persist({ ...soul, messages: [], pendingSinceRouter: 0 });
+    setTurnDebug({});
     setEditingId(null);
+  }
+
+  function wipeSoulDiary() {
+    if (!soul.diaryMd.trim()) return;
+    if (!window.confirm("Стереть её дневник в чате? Переписка останется.")) {
+      return;
+    }
+    void primeUiAudio();
+    playUiClick();
+    persist(clearSoulDiary(soul));
+  }
+
+  function wipeSoulTopics() {
+    if (soul.topics.length === 0) return;
+    if (!window.confirm("Стереть темы в памяти этой госпожи?")) return;
+    void primeUiAudio();
+    playUiClick();
+    persist(clearSoulTopics(soul));
   }
 
   const portrait = pack.assets.avatarFull;
   const diaryBit = lastDiaryExcerpt(soul.diaryMd);
+  const lastSession = lastSoulSessionEvent(soul);
+  const stanceView = stanceMemoryView(soul.user.stances ?? []);
   const canSpeak = !sessionLive;
   const voiceHint = loadVoiceSettings().model;
   const llmGate = chatLlmGate(chatLlm, ollamaStatus);
@@ -869,7 +1048,7 @@ export function ChatPage({
   return (
     <div className="chat-page page--chat">
       <header className="chat-page__head">
-        <div>
+        <div className="chat-page__head-copy">
           <p className="chat-page__eyebrow">Госпожа</p>
           <h1 className="chat-page__title">Чат · {pack.displayNameRu}</h1>
           <p className="chat-page__sub">
@@ -877,6 +1056,13 @@ export function ChatPage({
             приложении.
             {live.checkInOverdue ? " Она ждёт отчёт." : ""}
           </p>
+        </div>
+        <div
+          className={`chat-page__presence${busy ? " is-busy" : llmGate.ready ? " is-online" : ""}`}
+          title={llmGate.ready ? "Модель готова отвечать" : llmGate.detailRu}
+        >
+          <span className="chat-page__presence-dot" aria-hidden="true" />
+          {busy ? "Пишет…" : llmGate.ready ? "На связи" : "ИИ не запущен"}
         </div>
       </header>
 
@@ -892,7 +1078,23 @@ export function ChatPage({
         <section className="chat-page__thread" aria-label="Переписка">
           <div className="chat-page__log" ref={listRef}>
             {soul.messages.length === 0 ? (
-              <p className="chat-page__empty">{chatEmptyHint(soul.mode)}</p>
+              <div className="chat-page__empty">
+                <span className="chat-page__empty-mark" aria-hidden="true">✦</span>
+                <h2>Начни разговор</h2>
+                <p>{chatEmptyHint(soul.mode)}</p>
+                <div className="chat-page__starters" aria-label="Идеи для начала разговора">
+                  {CHAT_STARTERS.map((starter) => (
+                    <button
+                      key={starter}
+                      type="button"
+                      onClick={() => setDraft(starter)}
+                      disabled={busy}
+                    >
+                      {starter}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ) : (
               soul.messages.map((m, index) => {
                 if (busy && regenId === m.id) return null;
@@ -909,6 +1111,14 @@ export function ChatPage({
                 >
                 {m.role === "assistant" && m.think && m.think !== m.text ? (
                   <ChatThinkFold text={m.think} />
+                ) : null}
+                {m.role === "assistant" &&
+                (import.meta.env.DEV || chatLlm.turnDebug) &&
+                turnDebug[m.id] ? (
+                  <ChatTurnDebugFold
+                    snapshot={turnDebug[m.id]!}
+                    showPrompt={Boolean(import.meta.env.DEV || chatLlm.turnDebug)}
+                  />
                 ) : null}
                 <div
                   className={`chat-page__bubble chat-page__bubble--${m.role}`}
@@ -963,24 +1173,14 @@ export function ChatPage({
                   {m.role === "assistant" &&
                   editingId !== m.id &&
                   lastAssistantId === m.id &&
-                  !quietSpeechIds.includes(m.id) &&
                   !isQuietContractReply(soul.messages, m.id) ? (
                     <ChatSpeechOffers
-                      offers={parseSpeechOffers(assistantBubbleText(m.text), {
-                        moodScore: control.moodScore,
-                        cageOn: live.wear?.kind === "cage",
-                        plugOn: live.wear?.kind === "plug",
-                        denialOn: Boolean(live.denial),
-                      }).filter(
-                        (offer) =>
-                          !(dismissedSpeech[m.id] ?? []).includes(offer.kind),
-                      )}
+                      offers={proposals.visibleFor(m.id)}
                       disabled={busy}
                       onAccept={(offer) => {
-                        dismissSpeechOffer(m.id, offer.kind);
-                        void acceptSpeechOffer(offer);
+                        void acceptBubbleProposal(m.id, offer);
                       }}
-                      onDismiss={(kind) => dismissSpeechOffer(m.id, kind)}
+                      onDismiss={(offer) => refuseBubbleProposal(m.id, offer)}
                     />
                   ) : null}
                 </div>
@@ -991,7 +1191,14 @@ export function ChatPage({
               );
               })
             )}
-            {busy ? (
+            {busy && streamPreview ? (
+              <div className="chat-page__msg" aria-label="Ответ формируется" aria-busy="true">
+                <div className="chat-page__bubble chat-page__bubble--stream">
+                  <span className="chat-page__who">{pack.bible.nameRu} · пишет…</span>
+                  <p>{streamPreview}</p>
+                </div>
+              </div>
+            ) : busy ? (
               <div
                 className="chat-page__typing"
                 aria-live="polite"
@@ -1053,7 +1260,7 @@ export function ChatPage({
               >
                 <p>{llmGate.detailRu}</p>
                 <div className="chat-page__llm-gate-acts">
-                  {chatLlm.provider === "ollama" && canManageOllama() ? (
+                  {(chatLlm.provider === "ollama" || chatLlm.provider === "groq") && canManageOllama() ? (
                     <button
                       type="button"
                       className="chat-page__send"
@@ -1082,31 +1289,6 @@ export function ChatPage({
                 </div>
               </div>
             ) : null}
-
-            {timedOrders.map((order, index) => (
-              <div key={`${order.op}-${index}`} className="chat-page__order">
-                <p className="chat-page__card-lead">{timedOrderTitleRu(order)}</p>
-                <p className="chat-page__card-sub">
-                  Система. Таймер начнётся, когда подтвердишь.
-                </p>
-                <div className="chat-page__morning-acts">
-                  <button
-                    type="button"
-                    className="chat-page__send"
-                    onClick={() => confirmTimedOrder(index)}
-                  >
-                    {timedOrderConfirmRu(order)}
-                  </button>
-                  <button
-                    type="button"
-                    className="chat-page__ghost"
-                    onClick={() => dismissTimedOrder(index)}
-                  >
-                    Позже
-                  </button>
-                </div>
-              </div>
-            ))}
 
             {control.dispatch.phase === "morning" ? (
               <div className="chat-page__morning">
@@ -1282,7 +1464,7 @@ export function ChatPage({
           >
             <textarea
               className="chat-page__input"
-              rows={3}
+              rows={2}
               value={draft}
               disabled={busy}
               placeholder="Напиши ей или /помощь"
@@ -1295,13 +1477,25 @@ export function ChatPage({
               }}
             />
             <div className="chat-page__composer-row">
+              {busy && retryTurn ? (
+                <button key="stop" type="button" className="chat-page__send" onClick={(e) => { e.preventDefault(); stopReply(); }}>
+                  Остановить
+                </button>
+              ) : (
               <button
+                key="send"
                 type="submit"
                 className="chat-page__send"
                 disabled={!canSendDraft}
               >
                 Отправить
               </button>
+              )}
+              {!busy && retryTurn && (
+                <button type="button" className="chat-page__retry" disabled={!llmGate.ready} onClick={() => void retryReply()}>
+                  Повторить ответ
+                </button>
+              )}
               <button
                 type="button"
                 className="chat-page__ghost"
@@ -1311,6 +1505,8 @@ export function ChatPage({
                 Очистить переписку
               </button>
               <span className="chat-page__composer-spacer" />
+              <div className="chat-page__conversation-controls">
+              <GroqConversationSwitch value={chatLlm} onChange={persistLlm} disabled={busy || syncing} compact />
               <div className="chat-page__voice">
                 <UiCheck
                   className="ui-check--inline"
@@ -1341,6 +1537,7 @@ export function ChatPage({
                   onChange={(e) => setChatVolume(Number(e.target.value))}
                 />
               </div>
+              </div>
               <button
                 type="button"
                 className={`chat-page__gear${cmdsOpen ? " is-on" : ""}`}
@@ -1368,6 +1565,10 @@ export function ChatPage({
                 <ChatGearIcon />
               </button>
             </div>
+            {deliveryNotice && <p className="chat-page__delivery-notice" role="status">{deliveryNotice}</p>}
+            <p className="chat-page__composer-hint">
+              Enter — отправить · Shift+Enter — новая строка
+            </p>
           </form>
           </div>
         </section>
@@ -1417,6 +1618,7 @@ export function ChatPage({
                   value={chatLlm}
                   onChange={persistLlm}
                   ollamaModelHint={voiceHint}
+                  installedModels={ollamaStatus?.models ?? []}
                 />
               ) : null}
 
@@ -1519,6 +1721,60 @@ export function ChatPage({
                       <dt>Доверие</dt>
                       <dd>{soul.user.trustLevel}</dd>
                     </div>
+                    {soul.openLoops.length > 0 ? (
+                      <div>
+                        <dt>Незакрыто</dt>
+                        <dd>
+                          {soul.openLoops
+                            .slice(-3)
+                            .map((loop) => loop.summary)
+                            .join(" · ")}
+                        </dd>
+                      </div>
+                    ) : null}
+                    {lastSession ? (
+                      <div>
+                        <dt>Последняя сессия</dt>
+                        <dd>{lastSession.summary}</dd>
+                      </div>
+                    ) : null}
+                    {stanceView.likes.length +
+                      stanceView.curious.length +
+                      stanceView.refuses.length >
+                    0 ? (
+                      <div>
+                        <dt>Предпочтения</dt>
+                        <dd>
+                          {[
+                            stanceView.likes.length
+                              ? `Любит: ${stanceView.likes.join(", ")}`
+                              : "",
+                            stanceView.curious.length
+                              ? `Интересно: ${stanceView.curious.join(", ")}`
+                              : "",
+                            stanceView.refuses.length
+                              ? `Часто отказывается: ${stanceView.refuses.join(", ")}`
+                              : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </dd>
+                      </div>
+                    ) : null}
+                    {stanceView.boundaries.length > 0 ? (
+                      <div>
+                        <dt>Границы</dt>
+                        <dd>{stanceView.boundaries.join(", ")}</dd>
+                      </div>
+                    ) : null}
+                    {soul.intent &&
+                    (!soul.intent.expiresAtMs ||
+                      soul.intent.expiresAtMs > Date.now()) ? (
+                      <div>
+                        <dt>Цель</dt>
+                        <dd>{formatIntentLabelRu(soul.intent)}</dd>
+                      </div>
+                    ) : null}
                     <div>
                       <dt>Темы</dt>
                       <dd>
@@ -1540,6 +1796,24 @@ export function ChatPage({
                       Дневник появится после пачки реплик.
                     </p>
                   )}
+                  <div className="chat-page__memory-acts">
+                    <button
+                      type="button"
+                      className="chat-page__ghost"
+                      disabled={!soul.diaryMd.trim()}
+                      onClick={wipeSoulDiary}
+                    >
+                      Очистить дневник
+                    </button>
+                    <button
+                      type="button"
+                      className="chat-page__ghost"
+                      disabled={soul.topics.length === 0}
+                      onClick={wipeSoulTopics}
+                    >
+                      Очистить темы
+                    </button>
+                  </div>
                   <p className="chat-page__muted chat-page__selfie-note">
                     Селфи позже — когда будет Comfy/A1111.
                   </p>

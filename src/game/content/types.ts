@@ -102,6 +102,8 @@ export type EmberInteractivityModifier = {
   scriptId?: string;
   /** quest_marker: item-icon id (`quest_available` / `quest` alias). */
   iconId?: string;
+  /** quest_marker: canonical Godot quest definition; action stays in scriptId. */
+  questId?: string;
   /** shop: id from pack.shops (`shops/catalog.json`). */
   shopId?: string;
   /** quest_marker: authored pin state. Runtime may override via flags. */
@@ -668,7 +670,8 @@ export type EmberVoxelEmissiveLamp = {
 };
 
 /**
- * Sculpted voxel prop. Size is in whole map blocks; each block is 16³ voxels.
+ * Sculpted voxel prop. Size is in whole map blocks; art density is independent
+ * from the gameplay footprint. Omitted `voxelsPerBlock` is legacy 16.
  * Axis: X/Z ground, Y up.
  */
 export type EmberVoxelModel = {
@@ -679,8 +682,10 @@ export type EmberVoxelModel = {
   /** Explicit optional-component presence for the shared library asset. */
   componentStates?: Partial<Record<"collider" | "voxel-light", boolean>>;
   sizeBlocks: { x: number; y: number; z: number };
+  /** Art cells along one block edge. Legacy files omit it and resolve to 16. */
+  voxelsPerBlock?: 16 | 32;
   /**
-   * Optional height in voxels (overrides sizeBlocks.y * 16).
+   * Optional height in art voxels (overrides sizeBlocks.y * voxelsPerBlock).
    * Must be ≥1; X/Z stay in whole blocks.
    */
   heightVoxels?: number;

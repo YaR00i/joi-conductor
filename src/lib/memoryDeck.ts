@@ -69,3 +69,10 @@ export function memoryGridFor(cardCount: number): { cols: number; rows: number }
   if (n === 1) return { cols: 1, rows: 1 };
   return { cols: start, rows: Math.ceil(n / start) };
 }
+
+/** File names like `cruel.png` become a readable trophy caption. */
+export function prettyMediaLabel(label: string): string {
+  const trimmed = label.trim();
+  const stripped = trimmed.replace(/\.[a-z0-9]{1,5}$/i, "").trim();
+  return stripped || trimmed || "Картинка";
+}

@@ -128,8 +128,12 @@ export function buildCharacterStep(
 export function buildMediaTypeStep(
   settings: RouletteSettings = loadRouletteSettings(),
   unlocks: ContentUnlockLists = EMPTY_UNLOCKS,
+  availability?: { mediaListReady?: boolean },
 ): ContentWheelStep {
-  const mapped: ContentWheelOption[] = MEDIA_TYPE_CATALOG.map((m, i) => {
+  const catalog = MEDIA_TYPE_CATALOG.filter(
+    (entry) => availability?.mediaListReady !== false || entry.id !== "list",
+  );
+  const mapped: ContentWheelOption[] = catalog.map((m, i) => {
     const unlocked = isMediaTypeUnlocked(m.id, unlocks);
     return {
       id: m.id,

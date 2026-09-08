@@ -27,6 +27,11 @@ import { creditCinders, loadWallet, saveWallet } from "../../wallet";
 import { ensureMorningPack } from "./morning";
 import { loadControlState, notifyControlChanged, saveControlState } from "./store";
 import type { ControlDispatch, ControlState, DispatchPhase } from "./types";
+import {
+  recordCheckInForSoul,
+  recordMorningPackForSoul,
+  recordSessionRefusedForSoul,
+} from "../worldEventBridge";
 
 export const REFUSE_SESSION_CHAT =
   "Отказываюсь от сессии — не от утреннего пака и не от зарядки. Кара уже карточками в приложении.";
@@ -200,6 +205,7 @@ export function submitCheckIn(mistressId: MistressId): ControlState {
   };
   saveControlState(mistressId, next);
   notifyControlChanged();
+  recordCheckInForSoul(mistressId);
   return next;
 }
 
@@ -227,6 +233,7 @@ export function refuseSessionOffer(mistressId: MistressId): {
     phase: "punish",
     punishIds: contracts.map((c) => c.instanceId),
   });
+  recordSessionRefusedForSoul(mistressId);
   return { state: next, specs, contracts };
 }
 
@@ -293,6 +300,8 @@ export function reportMorningPack(
   let lockedSkip = 0;
   let lockedDone = 0;
   let rewarded = 0;
+  let markedDone = 0;
+  let markedSkip = 0;
   for (const instanceId of state.dispatch.morningIds) {
     const row = findContract(instanceId);
     if (!row || row.status !== "open") continue;
@@ -302,6 +311,7 @@ export function reportMorningPack(
       const result = reportContract(instanceId, "done");
       rewarded += result?.rewarded ?? 0;
       lockedDone += 1;
+      markedDone += 1;
       if (row.defId === "body_smooth_shave") {
         state = {
           ...loadControlState(mistressId),
@@ -311,9 +321,15 @@ export function reportMorningPack(
       }
     } else {
       reportContract(instanceId, "failed");
+      markedSkip += 1;
       if (locked) lockedSkip += 1;
     }
   }
+  recordMorningPackForSoul({
+    mistressId,
+    done: markedDone,
+    skipped: markedSkip,
+  });
   if (rewarded > 0) {
     saveWallet(creditCinders(loadWallet(), rewarded));
   }

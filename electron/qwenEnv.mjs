@@ -172,7 +172,7 @@ export async function ensureQwenPythonEnv(opts) {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         throw new Error(
-          `Не удалось создать venv (${opts.hostPython}): ${msg.slice(0, 240)}. Нужен Python 3.10–3.12 (python.org или Miniconda).`,
+          `Не удалось создать venv (${opts.hostPython}): ${msg.slice(0, 240)}. Нужен Python 3.10–3.12 — приложение качает свой при старте, либо поставь python.org / Miniconda.`,
         );
       }
       if (!existsSync(venvPy)) {

@@ -703,6 +703,7 @@ export function SessionPage({
         <SessionFxOverlay
           active={sessionLive || sandboxSlot}
           previewUser={sandboxSlot}
+          mood={mood ?? "sweet"}
         />
         <MediaStage
           key={mediaDeckKey}

@@ -41,7 +41,7 @@ export function PuzzleTaskEditor({ onExit }: Props) {
 
   const startNew = () => {
     const t = blankPuzzleTask();
-    persist([t, ...tasks.filter((x) => !x.builtin)]);
+    persist([t, ...tasks]);
     setEditingId(t.id);
   };
 
@@ -83,9 +83,9 @@ export function PuzzleTaskEditor({ onExit }: Props) {
         <button type="button" className="puzzle-btn" onClick={onExit}>
           ← К мини-играм
         </button>
-        <h2 className="puzzle-editor__title">Редактор заданий пазла</h2>
+        <h2 className="puzzle-editor__title">Редактор заданий мини-игр</h2>
         <span className="muted puzzle-editor__hint">
-          Только Песочница · задания доступны в обоих слотах
+          Только Песочница · задания для всех мини-игр, в обоих слотах
         </span>
         <button type="button" className="primary" onClick={startNew}>
           + Новое задание
@@ -281,7 +281,7 @@ function TaskForm({ task, onChange, onPerTouchKind, onPerTouchChange }: TaskForm
       {showPerTouch ? (
         <div className="puzzle-form__group">
           <label className="puzzle-form__field">
-            <span>На сколько следующих кусочков</span>
+            <span>На сколько следующих ходов</span>
             <input
               type="number"
               min={1}
@@ -291,7 +291,7 @@ function TaskForm({ task, onChange, onPerTouchKind, onPerTouchChange }: TaskForm
             />
           </label>
           <label className="puzzle-form__field">
-            <span>Действие на каждый кусочек</span>
+            <span>Действие на каждый ход</span>
             <select
               value={task.perTouchAction?.kind ?? "spank"}
               onChange={(e) => onPerTouchKind(e.target.value as PerTouchKind)}
@@ -303,7 +303,7 @@ function TaskForm({ task, onChange, onPerTouchKind, onPerTouchChange }: TaskForm
           </label>
           {task.perTouchAction?.kind === "spank" ? (
             <label className="puzzle-form__field">
-              <span>Шлепков на каждый кусочек</span>
+              <span>Шлепков на каждый ход</span>
               <input
                 type="number"
                 min={1}

@@ -1,6 +1,14 @@
 import { parseJsonObject } from "./json";
 import { characterMemoryToMd, userMemoryToMd, soulTopicFilename } from "./markdown";
 import { findSimilarSoulTopic } from "./rag";
+import {
+  applyStanceUpdates,
+  everydayHabitsFrom,
+  normalizeStanceSubject,
+  parseRouterStanceUpdates,
+  stanceSubjectFromTurnSubject,
+} from "./stance";
+import { detectSoulTurnSubjects } from "./conversationMode";
 import type {
   SoulCharacterMemory,
   SoulMistressState,
@@ -14,15 +22,18 @@ export type SoulTopicAction = {
   action: SoulTopicActionKind;
   filename: string;
   reason: string;
+  body: string;
 };
 
 export type SoulRouterResult =
-  | { kind: "no_change" }
+  | { kind: "no_change"; diaryEntry: string; rejected?: string[] }
   | {
       kind: "patch";
       character: SoulCharacterMemory;
       user: SoulUserMemory;
       topicActions: SoulTopicAction[];
+      diaryEntry: string;
+      rejected?: string[];
     };
 
 function asString(v: unknown, fallback: string): string {
@@ -37,6 +48,31 @@ function asStringList(v: unknown, fallback: string[]): string[] {
     .filter(Boolean)
     .slice(0, 8);
   return next.length > 0 ? next : fallback;
+}
+
+function asEverydayHabits(v: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(v)) return fallback;
+  const incoming = v
+    .filter((x): x is string => typeof x === "string")
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+  const everyday = everydayHabitsFrom(incoming);
+  return everyday.length > 0 ? everyday : fallback;
+}
+
+function mergeStringList(v: unknown, fallback: string[], cap = 8): string[] {
+  const incoming = asStringList(v, []);
+  if (incoming.length === 0) return fallback;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const line of [...fallback, ...incoming]) {
+    const key = line.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(line.trim());
+  }
+  return out.slice(-cap);
 }
 
 function asInt(v: unknown, fallback: number): number {
@@ -153,14 +189,15 @@ function parseUser(raw: unknown, fallback: SoulUserMemory): SoulUserMemory {
       rel.unspoken_tension ?? obj.unspoken_tension,
       fallback.unspokenTension,
     ),
-    preferencesHabits: asStringList(
+    preferencesHabits: asEverydayHabits(
       obj.preferences_and_habits,
       fallback.preferencesHabits,
     ),
-    sharedMilestones: asStringList(
+    sharedMilestones: mergeStringList(
       obj.shared_milestones,
       fallback.sharedMilestones,
     ),
+    stances: fallback.stances,
   };
 }
 
@@ -172,7 +209,65 @@ function parseTopicAction(raw: unknown): SoulTopicAction | null {
   const filename = soulTopicFilename(asString(obj.filename, ""));
   const reason = asString(obj.reason, "");
   if (!reason) return null;
-  return { action, filename, reason };
+  const body = typeof obj.body === "string" ? obj.body.trim().slice(0, 3600) : "";
+  return { action, filename, reason, body };
+}
+
+function hasMeaningfulObject(v: unknown): boolean {
+  const obj = readObj(v);
+  if (!obj) return false;
+  return Object.keys(obj).length > 0;
+}
+
+function isEmptyRouterPatch(obj: Record<string, unknown>): boolean {
+  const stances =
+    Array.isArray(obj.stance_updates) && obj.stance_updates.length > 0;
+  const plan = readObj(obj.topic_plan);
+  const actions =
+    Boolean(plan) && Array.isArray(plan?.actions) && plan.actions.length > 0;
+  return (
+    !hasMeaningfulObject(obj.character_memory) &&
+    !hasMeaningfulObject(obj.user_memory) &&
+    !stances &&
+    !actions
+  );
+}
+
+function filterStanceUpdatesByTranscript(
+  updates: ReturnType<typeof parseRouterStanceUpdates>,
+  state: SoulMistressState,
+): {
+  accepted: ReturnType<typeof parseRouterStanceUpdates>;
+  rejected: string[];
+} {
+  const allowed = new Set(
+    state.messages
+      .filter((message) => message.role === "user")
+      .slice(-5)
+      .flatMap((message) => detectSoulTurnSubjects(message.text))
+      .map(stanceSubjectFromTurnSubject)
+      .filter((subject): subject is string => Boolean(subject)),
+  );
+  const accepted: ReturnType<typeof parseRouterStanceUpdates> = [];
+  const rejected: string[] = [];
+  for (const update of updates) {
+    const subject = normalizeStanceSubject(update.subject);
+    if (subject && allowed.has(subject)) accepted.push(update);
+    else rejected.push(`stance:${update.subject}:no matching user subject`);
+  }
+  return { accepted, rejected };
+}
+
+function recentChatRequiresTopic(state: SoulMistressState): boolean {
+  if (state.mode !== 0) return false;
+  return state.messages
+    .filter((message) => message.role === "user")
+    .slice(-5)
+    .some(
+      (message) =>
+        /(запомни|не забудь|remember)/i.test(message.text) &&
+        /(важн|первая\s+встреч|first\s+meet|значим|особенн)/i.test(message.text),
+    );
 }
 
 export function parseSoulRouterOutput(
@@ -181,19 +276,65 @@ export function parseSoulRouterOutput(
 ): SoulRouterResult | null {
   const obj = parseJsonObject(raw);
   if (!obj) return null;
-  if (obj.no_significant_change === true) return { kind: "no_change" };
-  const character = applyEmotionalDecay(
-    previous.character,
-    parseCharacter(obj.character_memory, previous.character),
+  const diaryEntry =
+    typeof obj.diary_entry === "string"
+      ? obj.diary_entry.trim().slice(0, 2400)
+      : "";
+  if (isEmptyRouterPatch(obj)) {
+    if (recentChatRequiresTopic(previous)) return null;
+    return { kind: "no_change", diaryEntry };
+  }
+  const character = hasMeaningfulObject(obj.character_memory)
+    ? applyEmotionalDecay(
+        previous.character,
+        parseCharacter(obj.character_memory, previous.character),
+      )
+    : previous.character;
+  const userBase = parseUser(obj.user_memory, previous.user);
+  const stanceUpdates = filterStanceUpdatesByTranscript(
+    parseRouterStanceUpdates(obj.stance_updates),
+    previous,
   );
-  const user = parseUser(obj.user_memory, previous.user);
+  const stances = applyStanceUpdates(
+    userBase.stances,
+    stanceUpdates.accepted,
+    Date.now(),
+  );
+  const user = { ...userBase, stances };
   const plan = readObj(obj.topic_plan);
   const actionsRaw = plan && Array.isArray(plan.actions) ? plan.actions : [];
   const topicActions = actionsRaw
     .map(parseTopicAction)
     .filter((a): a is SoulTopicAction => a !== null)
     .slice(0, 2);
-  return { kind: "patch", character, user, topicActions };
+  if (recentChatRequiresTopic(previous) && topicActions.length === 0) {
+    return null;
+  }
+  const noAcceptedDelta =
+    character === previous.character &&
+    userBase === previous.user &&
+    stanceUpdates.accepted.length === 0 &&
+    topicActions.length === 0 &&
+    !diaryEntry;
+  if (noAcceptedDelta) {
+    return {
+      kind: "no_change",
+      diaryEntry: "",
+      ...(stanceUpdates.rejected.length
+        ? { rejected: stanceUpdates.rejected }
+        : {}),
+    };
+  }
+  return {
+    kind: "patch",
+    character,
+    user,
+    topicActions,
+    diaryEntry,
+    ...(stanceUpdates.rejected.length
+      ? { rejected: stanceUpdates.rejected }
+      : {}),
+  };
 }
 
 export function applySoulRouterPatch(

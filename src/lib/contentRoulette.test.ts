@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildMediaTypeStep,
   composeContentQuery,
   extractFetishContentTags,
 } from "./contentRoulette";
@@ -80,5 +81,13 @@ describe("composeContentQuery", () => {
       "soles",
     ]);
     expect(extractFetishContentTags("furry soles").content).toEqual(["soles"]);
+  });
+
+  it("does not offer a saved-list session when no playable list exists", () => {
+    const step = buildMediaTypeStep(undefined, undefined, {
+      mediaListReady: false,
+    });
+    expect(step.options.some((option) => option.id === "list")).toBe(false);
+    expect(step.options.some((option) => option.id === "photo")).toBe(true);
   });
 });

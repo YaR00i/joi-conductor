@@ -1,467 +1,595 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CindersGlyph } from "../../components/CindersGlyph";
-import { getActiveSaveSlot } from "../../lib/saveSlots";
+import { MinigameMistressFace } from "../../components/MinigameMistressFace";
+import { MinigameStimToggles } from "../../components/MinigameStimToggles";
+import { recordMinigameClear } from "../../lib/achievements";
 import {
   FARM_INSPECTION_WARN_MS,
-  calcFarmReward,
-  farmComboMult,
-  getFarmDifficulty,
-  type FarmDifficultyId,
+  calcFarmVisitReward,
   type FarmRewardResult,
 } from "../../lib/farmReward";
+import { activeMistressNameRu, subscribeActiveMistress } from "../../lib/mistress";
 import { loadPuzzleTasks, pickRandomTask, type PuzzleTask } from "../../lib/puzzleTasks";
-import { PuzzleTaskRunner } from "../puzzle/PuzzleTaskRunner";
 import {
+  filterArcadeTasks,
+  loadRunnerSettings,
+  saveRunnerSettings,
+  stimVibeMode,
+} from "../../lib/runnerSettings";
+import { getActiveSaveSlot } from "../../lib/saveSlots";
+import { PuzzleTaskRunner } from "../puzzle/PuzzleTaskRunner";
+import { FarmCanvas, type FarmCanvasHandle } from "./FarmCanvas";
+import {
+  FARM_INSPECTION_EVERY_MS,
+  FARM_INSPECTION_FIRST_MS,
+  FARM_UPGRADE_DEFS,
+  buyFarmUpgrade,
+  defaultFarmRanks,
+  farmUnlocks,
+  farmUpgradesFrom,
+  type FarmRanks,
+  type FarmUpgradeId,
+} from "./farmCampaign";
+import {
+  FARM_ANIMALS,
+  FARM_BUILD_GOLD,
   FARM_CROPS,
-  clearPlot,
-  createFarmField,
-  farmCropById,
-  farmDirtCount,
-  farmPlotProgress,
-  farmRipeUrgency,
-  farmWeedsLeft,
-  harvestPlot,
-  plantCrop,
-  stepFarmField,
-  waterPlot,
-  type FarmField,
-} from "./farmField";
-import { FarmPlot } from "./FarmPlot";
-import { FarmSetup } from "./FarmSetup";
-import { CropArt } from "./FarmArt";
-
-/**
- * Naughty farm (Пошлая ферма): a Farm-Frenzy-style timed round. Plant cheeky
- * crops, water the needy ones, harvest before they sulk; Mistress inspections
- * reward a clean field and punish neglect with a shared-library task.
- */
+  FARM_FACTORIES,
+  FARM_ITEMS,
+  warehouseUsed,
+} from "./farmItems";
+import {
+  bootFarmWorld,
+  farmLevelFromXp,
+  farmXpBar,
+  loadFarmDisk,
+  packFarmDisk,
+  saveFarmDisk,
+  syncFarmUnlocks,
+} from "./farmSave";
+import {
+  animalIsHungry,
+  clickBuildFactory,
+  clickBuy,
+  clickFactory,
+  clickTruck,
+  clickWell,
+  farmMessCount,
+  farmMessSummaryRu,
+  stepFarmWorld,
+  type FarmEvent,
+  type FarmFieldTool,
+  type FarmWorld,
+} from "./farmSim";
+import "./farm.css";
 
 interface Props {
   onReward: (cinders: number) => void;
   onExit: () => void;
 }
 
-type Phase = "setup" | "play" | "result";
+type Phase = "play" | "result";
 
-const TICK_MS = 150;
-/** How long a clean / caught inspection banner stays after it resolves. */
+const TICK_MS = 50;
 const BANNER_MS = 2600;
-const POP_MS = 900;
+const SAVE_MS = 2000;
 
-interface Banner {
-  id: number;
-  kind: "warn" | "clean" | "dirty" | "punished-ok" | "punished-fail";
-  text: string;
+function playEventBanner(events: FarmEvent[]): { kind: string; text: string } | null {
+  let best: { kind: string; text: string; rank: number } | null = null;
+  const take = (rank: number, kind: string, text: string) => {
+    if (!best || rank >= best.rank) best = { kind, text, rank };
+  };
+  for (const e of events) {
+    switch (e.kind) {
+      case "starve":
+        take(
+          5,
+          "warn",
+          e.reason === "bear"
+            ? `Медведь напугал: ${e.nameRu} — покорми`
+            : `${e.nameRu} голодает — полей траву`,
+        );
+        break;
+      case "hungry":
+        take(4, "warn", `${e.nameRu} голодна — полей траву`);
+        break;
+      case "full":
+        take(4, "warn", "Сарай полный — отправь грузовик");
+        break;
+      case "rot":
+        take(3, "warn", `${FARM_ITEMS[e.item].nameRu} сгнило — не успел в сарай`);
+        break;
+      case "pest":
+        take(3, "warn", "Медведь на поле! Кликай, пока не сядет в клетку");
+        break;
+      case "built":
+        take(3, "clean", `${e.nameRu} стоит у двора`);
+        break;
+      case "sold":
+        take(2, "clean", `Грузовик: +${e.gold} золота`);
+        break;
+      case "harvest":
+        take(1, "clean", `Собрал: ${FARM_ITEMS[e.item].nameRu}`);
+        break;
+      case "planted":
+      case "collect":
+      case "win":
+      case "fail":
+        break;
+      default: {
+        const _never: never = e;
+        void _never;
+      }
+    }
+  }
+  return best;
 }
 
-function fmtTime(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = Math.max(0, sec) % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
+function mulberry32(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function inspectionDue(elapsedMs: number): number {
+  if (elapsedMs < FARM_INSPECTION_FIRST_MS) return 0;
+  return 1 + Math.floor((elapsedMs - FARM_INSPECTION_FIRST_MS) / FARM_INSPECTION_EVERY_MS);
 }
 
 export function FarmGame({ onReward, onExit }: Props) {
-  const [phase, setPhase] = useState<Phase>("setup");
-  const [difficultyId, setDifficultyId] = useState<FarmDifficultyId>("medium");
-  const difficulty = useMemo(() => getFarmDifficulty(difficultyId), [difficultyId]);
-
-  const [selectedCropId, setSelectedCropId] = useState(FARM_CROPS[0].id);
-  const [banner, setBanner] = useState<Banner | null>(null);
-  const [taskOverlay, setTaskOverlay] = useState<PuzzleTask | null>(null);
+  const [phase, setPhase] = useState<Phase>("play");
+  const [ranks, setRanks] = useState<FarmRanks>(defaultFarmRanks);
+  const [feel, setFeel] = useState(loadRunnerSettings);
+  const [mistressName, setMistressName] = useState(activeMistressNameRu);
+  const [hud, setHud] = useState(0);
+  const [banner, setBanner] = useState<string | null>(null);
+  const [bannerKind, setBannerKind] = useState("warn");
+  const [task, setTask] = useState<PuzzleTask | null>(null);
   const [result, setResult] = useState<FarmRewardResult | null>(null);
-  const [remainingSec, setRemainingSec] = useState(difficulty.roundSec);
-  const [pops, setPops] = useState<Record<number, { id: number; text: string } | undefined>>({});
-  const [, setRenderTick] = useState(0);
-
-  const fieldRef = useRef<FarmField | null>(null);
-  const remainingMsRef = useRef(0);
-  const lastTickRef = useRef<number | null>(null);
-  const nextInspectionRef = useRef(0);
-  const warnShownForRef = useRef(-1);
-  const cleanInspectionsRef = useRef(0);
-  const punishedInspectionsRef = useRef(0);
+  const [tool, setTool] = useState<FarmFieldTool>("water");
+  const [panel, setPanel] = useState<null | "market" | "barn" | "build">(null);
+  const [ready, setReady] = useState(false);
+  const worldRef = useRef<FarmWorld | null>(null);
+  const ranksRef = useRef<FarmRanks>(ranks);
+  const viewRef = useRef<FarmCanvasHandle | null>(null);
+  const rngRef = useRef(mulberry32(1));
+  const claimedRef = useRef(true);
   const taskRewardRef = useRef(0);
   const taskPenaltyRef = useRef(0);
-  const timersRef = useRef<number[]>([]);
-  const bannerIdRef = useRef(0);
-  const popIdRef = useRef(0);
-
+  const nextInspRef = useRef(0);
+  const warnForRef = useRef(-1);
+  const bannerTimer = useRef(0);
+  const visitGoldRef = useRef(0);
+  const visitXpRef = useRef(0);
+  const visitAtRef = useRef(0);
   const tasks = useMemo(
-    () => loadPuzzleTasks().filter((t) => t.kind !== "per_touch" && t.kind !== "ghost_hint"),
-    [],
+    () => filterArcadeTasks(loadPuzzleTasks(), feel),
+    [feel],
   );
 
-  const clearTimers = useCallback(() => {
-    for (const t of timersRef.current) window.clearTimeout(t);
-    timersRef.current = [];
+  useEffect(() => subscribeActiveMistress((p) => setMistressName(p.displayNameRu)), []);
+
+  const bumpHud = useCallback(() => setHud((n) => n + 1), []);
+
+  const persistWorld = useCallback(() => {
+    const w = worldRef.current;
+    if (!w) return;
+    saveFarmDisk(packFarmDisk(w, ranksRef.current));
   }, []);
-  const later = useCallback((fn: () => void, ms: number) => {
-    timersRef.current.push(window.setTimeout(fn, ms));
-  }, []);
 
-  useEffect(() => () => clearTimers(), [clearTimers]);
-
-  const showBanner = useCallback(
-    (kind: Banner["kind"], text: string, autoHide = true) => {
-      bannerIdRef.current += 1;
-      const b = { id: bannerIdRef.current, kind, text };
-      setBanner(b);
-      if (autoHide) later(() => setBanner((cur) => (cur?.id === b.id ? null : cur)), BANNER_MS);
-    },
-    [later],
-  );
-
-  const addPop = useCallback(
-    (idx: number, text: string) => {
-      popIdRef.current += 1;
-      const pop = { id: popIdRef.current, text };
-      setPops((prev) => ({ ...prev, [idx]: pop }));
-      later(() => {
-        setPops((prev) => (prev[idx]?.id === pop.id ? { ...prev, [idx]: undefined } : prev));
-      }, POP_MS);
-    },
-    [later],
-  );
-
-  const startRound = useCallback(() => {
-    clearTimers();
-    fieldRef.current = createFarmField(difficulty.cols * difficulty.rows);
-    remainingMsRef.current = difficulty.roundSec * 1000;
-    lastTickRef.current = null;
-    nextInspectionRef.current = 0;
-    warnShownForRef.current = -1;
-    cleanInspectionsRef.current = 0;
-    punishedInspectionsRef.current = 0;
-    taskRewardRef.current = 0;
-    taskPenaltyRef.current = 0;
-    setBanner(null);
-    setTaskOverlay(null);
-    setResult(null);
-    setPops({});
-    setRemainingSec(difficulty.roundSec);
-    setPhase("play");
-  }, [clearTimers, difficulty]);
-
-  const finish = useCallback(() => {
-    const f = fieldRef.current;
-    if (!f) return;
-    setResult(
-      calcFarmReward({
-        difficulty,
-        harvestScore: f.harvestScore,
-        cleanInspections: cleanInspectionsRef.current,
-        totalInspections: cleanInspectionsRef.current + punishedInspectionsRef.current,
-        wilts: f.wilts,
-        weedsLeft: farmWeedsLeft(f),
-        taskReward: taskRewardRef.current,
-        taskPenalty: taskPenaltyRef.current,
-      }),
-    );
-    setPhase("result");
-  }, [difficulty]);
-
-  /** One inspection: praise the clean, punish the messy with a task. */
-  const runInspection = useCallback(() => {
-    const f = fieldRef.current;
-    if (!f) return;
-    const dirt = farmDirtCount(f);
-    if (dirt === 0) {
-      cleanInspectionsRef.current += 1;
-      showBanner("clean", "👠 Хозяйка обходу довольна: грядки вылизаны. Бонус!");
-      return;
+  const showBanner = (kind: string, text: string, auto = true) => {
+    setBannerKind(kind);
+    setBanner(text);
+    window.clearTimeout(bannerTimer.current);
+    if (auto) {
+      bannerTimer.current = window.setTimeout(() => setBanner(null), BANNER_MS);
     }
-    punishedInspectionsRef.current += 1;
-    const task = pickRandomTask(tasks);
-    if (!task) {
-      // No task library available: a flat fine keeps neglect unprofitable.
-      taskPenaltyRef.current += dirt * difficulty.wiltPenalty;
-      showBanner("dirty", `👠 Бардак (${dirt})! Заданий нет — Хозяйка просто злится.`);
-      return;
-    }
-    setBanner(null);
-    setTaskOverlay(task);
-  }, [tasks, difficulty.wiltPenalty, showBanner]);
+  };
 
-  const onTaskResolved = useCallback(
-    (success: boolean) => {
-      const task = taskOverlay;
-      setTaskOverlay(null);
-      if (!task) return;
-      if (success) {
-        taskRewardRef.current += task.rewardBonus;
-        showBanner("punished-ok", `👠 Отработал: +${task.rewardBonus}. «Смотри, умеешь же…»`);
-      } else {
-        taskPenaltyRef.current += task.failPenalty;
-        showBanner("punished-fail", `👠 Провалил: −${task.failPenalty}. «Запомни этот урок.»`);
-      }
-    },
-    [taskOverlay, showBanner],
-  );
-
-  // ---- main tick ----
   useEffect(() => {
-    if (phase !== "play") return;
+    rngRef.current = mulberry32((Date.now() ^ 7) >>> 0);
+    const disk = loadFarmDisk();
+    const nextRanks = disk?.ranks ?? defaultFarmRanks();
+    ranksRef.current = nextRanks;
+    setRanks(nextRanks);
+    const w = bootFarmWorld(rngRef.current, disk);
+    worldRef.current = w;
+    visitGoldRef.current = w.gold;
+    visitXpRef.current = w.xp;
+    visitAtRef.current = Date.now();
+    nextInspRef.current = inspectionDue(w.elapsedMs);
+    warnForRef.current = -1;
+    claimedRef.current = true;
+    setReady(true);
+    showBanner("clean", "Это твой двор. Посей пшеницу, полей траву, строй станки.", false);
+  }, []);
+
+  useEffect(() => {
+    ranksRef.current = ranks;
+  }, [ranks]);
+
+  useEffect(() => {
+    if (!ready || phase !== "play") return;
+    const id = window.setInterval(persistWorld, SAVE_MS);
+    return () => window.clearInterval(id);
+  }, [ready, phase, persistWorld]);
+
+  useEffect(() => () => persistWorld(), [persistWorld]);
+
+  const applyRanks = (next: FarmRanks) => {
+    const w = worldRef.current;
+    if (!w) return;
+    ranksRef.current = next;
+    setRanks(next);
+    w.upgrades = farmUpgradesFrom(next);
+    if (w.upgrades.hasCat && !w.cat) w.cat = { x: 0.8, y: w.rows - 0.8, vx: 0, vy: 0 };
+    if (!w.upgrades.hasCat) w.cat = null;
+    if (w.upgrades.hasDog && !w.dog) w.dog = { x: 1.6, y: w.rows - 0.8, vx: 0, vy: 0 };
+    if (!w.upgrades.hasDog) w.dog = null;
+    persistWorld();
+    bumpHud();
+  };
+
+  const leaveYard = useCallback(() => {
+    const w = worldRef.current;
+    persistWorld();
+    if (!w) {
+      onExit();
+      return;
+    }
+    const reward = calcFarmVisitReward({
+      visitMs: Date.now() - visitAtRef.current,
+      goldEarned: w.gold - visitGoldRef.current,
+      xpGained: w.xp - visitXpRef.current,
+      taskReward: taskRewardRef.current,
+      taskPenalty: taskPenaltyRef.current,
+    });
+    if (w.gold > visitGoldRef.current) recordMinigameClear("farm");
+    if (reward.total <= 0) {
+      onExit();
+      return;
+    }
+    claimedRef.current = false;
+    setResult(reward);
+    setPhase("result");
+  }, [onExit, persistWorld]);
+
+  useEffect(() => {
+    if (!ready || phase !== "play") return;
     const id = window.setInterval(() => {
-      const f = fieldRef.current;
-      if (!f || taskOverlay) {
-        lastTickRef.current = null;
-        return;
-      }
-      const now = performance.now();
-      if (lastTickRef.current == null) lastTickRef.current = now;
-      const dt = Math.min(1000, now - lastTickRef.current);
-      lastTickRef.current = now;
-
-      remainingMsRef.current -= dt;
-      const elapsedMs = difficulty.roundSec * 1000 - remainingMsRef.current;
-
-      stepFarmField(f, dt, {
-        thirstPerSec: difficulty.thirstPerMin / 60,
-        weedPerSec: difficulty.weedPerMin / 60,
-      });
-
-      // inspections: warn window → run at the scheduled moment
-      const k = nextInspectionRef.current;
-      if (k < difficulty.inspections.length) {
-        const atMs = difficulty.inspections[k] * difficulty.roundSec * 1000;
-        if (elapsedMs >= atMs) {
-          nextInspectionRef.current += 1;
-          warnShownForRef.current = -1;
-          runInspection();
-        } else if (elapsedMs >= atMs - FARM_INSPECTION_WARN_MS && warnShownForRef.current !== k) {
-          warnShownForRef.current = k;
-          showBanner("warn", "👠 Хозяйка идёт с проверкой! Прибери грядки…", false);
+      const w = worldRef.current;
+      if (!w || task) return;
+      const events = stepFarmWorld(w, TICK_MS, rngRef.current);
+      syncFarmUnlocks(w);
+      const due = inspectionDue(w.elapsedMs);
+      const k = nextInspRef.current;
+      let hushEvents = false;
+      if (due > k) {
+        hushEvents = true;
+        nextInspRef.current = due;
+        warnForRef.current = -1;
+        const dirt = farmMessCount(w);
+        if (dirt === 0) {
+          showBanner("clean", `👠 ${mistressName} обходу довольна.`);
+        } else {
+          const picked = pickRandomTask(tasks);
+          if (!picked) {
+            taskPenaltyRef.current += dirt;
+            showBanner("warn", `👠 Бардак (${farmMessSummaryRu(w)}). Заданий нет.`);
+          } else {
+            setBanner(null);
+            setTask(picked);
+          }
+        }
+      } else if (due === k) {
+        const atMs = k === 0
+          ? FARM_INSPECTION_FIRST_MS
+          : FARM_INSPECTION_FIRST_MS + k * FARM_INSPECTION_EVERY_MS;
+        if (w.elapsedMs >= atMs - FARM_INSPECTION_WARN_MS && w.elapsedMs < atMs && warnForRef.current !== k) {
+          hushEvents = true;
+          warnForRef.current = k;
+          const mess = farmMessSummaryRu(w);
+          showBanner(
+            "warn",
+            mess
+              ? `👠 ${mistressName} идёт! ${mess}.`
+              : `👠 ${mistressName} идёт с проверкой.`,
+            false,
+          );
         }
       }
-
-      setRemainingSec(Math.ceil(remainingMsRef.current / 1000));
-      setRenderTick((n) => n + 1);
-
-      if (remainingMsRef.current <= 0) {
-        setBanner(null);
-        finish();
-      }
+      const note = playEventBanner(events);
+      if (note && !hushEvents) showBanner(note.kind, note.text);
+      bumpHud();
     }, TICK_MS);
     return () => window.clearInterval(id);
-  }, [phase, taskOverlay, difficulty, runInspection, finish, showBanner]);
+  }, [ready, phase, task, tasks, mistressName, bumpHud]);
 
-  const onPlotClick = useCallback(
-    (idx: number) => {
-      const f = fieldRef.current;
-      if (!f || phase !== "play" || taskOverlay) return;
-      const plot = f.plots[idx];
-      switch (plot.kind) {
-        case "weed":
-        case "wilted":
-          if (clearPlot(f, idx)) addPop(idx, plot.kind === "weed" ? "🌿" : "🥀");
-          break;
-        case "growing":
-          if (plot.thirsty && waterPlot(f, idx)) addPop(idx, "💧");
-          break;
-        case "ripe":
-          {
-            const gained = harvestPlot(f, idx);
-            if (gained != null) addPop(idx, `+${gained}`);
-          }
-          break;
-        case "empty":
-          plantCrop(f, idx, selectedCropId);
-          break;
-      }
-      setRenderTick((n) => n + 1);
-    },
-    [phase, taskOverlay, selectedCropId, addPop],
-  );
+  useEffect(() => () => window.clearTimeout(bannerTimer.current), []);
 
-  // ----- render phases -----
-  if (phase === "setup") {
-    return (
-      <FarmSetup
-        difficultyId={difficultyId}
-        onDifficulty={setDifficultyId}
-        onStart={startRound}
-        onBack={onExit}
-      />
-    );
-  }
+  const claim = (then: () => void) => {
+    if (!claimedRef.current && result) {
+      claimedRef.current = true;
+      if (result.total > 0) onReward(result.total);
+    }
+    then();
+  };
 
   if (phase === "result" && result) {
-    const f = fieldRef.current;
-    const rows: Array<[string, string, string]> = [
-      ["База за раунд", `+${result.base}`, ""],
-      ["Урожай (с комбо)", `+${result.harvestScore}`, "farm-result__plus"],
-      [
-        "Чистые проверки Хозяйки",
-        result.inspectionBonus > 0 ? `+${result.inspectionBonus}` : "—",
-        result.inspectionBonus > 0 ? "farm-result__plus" : "",
-      ],
-      ["Отработанные наказания", result.taskReward > 0 ? `+${result.taskReward}` : "—", result.taskReward > 0 ? "farm-result__plus" : ""],
-      ["Увядшее", result.wiltPenalty > 0 ? `−${result.wiltPenalty}` : "—", result.wiltPenalty > 0 ? "farm-result__minus" : ""],
-      ["Сорняки к концу", result.weedPenalty > 0 ? `−${result.weedPenalty}` : "—", result.weedPenalty > 0 ? "farm-result__minus" : ""],
-      ["Проваленные задания", result.taskPenalty > 0 ? `−${result.taskPenalty}` : "—", result.taskPenalty > 0 ? "farm-result__minus" : ""],
-    ];
     return (
-      <div className="farm-result" role="dialog">
-        <div className="farm-result__card">
-          <div className="farm-result__headline">
-            <span className="farm-result__glyph" aria-hidden>👠</span>
-            <h2>Урожай сдан!</h2>
-          </div>
-          <p className="muted">
-            {difficulty.labelRu} · собрано {f?.harvested ?? 0} · завяло {f?.wilts ?? 0} ·
-            полито {f?.watered ?? 0}
-          </p>
-          <ul className="farm-result__breakdown">
-            {rows.map(([label, value, cls]) => (
-              <li key={label}>
-                <span>{label}</span>
-                <span className={cls}>{value}</span>
-              </li>
-            ))}
-            <li className="farm-result__total">
-              <span>Итого</span>
-              <span className="farm-result__total-num">
-                <CindersGlyph className="farm-result__total-glyph" />
-                {result.total}
-              </span>
-            </li>
-          </ul>
-          <div className="farm-result__actions">
-            <button
-              type="button"
-              className="puzzle-config__start"
-              onClick={() => {
-                onReward(result.total);
-                onExit();
-              }}
-            >
-              <CindersGlyph className="farm-result__btn-glyph" />
-              Забрать {result.total}
-            </button>
-            <button type="button" className="puzzle-btn" onClick={startRound}>
-              Ещё раз
-            </button>
-            <button type="button" className="puzzle-btn" onClick={() => setPhase("setup")}>
-              Сложность
-            </button>
-          </div>
+      <div className="farm-result">
+        <MinigameMistressFace size="sm" />
+        <h2>Двор сохранён</h2>
+        <p className="muted">
+          Угольки за визит: касса {result.goldConvert} · опыт {result.xpConvert}
+          {result.visit ? ` · смена ${result.visit}` : ""}
+          {result.taskReward ? ` · задания +${result.taskReward}` : ""}
+          {result.taskPenalty ? ` · штраф −${result.taskPenalty}` : ""}
+        </p>
+        <div className="farm-result__actions">
+          <button type="button" className="primary" onClick={() => claim(onExit)}>
+            Забрать {result.total} <CindersGlyph className="runner-inline-glyph" />
+          </button>
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => claim(() => {
+              visitGoldRef.current = worldRef.current?.gold ?? visitGoldRef.current;
+              visitXpRef.current = worldRef.current?.xp ?? visitXpRef.current;
+              visitAtRef.current = Date.now();
+              taskRewardRef.current = 0;
+              taskPenaltyRef.current = 0;
+              setResult(null);
+              setPhase("play");
+            })}
+          >
+            Обратно во двор
+          </button>
         </div>
       </div>
     );
   }
 
-  // phase === "play"
-  const f = fieldRef.current;
-  const field = f ?? createFarmField(difficulty.cols * difficulty.rows);
-  if (!f) fieldRef.current = field;
-  const combo = field.combo;
-  const earned =
-    field.harvestScore +
-    taskRewardRef.current +
-    cleanInspectionsRef.current * difficulty.inspectionBonus -
-    field.wilts * difficulty.wiltPenalty -
-    taskPenaltyRef.current;
-  const elapsedMs = difficulty.roundSec * 1000 - Math.max(0, remainingMsRef.current);
-  const nextInspectionAt =
-    difficulty.inspections
-      .slice(nextInspectionRef.current)
-      .map((frac) => frac * difficulty.roundSec * 1000)
-      .find((atMs) => atMs > elapsedMs) ?? null;
+  const world = worldRef.current;
+  if (!ready || !world) return null;
+  const vibeMode = stimVibeMode(feel);
+  const near = farmMessCount(world) > 0;
+  const hungryN = world.animals.filter(animalIsHungry).length;
+  const bar = farmXpBar(world.xp);
+  const unlocks = farmUnlocks(farmLevelFromXp(world.xp));
+  const toBuild = unlocks.factories.filter((k) => !world.factories.some((f) => f.kind === k));
+  void hud;
 
   return (
-    <div className="farm-play">
-      <div className="farm-hud">
-        <button
-          type="button"
-          className="puzzle-hud__btn puzzle-hud__btn--back"
-          onClick={onExit}
-          title="Выйти из игры"
-        >
-          ←
-        </button>
-        <div className="farm-hud__title">
-          <span>Пошлая ферма</span>
-          <span className="puzzle-hud__crumb">
-            {difficulty.labelRu} · {difficulty.cols}×{difficulty.rows}
-          </span>
+    <div className="farm-play farm-play--iso">
+      <div className="farm-play__stage">
+        <FarmCanvas
+          ref={viewRef}
+          worldRef={worldRef}
+          paused={task != null}
+          onHud={bumpHud}
+          tool={tool}
+        />
+        <div className="farm-hud-top">
+          <button type="button" className="puzzle-hud__btn puzzle-hud__btn--back" onClick={leaveYard} title="К играм">
+            ←
+          </button>
+          <MinigameMistressFace size="sm" />
+          <div className="farm-hud-top__meta">
+            <strong>Двор · ур. {bar.level}</strong>
+            <span className="muted">
+              {bar.need > 0 ? `опыт ${bar.have} / ${bar.need}` : "максимум"}
+            </span>
+          </div>
+          <span className="farm-chip">золото {world.gold}</span>
+          <span className={`farm-chip${hungryN ? " is-hot" : ""}`}>скот {world.animals.length}</span>
+          <span className={`farm-chip${near ? " is-hot" : ""}`}>{mistressName}</span>
         </div>
-        <div
-          className={`farm-hud__combo ${combo >= 2 ? "is-hot" : ""}`}
-          title="Серия сборов подряд"
-        >
-          🧺 ×{farmComboMult(combo).toFixed(2).replace(/\.?0+$/, "")}
+        <div className="farm-hud-quest">
+          <strong>Двор</strong>
+          <ul className="farm-goals">
+            <li>посей пшеницу лейкой-семенами</li>
+            <li>трава — еда скота, не грядка</li>
+            <li>яичко в сарай, грузовик в город</li>
+            {unlocks.factories.length === 0 ? <li>уровень 2 откроет сушилку</li> : null}
+          </ul>
         </div>
-        {nextInspectionAt != null ? (
-          <div
-            className={`farm-hud__inspection ${
-              nextInspectionAt - elapsedMs <= FARM_INSPECTION_WARN_MS ? "is-near" : ""
-            }`}
-            title="До следующей проверки Хозяйки"
+        <div className="farm-hud-zoom">
+          <button type="button" className="ghost" onClick={() => viewRef.current?.zoomBy(1.15)} title="Крупнее">
+            +
+          </button>
+          <button type="button" className="ghost" onClick={() => viewRef.current?.zoomBy(1 / 1.15)} title="Мельче">
+            −
+          </button>
+        </div>
+        <div className="farm-hud-dock">
+          <button
+            type="button"
+            className={tool === "water" ? "primary" : "ghost"}
+            onClick={() => setTool("water")}
           >
-            👠 {fmtTime(Math.ceil((nextInspectionAt - elapsedMs) / 1000))}
+            Лейка {world.water}/{world.upgrades.wellCap}
+          </button>
+          {unlocks.crops.map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              className={tool === kind ? "primary" : "ghost"}
+              onClick={() => setTool(kind)}
+            >
+              {FARM_CROPS[kind].nameRu} · {FARM_CROPS[kind].seedGold}
+            </button>
+          ))}
+          <button
+            type="button"
+            className={panel === "market" ? "primary" : "ghost"}
+            onClick={() => setPanel(panel === "market" ? null : "market")}
+          >
+            Рынок
+          </button>
+          <button
+            type="button"
+            className={panel === "build" ? "primary" : "ghost"}
+            onClick={() => setPanel(panel === "build" ? null : "build")}
+          >
+            Стройка
+          </button>
+          <button
+            type="button"
+            className={panel === "barn" ? "primary" : "ghost"}
+            onClick={() => setPanel(panel === "barn" ? null : "barn")}
+          >
+            Склад {warehouseUsed(world.warehouse)}/{world.upgrades.warehouseCap}
+          </button>
+        </div>
+        {banner ? <div className={`farm-banner farm-hud-banner is-${bannerKind}`}>{banner}</div> : null}
+        {panel === "market" ? (
+          <div className="farm-hud-sheet">
+            <strong>Рынок</strong>
+            <div className="farm-side__row">
+              {world.spec.shop.map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  className="ghost"
+                  onClick={() => { clickBuy(world, kind, rngRef.current); persistWorld(); bumpHud(); }}
+                >
+                  {FARM_ANIMALS[kind].nameRu} · {FARM_ANIMALS[kind].buyGold}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => {
+                if (clickWell(world)) showBanner("clean", "Колодец полный.");
+                else if (world.water >= world.upgrades.wellCap) showBanner("clean", "Вода есть.");
+                else showBanner("warn", `Долив стоит ${world.upgrades.wellRefillCost} золота.`);
+                persistWorld();
+                bumpHud();
+              }}
+            >
+              Долить колодец (−{world.upgrades.wellRefillCost})
+            </button>
+            <button type="button" className="ghost" onClick={() => { clickTruck(world); persistWorld(); bumpHud(); }}>
+              {world.truck.awayMs > 0 ? "Грузовик в пути…" : "Отправить грузовик"}
+            </button>
+            {world.factories.map((f) => (
+              <button
+                key={f.kind}
+                type="button"
+                className="ghost"
+                disabled={f.busyMs > 0}
+                onClick={() => { clickFactory(world, f.kind, []); persistWorld(); bumpHud(); }}
+              >
+                {FARM_FACTORIES[f.kind].nameRu}
+                {f.busyMs > 0 ? "…" : ""}
+              </button>
+            ))}
           </div>
         ) : null}
-        <div className="puzzle-hud__timer" aria-live="polite">
-          {fmtTime(remainingSec)}
-        </div>
-        <div className="farm-hud__earned" title="Текущие Угольки (без базы)">
-          <CindersGlyph className="farm-hud__earned-glyph" />
-          {earned >= 0 ? `+${earned}` : earned}
-        </div>
-      </div>
-
-      <div className="farm-stage">
-        <div
-          className="farm-grid"
-          style={{ "--cols": difficulty.cols } as CSSProperties}
-        >
-          {field.plots.map((plot, idx) => (
-            <FarmPlot
-              key={idx}
-              plot={plot}
-              progress={farmPlotProgress(plot)}
-              urgency={farmRipeUrgency(plot)}
-              pop={pops[idx] ?? null}
-              disabled={taskOverlay != null}
-              onClick={() => onPlotClick(idx)}
+        {panel === "build" ? (
+          <div className="farm-hud-sheet">
+            <strong>Стройка</strong>
+            <p className="muted">Станок встанет справа от поля. Уровень двора открывает новые.</p>
+            <div className="farm-side__row">
+              {toBuild.length === 0 ? (
+                <span className="muted">
+                  {unlocks.factories.length === 0 ? "Сначала добери опыт — сушилка с ур. 2." : "Все открытые станки уже стоят."}
+                </span>
+              ) : (
+                toBuild.map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    className="ghost"
+                    onClick={() => {
+                      const ev: FarmEvent[] = [];
+                      if (clickBuildFactory(world, kind, ev)) {
+                        const note = playEventBanner(ev);
+                        if (note) showBanner(note.kind, note.text);
+                      } else {
+                        showBanner("warn", `Нужно ${FARM_BUILD_GOLD[kind]} золота.`);
+                      }
+                      persistWorld();
+                      bumpHud();
+                    }}
+                  >
+                    {FARM_FACTORIES[kind].nameRu} · {FARM_BUILD_GOLD[kind]}
+                  </button>
+                ))
+              )}
+            </div>
+            <strong>Апгрейды</strong>
+            {FARM_UPGRADE_DEFS.map((u) => {
+              const rank = ranks[u.id] ?? 0;
+              const maxed = rank >= u.maxRank;
+              return (
+                <div key={u.id} className="farm-upgrade">
+                  <div>
+                    <div>{u.nameRu} · {rank}/{u.maxRank}</div>
+                    <div className="muted">{u.hintRu}</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="ghost"
+                    disabled={maxed || world.gold < u.goldCost}
+                    onClick={() => {
+                      const next = buyFarmUpgrade(ranks, world.gold, u.id as FarmUpgradeId);
+                      if (!next) return;
+                      world.gold = next.gold;
+                      applyRanks(next.ranks);
+                    }}
+                  >
+                    {maxed ? "Макс" : `${u.goldCost}з`}
+                  </button>
+                </div>
+              );
+            })}
+            <MinigameStimToggles
+              settings={feel}
+              onChange={(next) => {
+                setFeel(next);
+                saveRunnerSettings(next);
+              }}
             />
-          ))}
-        </div>
+          </div>
+        ) : null}
+        {panel === "barn" ? (
+          <div className="farm-hud-sheet">
+            <strong>Сарай {warehouseUsed(world.warehouse)}/{world.upgrades.warehouseCap}</strong>
+            <p>
+              {world.warehouse.length === 0
+                ? "Пусто. Кликай яйца, урожай и кувшины на земле."
+                : world.warehouse.map((i) => FARM_ITEMS[i].nameRu).join(", ")}
+            </p>
+            <button type="button" className="ghost" onClick={() => { clickTruck(world); persistWorld(); bumpHud(); }}>
+              {world.truck.awayMs > 0 ? "Грузовик в пути…" : "Увезти грузовиком"}
+            </button>
+          </div>
+        ) : null}
       </div>
-
-      <div className="farm-tray" role="toolbar" aria-label="Семена">
-        {FARM_CROPS.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            className={`farm-tray__seed${c.id === selectedCropId ? " is-selected" : ""}`}
-            onClick={() => setSelectedCropId(c.id)}
-            title={c.jokeRu}
-          >
-            <CropArt id={c.id} className="farm-tray__art" />
-            <span className="farm-tray__name">{c.nameRu}</span>
-            <span className="farm-tray__meta muted">
-              {Math.round(c.growMs / 1000)}с · +{c.value}
-            </span>
-          </button>
-        ))}
-        <div className="farm-tray__hint muted">
-          {farmCropById(selectedCropId).jokeRu}
-        </div>
-      </div>
-
-      {banner ? (
-        <div key={banner.id} className={`farm-banner farm-banner--${banner.kind}`} role="status">
-          {banner.text}
-        </div>
-      ) : null}
-
-      {taskOverlay ? (
+      {task ? (
         <PuzzleTaskRunner
           mode="task"
-          task={taskOverlay}
+          task={task}
+          vibeMode={vibeMode}
           allowCancel={getActiveSaveSlot() === "sandbox"}
-          onComplete={onTaskResolved}
+          onComplete={(ok) => {
+            if (ok) {
+              taskRewardRef.current += task.rewardBonus;
+              showBanner("clean", `👠 Отработал: +${task.rewardBonus}`);
+            } else {
+              taskPenaltyRef.current += task.failPenalty;
+              showBanner("warn", `👠 Провалил: −${task.failPenalty}`);
+            }
+            setTask(null);
+          }}
         />
       ) : null}
     </div>

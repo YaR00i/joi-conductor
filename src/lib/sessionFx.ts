@@ -17,6 +17,9 @@ export const SESSION_FX_THEMES = [
 ] as const;
 export type SessionFxTheme = (typeof SESSION_FX_THEMES)[number];
 
+export const SESSION_FX_BAR_LOOKS = ["shuusei", "ribbon"] as const;
+export type SessionFxBarLook = (typeof SESSION_FX_BAR_LOOKS)[number];
+
 export type SessionFxCaptionBook = Record<SessionFxTheme, string[]>;
 
 export type SessionFxSettings = {
@@ -36,6 +39,8 @@ export type SessionFxSettings = {
   /** Bright flashes. Off by default — can nauseate. */
   pulse: boolean;
   avatarBar: boolean;
+  /** Look of the avatar plaque: Japanese 修正 stamp or mistress ribbon. */
+  barLook: SessionFxBarLook;
 };
 
 export const SESSION_FX_CAPTION_MAX_LEN = 48;
@@ -43,6 +48,7 @@ export const SESSION_FX_CAPTION_MAX_LINES = 80;
 
 export const SESSION_FX_CAPTIONS: Record<SessionFxTheme, readonly string[]> = {
   sparkle: [
+    "безумие",
     "только анал",
     "в клетке",
     "фантом",
@@ -51,8 +57,9 @@ export const SESSION_FX_CAPTIONS: Record<SessionFxTheme, readonly string[]> = {
     "цирк",
     "не думай",
     "глубже",
-    "тише",
+    "хаос",
     "смотри",
+    "две маски",
   ],
   goon: [
     "пустой",
@@ -125,12 +132,13 @@ export const DEFAULT_SESSION_FX: SessionFxSettings = {
   glitch: true,
   pulse: false,
   avatarBar: true,
+  barLook: "shuusei",
 };
 
 export function sessionFxThemeLabelRu(theme: SessionFxTheme): string {
   switch (theme) {
     case "sparkle":
-      return "Искра";
+      return "Безумие";
     case "goon":
       return "Goon";
     case "beta":
@@ -149,7 +157,7 @@ export function sessionFxThemeLabelRu(theme: SessionFxTheme): string {
 export function sessionFxThemeSubRu(theme: SessionFxTheme): string {
   switch (theme) {
     case "sparkle":
-      return "маска · клетка";
+      return "две маски · хаос";
     case "goon":
       return "пустой взгляд";
     case "beta":
@@ -165,6 +173,58 @@ export function sessionFxThemeSubRu(theme: SessionFxTheme): string {
   }
 }
 
+export function sessionFxBarLookLabelRu(look: SessionFxBarLook): string {
+  switch (look) {
+    case "shuusei":
+      return "修正";
+    case "ribbon":
+      return "Лента";
+    default: {
+      const _exhaustive: never = look;
+      return _exhaustive;
+    }
+  }
+}
+
+export function sessionFxBarLookSubRu(look: SessionFxBarLook): string {
+  switch (look) {
+    case "shuusei":
+      return "штамп";
+    case "ribbon":
+      return "госпожа";
+    default: {
+      const _exhaustive: never = look;
+      return _exhaustive;
+    }
+  }
+}
+
+export function sessionFxBarLookClass(look: SessionFxBarLook): string {
+  switch (look) {
+    case "shuusei":
+      return "session-fx__censor--shuusei";
+    case "ribbon":
+      return "session-fx__censor--ribbon";
+    default: {
+      const _exhaustive: never = look;
+      return _exhaustive;
+    }
+  }
+}
+
+export function sessionFxBarLookStamp(look: SessionFxBarLook): string | null {
+  switch (look) {
+    case "shuusei":
+      return "修正";
+    case "ribbon":
+      return null;
+    default: {
+      const _exhaustive: never = look;
+      return _exhaustive;
+    }
+  }
+}
+
 function clampInt(n: unknown, min: number, max: number, fallback: number): number {
   const v = typeof n === "number" ? n : Number(n);
   if (!Number.isFinite(v)) return fallback;
@@ -173,6 +233,13 @@ function clampInt(n: unknown, min: number, max: number, fallback: number): numbe
 
 function isTheme(v: unknown): v is SessionFxTheme {
   return typeof v === "string" && (SESSION_FX_THEMES as readonly string[]).includes(v);
+}
+
+function isBarLook(v: unknown): v is SessionFxBarLook {
+  return (
+    typeof v === "string" &&
+    (SESSION_FX_BAR_LOOKS as readonly string[]).includes(v)
+  );
 }
 
 export function parseSessionFxCaptionLines(
@@ -229,6 +296,7 @@ export function parseSessionFxSettings(raw: unknown): SessionFxSettings {
     glitch: rec.glitch !== false,
     pulse: rec.pulse === true,
     avatarBar: rec.avatarBar !== false,
+    barLook: isBarLook(rec.barLook) ? rec.barLook : DEFAULT_SESSION_FX.barLook,
   };
 }
 

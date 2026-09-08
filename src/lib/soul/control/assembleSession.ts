@@ -3,6 +3,8 @@ import { applyMoodToSessionParams } from "../../moodScale";
 import { moodFromScore } from "../../moodEngine";
 import { listFavoriteRecords } from "../../mediaFavorites";
 import { buildFavoriteTasteProfile } from "../../favoriteTagTaste";
+import { getGelbooruList } from "../../gelbooruLists";
+import { loadMediaSettings } from "../../media";
 import {
   applyRoulettePicks,
   buildPlanRouletteSteps,
@@ -39,7 +41,13 @@ export async function assembleProgramSession(
   const mood = moodFromScore(state.moodScore);
   const unlocks = loadWallet().unlocks;
   const settings = loadRouletteSettings();
-  const steps = buildPlanRouletteSteps(settings, unlocks, base.finishId);
+  const media = loadMediaSettings();
+  const selectedList = media.listId
+    ? await getGelbooruList(media.listId, media.booruSite).catch(() => undefined)
+    : undefined;
+  const steps = buildPlanRouletteSteps(settings, unlocks, base.finishId, {
+    mediaListReady: Boolean(selectedList?.items.length),
+  });
   const records = await listFavoriteRecords();
   const taste = buildFavoriteTasteProfile(records);
   const gate = readLiveWearGate();

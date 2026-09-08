@@ -222,7 +222,7 @@ export function SettingsPage({
       <SettingsTabs
         tabs={[
           { id: "profile", label: "Профиль", hint: "Слоты и бэкапы" },
-          { id: "brain", label: "ИИ ресурсы", hint: "LLM · TTS веса · что говорит" },
+          { id: "brain", label: "ИИ ресурсы", hint: "модели · роли чата · TTS" },
           { id: "voice", label: "Голос", hint: "озвучка · как звучит" },
           { id: "media", label: "Медиа", hint: "Gelbooru · nhentai" },
           { id: "gameplay", label: "Геймплей", hint: "Рулетка, CBT, цензор, эффекты" },
@@ -372,7 +372,7 @@ export function SettingsPage({
           id="brain"
           title="ИИ ресурсы"
           wide
-          sub="Модели на диске: скачать, выбрать, удалить. Как звучит — вкладка «Голос»."
+          sub="Установка отдельно: текстовые модели и роли либо голосовые движки. Настройка звучания — вкладка «Голос»."
         >
           <BrainPanel
             voice={voice}
@@ -389,7 +389,7 @@ export function SettingsPage({
           id="voice"
           title={`Голос · ${getActiveMistress().displayNameRu}`}
           wide
-          sub="Движки со стартом и настройками. Веса Piper/Qwen — вкладка «ИИ ресурсы»."
+          sub="Включение, движок, тембр и проба. Установка весов — вкладка «ИИ ресурсы» → «Голосовые модели»."
         >
           <TtsSettingsPanel voice={voice} onVoice={onVoice} tts={tts} />
         </SettingsSection>

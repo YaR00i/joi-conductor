@@ -19,6 +19,7 @@ import {
   venvPythonPath,
   withPythonArgs,
 } from "./qwenEnv.mjs";
+import { findAppPortablePython } from "./pythonInstall.mjs";
 
 export const QWEN_HF_REPOS = {
   tokenizer: "Qwen/Qwen3-TTS-Tokenizer-12Hz",
@@ -89,6 +90,8 @@ function userHome() {
 }
 
 export function findHostPython() {
+  const portable = findAppPortablePython();
+  if (portable) return portable;
   const home = userHome();
   const candidates = [
     process.env.QWEN_PYTHON || "",

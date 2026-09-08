@@ -15,6 +15,9 @@ import {
   type MemoryDifficultyId,
 } from "../../lib/memoryReward";
 import type { MemorySource } from "./memoryAssets";
+import { MinigameStimToggles } from "../../components/MinigameStimToggles";
+import { MinigameMistressFace } from "../../components/MinigameMistressFace";
+import type { RunnerSettings } from "../../lib/runnerSettings";
 
 /**
  * Setup screen for the memory game: pick a difficulty, narrow the favorites
@@ -28,6 +31,9 @@ interface Props {
   onDifficulty: (id: MemoryDifficultyId) => void;
   onStart: (source: MemorySource) => void;
   onBack: () => void;
+  feel: RunnerSettings;
+  onFeel: (next: RunnerSettings) => void;
+  loadError: string | null;
 }
 
 type Mode = "favorites" | "upload";
@@ -40,6 +46,9 @@ export function MemorySourcePicker({
   onDifficulty,
   onStart,
   onBack,
+  feel,
+  onFeel,
+  loadError,
 }: Props) {
   const [mode, setMode] = useState<Mode>("favorites");
   const [allMeta, setAllMeta] = useState<FavoriteMetadata[]>([]);
@@ -50,6 +59,7 @@ export function MemorySourcePicker({
   const [search, setSearch] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+  const [uploadPreviewUrls, setUploadPreviewUrls] = useState<string[]>([]);
 
   /** id → "loading" marker or its live URL; tracks URLs for unmount revoke. */
   const urlCacheRef = useRef<Map<string, string>>(new Map());
@@ -153,6 +163,19 @@ export function MemorySourcePicker({
     [files],
   );
 
+  const uploadPreviewFiles = useMemo(
+    () => imageFiles.slice(0, PREVIEW_LIMIT),
+    [imageFiles],
+  );
+
+  useEffect(() => {
+    const urls = uploadPreviewFiles.map((f) => URL.createObjectURL(f));
+    setUploadPreviewUrls(urls);
+    return () => {
+      for (const u of urls) URL.revokeObjectURL(u);
+    };
+  }, [uploadPreviewFiles]);
+
   const canStart =
     mode === "upload"
       ? imageFiles.length >= difficulty.pairs
@@ -172,6 +195,7 @@ export function MemorySourcePicker({
         <button type="button" className="puzzle-btn" onClick={onBack}>
           ← Назад
         </button>
+        <MinigameMistressFace size="sm" />
         <h2 className="memory-setup__title">Пары на память</h2>
         <div className="puzzle-source__tabs">
           <button
@@ -268,6 +292,20 @@ export function MemorySourcePicker({
                 <span>Перетащи или выбери картинки с диска</span>
                 <span className="muted">PNG / JPG / WEBP / GIF</span>
               </label>
+              {uploadPreviewUrls.length > 0 ? (
+                <div className="memory-setup__preview">
+                  {uploadPreviewUrls.map((url) => (
+                    <span key={url} className="memory-setup__preview-cell">
+                      <img src={url} alt="" draggable={false} />
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              {imageFiles.length > PREVIEW_LIMIT ? (
+                <p className="muted memory-setup__preview-more">
+                  …и ещё {imageFiles.length - PREVIEW_LIMIT}
+                </p>
+              ) : null}
               <p className="memory-setup__poolline">
                 {imageFiles.length === 0
                   ? `Каждая картинка станет парой карт — выбери минимум ${difficulty.pairs}.`
@@ -305,6 +343,12 @@ export function MemorySourcePicker({
             поднимает множитель до ×2, промах жжёт Угольки. Найденная пара на
             пару секунд появится целиком в панели награды.
           </p>
+          <MinigameStimToggles settings={feel} onChange={onFeel} />
+          {loadError ? (
+            <p className="memory-setup__hint" role="alert">
+              {loadError}
+            </p>
+          ) : null}
           <button
             type="button"
             className="memory-setup__start"

@@ -44,8 +44,10 @@ const PRESET_IDS_BY_MISTRESS: Record<MistressId, readonly string[]> = {
     "anal_locked",
     "phantom_cage",
     "mask_deny",
+    "madness",
+    "cbt_court",
+    "oral_rehearsal",
     "heavy",
-    "anal_focus",
     "chastity",
   ],
 };

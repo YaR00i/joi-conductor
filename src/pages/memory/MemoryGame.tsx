@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CindersGlyph } from "../../components/CindersGlyph";
 import { getActiveSaveSlot } from "../../lib/saveSlots";
+import { recordMinigameClear } from "../../lib/achievements";
+import {
+  filterArcadeTasks,
+  loadRunnerSettings,
+  saveRunnerSettings,
+  stimVibeMode,
+  type RunnerSettings,
+} from "../../lib/runnerSettings";
 import {
   buildMemoryDeck,
   memoryGridFor,
@@ -57,6 +65,9 @@ function fmtTime(sec: number): string {
 export function MemoryGame({ onReward, onExit }: Props) {
   const [phase, setPhase] = useState<Phase>("setup");
   const [difficultyId, setDifficultyId] = useState<MemoryDifficultyId>("medium");
+  const [feel, setFeel] = useState(loadRunnerSettings);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [timerOn, setTimerOn] = useState(false);
   const difficulty = useMemo(
     () => getMemoryDifficulty(difficultyId),
     [difficultyId],
@@ -80,6 +91,7 @@ export function MemoryGame({ onReward, onExit }: Props) {
   const [loadProgress, setLoadProgress] = useState("");
   const [result, setResult] = useState<MemoryRewardResult | null>(null);
 
+  const claimedRef = useRef(false);
   const assetsRef = useRef<MemoryPairAsset[]>([]);
   const startMsRef = useRef<number | null>(null);
   const matchScoreRef = useRef(0);
@@ -91,8 +103,8 @@ export function MemoryGame({ onReward, onExit }: Props) {
   const timersRef = useRef<number[]>([]);
 
   const tasks = useMemo(
-    () => loadPuzzleTasks().filter((t) => t.kind !== "per_touch" && t.kind !== "ghost_hint"),
-    [],
+    () => filterArcadeTasks(loadPuzzleTasks(), feel),
+    [feel],
   );
   const pairsTotal = assets.length;
 
@@ -104,15 +116,15 @@ export function MemoryGame({ onReward, onExit }: Props) {
     timersRef.current.push(window.setTimeout(fn, ms));
   }, []);
 
-  // timer tick while playing (starts on the first flip)
+  // timer tick while playing (starts on the first flip or peek)
   useEffect(() => {
-    if (phase !== "play" || startMsRef.current == null) return;
+    if (phase !== "play" || !timerOn || startMsRef.current == null) return;
     const id = window.setInterval(() => {
       if (startMsRef.current != null)
         setElapsed(Math.floor((Date.now() - startMsRef.current) / 1000));
     }, 500);
     return () => window.clearInterval(id);
-  }, [phase, flipped.length]);
+  }, [phase, timerOn]);
 
   // teardown: object URLs + pending timers
   useEffect(
@@ -141,6 +153,8 @@ export function MemoryGame({ onReward, onExit }: Props) {
       setReward(null);
       setBusy(false);
       setPeekActive(false);
+      setLoadError(null);
+      setTimerOn(false);
       startMsRef.current = null;
       missRef.current = 0;
       matchScoreRef.current = 0;
@@ -152,8 +166,15 @@ export function MemoryGame({ onReward, onExit }: Props) {
       setLoadProgress("Готовлю колоду…");
       void loadMemoryAssets(source, difficulty.pairs, (loaded, target) => {
         setLoadProgress(`Открываю картинки ${loaded}/${target}…`);
-      }).then(({ assets: loaded }) => {
+      }).then(({ assets: loaded, skipped }) => {
         if (loaded.length < 2) {
+          const asked =
+            source.kind === "files" ? source.files.length : source.ids.length;
+          setLoadError(
+            skipped > 0
+              ? `Не открыл ${asked - loaded.length} из ${asked}. Нужно хотя бы две картинки.`
+              : "Нужно хотя бы две картинки.",
+          );
           setLoadProgress("");
           setPhase("setup");
           return;
@@ -162,6 +183,7 @@ export function MemoryGame({ onReward, onExit }: Props) {
         setAssets(loaded);
         deckByIdRef.current = new Map(loaded.map((a) => [a.id, a]));
         setDeck(buildMemoryDeck(loaded, difficulty.cursedPairs));
+        claimedRef.current = false;
         setPhase("play");
       });
     },
@@ -190,7 +212,9 @@ export function MemoryGame({ onReward, onExit }: Props) {
     rewardRef.current = 0;
     penaltyRef.current = 0;
     setElapsed(0);
+    setTimerOn(false);
     setDeck(buildMemoryDeck(assetsRef.current, difficulty.cursedPairs));
+    claimedRef.current = false;
     setPhase("play");
   }, [clearTimers, difficulty]);
 
@@ -210,6 +234,8 @@ export function MemoryGame({ onReward, onExit }: Props) {
         taskPenalty: penaltyRef.current,
       }),
     );
+    recordMinigameClear("memory");
+    claimedRef.current = false;
     setPhase("result");
   }, [difficulty]);
 
@@ -223,7 +249,10 @@ export function MemoryGame({ onReward, onExit }: Props) {
   const onFlip = useCallback(
     (card: MemoryCard) => {
       if (busy || peekActive || taskOverlay) return;
-      if (startMsRef.current == null) startMsRef.current = Date.now();
+      if (startMsRef.current == null) {
+        startMsRef.current = Date.now();
+        setTimerOn(true);
+      }
       if (flipped.length === 0) {
         setFlipped([card.key]);
         return;
@@ -303,6 +332,10 @@ export function MemoryGame({ onReward, onExit }: Props) {
 
   const peek = useCallback(() => {
     if (busy || taskOverlay || flipped.length > 0 || peekActive) return;
+    if (startMsRef.current == null) {
+      startMsRef.current = Date.now();
+      setTimerOn(true);
+    }
     peeksRef.current += 1;
     setPeeks(peeksRef.current);
     setPeekActive(true);
@@ -317,6 +350,12 @@ export function MemoryGame({ onReward, onExit }: Props) {
         onDifficulty={setDifficultyId}
         onStart={startRound}
         onBack={onExit}
+        feel={feel}
+        onFeel={(next: RunnerSettings) => {
+          setFeel(next);
+          saveRunnerSettings(next);
+        }}
+        loadError={loadError}
       />
     );
   }
@@ -373,20 +412,39 @@ export function MemoryGame({ onReward, onExit }: Props) {
               type="button"
               className="puzzle-config__start"
               onClick={() => {
-                onReward(result.total);
+                if (!claimedRef.current) {
+                  claimedRef.current = true;
+                  onReward(result.total);
+                }
                 onExit();
               }}
             >
               <CindersGlyph className="memory-result__btn-glyph" />
               Забрать {result.total}
             </button>
-            <button type="button" className="puzzle-btn" onClick={restart}>
+            <button
+              type="button"
+              className="puzzle-btn"
+              onClick={() => {
+                if (!claimedRef.current) {
+                  claimedRef.current = true;
+                  onReward(result.total);
+                }
+                restart();
+              }}
+            >
               Ещё раз
             </button>
             <button
               type="button"
               className="puzzle-btn"
-              onClick={() => setPhase("setup")}
+              onClick={() => {
+                if (!claimedRef.current) {
+                  claimedRef.current = true;
+                  onReward(result.total);
+                }
+                setPhase("setup");
+              }}
             >
               Другие картинки
             </button>
@@ -470,6 +528,7 @@ export function MemoryGame({ onReward, onExit }: Props) {
         <PuzzleTaskRunner
           mode="task"
           task={taskOverlay}
+          vibeMode={stimVibeMode(feel)}
           allowCancel={getActiveSaveSlot() === "sandbox"}
           onComplete={onCursedResolved}
         />

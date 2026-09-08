@@ -17,3 +17,5 @@ __pycache__/
 *.tsbuildinfo
 content/ember/voxels/_legacy/
 debug/ember-saves/
+tmp/
+.playwright-mcp/

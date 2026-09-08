@@ -1,15 +1,15 @@
 # Система профилей Госпож (Mistress Packs)
 
-Живая спека. Обновляй по мере внедрения. Картинки аватаров/портретов: SVG-плейсхолдеры; положи PNG с теми же именами — `MistressImg` подхватит.
+Живая спека. Обновляй по мере внедрения. Ху Тао и Искорка — PNG в `public/`. Фурина/Санна: SVG-плейсхолдеры; положи PNG с теми же именами — `MistressImg` подхватит.
 
 ## Статус
 
 | Пак | id | Статус |
 |-----|-----|--------|
-| Ember — Ху Тао | `hu_tao` | Есть · база hand-stroke · **онахол** только у неё |
-| Tide — Фурина | `furina` | **Закрыта** до CBT/plapping/prone + censored/blacked · **CBT + Prone** только у неё · мало hand-stroke |
+| Ember — Ху Тао | `hu_tao` | Есть · база hand-stroke · **онахол** у неё; цирк Искорки тоже может |
+| Tide — Фурина | `furina` | **Закрыта** до CBT/plapping/prone + censored/blacked · **CBT + Prone** только у неё (пока она активна) · мало hand-stroke |
 | Idol Soft — Санна | `sunna` | **Закрыта** до вибро + клетка/орал + архетип · **орал** только у неё · **без дрочки руками** (vibe-first) |
-| Mask Circus — Искорка / Искра | `sparkle` | **Закрыта** (правила ниже); phantom + SessionFx при разблоке |
+| Mask Circus — Искорка / Искра | `sparkle` | **Закрыта** (правила ниже); PNG арты; **все режимы** пока она активна; phantom + тема **Безумие** |
 
 «Её вкусы» (пресеты плана) — **по госпоже**: [`presets.ts`](../src/lib/presets.ts) `listMistressPresets` · каталог [`presets.json`](../data/presets.json).
 
@@ -23,7 +23,9 @@
 4. Оба магазин-ключа: **Маска Искорки** (`sparkle_mask`) + **Клык Искры** (`iskra_fang`)
 5. ≥1 завершённая сессия в режиме клетки
 
-При разблоке авто-выдаются флаги `sparkle_phantom` + `sparkle_session_fx`, включаются secondary censored/blacked. Логика: [`mistressUnlocks.ts`](../src/lib/mistress/mistressUnlocks.ts). Настройки эффектов сессии (спираль, артефакты, темы надписей): [`sessionFx.ts`](../src/lib/sessionFx.ts), Настройки → Геймплей → Эффекты.
+При разблоке авто-выдаются флаги `sparkle_phantom` + `sparkle_session_fx`, режимы CBT / Prone / орал / plapping / онахол, и включаются secondary censored/blacked. Пока Искорка активна, колесо режимов не режет чужие exclusive. Логика: [`mistressUnlocks.ts`](../src/lib/mistress/mistressUnlocks.ts). Тема эффектов **Безумие** ([`sessionFx.ts`](../src/lib/sessionFx.ts)): Настройки → Геймплей → Эффекты.
+
+Арты: [`sparkleArt.ts`](../src/lib/sparkleArt.ts) — полный кадр (обе девочки) в `mood/full/` для Рулетки справа: **справа** тёмная **Искорка** (`sparkle`), **слева** белая **Искра** (`sparxie`). Квадратные мини-лица: Искорка на sweet/calm/bored, Искра на cruel/chaotic/horny. Заготовки обеих морд: `mood/sparkle/` и `mood/sparxie/`.
 
 ## Furina Tide (готово)
 

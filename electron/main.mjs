@@ -80,6 +80,10 @@ import {
   readCensorDetectPpModel,
 } from "./censorDetectInstall.mjs";
 import {
+  getPortablePythonStatus,
+  installPortablePython,
+} from "./pythonInstall.mjs";
+import {
   getSovitsProcessStatus,
   startSovitsProcess,
   stopSovitsOnQuit,
@@ -796,6 +800,14 @@ ipcMain.handle("tts:voice-ref-write", async (_e, payload) => {
     String(payload?.destRel ?? ""),
     String(payload?.wavBase64 ?? ""),
   );
+});
+
+handleIpc("python:status", async () => getPortablePythonStatus());
+
+handleIpc("python:install", async (event) => {
+  return installPortablePython((p) => {
+    event.sender.send("python:install-progress", p);
+  });
 });
 
 handleIpc("tts:piper-status", async () => getPiperStatus());

@@ -34,6 +34,17 @@ export type TtsOptions = {
   qwenApiKey: string;
 };
 
+export type TtsSpeakOutcome = {
+  ok: boolean;
+  engine: string | null;
+  error: string | null;
+  generationMs?: number;
+  audioSeconds?: number;
+  realtimeX?: number;
+  backend?: string;
+  device?: string;
+};
+
 const DEFAULTS: TtsOptions = {
   enabled: true,
   provider: "sovits",
@@ -157,15 +168,12 @@ export class SpeechTts {
   private generation = 0;
   private lastError: string | null = null;
   private lastEngine: string | null = null;
+  private lastTiming: Omit<TtsSpeakOutcome, "ok" | "engine" | "error"> = {};
   private draining = false;
   private queued: {
     text: string;
     emotion: Emotion | undefined;
-    resolve: (value: {
-      ok: boolean;
-      engine: string | null;
-      error: string | null;
-    }) => void;
+    resolve: (value: TtsSpeakOutcome) => void;
     gen: number;
   } | null = null;
 
@@ -268,7 +276,7 @@ export class SpeechTts {
   async speakUntilDone(
     text: string,
     emotion?: Emotion,
-  ): Promise<{ ok: boolean; engine: string | null; error: string | null }> {
+  ): Promise<TtsSpeakOutcome> {
     if (!this.opts.enabled) {
       return { ok: false, engine: null, error: "TTS выключен" };
     }
@@ -281,6 +289,7 @@ export class SpeechTts {
       this.generation += 1;
       const gen = this.generation;
       this.lastError = null;
+      this.lastTiming = {};
       if (typeof window !== "undefined" && window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
@@ -323,6 +332,7 @@ export class SpeechTts {
           ok: !this.lastError && job.gen === this.generation,
           engine: this.lastEngine,
           error: this.lastError,
+          ...this.lastTiming,
         });
       }
     } finally {
@@ -335,7 +345,7 @@ export class SpeechTts {
   async speakAndWait(
     text: string,
     emotion?: Emotion,
-  ): Promise<{ ok: boolean; engine: string | null; error: string | null }> {
+  ): Promise<TtsSpeakOutcome> {
     return this.speakUntilDone(text, emotion);
   }
 
@@ -407,6 +417,13 @@ export class SpeechTts {
 
     if (gen !== this.generation) return;
     this.lastEngine = result.engine ?? "neural";
+    this.lastTiming = {
+      generationMs: result.generationMs,
+      audioSeconds: result.audioSeconds,
+      realtimeX: result.realtimeX,
+      backend: result.backend,
+      device: result.device,
+    };
 
     // Prefer OS-level playback from main (Electron <audio> often silent).
     // Host PlaySync blocks until audio finishes — speakUntilDone can await this.

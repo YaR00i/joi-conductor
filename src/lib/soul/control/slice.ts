@@ -1,5 +1,5 @@
 import type { MistressId } from "../../mistress/types";
-import { compactMistressOs, sessionKindLabelRu } from "./catalog";
+import { sessionKindLabelRu } from "./catalog";
 import { formatHoursLeft } from "./live";
 import { moodFromScore } from "../../moodEngine";
 import { findContract } from "../../contracts/dailyBoard";
@@ -12,6 +12,10 @@ import type {
   ProgressionTrack,
   TriggerEntry,
 } from "./types";
+import {
+  detectSoulTurnSubjects,
+  type SoulCanonicalSubject,
+} from "../conversationMode";
 
 function pickRelevantTrigger(
   triggers: readonly TriggerEntry[],
@@ -41,33 +45,50 @@ function pickProgression(
   );
 }
 
-function liveLines(live: ControlLiveSnapshot): string[] {
+function relevantLiveLines(
+  live: ControlLiveSnapshot,
+  subjects: ReadonlySet<SoulCanonicalSubject>,
+): string[] {
   const lines: string[] = [];
-  if (live.wear) {
-    const label = live.wear.kind === "plug" ? "plug" : "cage";
+  if (subjects.has("wear:cage")) {
     lines.push(
-      `Wear: ${label} ${formatHoursLeft(live.wear.remainingMs)} left (${live.wear.hours}h set).`,
+      live.wear?.kind === "cage"
+        ? `Cage: ${formatHoursLeft(live.wear.remainingMs)} left (${live.wear.hours}h set).`
+        : "Cage: not worn.",
     );
-  } else {
-    lines.push("Wear: none.");
   }
-  if (live.denial) {
+  if (subjects.has("wear:plug")) {
     lines.push(
-      `Denial: ${formatHoursLeft(live.denial.remainingMs)} left, edges ${live.denial.edgesDone}/${live.denial.edgesTarget}.`,
+      live.wear?.kind === "plug"
+        ? `Plug: ${formatHoursLeft(live.wear.remainingMs)} left (${live.wear.hours}h set).`
+        : "Plug: not worn.",
     );
-  } else {
-    lines.push("Denial: none.");
   }
-  if (live.clothing.active) {
-    lines.push(`Clothing: ${live.clothing.detail}`);
+  if (
+    subjects.has("denial") ||
+    subjects.has("edging") ||
+    subjects.has("orgasm") ||
+    subjects.has("masturbation") ||
+    subjects.has("ruin")
+  ) {
+    lines.push(
+      live.denial
+        ? `Denial: ${formatHoursLeft(live.denial.remainingMs)} left, edges ${live.denial.edgesDone}/${live.denial.edgesTarget}.`
+        : "Denial: inactive.",
+    );
   }
-  if (live.checkIn) {
+  if (subjects.has("clothing") || subjects.has("appearance")) {
+    lines.push(
+      live.clothing.active
+        ? `Clothing: ${live.clothing.detail}`
+        : "Clothing: no active instruction.",
+    );
+  }
+  if (subjects.has("checkin") && live.checkIn) {
     const when = live.checkInOverdue
       ? "overdue — you may ask for a report after he is already talking, not instead of a hello"
       : `due ${new Date(live.checkIn.atMs).toLocaleString()}`;
     lines.push(`Check-in (${live.checkIn.kind}): ${when}. ${live.checkIn.note}`.trim());
-  } else {
-    lines.push("Check-in: none.");
   }
   return lines;
 }
@@ -77,14 +98,19 @@ function moodLine(state: ControlState): string {
   return `MOOD: ${mood} (score ${state.moodScore}) — comment only, do not change it.`;
 }
 
-function dispatchLines(state: ControlState): string[] {
+function dispatchLines(
+  state: ControlState,
+  subjects: ReadonlySet<SoulCanonicalSubject>,
+): string[] {
   const phase: DispatchPhase = state.dispatch.phase;
+  const sessionRelevant = subjects.has("session");
+  const taskRelevant = subjects.has("task") || subjects.has("contract");
+  const checkInRelevant = subjects.has("checkin");
   switch (phase) {
     case "idle":
-      return [
-        "Dispatch: idle. Session offers, morning reports, and punishments are app commands — speak only.",
-      ];
+      return [];
     case "morning": {
+      if (!taskRelevant && !checkInRelevant) return [];
       const titles = listMorningContracts(state)
         .map((row) => row.titleRu)
         .join("; ");
@@ -94,11 +120,13 @@ function dispatchLines(state: ControlState): string[] {
       ];
     }
     case "session_offer":
+      if (!sessionRelevant) return [];
       return [
         "Dispatch: a SESSION offer is open in the app (agree / refuse).",
         "If he refuses the session, that is not a morning skip. Speak only. Do not set_wear or set_denial.",
       ];
     case "punish": {
+      if (!taskRelevant && !sessionRelevant) return [];
       const titles = state.dispatch.punishIds
         .map((id) => findContract(id)?.titleRu)
         .filter((title): title is string => Boolean(title))
@@ -115,34 +143,96 @@ function dispatchLines(state: ControlState): string[] {
   }
 }
 
+function progressionSubjects(id: ProgressionTrack["id"]): SoulCanonicalSubject[] {
+  switch (id) {
+    case "cage":
+      return ["wear:cage"];
+    case "plug":
+      return ["wear:plug"];
+    case "ruin_cei":
+      return ["ruin", "cei"];
+    case "session_variety":
+      return ["session"];
+    case "sensitivity":
+      return ["masturbation", "orgasm", "edging"];
+    case "oral":
+      return ["session"];
+    case "morning":
+      return ["checkin", "task"];
+    case "smooth":
+      return ["appearance"];
+    default: {
+      const _exhaustive: never = id;
+      return _exhaustive;
+    }
+  }
+}
+
+function subjectsOverlap(
+  left: readonly SoulCanonicalSubject[],
+  right: ReadonlySet<SoulCanonicalSubject>,
+): boolean {
+  return left.some((subject) => right.has(subject));
+}
+
+function ruleSubjects(note: string): SoulCanonicalSubject[] {
+  if (/(гладк|брит|shav)/i.test(note)) return ["appearance"];
+  if (/(утрен|morning)/i.test(note)) return ["task", "checkin"];
+  return detectSoulTurnSubjects(note);
+}
+
 export function buildControlPromptSlice(
-  mistressId: MistressId,
+  _mistressId: MistressId,
   state: ControlState,
   live: ControlLiveSnapshot,
   userText: string,
+  requestedSubjects: readonly SoulCanonicalSubject[] = detectSoulTurnSubjects(userText),
 ): string {
-  const rules = state.rules.notes.slice(0, 8);
+  const subjects = new Set(requestedSubjects);
+  if (subjects.size === 0) return "";
+  const rules = state.rules.notes
+    .filter((note) => subjectsOverlap(ruleSubjects(note), subjects))
+    .slice(0, 4);
   const trigger = pickRelevantTrigger(state.triggers, userText);
-  const progression = pickProgression(state.progressions, userText);
+  const directProgression = pickProgression(state.progressions, userText);
+  const progression =
+    directProgression ??
+    state.progressions.find((row) =>
+      subjectsOverlap(progressionSubjects(row.id), subjects),
+    ) ??
+    null;
   const kinds = state.lastSessionKinds
     .slice(-4)
     .map((k: MistressSessionKind) => sessionKindLabelRu(k));
+  const liveShown = relevantLiveLines(live, subjects);
+  const orgasmRelevant = [
+    "session",
+    "masturbation",
+    "orgasm",
+    "edging",
+    "denial",
+    "ruin",
+    "cei",
+  ].some((subject) => subjects.has(subject as SoulCanonicalSubject));
   return [
-    compactMistressOs(mistressId),
-    "",
     "--- CONTROL ---",
-    moodLine(state),
-    ...liveLines(live),
-    ...dispatchLines(state),
-    rules.length ? `Rules:\n${rules.map((n) => `- ${n}`).join("\n")}` : "",
+    subjects.has("mood") ? moodLine(state) : "",
+    ...liveShown,
+    orgasmRelevant
+      ? `Orgasm permission required: ${state.rules.orgasmNeedsPermission ? "yes" : "no"}.`
+      : "",
+    ...dispatchLines(state, subjects),
+    rules.length ? `Relevant rules:\n${rules.map((n) => `- ${n}`).join("\n")}` : "",
     progression
       ? `Progression: ${progression.labelRu} lv${progression.level}. ${progression.note}`.trim()
       : "",
     trigger
       ? `Trigger: ${trigger.actionRu} — ${trigger.need} needs an order. Phrases: ${trigger.phrases.slice(0, 3).join(" / ")}`
       : "",
-    kinds.length ? `Recent session kinds: ${kinds.join(", ")}` : "",
-    state.pendingProposal
+    subjects.has("session") && kinds.length
+      ? `Recent session kinds: ${kinds.join(", ")}`
+      : "",
+    subjects.has("session") && state.pendingProposal
       ? `Pending her session: ${sessionKindLabelRu(state.pendingProposal.kind)}, ${state.pendingProposal.durationSec}s, edges ${state.pendingProposal.edgesTarget}, ${state.pendingProposal.finalePolicy}.`
       : "",
     "CONTROL is private state. Do not recap timers, check-ins, or rules unless you are changing an order this turn.",

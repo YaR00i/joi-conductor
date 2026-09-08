@@ -12,9 +12,10 @@
 - [Додзинси / Контент (nhentai)](docs/DOUJIN.md)
 - [V1 Spec (Phase 1 — механика)](docs/V1_SPEC.md) ✅
 - [V2 Spec (Phase 2 — voice + presets)](docs/V2_SPEC.md) ✅
-- [Ember JRPG — единый Game Design Document](docs/EMBER_JRPG_DESIGN.md)
+- [Ember Godot — активный отдельный проект](../ember-godot/README.md)
+- [Ember JRPG — архивный Game Design Document](docs/EMBER_JRPG_DESIGN.md)
 - [Исследование референсов и границы заимствования](docs/EMBER_JRPG_REFERENCES.md)
-- [Ember AI handoff — Godot-миграция + frozen Three-контракт](docs/EMBER_AI_HANDOFF.md)
+- [Ember AI handoff — архив миграции + frozen Three-контракт](docs/EMBER_AI_HANDOFF.md)
 - [Стиль персонажей Ember](docs/EMBER_CHARACTER_STYLE.md)
 - [Пайплайн воксельных ботов](docs/EMBER_VOXEL_BOT.md)
 - [JOI/Three — пауза, архив монолитов](docs/EMBER_RESTRUCTURE_PLAN.md)

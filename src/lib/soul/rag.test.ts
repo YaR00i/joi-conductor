@@ -3,12 +3,12 @@ import { pickSoulTopics, soulTextCosine } from "./rag";
 import type { SoulTopicFile } from "./types";
 
 describe("soul rag", () => {
-  it("returns all topics when there are four or fewer", () => {
+  it("returns no unrelated topics even when the topic set is small", () => {
     const topics: SoulTopicFile[] = [
       { filename: "a.md", body: "cats" },
       { filename: "b.md", body: "dogs" },
     ];
-    expect(pickSoulTopics(topics, "unrelated query")).toHaveLength(2);
+    expect(pickSoulTopics(topics, "unrelated query")).toEqual([]);
   });
 
   it("ranks by lexical cosine and keeps top 3 when over the threshold", () => {

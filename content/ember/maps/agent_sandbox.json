@@ -6026,9 +6026,11 @@
       "interactivity": {
         "kind": "quest_marker",
         "triggerId": "notice",
-        "scriptId": "sandbox_notice_read",
+        "scriptId": "sandbox_notice",
+        "questId": "sandbox_notice_quest",
         "iconId": "quest",
-        "questStatus": "available"
+        "questStatus": "available",
+        "note": "Старт задания: после выполнения sandbox_notice обработанный giver скрывается"
       }
     },
     {

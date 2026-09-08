@@ -33,6 +33,7 @@ export function seedSoulFactsIfEmpty(
       unspokenTension: facts.user.unspokenTension,
       preferencesHabits: [...facts.user.preferencesHabits],
       sharedMilestones: [...facts.user.sharedMilestones],
+      stances: [...(state.user.stances ?? [])],
     },
     topics,
   };

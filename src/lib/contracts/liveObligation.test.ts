@@ -17,6 +17,7 @@ import {
   bindDenialQuestToContract,
   bindWearLockToContract,
   DENIAL_LIVE_DEF_ID,
+  liveWearKindForContract,
   syncLiveObligationContracts,
 } from "./liveObligation";
 
@@ -33,7 +34,7 @@ describe("liveObligation", () => {
     const size = board.contracts.length;
     const lock = setCageLock(6, { kind: "cage" });
     const row = bindWearLockToContract(lock);
-    expect(row?.defId).toBe("chastity_locked_hours");
+    expect(row && liveWearKindForContract(row)).toBe("cage");
     expect(row && isAcceptedOpen(row)).toBe(true);
     expect(row?.params.hours).toBe(6);
     const next = loadContractBoard();

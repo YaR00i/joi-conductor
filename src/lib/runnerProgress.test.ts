@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyStage, RUNNER_STAGE_MAX, stageOf } from "./runnerProgress";
 import { getRunnerDifficulty } from "./runnerReward";
-import { applyRunnerRun, emptyAchievements } from "./achievements";
+import { applyRunnerRun, applyMinigameClear, emptyAchievements } from "./achievements";
 
 describe("applyStage", () => {
   const base = getRunnerDifficulty("run");
@@ -47,5 +47,20 @@ describe("applyRunnerRun", () => {
     expect(st.counters.runnerBosses).toBe(2);
     expect(st.counters.runnerCleanRuns).toBe(1); // clean requires survival
     expect(st.counters.runnerBestCrowd).toBe(42); // wiped crowds don't count
+  });
+});
+
+describe("applyMinigameClear", () => {
+  it("counts a finished puzzle / memory / farm / doodle round", () => {
+    let st = emptyAchievements();
+    st = applyMinigameClear(st, "puzzle");
+    st = applyMinigameClear(st, "puzzle");
+    st = applyMinigameClear(st, "memory");
+    st = applyMinigameClear(st, "farm");
+    st = applyMinigameClear(st, "doodle");
+    expect(st.counters.puzzleClears).toBe(2);
+    expect(st.counters.memoryClears).toBe(1);
+    expect(st.counters.farmRounds).toBe(1);
+    expect(st.counters.doodleClimbs).toBe(1);
   });
 });

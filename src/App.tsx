@@ -15,6 +15,8 @@ import { SectionBriefingOverlay } from "./components/SectionBriefingOverlay";
 import { SideNav, type NavId } from "./components/SideNav";
 import { parseEmberVoxelEditorDeepLink } from "./game/content/emberEditorDeepLink";
 import { TitleBar } from "./components/TitleBar";
+import { RuntimeBootstrapStrip } from "./components/RuntimeBootstrapStrip";
+import { RuntimeOptionalOverlay } from "./components/RuntimeOptionalOverlay";
 import type { VibeHudDeviceInfo, VibeHudState } from "./components/VibeHud";
 import { DebugAvatar, type AvatarSnapshot } from "./lib/avatar/debugAvatar";
 import {
@@ -40,6 +42,10 @@ import {
   loadControlState,
   saveControlMood,
 } from "./lib/soul/control";
+import {
+  recordQuestEndForSoul,
+  recordSessionEndForSoul,
+} from "./lib/soul/worldEventBridge";
 import { moodFromScore, scoreFromMood } from "./lib/moodEngine";
 import { setCageLock } from "./lib/cageTimer";
 import {
@@ -188,8 +194,17 @@ import {
 } from "./lib/types";
 import { getVibeProfile } from "./lib/vibeProfiles";
 import { LocalLlmVoice, type VoiceActivity } from "./lib/voice/localLlmVoice";
-import { ensureSovitsAutoStart } from "./lib/voice/sovitsAutoStart";
 import { ensureQwenAutoStart } from "./lib/voice/qwenAutoStart";
+import { ensureSovitsAutoStart } from "./lib/voice/sovitsAutoStart";
+import { runRuntimeBootstrap, collectRuntimeBootstrapSnapshot, type RuntimeBootstrapProgress } from "./lib/runtimeBootstrapRun";
+import {
+  loadOptionalOffersDismissed,
+  optionalJobsFromSelection,
+  planOptionalRuntimeOffers,
+  saveOptionalOffersDismissed,
+  type RuntimeOptionalId,
+  type RuntimeOptionalOffer,
+} from "./lib/runtimeOptionalOffers";
 import { SpeechTts } from "./lib/voice/speechTts";
 import { TemplateVoice } from "./lib/voice/templateVoice";
 import { translateCaptionGoogleRu } from "./lib/voice/translateToRu";
@@ -715,6 +730,11 @@ export function App() {
   const voiceSettingsRef = useRef(voiceSettings);
   voiceSettingsRef.current = voiceSettings;
   const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
+  const [runtimeBootstrap, setRuntimeBootstrap] =
+    useState<RuntimeBootstrapProgress | null>(null);
+  const [optionalOffers, setOptionalOffers] = useState<
+    RuntimeOptionalOffer[] | null
+  >(null);
   /** Crash / reload resume offer. */
   const [pendingCheckpoint, setPendingCheckpoint] =
     useState<SessionCheckpoint | null>(() => loadSessionCheckpoint());
@@ -1750,6 +1770,7 @@ export function App() {
         const showAbortDebrief = progress.showAbortDebrief;
         const skipContractSettle =
           event.silent === true || isLabPracticeRun(st);
+        const seedBeforeEnd = skipContractSettle ? null : loadActiveSessionSeed();
         const contractSettle = skipContractSettle
           ? null
           : settleSessionSeedAfterEnd(
@@ -1764,6 +1785,28 @@ export function App() {
                 : null,
               { announce: !showDebrief && !showAbortDebrief },
             );
+        if (!skipContractSettle) {
+          const endedAtMs = Date.now();
+          const startedAtMs = diaryStartedAt
+            ? Date.parse(diaryStartedAt)
+            : undefined;
+          recordSessionEndForSoul({
+            mistressId: getActiveMistress().id,
+            reason: event.reason,
+            finaleOutcome: st?.finaleOutcome,
+            edgesDone: st?.edgesDone,
+            durationSec: st?.elapsedSec,
+            mode: st?.params.mode,
+            events: eventLogRef.current,
+            endedAtMs,
+            startedAtMs:
+              startedAtMs != null && Number.isFinite(startedAtMs)
+                ? startedAtMs
+                : undefined,
+            contractInstanceId: seedBeforeEnd?.instanceId,
+            contractStatus: contractSettle?.status,
+          });
+        }
         if (showDebrief && st) {
           const mistress = getActiveMistress();
           const mood = st.mood;
@@ -1840,6 +1883,14 @@ export function App() {
                 findContract(cbtSeed.instanceId)?.reward ?? 0,
               )
             : null;
+        if (!isLabPracticeRun(runtimeRef.current?.getState())) {
+          recordQuestEndForSoul({
+            mistressId: getActiveMistress().id,
+            outcome: "completed",
+            titleRu: event.questId,
+            questId: event.questId,
+          });
+        }
         if (cbtNote?.settleDone) {
           settleLiveContractProgress(cbtNote.next, "done");
           clearQuestMediaDeck();
@@ -1854,6 +1905,14 @@ export function App() {
         }
       }
       if (event.type === "quest_failed") {
+        if (!isLabPracticeRun(runtimeRef.current?.getState())) {
+          recordQuestEndForSoul({
+            mistressId: getActiveMistress().id,
+            outcome: "failed",
+            titleRu: event.questId,
+            questId: event.questId,
+          });
+        }
         clearQuestMediaDeck();
       }
       if (event.type === "quest_started") {
@@ -2474,34 +2533,76 @@ export function App() {
     if (!voiceSettings.ttsEnabled) ttsRef.current.stop();
   }, [voiceSettings]);
 
-  // GPT-SoVITS / Qwen vLLM auto-start on app boot (not only when Settings is opened).
+  // Fresh PC: install missing runtimes once, then optional Ollama offer.
   useEffect(() => {
-    void ensureSovitsAutoStart({
-      ttsEnabled: voiceSettings.ttsEnabled,
-      autoStartSovits: voiceSettings.autoStartSovits,
-      ttsProvider: voiceSettings.ttsProvider,
-      sovitsUrl: voiceSettings.sovitsUrl,
-    }).catch(() => {
-      /* TitleBar / Settings show status; boot must not throw */
+    if (!window.joiDesktop?.isDesktop) return;
+    let cancelled = false;
+    void (async () => {
+      await runRuntimeBootstrap({
+        voice: voiceSettingsRef.current,
+        autoTagOnImport: mediaSettingsRef.current.autoTagOnImport,
+        wd14Url: mediaSettingsRef.current.wd14Url,
+        onProgress: setRuntimeBootstrap,
+      });
+      if (cancelled) return;
+      const voice = voiceSettingsRef.current;
+      void ensureSovitsAutoStart({
+        ttsEnabled: voice.ttsEnabled,
+        autoStartSovits: voice.autoStartSovits,
+        ttsProvider: voice.ttsProvider,
+        sovitsUrl: voice.sovitsUrl,
+      }).catch(() => undefined);
+      void ensureQwenAutoStart({
+        ttsEnabled: voice.ttsEnabled,
+        autoStartQwen: voice.autoStartQwen,
+        ttsProvider: voice.ttsProvider,
+        qwenUrl: voice.qwenUrl,
+        qwenModel: voice.qwenModel,
+        qwenRefPath: voice.qwenRefPath,
+        qwenPromptText: voice.qwenPromptText,
+      }).catch(() => undefined);
+      if (loadOptionalOffersDismissed()) return;
+      const snap = await collectRuntimeBootstrapSnapshot({
+        voice: voiceSettingsRef.current,
+        autoTagOnImport: mediaSettingsRef.current.autoTagOnImport,
+        wd14Url: mediaSettingsRef.current.wd14Url,
+      });
+      const offers = planOptionalRuntimeOffers(snap);
+      if (!cancelled && offers.length) setOptionalOffers(offers);
+    })().catch(() => {
+      /* strip + Settings show the error; boot must not throw */
     });
-    void ensureQwenAutoStart({
-      ttsEnabled: voiceSettings.ttsEnabled,
-      autoStartQwen: voiceSettings.autoStartQwen,
-      ttsProvider: voiceSettings.ttsProvider,
-      qwenUrl: voiceSettings.qwenUrl,
-      qwenModel: voiceSettings.qwenModel,
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!runtimeBootstrap?.done || runtimeBootstrap.error) return;
+    if (optionalOffers) return;
+    const id = window.setTimeout(() => setRuntimeBootstrap(null), 6000);
+    return () => window.clearTimeout(id);
+  }, [runtimeBootstrap, optionalOffers]);
+
+  function dismissOptionalOffers() {
+    saveOptionalOffersDismissed();
+    setOptionalOffers(null);
+  }
+
+  function confirmOptionalOffers(selected: RuntimeOptionalId[]) {
+    dismissOptionalOffers();
+    const jobs = optionalJobsFromSelection(selected);
+    if (jobs.length === 0) return;
+    void runRuntimeBootstrap({
+      jobs,
+      voice: voiceSettingsRef.current,
+      autoTagOnImport: mediaSettingsRef.current.autoTagOnImport,
+      wd14Url: mediaSettingsRef.current.wd14Url,
+      onProgress: setRuntimeBootstrap,
     }).catch(() => {
-      /* Settings show status; boot must not throw */
+      /* strip shows the error */
     });
-  }, [
-    voiceSettings.ttsEnabled,
-    voiceSettings.autoStartSovits,
-    voiceSettings.autoStartQwen,
-    voiceSettings.ttsProvider,
-    voiceSettings.sovitsUrl,
-    voiceSettings.qwenUrl,
-    voiceSettings.qwenModel,
-  ]);
+  }
 
   useEffect(() => {
     saveToyOwnedOverrides(toyOverrides);
@@ -2984,10 +3085,12 @@ export function App() {
   }
 
   async function runAutoTagging(items: MediaItem[], files: File[]) {
-    const status = await getWd14Status(mediaSettings.wd14Url);
+    let status = await getWd14Status(mediaSettings.wd14Url);
+    if (status.backend === "none" || !status.online) {
+      status = await startWd14Server({ baseUrl: mediaSettings.wd14Url });
+    }
     setWd14Status(status);
     if (status.backend === "none" || !status.online) {
-      // Backend unavailable — keep filename tags; UI will show a hint.
       return;
     }
     setTagProgress({ done: 0, total: items.length });
@@ -3620,6 +3723,14 @@ export function App() {
           qwenUrl={voiceSettings.qwenUrl}
         />
       ) : null}
+      {!fullscreen ? <RuntimeBootstrapStrip progress={runtimeBootstrap} /> : null}
+      {optionalOffers ? (
+        <RuntimeOptionalOverlay
+          offers={optionalOffers}
+          onConfirm={confirmOptionalOffers}
+          onSkip={dismissOptionalOffers}
+        />
+      ) : null}
       <div
         className={[
           "shell",
@@ -3959,7 +4070,7 @@ export function App() {
                 void startSession(next);
               }}
               onStartAssembledSession={(result) => {
-                void mistressDecide(result);
+                return mistressDecide(result);
               }}
               onAcceptContract={(contract) => {
                 startSessionSeed(contract, { navigate: false });

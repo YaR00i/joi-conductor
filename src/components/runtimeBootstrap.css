@@ -1,0 +1,121 @@
+.runtime-bootstrap {
+  position: relative;
+  z-index: 40;
+  padding: 0.45rem 0.9rem 0.55rem;
+  background: #10131a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(242, 239, 232, 0.9);
+  font-size: 0.78rem;
+}
+
+.runtime-bootstrap.is-error {
+  background: #1a1214;
+}
+
+.runtime-bootstrap__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.runtime-bootstrap__top strong {
+  font-weight: 650;
+}
+
+.runtime-bootstrap__bar {
+  margin-top: 0.28rem;
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.runtime-bootstrap__bar > i {
+  display: block;
+  height: 100%;
+  background: #d4a017;
+}
+
+.runtime-bootstrap.is-error .runtime-bootstrap__bar > i {
+  background: #c45c5c;
+}
+
+.runtime-bootstrap.is-done:not(.is-error) .runtime-bootstrap__bar > i {
+  background: #6aa56a;
+}
+
+.runtime-bootstrap__meta {
+  margin: 0.28rem 0 0;
+  color: rgba(242, 239, 232, 0.62);
+  line-height: 1.35;
+  max-height: 2.7em;
+  overflow: hidden;
+}
+
+.runtime-optional {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: rgba(6, 7, 10, 0.62);
+}
+
+.runtime-optional__card {
+  width: min(36rem, 100%);
+  padding: 1.35rem 1.45rem 1.2rem;
+  border-radius: 16px;
+  background: #141821;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+
+.runtime-optional__eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(242, 239, 232, 0.5);
+}
+
+.runtime-optional__card h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.runtime-optional__lead {
+  margin: 0.55rem 0 1rem;
+  color: rgba(242, 239, 232, 0.7);
+  line-height: 1.45;
+}
+
+.runtime-optional__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.runtime-optional__item {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.runtime-optional__item strong {
+  font-weight: 650;
+}
+
+.runtime-optional__item span {
+  font-size: 0.82rem;
+  color: rgba(242, 239, 232, 0.58);
+}
+
+.runtime-optional__acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
+}

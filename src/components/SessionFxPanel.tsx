@@ -8,11 +8,15 @@ import {
   parseSessionFxCaptionLines,
   patchSessionFxSettings,
   pickSessionFxCaption,
+  sessionFxBarLookLabelRu,
+  sessionFxBarLookSubRu,
   sessionFxThemeLabelRu,
   sessionFxThemeSubRu,
+  SESSION_FX_BAR_LOOKS,
   SESSION_FX_CAPTIONS,
   SESSION_FX_THEMES,
   subscribeSessionFx,
+  type SessionFxBarLook,
   type SessionFxSettings,
   type SessionFxTheme,
 } from "../lib/sessionFx";
@@ -240,11 +244,41 @@ export function SessionFxPanel() {
         />
         <FxToggle
           label="Плашка на аватаре"
+          hint="Вебка слева: закрывает лицо госпожи, не само фото сессии."
           value={fx.avatarBar}
           onSub="закрыто"
           offSub="лицо"
           onChange={(on) => patch({ avatarBar: on })}
         />
+        <div className="session-fx-row">
+          <div className="session-fx-row__copy">
+            <span className="field__label">Вид плашки</span>
+            <span className="field__hint">
+              Штамп 修正 или лента по глазам. Нажми — вебка и плашка
+              включатся.
+            </span>
+          </div>
+          <div className="brain-seg" role="radiogroup" aria-label="Вид плашки">
+            {SESSION_FX_BAR_LOOKS.map((id: SessionFxBarLook) => {
+              const on = id === fx.barLook;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  className={"brain-seg__btn" + (on ? " is-on" : "")}
+                  onClick={() => patch({ avatarBar: true, barLook: id })}
+                >
+                  {sessionFxBarLookLabelRu(id)}
+                  <span className="brain-seg__sub">
+                    {sessionFxBarLookSubRu(id)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
       {fx.captions || fx.popups ? (
         <div className="session-fx-preview">

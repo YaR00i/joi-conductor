@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { NavId } from "../components/SideNav";
 import { PlayHubChrome } from "../components/HubChrome";
+import { MinigameMistressFace } from "../components/MinigameMistressFace";
+import { activeMistressNameRu, subscribeActiveMistress } from "../lib/mistress";
 import { getActiveSaveSlot } from "../lib/saveSlots";
 import { DoodleGame } from "./doodle/DoodleGame";
 import { FarmGame } from "./farm/FarmGame";
@@ -26,7 +28,13 @@ export function MinigamesPage({
   onNavigate,
 }: Props) {
   const [view, setView] = useState<View>("catalog");
+  const [mistressName, setMistressName] = useState(activeMistressNameRu);
   const isSandbox = getActiveSaveSlot() === "sandbox";
+
+  useEffect(
+    () => subscribeActiveMistress((p) => setMistressName(p.displayNameRu)),
+    [],
+  );
 
   if (view === "memory") {
     return (
@@ -88,8 +96,12 @@ export function MinigamesPage({
           </div>
         </header>
       )}
-      <p className="muted">
-        Простые игры на Угольки. Больше риска — больше награда.
+      <p className="muted minigames-intro">
+        <MinigameMistressFace size="sm" />
+        <span>
+          {mistressName} смотрит, как ты играешь. Угольки те же, что за сессию —
+          промах по заданию она заметит.
+        </span>
       </p>
 
       <div className="minigames-grid">
@@ -101,7 +113,7 @@ export function MinigamesPage({
           <div className="minigame-card__icon" aria-hidden>🧩</div>
           <div className="minigame-card__title">Пазл</div>
           <div className="minigame-card__desc muted">
-            Собери картинку из избранного или с диска. Особые кусочки дают
+            Собери картинку из избранного или с диска. Особые клетки дают
             задания: эдж, шлепки, стимул. Чем быстрее — тем больше Угольков.
           </div>
           <div className="minigame-card__cta">Играть →</div>
@@ -161,9 +173,8 @@ export function MinigamesPage({
           <div className="minigame-card__icon" aria-hidden>🍆</div>
           <div className="minigame-card__title">Пошлая ферма</div>
           <div className="minigame-card__desc muted">
-            Весёлая ферма на таймере: сажай пошлые культуры, поливай жаждущие
-            грядки и собирай урожай, пока он не обиделся. Хозяйка заходит с
-            проверкой: чисто — бонус, бардак — наказание заданием.
+            Свой двор: сей, строй, корми скот, вези грузовик. Прогресс сохраняется. {mistressName}{" "}
+            проверяет бардак заданием.
           </div>
           <div className="minigame-card__cta">Играть →</div>
         </button>
@@ -177,7 +188,7 @@ export function MinigamesPage({
             <div className="minigame-card__icon" aria-hidden>📝</div>
             <div className="minigame-card__title">Редактор заданий</div>
             <div className="minigame-card__desc muted">
-              Свои задания для особых кусочков: тип, текст, параметры, бонус и
+              Свои задания для всех мини-игр: тип, текст, параметры, бонус и
               штраф. Доступно только в Песочнице, играется в обоих слотах.
             </div>
             <div className="minigame-card__cta">Открыть →</div>
@@ -188,16 +199,10 @@ export function MinigamesPage({
             <div className="minigame-card__title">Редактор заданий</div>
             <div className="minigame-card__desc muted">
               Доступен только в слоте «Песочница». Переключись в настройках,
-              чтобы создавать свои задания для особых кусочков.
+              чтобы создавать свои задания для мини-игр.
             </div>
           </div>
         )}
-
-        <div className="minigame-card minigame-card--soon">
-          <div className="minigame-card__icon" aria-hidden>🎲</div>
-          <div className="minigame-card__title">Ещё игры…</div>
-          <div className="minigame-card__desc muted">Скоро появятся новые мини-игры.</div>
-        </div>
       </div>
     </div>
   );

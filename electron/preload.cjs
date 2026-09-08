@@ -65,6 +65,16 @@ contextBridge.exposeInMainWorld("joiDesktop", {
         ipcRenderer.removeListener("ember:file-changed", handler);
     },
   },
+  python: {
+    status: () => ipcRenderer.invoke("python:status"),
+    install: () => ipcRenderer.invoke("python:install"),
+    onInstallProgress: (cb) => {
+      const handler = (_e, payload) => cb(payload);
+      ipcRenderer.on("python:install-progress", handler);
+      return () =>
+        ipcRenderer.removeListener("python:install-progress", handler);
+    },
+  },
   tts: {
     voices: () => ipcRenderer.invoke("tts:voices"),
     speak: (payload) => ipcRenderer.invoke("tts:speak", payload),

@@ -421,6 +421,17 @@ export function appendDiaryEntry(entry: DiaryEntry): DiaryEntry[] {
   return next;
 }
 
+export function deleteDiaryEntry(entryId: string): DiaryEntry[] {
+  const next = loadDiaryEntries().filter((e) => e.id !== entryId);
+  saveDiaryEntries(next);
+  return next;
+}
+
+export function clearDiaryEntries(): DiaryEntry[] {
+  saveDiaryEntries([]);
+  return [];
+}
+
 /** Remove the «На что кончил» thumbnail from one entry. */
 export function clearDiaryEntrySouvenir(entryId: string): DiaryEntry[] {
   const next = loadDiaryEntries().map((e) =>

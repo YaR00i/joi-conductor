@@ -15,7 +15,7 @@ import {
   filterLibraryAssets,
   uniqueLibraryTags,
 } from "../../../game/editor/emberLibraryIndex";
-import { VOXELS_PER_BLOCK } from "../../../game/voxel/constants";
+import { voxelDensity } from "../../../game/voxel/voxelModel";
 import { EmberSpriteThumb, EmberTileSwatch, EmberVoxelSceneThumb, EmberVoxelThumb } from "./EmberThumbGrid";
 import {
   MAP_REGION_KIND_COLOR,
@@ -234,7 +234,7 @@ export function MapLibraryTray({
               key: `voxel:${m.id}`,
               payload: { kind: "voxel" as const, modelId: m.id },
               label: m.nameRu?.trim() || m.id,
-              title: `${m.nameRu ?? m.id} · ${m.sizeBlocks.x}×${m.sizeBlocks.y}×${m.sizeBlocks.z} бл. (${VOXELS_PER_BLOCK}³)${m.tags?.length ? ` · ${m.tags.join(", ")}` : ""}${usage ? ` · ${usage} на картах` : ""}`,
+              title: `${m.nameRu ?? m.id} · ${m.sizeBlocks.x}×${m.sizeBlocks.y}×${m.sizeBlocks.z} бл. · ${voxelDensity(m)} вокс/блок${m.tags?.length ? ` · ${m.tags.join(", ")}` : ""}${usage ? ` · ${usage} на картах` : ""}`,
               usage,
               thumb: useScene ? (
                 <EmberVoxelSceneThumb

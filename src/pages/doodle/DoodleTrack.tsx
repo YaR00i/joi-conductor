@@ -12,7 +12,7 @@ import type { PuzzleTask } from "../../lib/puzzleTasks";
  *
  * The ember bounces by itself; the player steers left/right (screen edges
  * wrap). Platform kinds: normal, moving (drifts sideways), break (crumbles
- * after one bounce), spring (boosts ~3× higher) and task (🔥 pauses the game
+ * after one bounce), spring (boosts ×1.7) and task (🔥 pauses the game
  * with a PuzzleTask: success = cinders + a boost, fail = penalty + fog +
  * device pulse from the shell). Every run eventually ends with a fall —
  * max height is the score.
@@ -304,7 +304,7 @@ export function makeSeededRng(seed: number): () => number {
 
 const PLAT_COLORS: Record<PlatKind, { main: string; top: string; base: string }> = {
   normal: { main: "#3dd68c", top: "#7cf0b8", base: "#1d6b46" },
-  moving: { main: "#ffd23e", top: "#ffe98a", base: "#a5811a" },
+  moving: { main: "#c4783a", top: "#e8a56a", base: "#7a3d18" },
   break: { main: "#8a5f4e", top: "#a97a63", base: "#5d3e32" },
   spring: { main: "#3dd68c", top: "#7cf0b8", base: "#1d6b46" },
   task: { main: "#ff8a4a", top: "#ffc49a", base: "#b3541f" },
@@ -1134,24 +1134,19 @@ export function DoodleTrack({
           ctx.fill();
         }
         if (p.kind === "ice") {
-          // glossy sheen + icicles under the plate
-          ctx.strokeStyle = "rgba(255,255,255,0.55)";
-          ctx.lineWidth = Math.max(1, 1.6 * scale);
+          // glossy sheen — ice is slip, not spikes
+          ctx.strokeStyle = "rgba(255,255,255,0.7)";
+          ctx.lineWidth = Math.max(1.2, 2 * scale);
           ctx.beginPath();
-          ctx.moveTo(px - wpx * 0.3, py + 1.5);
-          ctx.lineTo(px - wpx * 0.05, py + ph * 0.55);
+          ctx.moveTo(px - wpx * 0.32, py + ph * 0.35);
+          ctx.lineTo(px + wpx * 0.08, py + ph * 0.18);
           ctx.stroke();
-          ctx.fillStyle = "rgba(216,240,255,0.85)";
-          for (let k = -1; k <= 1; k++) {
-            const ix = px + k * wpx * 0.28;
-            const ih = (5 + ((k + 2) % 2) * 3) * scale;
-            ctx.beginPath();
-            ctx.moveTo(ix - 2.5 * scale, py + ph * 0.9);
-            ctx.lineTo(ix + 2.5 * scale, py + ph * 0.9);
-            ctx.lineTo(ix, py + ph * 0.9 + ih);
-            ctx.closePath();
-            ctx.fill();
-          }
+          ctx.strokeStyle = "rgba(210,236,255,0.45)";
+          ctx.lineWidth = Math.max(1, 1.4 * scale);
+          ctx.beginPath();
+          ctx.moveTo(px - wpx * 0.18, py + ph * 0.62);
+          ctx.lineTo(px + wpx * 0.28, py + ph * 0.48);
+          ctx.stroke();
         }
         if (p.kind === "phantom" && alpha <= 0.5) {
           // ghost phase: dashed outline says "you will fall through"

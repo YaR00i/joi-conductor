@@ -1,5 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { OLLAMA_RECOMMENDED_PRESETS, filterOllamaPresets } from "../lib/ollamaCatalog";
+import {
+  filterOllamaPresets,
+  ollamaRoleMarks,
+  recommendedOllamaNotInstalled,
+  resolveInstalledOllamaName,
+  sameOllamaModel,
+  sortOllamaInstalled,
+} from "../lib/ollamaCatalog";
+import {
+  CHAT_LLM_CHANGED_EVENT,
+  loadChatLlmSettings,
+  saveChatLlmSettings,
+  type ChatLlmSettings,
+  chatLlmProviderLabelRu,
+} from "../lib/soul/llmSettings";
 import {
   mergeOllamaSearchHits,
   parseOllamaSearchHtml,
@@ -22,7 +36,9 @@ import {
   type QwenInstallTarget,
 } from "../lib/qwenTtsCatalog";
 import type { VoiceSettings } from "../lib/voiceSettings";
+import { SoulRoleAssign } from "./SoulRoleAssign";
 import { UiCheck } from "./UiCheck";
+import "./voiceSettings.css";
 
 type Props = {
   voice: VoiceSettings;
@@ -81,26 +97,6 @@ type DiskXfer = {
   filesTotal?: number;
 };
 
-function modelBase(name: string): string {
-  return name.split(":")[0] ?? name;
-}
-
-function sameOllamaModel(a: string, b: string): boolean {
-  if (a === b) return true;
-  return (
-    a.startsWith(`${b}:`) ||
-    b.startsWith(`${a}:`) ||
-    modelBase(a) === modelBase(b)
-  );
-}
-
-function resolveInstalledName(
-  want: string,
-  installed: string[],
-): string | null {
-  return installed.find((m) => sameOllamaModel(m, want)) ?? null;
-}
-
 function desktopTts() {
   return typeof window !== "undefined" ? window.joiDesktop?.tts : undefined;
 }
@@ -152,6 +148,8 @@ export function BrainPanel({
   const [sovits, setSovits] = useState<SovitsInstallStatus | null>(null);
   const [xfer, setXfer] = useState<DiskXfer | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [chatLlm, setChatLlm] = useState<ChatLlmSettings>(loadChatLlmSettings);
+  const [resourceView, setResourceView] = useState<"text" | "voice">("text");
   const autoStartedRef = useRef(false);
 
   const refreshOllama = useCallback(async () => {
@@ -313,9 +311,25 @@ export function BrainPanel({
   }, []);
 
   const installed = status?.models ?? [];
+  const disk = useMemo(() => sortOllamaInstalled(installed), [installed]);
+  const catalogMissing = useMemo(
+    () => recommendedOllamaNotInstalled(disk),
+    [disk],
+  );
 
   useEffect(() => {
-    const resolved = resolveInstalledName(voice.model, installed);
+    const sync = () => setChatLlm(loadChatLlmSettings());
+    window.addEventListener(CHAT_LLM_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(CHAT_LLM_CHANGED_EVENT, sync);
+  }, []);
+
+  function persistChatLlm(next: ChatLlmSettings) {
+    saveChatLlmSettings(next);
+    setChatLlm(next);
+  }
+
+  useEffect(() => {
+    const resolved = resolveInstalledOllamaName(voice.model, installed);
     if (!resolved || resolved === voice.model) return;
     onVoice({ ...voice, model: resolved });
   }, [installed, voice.model, onVoice, voice]);
@@ -327,10 +341,6 @@ export function BrainPanel({
     void (async () => {
       const cur = await fetchOllamaStatus(voice.model);
       if (cancelled || cur.running) {
-        setStatus(cur);
-        return;
-      }
-      if (!cur.binaryPath) {
         setStatus(cur);
         return;
       }
@@ -363,26 +373,6 @@ export function BrainPanel({
       cancelled = true;
     };
   }, [voice.mode, voice.autoStartOllama, voice.model, manage]);
-
-  const rows = useMemo(() => {
-    const out: Array<{
-      id: string;
-      hint: string;
-      installedName: string | null;
-    }> = [];
-    const seen = new Set<string>();
-    for (const preset of OLLAMA_RECOMMENDED_PRESETS) {
-      const installedName = resolveInstalledName(preset.id, installed);
-      if (installedName) seen.add(installedName);
-      out.push({ id: preset.id, hint: preset.hint, installedName });
-    }
-    for (const name of installed) {
-      if (seen.has(name)) continue;
-      if (out.some((row) => sameOllamaModel(row.id, name))) continue;
-      out.push({ id: name, hint: "на диске", installedName: name });
-    }
-    return out;
-  }, [installed]);
 
   async function pullModel(id: string) {
     if (!manage) {
@@ -427,6 +417,25 @@ export function BrainPanel({
         const fallback = next.models[0] ?? "";
         onVoice({ ...voice, model: fallback });
       }
+      const leftover = next.models;
+      const still = (want: string) =>
+        Boolean(want.trim()) &&
+        Boolean(resolveInstalledOllamaName(want, leftover));
+      persistChatLlm({
+        ...chatLlm,
+        model: still(chatLlm.model) ? chatLlm.model : leftover[0] ?? "",
+        roleModels: {
+          router: still(chatLlm.roleModels?.router ?? "")
+            ? (chatLlm.roleModels?.router ?? "")
+            : "",
+          extractor: still(chatLlm.roleModels?.extractor ?? "")
+            ? (chatLlm.roleModels?.extractor ?? "")
+            : "",
+          planner: still(chatLlm.roleModels?.planner ?? "")
+            ? (chatLlm.roleModels?.planner ?? "")
+            : "",
+        },
+      });
       setLine(`Удалена · ${name}`);
     } catch (err) {
       setLine(err instanceof Error ? err.message : "Ошибка удаления");
@@ -616,10 +625,35 @@ export function BrainPanel({
   const idle = busy == null;
   const xferAgo = xfer ? Math.max(0, Math.round((now - xfer.at) / 1000)) : 0;
   const selectedName =
-    resolveInstalledName(voice.model, installed) ?? voice.model;
+    resolveInstalledOllamaName(voice.model, installed) ?? voice.model;
 
   return (
     <div className="brain-panel">
+      <div className="ai-resource-nav" role="tablist" aria-label="Тип ИИ-ресурсов">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={resourceView === "text"}
+          className={`ai-resource-nav__btn${resourceView === "text" ? " is-active" : ""}`}
+          onClick={() => setResourceView("text")}
+        >
+          <strong>Текст и роли</strong>
+          <span>Ollama · чат · роутер · планер</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={resourceView === "voice"}
+          className={`ai-resource-nav__btn${resourceView === "voice" ? " is-active" : ""}`}
+          onClick={() => setResourceView("voice")}
+        >
+          <strong>Голосовые модели</strong>
+          <span>Qwen · SoVITS · Piper</span>
+        </button>
+      </div>
+
+      {resourceView === "text" ? (
+        <>
       <div className="brain-panel__bar">
         <div className="brain-seg" role="radiogroup" aria-label="Режим текста">
           <button
@@ -690,13 +724,144 @@ export function BrainPanel({
         </div>
       </div>
 
+      <UiCheck
+        checked={voice.autoStartOllama}
+        disabled={!manage}
+        onChange={(autoStartOllama) => onVoice({ ...voice, autoStartOllama })}
+      >
+        Автозапуск Ollama при Local LLM
+      </UiCheck>
+
       {voice.mode !== "llm" ? (
         <p className="brain-panel__hint">
-          Шаблоны из bible. Живые реплики — Local LLM.
+          Шаблоны из bible. Живые реплики сессии — Local LLM.
         </p>
       ) : null}
 
-      <h3 className="brain-panel__h">Модели Ollama</h3>
+      <h3 className="brain-panel__h">На диске</h3>
+      <p className="brain-panel__hint">
+        Скачанные модели. «Сессия» — Local LLM в шаблонах. «Чат» — реплики Soul.
+        Роутер и разбор — в блоке ролей ниже.
+      </p>
+      <ul className="brain-list">
+        <li
+          className={
+            "brain-row" + (status?.binaryPath ? " is-ready" : "")
+          }
+        >
+          <div className="brain-row__main">
+            <span className="brain-row__name">Среда Ollama</span>
+            <span className="brain-row__meta">
+              {status?.binaryPath
+                ? "CLI на диске"
+                : "скачается вместе со стартом или моделью (~1 ГБ)"}
+            </span>
+          </div>
+        </li>
+        {disk.length === 0 ? (
+          <li className="brain-row">
+            <div className="brain-row__main">
+              <span className="brain-row__name">Моделей пока нет</span>
+              <span className="brain-row__meta">скачай ниже из каталога</span>
+            </div>
+          </li>
+        ) : null}
+        {disk.map((name) => {
+          const marks = ollamaRoleMarks({
+            name,
+            chat: chatLlm.model,
+            router: chatLlm.roleModels?.router,
+            extractor: chatLlm.roleModels?.extractor,
+            planner: chatLlm.roleModels?.planner,
+            session: selectedName,
+          });
+          const sessionOn = sameOllamaModel(selectedName, name);
+          const chatOn = sameOllamaModel(chatLlm.model, name);
+          return (
+            <li
+              key={name}
+              className={
+                "brain-row" + (sessionOn || chatOn ? " is-active" : "")
+              }
+            >
+              <div className="brain-row__main">
+                <span className="brain-row__name">{name}</span>
+                <span className="brain-row__meta">
+                  {busy === `pull:${name}`
+                    ? "качаю…"
+                    : marks.length > 0
+                      ? marks.join(" · ")
+                      : "на диске"}
+                </span>
+              </div>
+              <div className="brain-row__acts">
+                <button
+                  type="button"
+                  className="brain-act"
+                  disabled={chatOn}
+                  onClick={() =>
+                    persistChatLlm({
+                      ...chatLlm,
+                      provider: "ollama",
+                      model: name,
+                    })
+                  }
+                >
+                  чат
+                </button>
+                <button
+                  type="button"
+                  className="brain-act"
+                  disabled={sessionOn}
+                  onClick={() =>
+                    onVoice({ ...voice, model: name, mode: "llm" })
+                  }
+                >
+                  сессия
+                </button>
+                <button
+                  type="button"
+                  className="brain-act"
+                  disabled={!idle}
+                  onClick={() => void pullModel(name)}
+                >
+                  обновить
+                </button>
+                <button
+                  type="button"
+                  className="brain-act brain-act--danger"
+                  disabled={!idle}
+                  onClick={() => void removeModel(name)}
+                >
+                  удалить
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      <h3 className="brain-panel__h">{chatLlm.provider === "groq" ? "Локальные роли и резерв Groq" : "Роли чата"}</h3>
+      {chatLlm.provider === "groq" ? <p className="brain-panel__hint">
+        Здесь выбирается локальная модель для приватного режима и служебных ролей.
+        Облачная модель и ключ — Чат → настройки → Модель.
+      </p> : chatLlm.provider !== "ollama" ? (
+        <p className="brain-panel__hint">
+          Чат сейчас на {chatLlmProviderLabelRu(chatLlm.provider)}. Выбор модели
+          с диска переключит на Ollama.
+        </p>
+      ) : null}
+      <SoulRoleAssign
+        settings={chatLlm.provider === "groq" ? { ...chatLlm, provider: "ollama", model: chatLlm.groqLocalModel || "" } : chatLlm}
+        onChange={(next) => persistChatLlm(chatLlm.provider === "groq"
+          ? { ...chatLlm, groqLocalModel: next.model, roleModels: next.roleModels } : next)}
+        installed={disk}
+        sessionFallback={voice.model}
+        allowEmptyChat
+        preferOllama
+      />
+
+      <h3 className="brain-panel__h">Скачать</h3>
       <p className="brain-panel__hint">
         Поиск по библиотеке ollama.com плюс рекомендованные теги под 12 ГБ.
         Скачивание — в окне Electron.
@@ -745,83 +910,30 @@ export function BrainPanel({
           ))}
         </ul>
       ) : null}
-      <ul className="brain-list">
-        <li
-          className={
-            "brain-row" + (status?.binaryPath ? " is-ready" : "")
-          }
-        >
-          <div className="brain-row__main">
-            <span className="brain-row__name">Среда Ollama</span>
-            <span className="brain-row__meta">
-              {status?.binaryPath
-                ? "CLI на диске"
-                : "скачается вместе со стартом или моделью (~1 ГБ)"}
-            </span>
-          </div>
-        </li>
-        {rows.map((row) => {
-          const active =
-            Boolean(row.installedName) &&
-            sameOllamaModel(selectedName, row.installedName ?? row.id);
-          const pullId = row.installedName ?? row.id;
-          return (
-            <li
-              key={row.id}
-              className={"brain-row" + (active ? " is-active" : "")}
-            >
+      {catalogMissing.length > 0 ? (
+        <ul className="brain-list">
+          {catalogMissing.map((row) => (
+            <li key={row.id} className="brain-row">
               <div className="brain-row__main">
                 <span className="brain-row__name">{row.id}</span>
                 <span className="brain-row__meta">
-                  {busy === `pull:${row.id}` || busy === `pull:${pullId}`
-                    ? "качаю…"
-                    : row.installedName
-                      ? active
-                        ? "активна"
-                        : "на диске"
-                      : row.hint}
+                  {busy === `pull:${row.id}` ? "качаю…" : row.hint}
                 </span>
               </div>
               <div className="brain-row__acts">
-                {row.installedName ? (
-                  <button
-                    type="button"
-                    className="brain-act"
-                    disabled={active}
-                    onClick={() =>
-                      onVoice({
-                        ...voice,
-                        model: row.installedName!,
-                        mode: "llm",
-                      })
-                    }
-                  >
-                    выбрать
-                  </button>
-                ) : null}
                 <button
                   type="button"
                   className="brain-act"
                   disabled={!idle}
                   onClick={() => void pullModel(row.id)}
                 >
-                  {row.installedName ? "обновить" : "скачать"}
+                  скачать
                 </button>
-                {row.installedName ? (
-                  <button
-                    type="button"
-                    className="brain-act brain-act--danger"
-                    disabled={!idle}
-                    onClick={() => void removeModel(row.installedName!)}
-                  >
-                    удалить
-                  </button>
-                ) : null}
               </div>
             </li>
-          );
-        })}
-      </ul>
+          ))}
+        </ul>
+      ) : null}
       <div className="brain-pull">
         <input
           className="brain-pull__input"
@@ -844,7 +956,7 @@ export function BrainPanel({
         </button>
       </div>
 
-      <h3 className="brain-panel__h">Параметры</h3>
+      <h3 className="brain-panel__h">Параметры сессии</h3>
       <div className="brain-fields">
         <label className="brain-field">
           <span>Модель</span>
@@ -874,15 +986,16 @@ export function BrainPanel({
           />
         </label>
       </div>
-      <UiCheck
-        checked={voice.autoStartOllama}
-        disabled={!manage}
-        onChange={(autoStartOllama) => onVoice({ ...voice, autoStartOllama })}
-      >
-        Автозапуск Ollama при Local LLM
-      </UiCheck>
 
-      <h3 className="brain-panel__h">TTS на диске</h3>
+        </>
+      ) : (
+        <>
+
+      <h3 className="brain-panel__h">Голосовые модели на диске</h3>
+      <p className="brain-panel__hint">
+        Здесь только установка и место на диске. Движок, RAM/VRAM, голос и
+        проба находятся во вкладке «Голос».
+      </p>
       <ul className="brain-list">
         <li className={"brain-row" + (sovits?.ready ? " is-ready" : "")}>
           <div className="brain-row__main">
@@ -1025,6 +1138,8 @@ export function BrainPanel({
           );
         })}
       </ul>
+        </>
+      )}
 
       {xfer ? (
         <div className="brain-xfer" aria-live="polite">

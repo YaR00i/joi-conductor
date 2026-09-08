@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "ember-agent": "tsx src/game/agent/emberAgentCli.ts",
     "ember-agent-mcp": "tsx src/game/agent/emberAgentMcp.ts",
-    "ember-aseprite": "tsx src/game/content/emberAsepriteCli.ts"
+    "ember-aseprite": "tsx src/game/content/emberAsepriteCli.ts",
+    "soul-eval": "tsx scripts/soul-eval.ts"
   },
   "dependencies": {
     "@xyflow/react": "^12.6.0",

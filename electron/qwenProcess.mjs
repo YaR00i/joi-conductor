@@ -111,22 +111,27 @@ function findQwenTtsScript() {
   return null;
 }
 
-function qwenTtsLaunch(python, model, host, port, device) {
+function qwenTtsLaunch(python, model, host, port, device, refAudio, refText) {
   const script = findQwenTtsScript();
   if (!script) return null;
+  const args = [
+    script,
+    "--host",
+    host,
+    "--port",
+    String(port),
+    "--model",
+    model,
+    "--device",
+    device,
+  ];
+  if (refAudio && existsSync(refAudio)) {
+    args.push("--ref-audio", refAudio);
+    if (refText) args.push("--ref-text", refText);
+  }
   return {
     cmd: python,
-    args: [
-      script,
-      "--host",
-      host,
-      "--port",
-      String(port),
-      "--model",
-      model,
-      "--device",
-      device,
-    ],
+    args,
   };
 }
 
@@ -200,6 +205,7 @@ export async function getQwenProcessStatus(opts = {}) {
     gpu: http?.gpu,
     torch: http?.torch,
     backend: http?.backend,
+    warmed: http?.warmed,
     baseUrl: base,
     detail,
   };
@@ -211,6 +217,8 @@ export async function getQwenProcessStatus(opts = {}) {
  *   flavor?: string,
  *   model?: string,
  *   device?: string,
+ *   refAudio?: string,
+ *   refText?: string,
  * }} [opts]
  */
 export async function startQwenProcess(opts = {}) {
@@ -243,6 +251,12 @@ export async function startQwenProcess(opts = {}) {
     throw new Error("Python для Qwen не найден. Укажи QWEN_PYTHON или поставь miniconda.");
   }
   const model = opts.model?.trim() || resolveServeModel(opts.flavor);
+  const refRaw = String(opts.refAudio || "").trim();
+  const refAudio = refRaw
+    ? path.isAbsolute(refRaw)
+      ? refRaw
+      : path.resolve(__dirname, "..", refRaw)
+    : "";
   const hasVllm = await pythonCanImport(python, "vllm");
   const hasQwenTts = await pythonCanImport(python, "qwen_tts");
   const backend = pickQwenServeBackend({ hasVllm, hasQwenTts, device });
@@ -254,7 +268,15 @@ export async function startQwenProcess(opts = {}) {
   const launch =
     backend === "vllm"
       ? vllmLaunch(python, model, host, port)
-      : qwenTtsLaunch(python, model, host, port, device);
+      : qwenTtsLaunch(
+          python,
+          model,
+          host,
+          port,
+          device,
+          refAudio,
+          String(opts.refText || ""),
+        );
   if (!launch) {
     throw new Error("Не найден scripts/qwen_tts_server.py");
   }

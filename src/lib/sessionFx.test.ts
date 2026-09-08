@@ -9,10 +9,12 @@ import {
   parseSessionFxSettings,
   pickSessionFxCaption,
   sessionFxAnyOn,
+  sessionFxBarLookLabelRu,
   sessionFxFromPack,
   sessionFxPopupPlace,
   sessionFxResolve,
   sessionFxThemeLabelRu,
+  SESSION_FX_BAR_LOOKS,
   SESSION_FX_CAPTIONS,
   SESSION_FX_SPIRAL_D,
   SESSION_FX_THEMES,
@@ -32,6 +34,8 @@ describe("sessionFx", () => {
     expect(s.hypno).toBe(true);
     expect(s.captions).toBe(true);
     expect(s.theme).toBe("sparkle");
+    expect(s.barLook).toBe("shuusei");
+    expect(s.avatarBar).toBe(true);
   });
 
   it("clamps intensity and rejects unknown theme", () => {
@@ -49,6 +53,17 @@ describe("sessionFx", () => {
       expect(sessionFxThemeLabelRu(theme).length).toBeGreaterThan(2);
       expect(SESSION_FX_CAPTIONS[theme].length).toBeGreaterThanOrEqual(8);
     }
+    expect(sessionFxThemeLabelRu("sparkle")).toBe("Безумие");
+  });
+
+  it("keeps plaque look and labels both styles", () => {
+    expect(parseSessionFxSettings({ barLook: "ribbon" }).barLook).toBe("ribbon");
+    expect(parseSessionFxSettings({ barLook: "mosaic" }).barLook).toBe("shuusei");
+    for (const look of SESSION_FX_BAR_LOOKS) {
+      expect(sessionFxBarLookLabelRu(look).length).toBeGreaterThan(1);
+    }
+    expect(sessionFxBarLookLabelRu("shuusei")).toBe("修正");
+    expect(sessionFxBarLookLabelRu("ribbon")).toBe("Лента");
   });
 
   it("picks a stable caption for the same salt", () => {

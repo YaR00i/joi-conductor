@@ -1,6 +1,7 @@
 /**
  * Boot-time / Settings shared Qwen vLLM auto-start.
  */
+import { inferQwenFlavor } from "../qwenTtsCatalog";
 import {
   qwenDeviceMatches,
   qwenServeDevice,
@@ -24,6 +25,8 @@ export async function ensureQwenAutoStart(opts: {
   qwenUrl: string;
   qwenModel: string;
   qwenFlavor?: string;
+  qwenRefPath?: string;
+  qwenPromptText?: string;
 }): Promise<QwenAutoStartResult | null> {
   if (!wantsQwenAutoStart(opts)) return null;
   const api = window.joiDesktop?.tts;
@@ -60,12 +63,24 @@ export async function ensureQwenAutoStart(opts: {
           skipped: true,
         };
       }
+      const flavor = opts.qwenFlavor || inferQwenFlavor(opts.qwenModel);
+      const inst = await api.qwenInstallStatus?.();
+      if (inst && api.installQwenModel) {
+        if (!inst.tokenizer) await api.installQwenModel("tokenizer");
+        if (flavor === "base" && !inst.base) {
+          await api.installQwenModel("base");
+        } else if (flavor !== "base" && !inst.customVoice) {
+          await api.installQwenModel("custom_voice");
+        }
+      }
       startedOnce = true;
       const st = await start({
         baseUrl: opts.qwenUrl,
         model: opts.qwenModel,
         flavor: opts.qwenFlavor,
         device,
+        refAudio: opts.qwenRefPath,
+        refText: opts.qwenPromptText,
       });
       return {
         online: st.online,

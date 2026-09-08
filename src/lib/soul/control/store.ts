@@ -266,3 +266,17 @@ export function clearPendingProposal(mistressId: MistressId): ControlState {
   notifyControlChanged();
   return next;
 }
+
+export function recordControlSessionKind(
+  mistressId: MistressId,
+  kind: MistressSessionKind,
+): ControlState {
+  const current = loadControlState(mistressId);
+  const next = {
+    ...current,
+    lastSessionKinds: [...current.lastSessionKinds, kind].slice(-12),
+  };
+  saveControlState(mistressId, next);
+  notifyControlChanged();
+  return next;
+}

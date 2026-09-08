@@ -97,6 +97,11 @@ export type LifetimeCounters = {
   runnerCleanRuns: number;
   /** Runner mini-game: largest crowd delivered to the finish */
   runnerBestCrowd: number;
+  /** Other mini-games: finished rounds */
+  puzzleClears: number;
+  memoryClears: number;
+  farmRounds: number;
+  doodleClimbs: number;
 };
 
 export type AchievementId =
@@ -144,7 +149,11 @@ export type AchievementId =
   | "runner_boss"
   | "runner_wins"
   | "runner_clean"
-  | "runner_crowd";
+  | "runner_crowd"
+  | "puzzle_clears"
+  | "memory_clears"
+  | "farm_rounds"
+  | "doodle_climbs";
 
 /**
  * Showcase groups (UI order):
@@ -255,6 +264,10 @@ export function emptyCounters(): LifetimeCounters {
     runnerBosses: 0,
     runnerCleanRuns: 0,
     runnerBestCrowd: 0,
+    puzzleClears: 0,
+    memoryClears: 0,
+    farmRounds: 0,
+    doodleClimbs: 0,
   };
 }
 
@@ -774,6 +787,50 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     accent: "#ffd23e",
     set: "minigames",
   },
+  {
+    id: "puzzle_clears",
+    nameRu: "Сборщик картинок",
+    blurbRu: "Собранные пазлы",
+    counter: "puzzleClears",
+    tiers: [1, 10, 25, 60],
+    unit: "count",
+    glyph: "🧩",
+    accent: "#ff8a4a",
+    set: "minigames",
+  },
+  {
+    id: "memory_clears",
+    nameRu: "Парный взгляд",
+    blurbRu: "Парные расклады, доведённые до конца",
+    counter: "memoryClears",
+    tiers: [1, 10, 25, 60],
+    unit: "count",
+    glyph: "🎴",
+    accent: "#c478e0",
+    set: "minigames",
+  },
+  {
+    id: "farm_rounds",
+    nameRu: "Грядки под каблуком",
+    blurbRu: "Уровни пошлой фермы: трава, скот, грузовик",
+    counter: "farmRounds",
+    tiers: [1, 10, 25, 60],
+    unit: "count",
+    glyph: "🍆",
+    accent: "#3dd68c",
+    set: "minigames",
+  },
+  {
+    id: "doodle_climbs",
+    nameRu: "Прыгун уголька",
+    blurbRu: "Подъёмы, даже если уголёк в итоге упал",
+    counter: "doodleClimbs",
+    tiers: [1, 10, 25, 60],
+    unit: "count",
+    glyph: "🦘",
+    accent: "#ffd23e",
+    set: "minigames",
+  },
 ];
 
 /** UI group titles + order for the achievements page. */
@@ -856,6 +913,42 @@ export function applyRunnerRun(
       runnerBestCrowd: Math.max(state.counters.runnerBestCrowd, crowd),
     },
   };
+}
+
+export type MinigameClearKind = "puzzle" | "memory" | "farm" | "doodle";
+
+const MINIGAME_CLEAR_COUNTER: Record<
+  MinigameClearKind,
+  keyof LifetimeCounters
+> = {
+  puzzle: "puzzleClears",
+  memory: "memoryClears",
+  farm: "farmRounds",
+  doodle: "doodleClimbs",
+};
+
+/** Fold a finished non-runner mini-game into the achievements state (pure). */
+export function applyMinigameClear(
+  state: AchievementsState,
+  kind: MinigameClearKind,
+): AchievementsState {
+  const key = MINIGAME_CLEAR_COUNTER[kind];
+  return {
+    ...state,
+    counters: {
+      ...state.counters,
+      [key]: state.counters[key] + 1,
+    },
+  };
+}
+
+/** Persist a finished puzzle / memory / farm / doodle round. */
+export function recordMinigameClear(kind: MinigameClearKind): void {
+  try {
+    saveAchievements(applyMinigameClear(loadAchievements(), kind));
+  } catch {
+    // achievements storage unavailable — the round still pays out
+  }
 }
 
 function addCounters(

@@ -68,7 +68,18 @@ describe("qwenMaxNewTokens", () => {
   it("caps short lines so generate cannot wander", () => {
     expect(qwenMaxNewTokens("Hi")).toBe(40);
     expect(qwenMaxNewTokens("Yeah, this is good, thanks!")).toBe(78);
-    expect(qwenMaxNewTokens("x".repeat(400))).toBe(192);
+    expect(qwenMaxNewTokens("x".repeat(400))).toBe(824);
+  });
+
+  it("scales for multi-sentence chat replies and still bounds runaway generation", () => {
+    expect(qwenMaxNewTokens("x".repeat(100))).toBe(224);
+    expect(qwenMaxNewTokens("я".repeat(900))).toBe(1824);
+    expect(qwenMaxNewTokens("x".repeat(10000))).toBe(2048);
+  });
+
+  it("counts Unicode characters like the Python server and ignores edge whitespace", () => {
+    expect(qwenMaxNewTokens("  Привет!  ")).toBe(40);
+    expect(qwenMaxNewTokens("😀".repeat(50))).toBe(124);
   });
 });
 

@@ -1,4 +1,4 @@
-import type { MemoryPairAsset } from "../../lib/memoryDeck";
+import { prettyMediaLabel, type MemoryPairAsset } from "../../lib/memoryDeck";
 import { MemoryCardFace } from "./MemoryCardFace";
 
 /**
@@ -45,7 +45,10 @@ export function MemoryTrophy({
 
       <div className={`memory-trophy__stage ${reward ? "is-live" : ""}`}>
         {rewardAsset ? (
-          <MemoryCardFace url={rewardAsset.url} label={rewardAsset.label} />
+          <MemoryCardFace
+            url={rewardAsset.url}
+            label={prettyMediaLabel(rewardAsset.label)}
+          />
         ) : (
           <p className="memory-trophy__idle muted">
             Найди пару — и она появится здесь целиком на несколько секунд.
@@ -58,7 +61,7 @@ export function MemoryTrophy({
       </div>
       {rewardAsset?.label ? (
         <div className="memory-trophy__label" title={rewardAsset.label}>
-          {rewardAsset.label}
+          {prettyMediaLabel(rewardAsset.label)}
         </div>
       ) : null}
 

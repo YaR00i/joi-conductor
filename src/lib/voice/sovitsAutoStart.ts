@@ -51,6 +51,10 @@ export async function ensureSovitsAutoStart(opts: {
           skipped: true,
         };
       }
+      const installed = await api.sovitsInstallStatus?.();
+      if (installed && !installed.ready && api.installSovits) {
+        await api.installSovits();
+      }
       startedOnce = true;
       const st = await api.sovitsStart({ baseUrl: opts.sovitsUrl });
       return {

@@ -58,6 +58,28 @@ export type DailyContractBoard = {
   rerollSalt?: number;
 };
 
+export type ContractLifecycleOutcome = "accepted" | "done" | "failed" | "expired";
+
+export type ContractLifecycleNotice = {
+  instance: ContractInstance;
+  outcome: ContractLifecycleOutcome;
+};
+
+type ContractLifecycleListener = (notice: ContractLifecycleNotice) => void;
+
+let contractLifecycleListener: ContractLifecycleListener | null = null;
+
+/** Soul installs one listener. Not a general event bus. */
+export function setContractLifecycleListener(
+  listener: ContractLifecycleListener | null,
+): void {
+  contractLifecycleListener = listener;
+}
+
+function emitContractLifecycle(notice: ContractLifecycleNotice): void {
+  contractLifecycleListener?.(notice);
+}
+
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
@@ -424,10 +446,15 @@ export function markContractAccepted(
   if (idx < 0) return null;
   const cur = board.contracts[idx]!;
   if (cur.status !== "open") return board;
+  const already = cur.acceptedAtMs != null;
   const contracts = board.contracts.slice();
-  contracts[idx] = { ...cur, acceptedAtMs: atMs };
+  const nextRow = { ...cur, acceptedAtMs: atMs };
+  contracts[idx] = nextRow;
   const next = { ...board, contracts };
   saveContractBoard(next);
+  if (!already) {
+    emitContractLifecycle({ instance: nextRow, outcome: "accepted" });
+  }
   return next;
 }
 
@@ -589,6 +616,7 @@ export function reportContract(
     contracts[idx] = expired;
     const next = { ...board, contracts };
     saveContractBoard(next);
+    emitContractLifecycle({ instance: expired, outcome: "expired" });
     return { board: next, rewarded: 0, status: "expired" };
   }
 
@@ -634,6 +662,10 @@ export function reportContract(
           : 0);
     }
   }
+  emitContractLifecycle({
+    instance: updated,
+    outcome: status === "done" ? "done" : "failed",
+  });
   return {
     board: next,
     rewarded,

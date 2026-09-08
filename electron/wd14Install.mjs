@@ -7,7 +7,11 @@ import path from "node:path";
 import { downloadFile } from "./installDownload.mjs";
 import { ensureQwenPythonEnv, venvPythonPath } from "./qwenEnv.mjs";
 import { findHostPython, spawnCapture } from "./qwenInstall.mjs";
-import { wd14ModelsReady } from "./wd14Runtime.mjs";
+import {
+  WD14_ONNX_URLS,
+  WD14_TAGS_URLS,
+  wd14ModelsReady,
+} from "./wd14Runtime.mjs";
 
 export { wd14ModelsReady } from "./wd14Runtime.mjs";
 
@@ -20,10 +24,25 @@ export const WD14_PACKAGES = [
   "pillow",
 ];
 
-const MODEL_ONNX =
-  "https://huggingface.co/SmilingWolf/wd-v1-4-moat-tagger/resolve/main/wd-v1-4-moat-tagger.onnx";
-const MODEL_CSV =
-  "https://huggingface.co/SmilingWolf/wd-v1-4-moat-tagger/resolve/main/selected_tags.csv";
+/** Same browser UA as censorDetectInstall — HF /resolve returns 401 for custom agents. */
+const HF_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+
+const HF_DL = { family: 4, userAgent: HF_UA };
+
+async function downloadFirst(urls, dest, onProgress) {
+  let last = null;
+  for (const url of urls) {
+    try {
+      await downloadFile(url, dest, onProgress, undefined, HF_DL);
+      return;
+    } catch (err) {
+      last = err;
+    }
+  }
+  const why = last instanceof Error ? last.message : String(last || "нет адреса");
+  throw new Error(`Не скачалась модель WD14: ${why}`);
+}
 
 export function wd14AppRoot() {
   return path.join(app.getPath("userData"), "wd14");
@@ -77,9 +96,9 @@ export async function ensureWd14Runtime(onProgress) {
       onProgress?.({
         phase: "Скачиваю WD14 onnx",
         pct: 58,
-        detail: "~440 МБ",
+        detail: "~330 МБ",
       });
-      await downloadFile(MODEL_ONNX, destOnnx, (pct) =>
+      await downloadFirst(WD14_ONNX_URLS, destOnnx, (pct) =>
         onProgress?.({
           phase: "Скачиваю WD14 onnx",
           pct: 58 + Math.round(pct * 0.32),
@@ -89,7 +108,7 @@ export async function ensureWd14Runtime(onProgress) {
     }
     if (!existsSync(destCsv)) {
       onProgress?.({ phase: "Скачиваю теги WD14", pct: 92, detail: destCsv });
-      await downloadFile(MODEL_CSV, destCsv);
+      await downloadFirst(WD14_TAGS_URLS, destCsv);
     }
   }
   if (!wd14ModelsReady(wd14AppModelDir())) {

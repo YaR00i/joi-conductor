@@ -1,11 +1,11 @@
-import type { SpeechOffer } from "../lib/soul/control/speechOffers";
+import type { ChatProposal } from "../lib/soul/control/proposals";
 import { playUiClick, primeUiAudio } from "../lib/uiSound";
 
 type Props = {
-  offers: SpeechOffer[];
+  offers: ChatProposal[];
   disabled?: boolean;
-  onAccept: (offer: SpeechOffer) => void;
-  onDismiss: (kind: SpeechOffer["kind"]) => void;
+  onAccept: (offer: ChatProposal) => void;
+  onDismiss: (offer: ChatProposal) => void;
 };
 
 export function ChatSpeechOffers({
@@ -18,7 +18,7 @@ export function ChatSpeechOffers({
   return (
     <div className="chat-speech-offers" aria-label="Варианты от системы">
       {offers.map((offer) => (
-        <article key={offer.kind} className="chat-speech-offers__card">
+        <article key={offer.id} className="chat-speech-offers__card">
           <p className="chat-speech-offers__kicker">Система</p>
           <p className="chat-speech-offers__title">{offer.titleRu}</p>
           <p className="chat-speech-offers__hint">{offer.hintRu}</p>
@@ -42,10 +42,10 @@ export function ChatSpeechOffers({
               onClick={() => {
                 void primeUiAudio();
                 playUiClick();
-                onDismiss(offer.kind);
+                onDismiss(offer);
               }}
             >
-              Не сейчас
+              {offer.refuseRu}
             </button>
           </div>
         </article>

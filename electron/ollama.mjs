@@ -205,6 +205,7 @@ export async function getOllamaStatus(preferredModel = "") {
     const hasPref =
       Boolean(preferredModel) &&
       models.some((name) => modelMatchesPreferred(name, preferredModel));
+    modelReady = preferredModel ? hasPref : n > 0;
     detail = managedByApp
       ? "Запускается…"
       : n > 0

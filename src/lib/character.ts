@@ -14,6 +14,8 @@ export interface CharacterBible {
    * Reinforces per-mistress voice beyond the system prompt.
    */
   llmVoiceGuide?: string;
+  /** Short spoken examples for chat voice. Style only, not world facts. */
+  chatVoiceExamples?: Array<{ tag: string; line: string }>;
   fallbackLines: Record<string, string[]>;
 }
 

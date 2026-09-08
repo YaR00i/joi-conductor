@@ -369,10 +369,11 @@ export function PuzzleSourcePicker({ onPick, onBack }: Props) {
             </div>
           ) : (
             <div className="puzzle-source__random-info muted">
-              {selectedTags.length > 0
-                ? `Будет выбрана случайная картинка с тегами: ${selectedTags.join(", ")}`
-                : "Будет выбрана случайная картинка из всего избранного."}
-              {filteredMeta.length > 0 ? ` Подходящих: ${filteredMeta.length}.` : ""}
+              {filteredMeta.length === 0
+                ? "В избранном пока нет картинок. Лайкай изображения на сессиях или загрузи с диска."
+                : selectedTags.length > 0
+                  ? `Будет выбрана случайная картинка с тегами: ${selectedTags.join(", ")} Подходящих: ${filteredMeta.length}.`
+                  : `Будет выбрана случайная картинка из всего избранного. Подходящих: ${filteredMeta.length}.`}
             </div>
           )}
 

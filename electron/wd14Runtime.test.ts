@@ -2,7 +2,11 @@ import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { wd14ModelsReady } from "./wd14Runtime.mjs";
+import {
+  WD14_ONNX_URLS,
+  WD14_TAGS_URLS,
+  wd14ModelsReady,
+} from "./wd14Runtime.mjs";
 
 describe("wd14ModelsReady", () => {
   it("needs onnx + selected_tags.csv", () => {
@@ -17,5 +21,14 @@ describe("wd14ModelsReady", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("WD14 download URLs", () => {
+  it("uses the public v2 repo, not the gated v1 onnx name", () => {
+    expect(WD14_ONNX_URLS[0]).toContain("wd-v1-4-moat-tagger-v2");
+    expect(WD14_ONNX_URLS[0]).toContain("model.onnx");
+    expect(WD14_ONNX_URLS[0]).not.toContain("wd-v1-4-moat-tagger.onnx");
+    expect(WD14_TAGS_URLS[0]).toContain("selected_tags.csv");
   });
 });

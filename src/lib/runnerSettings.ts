@@ -71,3 +71,21 @@ export function filterTasksForRunner(
   if (vibeContentAllowed(settings)) return tasks;
   return tasks.filter((t) => !taskRequiresVibe(t));
 }
+
+/** Filter for arcade games (memory / farm / doodle): drop puzzle-only kinds too. */
+export function filterArcadeTasks(
+  tasks: PuzzleTask[],
+  settings: RunnerSettings,
+): PuzzleTask[] {
+  return filterTasksForRunner(
+    tasks.filter((t) => t.kind !== "per_touch" && t.kind !== "ghost_hint"),
+    settings,
+  );
+}
+
+/** How the shared task overlay should drive stimulus for this feel. */
+export function stimVibeMode(
+  settings: RunnerSettings,
+): "device" | "manual" {
+  return settings.lovenseVibe ? "device" : "manual";
+}

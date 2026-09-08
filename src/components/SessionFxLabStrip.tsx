@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 import {
   loadSessionFxSettings,
   patchSessionFxSettings,
+  sessionFxBarLookLabelRu,
   sessionFxThemeLabelRu,
+  SESSION_FX_BAR_LOOKS,
   SESSION_FX_THEMES,
   subscribeSessionFx,
+  type SessionFxBarLook,
   type SessionFxSettings,
   type SessionFxTheme,
 } from "../lib/sessionFx";
@@ -68,6 +71,28 @@ export function SessionFxLabStrip() {
               onClick={() => patch({ [layer.key]: !fx[layer.key] })}
             >
               {layer.label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="session-fx-lab__row" role="group" aria-label="Вид плашки">
+        {SESSION_FX_BAR_LOOKS.map((id: SessionFxBarLook) => {
+          const on = fx.avatarBar && fx.barLook === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              className={"session-fx-lab__chip" + (on ? " is-on" : "")}
+              aria-pressed={on}
+              onClick={() =>
+                patch(
+                  on
+                    ? { avatarBar: false }
+                    : { avatarBar: true, barLook: id },
+                )
+              }
+            >
+              {sessionFxBarLookLabelRu(id)}
             </button>
           );
         })}

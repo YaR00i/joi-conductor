@@ -20,11 +20,13 @@ beforeEach(() => {
 
 describe("listHomeTasksToday", () => {
   it("splits accepted rows as active and the rest as fresh", () => {
-    const board = ensureDailyContractBoard(new Date(2026, 8, 1, 12));
+    const when = new Date(2026, 8, 1, 12);
+    const nowMs = when.getTime();
+    const board = ensureDailyContractBoard(when);
     const keep = board.contracts[0]!;
-    markContractAccepted(keep.instanceId, Date.now());
-    const next = ensureDailyContractBoard(new Date(2026, 8, 1, 12));
-    const home = listHomeTasksToday(next, Date.now());
+    markContractAccepted(keep.instanceId, nowMs);
+    const next = ensureDailyContractBoard(when);
+    const home = listHomeTasksToday(next, nowMs);
     expect(home.active.some((c) => c.instanceId === keep.instanceId)).toBe(
       true,
     );
@@ -32,7 +34,7 @@ describe("listHomeTasksToday", () => {
       false,
     );
     expect(home.active.length + home.fresh.length).toBe(
-      listOpenContractsToday(next).length,
+      listOpenContractsToday(next, nowMs).length,
     );
   });
 

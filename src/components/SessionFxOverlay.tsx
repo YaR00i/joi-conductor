@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from "react";
-import type { MistressId } from "../lib/mistress/types";
+import type { MistressId, MistressPack } from "../lib/mistress/types";
+import type { SessionMood } from "../lib/types";
 import {
   getActiveMistress,
   subscribeActiveMistress,
@@ -8,6 +9,8 @@ import {
   loadSessionFxSettings,
   pickSessionFxCaption,
   sessionFxAnyOn,
+  sessionFxBarLookClass,
+  sessionFxBarLookStamp,
   sessionFxCaptionMs,
   sessionFxOpacity,
   sessionFxPopupMs,
@@ -18,6 +21,7 @@ import {
   subscribeSessionFx,
   type SessionFxSettings,
 } from "../lib/sessionFx";
+import { MistressImg } from "./MistressImg";
 import "./sessionFx.css";
 
 type Popup = {
@@ -43,33 +47,52 @@ function reducedMotion(): boolean {
 export function SessionFxOverlay({
   active,
   previewUser = false,
+  mood = "sweet",
 }: {
   active: boolean;
   /** Sandbox lab: drive overlays from user kit even if Sparkle is not selected. */
   previewUser?: boolean;
+  /** Session mood — same portrait as the speech bubble. */
+  mood?: SessionMood;
 }) {
   const uid = useId();
   const [mistressId, setMistressId] = useState<MistressId>(
     () => getActiveMistress().id,
   );
   const [packFx, setPackFx] = useState(() => getActiveMistress().fx);
+  const [portraitSrc, setPortraitSrc] = useState(
+    () => getActiveMistress().assets.moodPortrait.sweet.src,
+  );
   const [user, setUser] = useState<SessionFxSettings>(() => loadSessionFxSettings());
   const [caption, setCaption] = useState<string | null>(null);
   const [popups, setPopups] = useState<Popup[]>([]);
 
-  useEffect(
-    () =>
-      subscribeActiveMistress((p) => {
-        setMistressId(p.id);
-        setPackFx(p.fx);
-      }),
-    [],
-  );
+  useEffect(() => {
+    const apply = (p: MistressPack) => {
+      setMistressId(p.id);
+      setPackFx(p.fx);
+      setPortraitSrc(p.assets.moodPortrait[mood].src);
+    };
+    apply(getActiveMistress());
+    return subscribeActiveMistress(apply);
+  }, [mood]);
   useEffect(() => subscribeSessionFx(() => setUser(loadSessionFxSettings())), []);
 
   const fx = sessionFxResolve(mistressId, packFx, user, previewUser);
   const show = active && sessionFxAnyOn(fx);
   const quiet = reducedMotion();
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (show && fx.avatarBar) {
+      root.dataset.sessionFxBar = fx.barLook;
+    } else {
+      delete root.dataset.sessionFxBar;
+    }
+    return () => {
+      delete root.dataset.sessionFxBar;
+    };
+  }, [show, fx.avatarBar, fx.barLook]);
 
   useEffect(() => {
     if (!show || !fx.captions) {
@@ -128,6 +151,7 @@ export function SessionFxOverlay({
   if (!show) return null;
 
   const opacity = sessionFxOpacity(fx.intensity);
+  const stamp = sessionFxBarLookStamp(fx.barLook);
   const classes = [
     "session-fx",
     `session-fx--${fx.theme}`,
@@ -173,11 +197,22 @@ export function SessionFxOverlay({
           <div className="session-fx__tear" />
         </>
       ) : null}
-      {fx.avatarBar ? <div className="session-fx__censor" /> : null}
+      {fx.avatarBar ? (
+        <div className="session-fx__avatar">
+          <MistressImg
+            className="session-fx__avatar-img"
+            src={portraitSrc}
+            alt=""
+          />
+          <div
+            className={"session-fx__censor " + sessionFxBarLookClass(fx.barLook)}
+          >
+            {stamp ? <span>{stamp}</span> : null}
+          </div>
+        </div>
+      ) : null}
       {fx.captions && caption ? (
-        <p className="session-fx__caption">
-          <span className="session-fx__sway">{caption}</span>
-        </p>
+        <p className="session-fx__caption">{caption}</p>
       ) : null}
       {fx.popups
         ? popups.map((p) => (

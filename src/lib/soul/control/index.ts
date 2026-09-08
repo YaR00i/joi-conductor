@@ -1,3 +1,5 @@
+import { ensureSoulWorldEventBridge } from "../worldEventBridge";
+
 export type {
   AppliedControlResult,
   ControlAction,
@@ -12,14 +14,35 @@ export {
   MISTRESS_SESSION_KINDS,
   PROGRESSION_IDS,
 } from "./types";
-export { loadControlState, saveControlState, notifyControlChanged, clearPendingProposal, saveControlMood } from "./store";
+export {
+  loadControlState,
+  saveControlState,
+  notifyControlChanged,
+  clearPendingProposal,
+  saveControlMood,
+  recordControlSessionKind,
+} from "./store";
 export { controlLiveSnapshot, formatHoursLeft } from "./live";
 export { buildControlPromptSlice } from "./slice";
 export { splitControlReply, applyControlActions, parseControlActions } from "./actions";
+export {
+  collectTurnProposals,
+  proposalsFromExtract,
+  type ChatProposal,
+  type ChatProposalKind,
+  type ChatProposalSource,
+} from "./proposals";
+export { acceptChatProposal, refuseChatProposal } from "./proposalApply";
 export { applyMistressQueuePatch } from "./session";
 export { applyProposalToParams, sessionKindLabelRu, finalePolicyLabelRu } from "./catalog";
 export { seedSoulFactsIfEmpty } from "./seed";
 export { assembleProgramSession } from "./assembleSession";
+export {
+  buildAcceptedSession,
+  parseSessionPlannerDraft,
+  type AcceptedSessionBuild,
+  type SessionPlannerDebug,
+} from "./sessionPlanner";
 export {
   ensureChatDispatch,
   listChatChips,
@@ -41,11 +64,6 @@ export {
 } from "./dispatch";
 export { openMorningPack } from "./morning";
 export {
-  parseSpeechOffers,
-  type SpeechOffer,
-  type SpeechOfferKind,
-} from "./speechOffers";
-export {
   CHAT_COMMANDS,
   CHAT_COMMAND_GROUPS,
   chatCommandGroupLabelRu,
@@ -58,3 +76,5 @@ export {
   type ChatCommandId,
   type ChatCommandDef,
 } from "./commands";
+
+ensureSoulWorldEventBridge();

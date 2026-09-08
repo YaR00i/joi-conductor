@@ -18,8 +18,12 @@ import {
 import { getToonGradientMap } from "../three/toonMaterials";
 import { patchEmberVoxelLightSnap } from "../three/voxelLightSnap";
 import { parseHexRgb } from "../tile/mapUtils";
-import { VOXELS_PER_BLOCK } from "./constants";
-import { normalizeVoxelModel, voxelGridSize, voxelIndex } from "./voxelModel";
+import {
+  normalizeVoxelModel,
+  voxelDensity,
+  voxelGridSize,
+  voxelIndex,
+} from "./voxelModel";
 
 /** Must stay unique vs lampDiscFalloff cache key (overwrites after patch). */
 const VOXEL_PROP_LIGHT_CACHE_KEY = "ember-lamp-discs-v5-voxel-prop-light-v2";
@@ -257,6 +261,14 @@ export type VoxelMeshBuild = {
   voxelWorld: number;
 };
 
+/** Shared art-density → world-size adapter used by preview and runtime mesh. */
+export function voxelWorldForBlock(
+  model: EmberVoxelModel,
+  blockWorld: number,
+): number {
+  return blockWorld / voxelDensity(model);
+}
+
 /**
  * Build a mesh for a voxel model.
  * `blockWorld` = world units per map block (usually map.tileSize).
@@ -268,7 +280,7 @@ export function buildVoxelModelMesh(
 ): VoxelMeshBuild {
   const model = normalizeVoxelModel(modelIn);
   const { sx, sy, sz } = voxelGridSize(model);
-  const voxelWorld = blockWorld / VOXELS_PER_BLOCK;
+  const voxelWorld = voxelWorldForBlock(model, blockWorld);
   const matKind = normalizeEmberMaterial(model.material);
   const matResponse = matKind
     ? resolveMaterialResponse(matKind)

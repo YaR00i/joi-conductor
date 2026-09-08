@@ -69,6 +69,10 @@ export function achievementActionCta(
     case "runner_wins":
     case "runner_clean":
     case "runner_crowd":
+    case "puzzle_clears":
+    case "memory_clears":
+    case "farm_rounds":
+    case "doodle_climbs":
       return { nav: "minigames", labelRu: "Открыть мини-игры" };
     default: {
       const _exhaustive: never = id;

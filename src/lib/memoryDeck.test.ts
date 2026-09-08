@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildMemoryDeck,
   memoryGridFor,
+  prettyMediaLabel,
   shuffled,
   type MemoryPairAsset,
 } from "./memoryDeck";
@@ -89,5 +90,13 @@ describe("memoryGridFor", () => {
   it("falls back to a partial last row for awkward counts", () => {
     expect(memoryGridFor(7)).toEqual({ cols: 3, rows: 3 });
     expect(memoryGridFor(0)).toEqual({ cols: 1, rows: 1 });
+  });
+});
+
+describe("prettyMediaLabel", () => {
+  it("strips a file extension from trophy captions", () => {
+    expect(prettyMediaLabel("cruel.png")).toBe("cruel");
+    expect(prettyMediaLabel("Calm.JPEG")).toBe("Calm");
+    expect(prettyMediaLabel("без расширения")).toBe("без расширения");
   });
 });

@@ -1,6 +1,5 @@
 import {
   SOUL_RAG_MAX_TOPICS,
-  SOUL_RAG_THRESHOLD,
   type SoulTopicFile,
 } from "./types";
 
@@ -77,12 +76,11 @@ export function soulTextCosine(a: string, b: string): number {
 export function pickSoulTopics(
   topics: readonly SoulTopicFile[],
   query: string,
-  opts?: { threshold?: number; max?: number },
+  opts?: { max?: number; minScore?: number },
 ): SoulTopicFile[] {
-  const threshold = opts?.threshold ?? SOUL_RAG_THRESHOLD;
   const max = opts?.max ?? SOUL_RAG_MAX_TOPICS;
+  const minScore = opts?.minScore ?? 0.06;
   if (topics.length === 0) return [];
-  if (topics.length <= threshold) return [...topics];
   const q = termFreq(tokenizeSoulText(`query: ${query}`));
   const ranked = topics
     .map((topic) => {
@@ -93,6 +91,7 @@ export function pickSoulTopics(
       );
       return { topic, score };
     })
+    .filter((row) => row.score >= minScore)
     .sort((a, b) => b.score - a.score);
   return ranked.slice(0, max).map((r) => r.topic);
 }

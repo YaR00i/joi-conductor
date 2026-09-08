@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { setDeviceVibeLevel, stopDevice } from "../../lib/device/deviceClient";
+import { MinigameMistressFace } from "../../components/MinigameMistressFace";
+import { activeMistressNameRu, getActiveMistress } from "../../lib/mistress";
 import {
   PUZZLE_TASK_KIND_LABELS,
+  puzzleTaskTimeoutIsSuccess,
   type PuzzleTask,
 } from "../../lib/puzzleTasks";
+import { applyControlMoodDelta } from "../../lib/soul/control/store";
 
 /**
  * Blocking overlay that runs a PuzzleTask while the board is frozen.
@@ -68,9 +72,17 @@ function vibeFor(mode: TaskRunnerMode, task: PuzzleTask): number {
 function timeoutIsSuccess(mode: TaskRunnerMode, task: PuzzleTask): boolean {
   if (mode === "pertouch_prompt") {
     const a = task.perTouchAction;
-    return a?.kind === "vibe";
+    return a?.kind === "vibe" || a?.kind === "edge";
   }
-  return task.kind === "vibe";
+  return puzzleTaskTimeoutIsSuccess(task.kind);
+}
+
+function noteTaskMood(success: boolean): void {
+  try {
+    applyControlMoodDelta(getActiveMistress().id, success ? 1 : -1);
+  } catch {
+    // no mistress / storage — the overlay still resolves
+  }
 }
 
 export function PuzzleTaskRunner({
@@ -111,6 +123,9 @@ export function PuzzleTaskRunner({
           window.clearInterval(id);
           if (!resolvedRef.current) {
             resolvedRef.current = true;
+            if (mode === "task" || mode === "pertouch_prompt") {
+              noteTaskMood(timeoutIsSuccess(mode, task));
+            }
             onComplete(timeoutIsSuccess(mode, task));
           }
           return 0;
@@ -121,15 +136,21 @@ export function PuzzleTaskRunner({
     return () => window.clearInterval(id);
   }, [total, mode, task, onComplete]);
 
-  const resolve = (success: boolean) => {
+  const resolve = (success: boolean, fromCancel = false) => {
     if (resolvedRef.current) return;
     resolvedRef.current = true;
+    if (
+      !fromCancel &&
+      (mode === "task" || mode === "pertouch_prompt")
+    ) {
+      noteTaskMood(success);
+    }
     onComplete(success);
   };
 
   const title =
     mode === "pertouch_announce"
-      ? "Особый кусочек активирован"
+      ? "Особый ход"
       : mode === "pertouch_prompt"
         ? "Ход стоит действия"
         : task.titleRu || PUZZLE_TASK_KIND_LABELS[task.kind];
@@ -149,10 +170,13 @@ export function PuzzleTaskRunner({
     <div className="puzzle-task" role="dialog" aria-modal="true">
       <div className="puzzle-task__card">
         <div className="puzzle-task__kicker">
-          {PUZZLE_TASK_KIND_LABELS[task.kind]}
-          {mode === "pertouch_prompt" && remaining != null
-            ? ` · осталось ${Math.max(0, remaining - 1)}`
-            : null}
+          <MinigameMistressFace size="sm" />
+          <span>
+            {activeMistressNameRu()} · {PUZZLE_TASK_KIND_LABELS[task.kind]}
+            {mode === "pertouch_prompt" && remaining != null
+              ? ` · осталось ${Math.max(0, remaining - 1)}`
+              : null}
+          </span>
         </div>
         <h3 className="puzzle-task__title">{title}</h3>
         <p className="puzzle-task__text">
@@ -167,6 +191,11 @@ export function PuzzleTaskRunner({
           <p className="puzzle-task__manual-note">
             Ручной режим: без устройства — делай вибрацию сам, уровень{" "}
             {vibeFor(mode, task)} из 5, пока идёт таймер.
+          </p>
+        ) : vibeMode === "device" && vibeFor(mode, task) > 0 ? (
+          <p className="puzzle-task__manual-note">
+            Если мотор не подключён — делай стимул руками, уровень{" "}
+            {vibeFor(mode, task)} из 5.
           </p>
         ) : null}
 
@@ -223,7 +252,7 @@ export function PuzzleTaskRunner({
             <button
               type="button"
               className="puzzle-task__cancel"
-              onClick={() => resolve(true)}
+              onClick={() => resolve(true, true)}
             >
               Отменить
             </button>

@@ -7,7 +7,12 @@
  * Shape + palette live in .vox. Collider / light / extra channels stay on the Ember model JSON.
  */
 import type { EmberVoxelAssetFile, EmberVoxelModel } from "../content/types";
-import { DEFAULT_VOXEL_PALETTE, VOXELS_PER_BLOCK } from "./constants";
+import {
+  DEFAULT_VOXEL_PALETTE,
+  NEW_ENVIRONMENT_VOXELS_PER_BLOCK,
+  normalizeVoxelsPerBlock,
+  VOXELS_PER_BLOCK,
+} from "./constants";
 import {
   createEmptyVoxelModel,
   getVoxel,
@@ -21,7 +26,7 @@ import {
   type VoxDocument,
 } from "./vox/voxFile";
 
-const GRID_MAX = 8 * VOXELS_PER_BLOCK;
+const GRID_MAX = 8 * NEW_ENVIRONMENT_VOXELS_PER_BLOCK;
 
 export function voxRelForModelId(id: string): string {
   const safe = String(id ?? "")
@@ -107,18 +112,20 @@ export function voxDocumentToEmberModel(
   doc: VoxDocument,
   id: string,
   nameRu?: string,
+  voxelsPerBlock: 16 | 32 = VOXELS_PER_BLOCK,
 ): EmberVoxelModel {
+  const density = normalizeVoxelsPerBlock(voxelsPerBlock);
   const src = doc.models[0];
   if (!src) throw new Error("vox: empty document");
   const sx = Math.max(1, Math.min(GRID_MAX, src.size.x));
   const sz = Math.max(1, Math.min(GRID_MAX, src.size.y));
   const sy = Math.max(1, Math.min(GRID_MAX, src.size.z));
   const sizeBlocks = {
-    x: Math.max(1, Math.ceil(sx / VOXELS_PER_BLOCK)),
-    y: Math.max(1, Math.ceil(sy / VOXELS_PER_BLOCK)),
-    z: Math.max(1, Math.ceil(sz / VOXELS_PER_BLOCK)),
+    x: Math.max(1, Math.ceil(sx / density)),
+    y: Math.max(1, Math.ceil(sy / density)),
+    z: Math.max(1, Math.ceil(sz / density)),
   };
-  let model = createEmptyVoxelModel(id, sizeBlocks, nameRu, sy);
+  let model = createEmptyVoxelModel(id, sizeBlocks, nameRu, sy, density);
   const used = new Map<number, number>();
   const colors: string[] = [""];
 
@@ -154,8 +161,9 @@ export function decodeVoxToEmberModel(
   bytes: Uint8Array,
   id: string,
   nameRu?: string,
+  voxelsPerBlock: 16 | 32 = VOXELS_PER_BLOCK,
 ): EmberVoxelModel {
-  return voxDocumentToEmberModel(parseVoxFile(bytes), id, nameRu);
+  return voxDocumentToEmberModel(parseVoxFile(bytes), id, nameRu, voxelsPerBlock);
 }
 
 function channelHasSignal(arr?: number[]): boolean {
@@ -208,6 +216,7 @@ export function mergeVoxMeshOntoPrefab(
 export function voxelOccupancyFingerprint(model: EmberVoxelModel): string {
   return JSON.stringify({
     sizeBlocks: model.sizeBlocks,
+    voxelsPerBlock: model.voxelsPerBlock ?? VOXELS_PER_BLOCK,
     heightVoxels: model.heightVoxels ?? null,
     palette: model.palette,
     voxels: model.voxels,
@@ -219,7 +228,12 @@ export function applyVoxBytesToEmberModel(
   prefab: EmberVoxelModel,
   bytes: Uint8Array,
 ): EmberVoxelModel {
-  const mesh = decodeVoxToEmberModel(bytes, prefab.id, prefab.nameRu);
+  const mesh = decodeVoxToEmberModel(
+    bytes,
+    prefab.id,
+    prefab.nameRu,
+    normalizeVoxelsPerBlock(prefab.voxelsPerBlock),
+  );
   return mergeVoxMeshOntoPrefab(prefab, mesh);
 }
 
@@ -263,6 +277,7 @@ export function joinEmberVoxelPrefab(
     voxBytes,
     asset.id,
     asset.nameRu ?? asset.model.nameRu,
+    normalizeVoxelsPerBlock(asset.model.voxelsPerBlock),
   );
   return mergeVoxMeshOntoPrefab(
     {

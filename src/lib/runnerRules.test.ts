@@ -35,6 +35,7 @@ describe("drawRunnerRule", () => {
       if (rule.kind === "crowdN") {
         expect(rule.targetN).toBeGreaterThanOrEqual(8);
         expect(rule.targetN!).toBeLessThanOrEqual(typCrowd);
+        expect(rule.labelRu).toBe(`Доведи толпу до ${rule.targetN}`);
       }
     }
   });

@@ -1,6 +1,6 @@
 # Ember — единый voxel tile kit и переход в бой
 
-Статус: общий план принят после v1.80; первый пункт D2.1h выполнен в Godot Migration v1.81. Это не новая параллельная карта и не возврат к Three.js.
+Статус: общий план принят после v1.80; D2.1h выполнен в v1.81, V1 Tile Scale — в Godot Migration v1.97, переход ownership в Godot начат в v1.98. Это не новая параллельная карта и не возврат к Three.js.
 
 ## Что увидит автор
 
@@ -11,7 +11,21 @@
 
 Кисть, прямоугольник, заливка, пипетка, preview штриха и Undo/Redo общие. Форматы расположения различаются намеренно: мир не должен хранить panel groups, а бой не должен становиться владельцем всей exploration-карты.
 
-Скульптор исходной voxel-модели остаётся в JOI. Godot отвечает за библиотеку, размещение, сцену, collision-preview и диагностику. Это один art source и один authoring UX, а не два независимых voxel-редактора.
+Исходная voxel-модель, библиотека, размещение и будущий скульптор принадлежат Godot. Старые пары JOI читаются только одноразовым importer и после сверки больше не участвуют в preview/runtime/save. Автор будет открывать модель из общей библиотеки в main-screen редакторе Godot: 3D preview, кисть/ластик/заливка/пипетка, срезы, палитра, material channels и штатный Undo/Redo.
+
+## Художественный контракт ALLfiring / Ember
+
+Редактор не должен подталкивать автора к Minecraft-поверхности из одинаковых крупных кубов. Референс ALLfiring используется для плотности и приключенческой выразительности handcrafted-зон: многослойные маршруты, тайники, перепады высоты, маленькие предметные истории и хорошо различимые регионы. Конкретную геометрию, персонажей и материалы Ember создаёт самостоятельно.
+
+- **Сначала силуэт и большие цветовые массы.** Мелкая voxel-деталь поддерживает форму, свет и ориентир, а не заполняет каждый участок шумом.
+- **Игровой блок не равен художественному вокселю.** Граница блока, footprint и gameplay-высота показываются отдельным overlay; внутри блока новая модель использует 32-grid.
+- **Два шага кисти.** Coarse-режим изменяет выровненные области 2×2×2 новых вокселя и совместим с прежним 16-grid; detail-режим работает по одному вокселю.
+- **Материал является частью формы.** Цвет редактируется вместе с существующими каналами `emissive`, `shine`, `transparency` и `transmittance`; они не заменяются набором случайных Godot-материалов на отдельных объектах.
+- **Композиция проверяется игровым ракурсом.** Помимо свободной orbit-камеры редактор показывает world/battle camera presets, фон и свет региона, чтобы верх, проходы и ориентиры читались в реальной диораме.
+- **Декор не меняет правила автоматически.** Небольшие сколы, бордюры, листва и выступы ниже gameplay-ступени остаются визуальной формой. Collision, blocker, высота клетки и elemental surface проверяются отдельным режимом, а не выводятся из каждого выступа.
+- **Повторное использование строится вариантами kit.** Edge/corner/ramp/декор и цветовые варианты сохраняют общий размер и точки стыка; случайный шум поверхности не сериализуется как уникальная модель для каждой клетки.
+
+Первый sculpt-gate принимается не на абстрактном кубе, а на одном небольшом environment-prop или tile: читаемый силуэт, минимум два material channel, preview с игрового ракурса, coarse/detail stroke, Undo/Redo, save/reopen и совпадение editor/runtime mesh. Только после этого редактор расширяется на поверхность мира и battle kit.
 
 ## Единица масштаба
 
@@ -52,8 +66,10 @@ Voxel mesh строится в нормализованных **block units**, �
 
 ### Ownership
 
-- JOI `voxels/models/<id>.json + <id>.vox` — исходный арт, footprint и `voxelsPerBlock`;
-- общий Godot Tile Kit — preview, tags, варианты и нормализованные meshes;
+- Godot `content/voxel_models/<id>.tres` (`EmberVoxelModelResource`) — исходный арт, palette/channels, footprint и `voxelsPerBlock`;
+- JOI `voxels/models/<id>.json + <id>.vox` — только read-only источник одноразовой миграции и временный архив сверки;
+- общий Godot Tile Kit — редактор, preview, tags, варианты и нормализованные meshes;
+- mesh, collision, thumbnail, prefab и MeshLibrary — производный rebuildable cache, не source;
 - world layout — текущая импортированная map data, затем один-way migration конкретной карты в Godot Resource;
 - `EmberBattlefieldResource` — боевые свойства клетки;
 - arena `.tscn` — камера, свет, декор, актёры и композиция;
@@ -109,11 +125,12 @@ Godot при `change_scene_to_file/packed` освобождает старую �
 
 1. **D2.1h — resize/remap + deployment anchors — выполнено в v1.81.** Battlefield editor переносит layout атомарно, preview показывает потери, а runtime читает canonical starts.
 2. **D2.2a — Encounter Resource + визуальная библиотека — выполнено в v1.82.** Одна E2-встреча, validation, native Inspector, mini-map и save/reopen.
-3. **D2.2b — battle action + return — первый проход выполнен в v1.82.** Terminal `talk → battle`, возврат на сохранённую позицию и отдельная outcome chain. Остались fade/retry и идемпотентная result transaction.
-4. **D2.2c — result/reward/quest bridge.** Один проверяемый enemy/tag/count event и один reward transaction; после этого возвращаются combat-типы целей заданий.
-5. **V1 Tile Scale — `voxelsPerBlock` и normalized builder.** Legacy 16 + new 32 в одной библиотеке, без изменения размеров карт.
-6. **V1 Battle Voxel Kit.** Neutral/edge/wet/ember/frozen/blocker заменяют primitive meshes под прежними semantic ID.
-7. **V1 World Surface pilot.** Одна маленькая sandbox-зона получает world-mode тех же Tile Kit/кистей и one-way migration; только после приёмки переносится `fan_town`.
-8. **Biome kits и большие зоны.** Grass/dirt/stone/water/road/edge/corner/ramp + variants, затем отдельный Terrain3D gate при доказанной необходимости.
+3. **D2.2b — battle action + return — выполнено в v1.82–v1.83.** Terminal `talk → battle`, fullscreen radial HUD, центральный result modal, fade/retry, возврат на сохранённую позицию и идемпотентная outcome chain.
+4. **D2.2c — result/reward/quest bridge — выполнено в v1.88.** Итог встречи проецирует enemy/tag/count events, preview прежней reward chain и атомарно обновляет typed save counters; quest objective выбирает подписанный боевой счётчик и required count.
+5. **V1 Tile Scale — выполнено в v1.97.** `voxelsPerBlock`: legacy 16 + new 32 в одной библиотеке; normalized mesh и world/battle adapters не меняют размеры карт.
+6. **G1 Godot voxel ownership — v1.98–v2.05.** Native Resource, native-first catalog/prefab и one-way importer проверены на `vox_fan_anvil`; visual queue переносит выбранную legacy-модель с preview и Ctrl+Z/Redo. Первый Surface Canvas shape-gate даёт связный 4×4 объём, 32-grid, add/remove/paint, coarse/detail brush, camera presets и save/reopen на общем mesher. Editor preview читает Packed source напрямую и frame-budgeted перестраивает seam-safe 16×16 art-voxel chunks; непрерывный drag заполняет промежутки, а time-based bounded Raise/Lower строят холмы и впадины с radial falloff, оставаясь одной Undo operation. После ручной оценки: explicit slices, Level/Smooth и material channels, затем обоснованный production chunk owner, parity report и перенос остальных моделей.
+7. **V1 Battle Voxel Kit.** Neutral/edge/wet/ember/frozen/blocker создаются уже как native Godot Resources и заменяют primitive meshes под прежними semantic ID.
+8. **V1 World Surface pilot.** Одна маленькая sandbox-зона получает world-mode тех же Tile Kit/кистей и one-way migration; только после приёмки переносится `fan_town`.
+9. **Biome kits и большие зоны.** Grass/dirt/stone/water/road/edge/corner/ramp + variants, затем отдельный Terrain3D gate при доказанной необходимости.
 
 Каждый пункт проходит Inspector/viewport, preview, runtime, Undo/Redo, save/reopen и targeted test. Массовая конверсия всех карт до sandbox-gate запрещена.

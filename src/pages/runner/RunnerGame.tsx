@@ -28,7 +28,8 @@ import {
 } from "../../lib/mediaFavorites";
 import { PuzzleTaskRunner } from "../puzzle/PuzzleTaskRunner";
 import { CindersGlyph } from "../../components/CindersGlyph";
-import { UiCheck } from "../../components/UiCheck";
+import { MinigameMistressFace } from "../../components/MinigameMistressFace";
+import { MinigameStimToggles } from "../../components/MinigameStimToggles";
 import {
   buildTrack,
   RunnerTrack,
@@ -167,6 +168,7 @@ export function RunnerGame({ onReward, onSpend, walletBalance, onExit }: Props) 
   );
   const quipSeqRef = useRef(0);
   const quipTimerRef = useRef<number | null>(null);
+  const claimedRef = useRef(false);
   const lastFightQuipRef = useRef(0);
   const showQuip = useCallback((event: MistressLineEvent) => {
     if (quipTimerRef.current) window.clearTimeout(quipTimerRef.current);
@@ -460,6 +462,7 @@ export function RunnerGame({ onReward, onSpend, walletBalance, onExit }: Props) 
       setBest(
         saveRunnerBestIfBetter(diffId, { crowd: o.finalCrowd, total: res.total }),
       );
+      claimedRef.current = false;
       setPhase("result");
     },
     [effDifficulty, diffId],
@@ -495,11 +498,16 @@ export function RunnerGame({ onReward, onSpend, walletBalance, onExit }: Props) 
           <header className="runner-intro__hero">
             <div className="runner-intro__hero-icon" aria-hidden>🏃</div>
             <div>
-              <h2>Пробег толпы</h2>
+              <div className="runner-intro__title-row">
+                <MinigameMistressFace size="sm" />
+                <h2>Пробег толпы</h2>
+              </div>
               <p className="muted runner-intro__lead">
                 Толпа бежит сама — ты выбираешь путь. Проведи её через лучшие
                 ворота, раздуй огнём заданий и сомни встречные толпы. У финиша
-                ждёт босс, а за его победу — трофей из твоего избранного.
+                ждёт босс{trophyCount === 0
+                  ? ". Лайкай картинки на сессиях — тогда босс будет дарить трофей."
+                  : ", а за его победу — трофей из избранного."}
               </p>
             </div>
           </header>
@@ -526,7 +534,7 @@ export function RunnerGame({ onReward, onSpend, walletBalance, onExit }: Props) 
               <p>
                 Огненные врата ставят забег на паузу и дают задание: успех —{" "}
                 <strong>+35% толпы и Угольки</strong>, провал —{" "}
-                <strong>−25% толпы и штраф</strong>.
+                <strong>−20% толпы и штраф</strong>.
               </p>
             </div>
             <div className="runner-rule">
@@ -540,34 +548,13 @@ export function RunnerGame({ onReward, onSpend, walletBalance, onExit }: Props) 
             </div>
           </div>
 
-          <div className="runner-intro__feel">
-            <span className="runner-intro__feel-title">Ощущения</span>
-            <UiCheck
-              checked={feel.lovenseVibe}
-              onChange={(v) => setFeelKey("lovenseVibe", v)}
-            >
-              <span className="runner-intro__feel-text">
-                <strong>С вибратором Lovense</strong>
-                <span className="muted">
-                  игра сама включает мотор: импульсы на красных вратах,
-                  схватках и боссе; задания со стимулом крутят устройство
-                </span>
-              </span>
-            </UiCheck>
-            <UiCheck
-              checked={feel.manualVibe}
-              onChange={(v) => setFeelKey("manualVibe", v)}
-            >
-              <span className="runner-intro__feel-text">
-                <strong>С ручной вибрацией</strong>
-                <span className="muted">
-                  задания со стимулом можно делать руками по инструкции —
-                  работает без Lovense. Выключи — и вибрационных заданий не
-                  будет вовсе
-                </span>
-              </span>
-            </UiCheck>
-          </div>
+          <MinigameStimToggles
+            settings={feel}
+            onChange={(next) => {
+              setFeel(next);
+              saveRunnerSettings(next);
+            }}
+          />
 
           <div className="runner-intro__diffs" role="radiogroup" aria-label="Сложность">
             {RUNNER_DIFFICULTIES.map((d) => (
@@ -801,28 +788,45 @@ export function RunnerGame({ onReward, onSpend, walletBalance, onExit }: Props) 
               className="puzzle-config__start"
               onClick={() => {
                 const payout = wager?.payout ?? 0;
-                onReward(result.total + payout);
+                if (!claimedRef.current) {
+                  claimedRef.current = true;
+                  onReward(result.total + payout);
+                }
                 onExit();
               }}
             >
               <CindersGlyph className="puzzle-result__btn-glyph" />
               Забрать {result.total + (wager?.payout ?? 0)}
             </button>
-            <button type="button" className="puzzle-btn" onClick={() => startRun(true)}>
+            <button
+              type="button"
+              className="puzzle-btn"
+              onClick={() => {
+                const payout = wager?.payout ?? 0;
+                if (!claimedRef.current) {
+                  claimedRef.current = true;
+                  onReward(result.total + payout);
+                }
+                startRun(true);
+              }}
+            >
               Новый забег
             </button>
             <button
               type="button"
               className="puzzle-btn"
-              onClick={() => setPhase("intro")}
-              title="Вернуться к выбору сложности (незабранная награда сгорит)"
+              onClick={() => {
+                const payout = wager?.payout ?? 0;
+                if (!claimedRef.current) {
+                  claimedRef.current = true;
+                  onReward(result.total + payout);
+                }
+                setPhase("intro");
+              }}
             >
               ← В меню
             </button>
           </div>
-          <p className="muted runner-result__note">
-            Незабранная награда сгорает при новом забеге или выходе в меню.
-          </p>
         </div>
       </div>
     );
@@ -837,8 +841,11 @@ export function RunnerGame({ onReward, onSpend, walletBalance, onExit }: Props) 
         <button
           type="button"
           className="puzzle-hud__btn puzzle-hud__btn--back"
-          onClick={onExit}
-          title="Выйти из забега"
+          onClick={() => {
+            if (stake > 0) setPaused(true);
+            else onExit();
+          }}
+          title={stake > 0 ? "Пауза — ставка уже снята" : "Выйти из забега"}
         >
           ←
         </button>
@@ -941,6 +948,9 @@ export function RunnerGame({ onReward, onSpend, walletBalance, onExit }: Props) 
             <h3 className="puzzle-task__title">Передышка</h3>
             <p className="puzzle-task__text">
               Толпа стоит и ждёт. Огонь не заплатит за простой.
+              {stake > 0
+                ? " Ставка уже снята: если бросишь забег, Угольки сгорят."
+                : ""}
             </p>
             <div className="puzzle-task__actions">
               <button type="button" className="primary" onClick={() => setPaused(false)}>

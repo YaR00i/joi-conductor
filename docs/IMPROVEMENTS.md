@@ -34,11 +34,12 @@
 
 | Среда | Сейчас | Как в SoW | Что сделать у нас |
 | --- | --- | --- | --- |
-| **Ollama (Local LLM)** | CLI zip качается при старте / pull модели (~1 ГБ), если нет системного Ollama | Models Hub: поиск HF, GGUF, llama.cpp CUDA/HIP/Vulkan + 10 облачных провайдеров | **Сделано (zip).** Дальше по желанию: облачный OpenAI-compat (OpenRouter) как запас без GPU; GGUF/llama.cpp не дублировать, пока хватает Ollama |
-| **Piper** | Бинарь + Irina сами | Нет прямого аналога (у них Silero / Kokoro / XTTS) | **Сделано.** Оставить как офлайн-RU fallback |
-| **Qwen3-TTS** | venv + `huggingface_hub` + **qwen-tts** (локальный `/v1/audio/speech` без vLLM). vLLM — опция на Linux | Qwen3 TTS local: 0.6B **и 1.7B**, клон 3 с | **Сделано (0.6B + qwen-tts).** 1.7B — опция «качество» |
-| **GPT-SoVITS** | Кнопка в «ИИ ресурсы»: клон + venv + pretrained в userData. Отдельный реф 4–10 с (`sovits-ref.wav`), не клип Qwen | Клона нет; клон через Qwen Base | **Сделано.** Ручной `~/Projects/GPT-SoVITS` по-прежнему находится, если есть |
-| **WD14 теггер** | Первый «Запустить сервер» ставит venv + onnx ~440 МБ в userData | Нет | **Сделано** |
+| **Ollama (Local LLM)** | После обязательных сред окно предлагает zip + llama3.2; можно пропустить. Кнопка в «ИИ ресурсы» ставит то же | Models Hub: поиск HF, GGUF, llama.cpp CUDA/HIP/Vulkan + 10 облачных провайдеров | **Сделано (zip + optional boot).** Дальше по желанию: облачный OpenAI-compat (OpenRouter) как запас без GPU; GGUF/llama.cpp не дублировать, пока хватает Ollama |
+| **Piper** | Бинарь + Irina качаются при старте Electron | Нет прямого аналога (у них Silero / Kokoro / XTTS) | **Сделано.** Оставить как офлайн-RU fallback |
+| **Python** | Windows: NuGet CPython 3.12 в `%APPDATA%/joi-conductor/python/` при старте, затем venv SoVITS/WD14/Qwen | Системный Python / conda | **Сделано.** Не python.org installer и не embeddable zip (нет `venv`) |
+| **Qwen3-TTS** | venv + `huggingface_hub` + **qwen-tts**. Если в Голосе выбран Qwen и автозапуск — веса ставятся при старте | Qwen3 TTS local: 0.6B **и 1.7B**, клон 3 с | **Сделано (0.6B + qwen-tts).** 1.7B — опция «качество» |
+| **GPT-SoVITS** | При голосе SoVITS/auto автозапуск **ставит** клон + venv + pretrained, если ещё нет, затем поднимает api_v2 | Клона нет; клон через Qwen Base | **Сделано.** Ручной `~/Projects/GPT-SoVITS` по-прежнему находится, если есть |
+| **WD14 теггер** | При включённых автотегах первый запуск ставит venv + onnx ~330 МБ (`tagger-v2`) | Нет | **Сделано** |
 | **Edge / Windows TTS** | Без среды | EdgeTTS + ElevenLabs | **Ок.** ElevenLabs не тащим (ключ, цензура, не локально) |
 | **STT / звонок** | Нет | Faster Whisper + Silero VAD, full-duplex, перебивание | Волна 3 (чат/«как звонок»). Пакет: `faster-whisper` в отдельном venv, не в Qwen |
 | **Silero TTS** | Нет | Быстрый русский local | Имеет смысл как RU-движок легче Piper+Irina и без SoVITS-EN. Кандидат в Голос после Qwen-Windows |
@@ -53,10 +54,21 @@
 
 ### Волна 3 — новые системы
 
+#### Поэтапное развитие чата после подключения Groq (сентябрь 2026)
+
+1. **Управление ожиданием — реализовано:** остановка ответа/перегенерации, ручной повтор без дубля сообщения, защита от запоздавших результатов и обновления чужой памяти, явный таймаут. Контракт UI — `docs/HUB.md`; регрессии — `chatRecovery.test.ts`.
+2. **Постепенное появление ответа — реализовано:** общий SSE-клиент для Groq/Ollama, временный пузырь речи, отмена reader, сброс preview при retry/локальном резерве, отделение reasoning и незавершённых служебных блоков. История, действия и TTS — только после финальной проверки. Протокол покрыт тестами, UI — локальным SSE-стендом в 1080p; нужен smoke-check на реальных моделях.
+3. **Управляемая память — далее:** понятный просмотр и правка запомненных фактов, видимая граница локального/облачного контекста; не расширять передачу данных по умолчанию.
+4. **Голосовой ввод — позже:** сначала push-to-talk с просмотром распознанного текста, затем обсуждать режим звонка и перебивание.
+
+Этапы 3–4 — последовательность для следующих итераций, не выполненные функции. Новые облачные провайдеры, автоматическая отправка приватной истории и Ember не входят в этот срез.
+
+#### Состояние систем
+
 - **3.0 CBT / plapping · проверка ударов** — **готово.** Переключатель Честь (метроном считает акценты) / Микрофон (Keuwlsoft-стиль: порог, гистерезис, пауза; тихий удар не считается). Док в сессии + Настройки → Геймплей.
 - **3.1 Чат + Soul Memory** — **в работе.** Свободный чат (не очередь сессии). Память как в Soul of Waifu: MEMORY.md / USER.md / темы / дневник, роутер после пачки реплик. Селфи и Whisper — позже.
 - **3.1b HotScreen-цензор медиа** — **сделано.** Оверлей на кадре сессии: мозаика / размытие / плашки / надпись. Вкл сам (тулбар сессии) или госпожа из чата (`set_censor`). Зоны: грудь / пах / **член** / зад / **живот** / **подмышки** / **стопы** / **руки** / лицо. Новые зоны по умолчанию выкл. Член по умолчанию выкл: сеть всё равно ловит и **вырезает дырку** в цензоре паха (сила дырки 1–5, шаг 0,1, по умолчанию 2). Класс поз `orl` (рот) идёт в лицо, не в дырку члена — иначе на орале вырезались головы. Головки как отдельного класса нет: дырка чуть длиннее коробки ствола, без лишней ширины. На наклоне овал считается на прогоне сети (не на отрисовке) и копируется в дырку; слежение работает и на «весь кадр». Вкл зоны — закрывать как остальные. Отдельный тогл **слежение нейросетью**: аниме тело (deepghs/booru_yolo nano) + соски/пах/член (`anime_censor_detection`) на одном кадре 640; руки и позы (`anime_hand_detection` + `yolov8s_pp12`) **докачиваются отдельно** и не валят тело, если не вышло; четыре YOLOv8 крутятся **параллельно**. YOLOX-real для фото, если аниме-проход пустой. **Один прогон на фото-слайд**. Видео и гифки — полный блюр. Не YOLO11/AGPL. Нет детекта — снова зоны. Настройки → Геймплей → Цензор.
-- **3.1c Эффекты сессии Искорки** — **сделано.** Слои поверх живой сессии (не захват рабочего стола): гипноспираль, VHS-артефакты, глитч, мантра по центру, всплывашки. Темы надписей: Искра / goon / бета / сисси / BBC, можно смешать. Список фраз правится в Настройках (одна строка — одна надпись). Сила 1–5. Вспышки по умолчанию выкл. Настройки → Геймплей → Эффекты. В песочнице те же тоглы сверху **Лаборатории** (кадр показывает слои сразу, даже без прогона). У других госпож на живом слоте пак как раньше (`pack.fx`).
+- **3.1c Эффекты сессии Искорки** — **сделано.** Слои поверх живой сессии (не захват рабочего стола): гипноспираль, VHS-артефакты, глитч, мантра по центру, всплывашки. Плашка — вебка госпожи слева: штамп **修正** или **лента** по лицу (тоглы в Лаборатории). Темы надписей: **Безумие** / goon / бета / сисси / BBC, можно смешать. Список фраз правится в Настройках (одна строка — одна надпись). Сила 1–5. Вспышки по умолчанию выкл. Настройки → Геймплей → Эффекты. В песочнице те же тоглы сверху **Лаборатории** (кадр показывает слои сразу, даже без прогона). У других госпож на живом слоте пак как раньше (`pack.fx`).
 
 ### Парковка (не трогать, пока не скажешь)
 
@@ -80,6 +92,12 @@
 
 Скачивание: Electron → `%APPDATA%/joi-conductor/qwen-tts/` (venv + веса) через `huggingface_hub`. Сервер: **qwen-tts** (`scripts/qwen_tts_server.py`, OpenAI `/v1/audio/speech`). vLLM — если пакет есть (Linux). Клон Base: `ref_audio` из wav госпожи.
 
+Профили запуска: **VRAM** — CUDA/BF16, модель и 12Hz-кодек остаются на GPU; **RAM** — CPU-only, видеопамять свободна для Ollama, но синтез существенно медленнее. Интерактивный CUDA-путь не включает `cudnn.benchmark`: длина реплик постоянно меняется, поэтому перебор convolution-алгоритмов на каждой новой форме добавлял секунды к codec decode. Холодный проход Base с референсом выполняется до статуса «онлайн». `/health` сообщает backend/device/warmed, а ответ `/audio/speech` возвращает generation/audio/realtime метрики в `X-JOI-*` headers.
+
+Обрыв длинной озвучки: прежний потолок **192 codec tokens** ограничивал весь ответ примерно 15 секундами независимо от длины текста. Теперь бюджет в Electron (`qwenMaxNewTokens`) и Python (`_cap_new_tokens` / `_gen_kw`) — `min(2048, max(40, 2 × число Unicode-символов + 24))`. Короткие фразы сохраняют прежний бюджет; 400 символов получают 824 токена, 900 — 1824. Ограничение 2048 остаётся защитой от зацикливания, а не целевой длительностью: генерация может закончиться раньше по EOS. Правило общее для RAM/VRAM и обычного/faster backend. Проверки: `electron/qwenLaunch.test.ts`, `python -m unittest discover -s scripts -p test_qwen_generation.py` (включая JS/Python parity). После обновления нужен перезапуск Electron **и** Python-сервера Qwen; одного Reload интерфейса недостаточно. Длинный синтез в RAM может по-прежнему упереться в существующий таймаут запроса 180 с — это отдельный лимит, не обрыв готового WAV на 15 с.
+
+Локальный baseline 2026-09-05, RTX 5070, Base 0.6B, короткая фраза ~2 с: до правки первый запрос 24,1 с, следующие ~8,0 с; после прогрева при старте пользовательские запросы 0,79–0,84 с (2,4–2,6× realtime). На CPU/RAM та же машина после кэша референса генерирует 4,88 с аудио за 17,88 с (0,27× realtime), поэтому RAM остаётся профилем совместимости, а не быстродействия. Это контроль этой машины, не обещание для другого железа.
+
 ---
 
 ## Ключевые файлы
@@ -87,12 +105,14 @@
 - Избранное: `src/pages/FavoritesPage.tsx`, `src/lib/mediaFavorites.ts`, `src/lib/contentUnlocks.ts` (`tagPurchaseStatus`)
 - Магазин: `src/pages/ShopPage.tsx`, `src/lib/shopFocus.ts`, `src/lib/wallet.ts`
 - Настройки / ИИ ресурсы: `src/pages/SettingsPage.tsx`, `src/components/BrainPanel.tsx`, `src/components/TtsSettingsPanel.tsx`
+- Первый запуск сред: `src/lib/runtimeBootstrap.ts`, `src/lib/runtimeBootstrapRun.ts`, `src/lib/runtimeOptionalOffers.ts`
+- Portable Python: `electron/pythonInstall.mjs`, `electron/pythonRuntime.mjs`
 - Ollama: `electron/ollama.mjs`, `electron/ollamaInstall.mjs`, `electron/ollamaRuntime.mjs`
 - Qwen: `src/lib/qwenTtsCatalog.ts`, `electron/qwen.mjs`, `electron/qwenInstall.mjs`, `electron/qwenEnv.mjs`, `electron/qwenProcess.mjs`, `scripts/qwen_tts_server.py`
 - SoVITS: `electron/sovitsProcess.mjs`, `docs/GPT_SOVITS_SETUP.md`
 - WD14: `electron/wd14Process.mjs`, `electron/wd14Install.mjs`, `docs/WD14_TAGGER.md`
 - Сессия: `src/pages/SessionPage.tsx`, `src/components/SessionQueuePanel.tsx`, `src/lib/queueEdit.ts`, `src/lib/sessionRuntime.ts`, `src/components/BeatBar.tsx`
-- Цензор медиа: `src/lib/mediaCensor.ts`, `src/lib/mediaCensorDetect.ts`, `src/lib/mediaCensorYolox.ts`, `src/components/MediaCensorOverlay.tsx`, `src/components/MediaCensorPanel.tsx`. Модели: `%APPDATA%/joi-conductor/censor-detect/` (`yolov8n_as01.onnx` тело + `censor_detect_v1.0_n.onnx` соски + YOLOX-real)
+- Цензор медиа: `src/lib/mediaCensor.ts`, `src/lib/mediaCensorDetect.ts`, `src/lib/mediaCensorYolox.ts`, `src/components/MediaCensorOverlay.tsx`, `src/components/MediaCensorPanel.tsx`. Модели: `%APPDATA%/joi-conductor/censor-detect/` (`yolov8n_as01.onnx` тело + `censor_detect_v1.0_n.onnx` соски + YOLOX-real). На старте Electron докачиваются, если ещё нет.
 - Эффекты Искорки: `src/lib/sessionFx.ts`, `src/components/SessionFxOverlay.tsx`, `src/components/SessionFxPanel.tsx`, `src/components/sessionFx.css`
 - Чат / Soul Memory: `src/pages/ChatPage.tsx`, `src/lib/soul/`
 - Контракты: `src/lib/contracts/catalog.ts`, `src/lib/contracts/dailyBoard.ts`

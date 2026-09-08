@@ -33,6 +33,7 @@ import type {
   MistressSessionProposal,
   QueuePatchEdit,
 } from "./types";
+import { isInitiativeOptOut } from "../conversationMode";
 
 const CONTROL_OPS = [
   "set_wear",
@@ -68,7 +69,6 @@ function notifyWearChanged(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event("joi-cage-lock-changed"));
 }
-
 function notifyDenialChanged(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event("joi-denial-quest-changed"));
@@ -123,7 +123,7 @@ function nextMorningAt(nowMs: number): number {
 }
 
 const SESSION_INVITE =
-  /сесси[яию]|сессия будет|начинаем|запускай|запусти\b|давай\s+(играть|эдж|hump|сесс)|хочу\s+(сесс|эдж)|her session|вот твоя сесс|заходи\b.{0,16}сесс/i;
+  /(?:давай|хочу|предлагаю|устрою|провед[еу]|начинаем|начн[её]м|запускай|запусти).{0,24}сесси|сесси[яию].{0,32}(будет|начина|запуск|устрою|предлагаю)|давай\s+(играть|эдж|hump)|хочу\s+эдж|her session|вот твоя сесс|заходи\b.{0,16}сесс/i;
 
 const USER_ASKS_ORDER =
   /надень|сними|запир|запрети|клетк\w{0,8}\s+на|пробк\w{0,8}\s+на|давай\s+(сесс|эдж|hump|играть)|хочу\s+(сесс|эдж)|запусти|check-?in|поставь\s+(клет|проб|таймер)|руки прочь|отчёт по|отчет по|цензор|закрой.{0,12}(кадр|картин|медиа)|мозаик/i;
@@ -132,7 +132,9 @@ const SPEECH_ISSUES_ORDER =
   /(надень|запир|ставь клет|ставь проб|держи клет|запрещаю|руки прочь|не снимай|не вынимай|цензор|мозаик|закрываю.{0,16}(кадр|картин|медиа))|((клетк|пробк)\w{0,8}\s+на\s+(?:\d+|полтора|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять))|(на\s+(?:\d+|два|три|четыре|пять)\s*(час|мин))|(пиши.{0,16}через\s+\d)|(сесси[яию].{0,40}(минут|час|начина|запуск))/i;
 
 export function looksLikeSessionInvite(text: string): boolean {
-  return SESSION_INVITE.test(text.trim());
+  const trimmed = text.trim();
+  if (isInitiativeOptOut(trimmed)) return false;
+  return SESSION_INVITE.test(trimmed);
 }
 
 /** True only if he asked for an order or she issued one this turn — not a status recap. */
@@ -140,28 +142,26 @@ export function looksLikeControlIntent(userText: string, speech = ""): boolean {
   const user = userText.trim();
   const spoken = speech.trim();
   if (looksLikeSessionInvite(user) || looksLikeSessionInvite(spoken)) return true;
-  if (USER_ASKS_ORDER.test(user)) return true;
+  if (!isInitiativeOptOut(user) && USER_ASKS_ORDER.test(user)) return true;
   if (SPEECH_ISSUES_ORDER.test(spoken)) return true;
   return false;
 }
 
-/** Drop session seeds and check-ins — those are chips / the morning pack, not LLM.
- *  A session-refuse turn must not silently start cage/plug/denial. */
+/** A session-refuse turn must not silently start cage/plug/denial.
+ *  Session/check-in now become proposals, not dropped. */
 export function filterControlActions(
   actions: ControlAction[],
   userText: string,
   _speech: string,
 ): ControlAction[] {
   const refuseSession = /отказываюсь от сессии/i.test(userText);
+  if (!refuseSession) return actions;
   return actions.filter((action) => {
-    if (action.op === "propose_session") return false;
-    if (action.op === "set_checkin") return false;
     if (
-      refuseSession &&
-      (action.op === "set_wear" ||
-        action.op === "clear_wear" ||
-        action.op === "set_denial" ||
-        action.op === "clear_denial")
+      action.op === "set_wear" ||
+      action.op === "clear_wear" ||
+      action.op === "set_denial" ||
+      action.op === "clear_denial"
     ) {
       return false;
     }
@@ -497,26 +497,4 @@ export function applyControlActions(
     wearChanged: flags.wear,
     denialChanged: flags.denial,
   };
-}
-
-export function applyRouterControlHint(
-  mistressId: MistressId,
-  raw: Record<string, unknown> | null,
-): ControlState {
-  if (!raw) return loadControlState(mistressId);
-  const control = raw.control;
-  if (!control || typeof control !== "object") {
-    return loadControlState(mistressId);
-  }
-  const rec = control as Record<string, unknown>;
-  const actions: ControlAction[] = [];
-  if (isProgressionId(rec.bump_id)) {
-    actions.push({
-      op: "bump_progression",
-      id: rec.bump_id,
-      note: typeof rec.note === "string" ? rec.note.trim() : "",
-    });
-  }
-  if (actions.length === 0) return loadControlState(mistressId);
-  return applyControlActions(mistressId, actions).state;
 }

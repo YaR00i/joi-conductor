@@ -24,6 +24,7 @@ import io
 import json
 import os
 import sys
+import tempfile
 import threading
 import time
 import traceback
@@ -41,9 +42,13 @@ SR_FALLBACK = 24000
 CLONE_PROMPT = None
 CLONE_KEY = None
 SYNTH_LOCK = threading.Lock()
+WARMED = False
+STARTUP_REF_AUDIO = ""
+STARTUP_REF_TEXT = ""
 
-# Soul of Waifu call path: cap codec tokens so generate cannot wander.
-SOW_MAX_NEW_TOKENS = 192
+# Length-based budget preserves short-line latency without truncating long chat
+# replies at 192 codec tokens (~15 seconds). Still bound runaway generation.
+QWEN_MAX_NEW_TOKENS = 2048
 SOW_TOP_P = 0.9
 SOW_TOP_K = 20
 SOW_TEMPERATURE = 0.7
@@ -74,7 +79,10 @@ def _tune_cuda() -> None:
         return
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
-    torch.backends.cudnn.benchmark = True
+    # Speech length changes on every line. cuDNN benchmark would re-profile
+    # many convolution shapes in the 12 Hz codec and can add seconds before
+    # every decode, so prefer the cached heuristic choice for interactive TTS.
+    torch.backends.cudnn.benchmark = False
     try:
         torch.backends.cuda.enable_flash_sdp(True)
         torch.backends.cuda.enable_mem_efficient_sdp(True)
@@ -106,6 +114,7 @@ def _runtime_info() -> dict[str, Any]:
         "requested": DEVICE_MODE,
         "gpu": gpu,
         "torch": str(torch.__version__),
+        "warmed": WARMED,
     }
 
 
@@ -279,6 +288,7 @@ def load_model(model_id: str) -> None:
 
 
 def _warmup() -> None:
+    global WARMED
     if MODEL is None:
         return
     t0 = time.perf_counter()
@@ -296,23 +306,45 @@ def _warmup() -> None:
         with torch.inference_mode():
             if is_base_model(MODEL_ID):
                 dummy = np.zeros(int(24000 * 0.4), dtype=np.float32)
+                temp_ref = None
+                warm_ref = STARTUP_REF_AUDIO if Path(STARTUP_REF_AUDIO).is_file() else ""
+                warm_text = STARTUP_REF_TEXT or "Hi"
                 clone_kw: dict[str, Any] = {
                     "text": "Hi",
                     "language": "English",
-                    "ref_audio": (dummy, 24000),
-                    "ref_text": "Hi",
+                    "ref_audio": _load_clone_audio(warm_ref) if warm_ref else (dummy, 24000),
+                    "ref_text": warm_text,
                     "max_new_tokens": 16,
                     "temperature": SOW_TEMPERATURE,
                     "top_p": SOW_TOP_P,
                     "top_k": SOW_TOP_K,
                 }
                 if BACKEND == "faster":
+                    # faster-qwen3-tts currently accepts a path here, unlike
+                    # stock qwen-tts. Prime the speaker encoder and codec now
+                    # so the user's first line does not pay that cold-start.
+                    if warm_ref:
+                        clone_kw["ref_audio"] = warm_ref
+                    else:
+                        fd, temp_ref = tempfile.mkstemp(suffix=".wav")
+                        os.close(fd)
+                        import soundfile as sf
+
+                        sf.write(temp_ref, dummy, 24000, format="WAV")
+                        clone_kw["ref_audio"] = temp_ref
                     clone_kw["xvec_only"] = FASTER_XVEC_ONLY
                     clone_kw["append_silence"] = FASTER_APPEND_SILENCE
                     clone_kw["non_streaming_mode"] = False
                 else:
                     clone_kw["non_streaming_mode"] = True
-                MODEL.generate_voice_clone(**clone_kw)
+                try:
+                    MODEL.generate_voice_clone(**clone_kw)
+                finally:
+                    if temp_ref:
+                        try:
+                            os.unlink(temp_ref)
+                        except OSError:
+                            pass
             else:
                 custom_kw: dict[str, Any] = {
                     "text": "Hi",
@@ -326,6 +358,7 @@ def _warmup() -> None:
                 if BACKEND != "faster":
                     custom_kw["non_streaming_mode"] = True
                 MODEL.generate_custom_voice(**custom_kw)
+        WARMED = True
         _log("qwen-tts warmup %.2fs" % (time.perf_counter() - t0))
     except Exception as exc:
         _log("qwen-tts warmup skip: %s" % str(exc)[:180])
@@ -354,7 +387,7 @@ def wav_bytes(audio, sr: int) -> bytes:
 def _cap_new_tokens(text: str) -> int:
     # Keep in sync with electron/qwenLaunch.mjs qwenMaxNewTokens.
     n = len(text.strip())
-    return min(SOW_MAX_NEW_TOKENS, max(40, n * 2 + 24))
+    return min(QWEN_MAX_NEW_TOKENS, max(40, n * 2 + 24))
 
 
 def _gen_kw(extra: dict[str, Any], text: str) -> dict[str, Any]:
@@ -381,7 +414,7 @@ def _gen_kw(extra: dict[str, Any], text: str) -> dict[str, Any]:
             pass
     if extra.get("max_new_tokens") is not None:
         try:
-            kw["max_new_tokens"] = max(16, min(SOW_MAX_NEW_TOKENS, int(extra["max_new_tokens"])))
+            kw["max_new_tokens"] = max(16, min(QWEN_MAX_NEW_TOKENS, int(extra["max_new_tokens"])))
         except (TypeError, ValueError):
             pass
     return kw
@@ -441,7 +474,7 @@ def _cached_clone_prompt(ref_audio: str, ref_text: str):
     return CLONE_PROMPT
 
 
-def synthesize(body: dict[str, Any]) -> bytes:
+def synthesize(body: dict[str, Any]) -> tuple[bytes, dict[str, str]]:
     if MODEL is None:
         raise RuntimeError("модель не загружена")
     import torch
@@ -542,18 +575,37 @@ def synthesize(body: dict[str, Any]) -> bytes:
             clone_mode,
         )
     )
-    return wav_bytes(wavs[0], sr)
+    realtime_x = audio_s / wall if wall > 0 else 0.0
+    return wav_bytes(wavs[0], sr), {
+        "X-JOI-Generation-Ms": str(round(wall * 1000)),
+        "X-JOI-Audio-Seconds": f"{audio_s:.3f}",
+        "X-JOI-Realtime-X": f"{realtime_x:.3f}",
+        "X-JOI-Backend": BACKEND,
+        "X-JOI-Device": "cuda" if _want_cuda() else "cpu",
+    }
 
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args: Any) -> None:
         _log("%s - %s" % (self.address_string(), fmt % args))
 
-    def _send(self, code: int, body: bytes, content_type: str) -> None:
+    def _send(
+        self,
+        code: int,
+        body: bytes,
+        content_type: str,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         self.send_response(code)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header(
+            "Access-Control-Expose-Headers",
+            "X-JOI-Generation-Ms, X-JOI-Audio-Seconds, X-JOI-Realtime-X, X-JOI-Backend, X-JOI-Device",
+        )
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.end_headers()
         self.wfile.write(body)
 
@@ -595,16 +647,16 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(raw.decode("utf-8") or "{}")
             if not isinstance(body, dict):
                 raise ValueError("JSON object expected")
-            wav = synthesize(body)
+            wav, timing = synthesize(body)
         except Exception as exc:
             _log(traceback.format_exc())
             self._json(400, {"error": str(exc)[:400]})
             return
-        self._send(200, wav, "audio/wav")
+        self._send(200, wav, "audio/wav", timing)
 
 
 def main() -> None:
-    global DEVICE_MODE
+    global DEVICE_MODE, STARTUP_REF_AUDIO, STARTUP_REF_TEXT
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
@@ -615,9 +667,13 @@ def main() -> None:
         default="auto",
         help="cpu = RAM only (CUDA stays free for Ollama)",
     )
+    parser.add_argument("--ref-audio", default="", help="optional Base warmup wav")
+    parser.add_argument("--ref-text", default="", help="transcript for warmup wav")
     args = parser.parse_args()
     os.environ.setdefault("PYTHONUTF8", "1")
     DEVICE_MODE = str(args.device)
+    STARTUP_REF_AUDIO = str(args.ref_audio or "")
+    STARTUP_REF_TEXT = str(args.ref_text or "")
     if DEVICE_MODE == "cpu":
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     try:

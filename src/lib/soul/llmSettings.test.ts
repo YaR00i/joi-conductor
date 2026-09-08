@@ -16,6 +16,8 @@ import {
   collapseRepeatedSpeech,
   harvestChatCompletion,
   OPENROUTER_CHAT_URL,
+  modelForRole,
+  samplingForRole,
 } from "./llmSettings";
 
 installLocalStorageMock();
@@ -159,6 +161,22 @@ describe("chat llm settings", () => {
     expect(harvested.think).toContain("Greet him");
   });
 
+  it("does not promote think-only output into visible speech", () => {
+    const harvested = harvestChatCompletion({
+      choices: [
+        {
+          message: {
+            role: "assistant",
+            thinking: "He said hi. Greet him, don't dump the cage.",
+            content: "<think>secret plan</think>",
+          },
+        },
+      ],
+    });
+    expect(harvested.speech).toBe("");
+    expect(harvested.think).toContain("secret plan");
+  });
+
   it("round-trips settings", () => {
     saveChatLlmSettings({
       provider: "openrouter",
@@ -171,5 +189,84 @@ describe("chat llm settings", () => {
     expect(loaded.provider).toBe("openrouter");
     expect(loaded.apiKey).toBe("sk-test");
     expect(loaded.sampling.temperature).toBe(1.05);
+    expect(loaded.generationPreset).toBe("balanced");
+    expect(loaded.voiceExamples).toBe(true);
+  });
+
+  it("uses the chat model when service-role overrides are empty", () => {
+    const resolved = resolveChatLlm(
+      {
+        provider: "ollama",
+        model: "qwen2.5:14b",
+        endpoint: "",
+        apiKey: "",
+        sampling: { ...DEFAULT_CHAT_SAMPLING },
+        roleModels: {
+          router: "",
+          extractor: "qwen2.5:7b",
+          planner: "qwen2.5:7b",
+        },
+      },
+      { endpoint: "/api/ollama/v1/chat/completions", model: "fallback" },
+    );
+    expect(modelForRole(resolved, "chat")).toBe("qwen2.5:14b");
+    expect(modelForRole(resolved, "router")).toBe("qwen2.5:14b");
+    expect(modelForRole(resolved, "extractor")).toBe("qwen2.5:7b");
+    expect(modelForRole(resolved, "planner")).toBe("qwen2.5:7b");
+    expect(samplingForRole(resolved, "router").temperature).toBeLessThan(
+      samplingForRole(resolved, "chat").temperature,
+    );
+    expect(samplingForRole(resolved, "extractor").temperature).toBeLessThan(
+      samplingForRole(resolved, "router").temperature,
+    );
+    const routerBody = buildChatCompletionBody(resolved, [{ role: "user", content: "hi" }], {
+      role: "router",
+    });
+    const chatBody = buildChatCompletionBody(resolved, [{ role: "user", content: "hi" }], {
+      role: "chat",
+      think: true,
+    });
+    const extractorBody = buildChatCompletionBody(resolved, [{ role: "user", content: "hi" }], {
+      role: "extractor",
+    });
+    const plannerBody = buildChatCompletionBody(resolved, [{ role: "user", content: "hi" }], {
+      role: "planner",
+    });
+    expect(routerBody.temperature).toBeLessThan(chatBody.temperature);
+    expect(extractorBody.temperature).toBe(0.05);
+    expect(extractorBody.model).toBe("qwen2.5:7b");
+    expect(routerBody.think).toBe(false);
+    expect(routerBody.response_format).toEqual({ type: "json_object" });
+    expect(extractorBody.response_format).toEqual({ type: "json_object" });
+    expect(plannerBody.response_format).toEqual({ type: "json_object" });
+    expect(chatBody.response_format).toBeUndefined();
+  });
+
+  it("keeps router/extractor sampling off the chat sliders", () => {
+    const resolved = resolveChatLlm(
+      {
+        provider: "ollama",
+        model: "huihui_ai/qwen3-abliterated:14b",
+        endpoint: "",
+        apiKey: "",
+        sampling: { ...DEFAULT_CHAT_SAMPLING, temperature: 1.4, topP: 0.95 },
+        roleModels: {
+          router: "qwen2.5:7b",
+          extractor: "qwen2.5:7b",
+          planner: "qwen2.5:7b",
+        },
+      },
+      { endpoint: "/api/ollama/v1/chat/completions", model: "fallback" },
+    );
+    expect(modelForRole(resolved, "router")).toBe("qwen2.5:7b");
+    expect(modelForRole(resolved, "extractor")).toBe("qwen2.5:7b");
+    expect(samplingForRole(resolved, "router").temperature).toBe(0.15);
+    expect(samplingForRole(resolved, "extractor").temperature).toBe(0.05);
+    const openaiRouter = buildChatCompletionBody(
+      { ...resolved, provider: "openai" },
+      [{ role: "user", content: "hi" }],
+      { role: "router" },
+    );
+    expect(openaiRouter.response_format).toBeUndefined();
   });
 });

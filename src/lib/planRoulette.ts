@@ -212,6 +212,7 @@ export function buildPlanRouletteSteps(
   unlocks: ContentUnlockLists = EMPTY_UNLOCKS,
   /** Used when the finish step is off — filter cumplay by this destination. */
   draftFinishId?: string,
+  availability?: { mediaListReady?: boolean },
 ): RouletteStepDef[] {
   const finishes = filterByEnabled(
     finishOptions,
@@ -284,7 +285,7 @@ export function buildPlanRouletteSteps(
     // Rebuilt after mood lands (favorites / dislike mix).
     buildPlaceholderTagStep() as RouletteStepDef,
     buildCharacterStep(settings, unlocks) as RouletteStepDef,
-    buildMediaTypeStep(settings, unlocks) as RouletteStepDef,
+    buildMediaTypeStep(settings, unlocks, availability) as RouletteStepDef,
     // Rebuilt after mood lands (easy/medium/hard count range).
     buildPlaceholderToysCountStep() as RouletteStepDef,
   ];

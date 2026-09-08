@@ -11,6 +11,7 @@ import {
 import {
   DEFAULT_VOXEL_PALETTE,
   MAX_VOXEL_PALETTE,
+  normalizeVoxelsPerBlock,
   VOXELS_PER_BLOCK,
 } from "./constants";
 
@@ -100,19 +101,27 @@ function normalizeEmissiveLights(
 }
 
 export function voxelGridSize(
-  model: Pick<EmberVoxelModel, "sizeBlocks" | "heightVoxels">,
+  model: Pick<EmberVoxelModel, "sizeBlocks" | "heightVoxels" | "voxelsPerBlock">,
 ): {
   sx: number;
   sy: number;
   sz: number;
 } {
-  const sx = Math.max(1, model.sizeBlocks.x) * VOXELS_PER_BLOCK;
-  const sz = Math.max(1, model.sizeBlocks.z) * VOXELS_PER_BLOCK;
-  const fromBlocks = Math.max(1, model.sizeBlocks.y) * VOXELS_PER_BLOCK;
+  const density = voxelDensity(model);
+  const sx = Math.max(1, model.sizeBlocks.x) * density;
+  const sz = Math.max(1, model.sizeBlocks.z) * density;
+  const fromBlocks = Math.max(1, model.sizeBlocks.y) * density;
   const sy = Number.isFinite(model.heightVoxels)
-    ? Math.max(1, Math.min(8 * VOXELS_PER_BLOCK, Math.round(model.heightVoxels!)))
+    ? Math.max(1, Math.min(8 * density, Math.round(model.heightVoxels!)))
     : fromBlocks;
   return { sx, sy, sz };
+}
+
+/** Art density only; gameplay/world coordinates continue to use whole blocks. */
+export function voxelDensity(
+  model: Pick<EmberVoxelModel, "voxelsPerBlock">,
+): 16 | 32 {
+  return normalizeVoxelsPerBlock(model.voxelsPerBlock);
 }
 
 export function voxelIndex(
@@ -267,24 +276,28 @@ export function createEmptyVoxelModel(
   sizeBlocks: { x: number; y: number; z: number },
   nameRu?: string,
   heightVoxels?: number,
+  voxelsPerBlock: 16 | 32 = VOXELS_PER_BLOCK,
 ): EmberVoxelModel {
+  const density = normalizeVoxelsPerBlock(voxelsPerBlock);
   const size = {
     x: Math.max(1, Math.min(8, Math.round(sizeBlocks.x))),
     y: Math.max(1, Math.min(8, Math.round(sizeBlocks.y))),
     z: Math.max(1, Math.min(8, Math.round(sizeBlocks.z))),
   };
   const hv = Number.isFinite(heightVoxels)
-    ? Math.max(1, Math.min(8 * VOXELS_PER_BLOCK, Math.round(heightVoxels!)))
-    : size.y * VOXELS_PER_BLOCK;
+    ? Math.max(1, Math.min(8 * density, Math.round(heightVoxels!)))
+    : size.y * density;
   const { sx, sy, sz } = voxelGridSize({
     sizeBlocks: size,
     heightVoxels: hv,
+    voxelsPerBlock: density,
   });
   const n = sx * sy * sz;
   return {
     id,
     nameRu: nameRu ?? id,
     sizeBlocks: size,
+    voxelsPerBlock: density === VOXELS_PER_BLOCK ? undefined : density,
     heightVoxels: hv,
     palette: [...DEFAULT_VOXEL_PALETTE],
     voxels: new Array(n).fill(0),
@@ -1418,12 +1431,13 @@ export function extractSelectionToModel(
   const sx = x1 - x0 + 1;
   const sy = y1 - y0 + 1;
   const sz = z1 - z0 + 1;
+  const density = voxelDensity(src);
   const sizeBlocks = {
-    x: Math.max(1, Math.ceil(sx / VOXELS_PER_BLOCK)),
-    y: Math.max(1, Math.ceil(sy / VOXELS_PER_BLOCK)),
-    z: Math.max(1, Math.ceil(sz / VOXELS_PER_BLOCK)),
+    x: Math.max(1, Math.ceil(sx / density)),
+    y: Math.max(1, Math.ceil(sy / density)),
+    z: Math.max(1, Math.ceil(sz / density)),
   };
-  let next = createEmptyVoxelModel(newId, sizeBlocks, nameRu, sy);
+  let next = createEmptyVoxelModel(newId, sizeBlocks, nameRu, sy, density);
   next.palette = [...src.palette];
   next.material = src.material;
   next = {
@@ -1620,16 +1634,21 @@ export function resizeVoxelModel(
   heightVoxels?: number,
 ): EmberVoxelModel {
   const prev = normalizeVoxelModel(model);
+  const density = voxelDensity(prev);
   const size = {
     x: Math.max(1, Math.min(8, Math.round(sizeBlocks.x))),
     y: Math.max(1, Math.min(8, Math.round(sizeBlocks.y))),
     z: Math.max(1, Math.min(8, Math.round(sizeBlocks.z))),
   };
   const hv = Number.isFinite(heightVoxels)
-    ? Math.max(1, Math.min(8 * VOXELS_PER_BLOCK, Math.round(heightVoxels!)))
-    : size.y * VOXELS_PER_BLOCK;
+    ? Math.max(1, Math.min(8 * density, Math.round(heightVoxels!)))
+    : size.y * density;
   const a = voxelGridSize(prev);
-  const b = voxelGridSize({ sizeBlocks: size, heightVoxels: hv });
+  const b = voxelGridSize({
+    sizeBlocks: size,
+    heightVoxels: hv,
+    voxelsPerBlock: density,
+  });
   const n = b.sx * b.sy * b.sz;
   const voxels = new Array(n).fill(0);
   const emissive = new Array(n).fill(0);
@@ -1693,6 +1712,7 @@ export function resizeVoxelModel(
 }
 
 export function normalizeVoxelModel(raw: EmberVoxelModel): EmberVoxelModel {
+  const density = voxelDensity(raw);
   const sizeBlocks = {
     x: Math.max(1, Math.min(8, Math.round(raw.sizeBlocks?.x ?? 1))),
     y: Math.max(1, Math.min(8, Math.round(raw.sizeBlocks?.y ?? 1))),
@@ -1701,10 +1721,14 @@ export function normalizeVoxelModel(raw: EmberVoxelModel): EmberVoxelModel {
   const heightVoxels = Number.isFinite(raw.heightVoxels)
     ? Math.max(
         1,
-        Math.min(8 * VOXELS_PER_BLOCK, Math.round(raw.heightVoxels!)),
+        Math.min(8 * density, Math.round(raw.heightVoxels!)),
       )
-    : sizeBlocks.y * VOXELS_PER_BLOCK;
-  const { sx, sy, sz } = voxelGridSize({ sizeBlocks, heightVoxels });
+    : sizeBlocks.y * density;
+  const { sx, sy, sz } = voxelGridSize({
+    sizeBlocks,
+    heightVoxels,
+    voxelsPerBlock: density,
+  });
   const need = sx * sy * sz;
   const src = Array.isArray(raw.voxels) ? raw.voxels : [];
   const voxels = new Array(need).fill(0);
@@ -1780,6 +1804,7 @@ export function normalizeVoxelModel(raw: EmberVoxelModel): EmberVoxelModel {
         }
       : undefined,
     sizeBlocks,
+    voxelsPerBlock: density === VOXELS_PER_BLOCK ? undefined : density,
     heightVoxels,
     palette,
     voxels,

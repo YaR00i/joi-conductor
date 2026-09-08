@@ -84,12 +84,31 @@ export function puzzleTaskSpec(t: PuzzleTask): string {
             ? `уровень ${a.level} на ${a.sec}с`
             : `держать край ${a.holdSec}с`
         : "—";
-      return `На следующие ${n} кусочков: ${aTxt}`;
+      return `На следующие ${n} ходов: ${aTxt}`;
     }
     default: {
       const _n: never = t.kind;
       void _n;
       return "";
+    }
+  }
+}
+
+/** Hold / rest / vibe: surviving the timer is success. Edge / spank: time ran out. */
+export function puzzleTaskTimeoutIsSuccess(kind: PuzzleTaskKind): boolean {
+  switch (kind) {
+    case "hold":
+    case "rest":
+    case "vibe":
+    case "ghost_hint":
+      return true;
+    case "edge":
+    case "spank":
+    case "per_touch":
+      return false;
+    default: {
+      const _n: never = kind;
+      return _n;
     }
   }
 }
@@ -152,7 +171,7 @@ function builtinTasks(): PuzzleTask[] {
       id: "builtin_vibe_pulse",
       builtin: true,
       titleRu: "Вибро-импульс",
-      instructionRu: "Терпи стимул, пока идёт таймер. Не двигай кусочки.",
+      instructionRu: "Терпи стимул, пока идёт таймер. Руки с тела, пока не кончится время.",
       kind: "vibe",
       vibeLevel: 3,
       durationSec: 30,
@@ -164,7 +183,7 @@ function builtinTasks(): PuzzleTask[] {
       builtin: true,
       titleRu: "Шлёпай за каждый ход",
       instructionRu:
-        "Каждый следующий кусочек, который ты тронешь, стоит 5 шлепков. Считай сам.",
+        "Каждый следующий ход стоит 5 шлепков. Считай сам, не жульничай.",
       kind: "per_touch",
       perTouchPieces: 10,
       perTouchAction: { kind: "spank", count: 5 },
@@ -187,7 +206,7 @@ function builtinTasks(): PuzzleTask[] {
       builtin: true,
       titleRu: "Голодная доска",
       instructionRu:
-        "Следующие 12 кусочков: каждый запускай стимул уровень 2 на 15 секунд.",
+        "Следующие 12 ходов: каждый запускай стимул уровень 2 на 15 секунд.",
       kind: "per_touch",
       perTouchPieces: 12,
       perTouchAction: { kind: "vibe", level: 2, sec: 15 },

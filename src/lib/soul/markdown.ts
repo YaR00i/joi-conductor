@@ -1,5 +1,6 @@
 import type { SoulCharacterMemory, SoulUserMemory } from "./types";
 import { stripThinkBlocks } from "./llmSettings";
+import { everydayHabitsFrom } from "./stance";
 
 function bullets(lines: string[]): string {
   if (lines.length === 0) return "- (none yet)";
@@ -49,6 +50,14 @@ export function userMemoryToMd(memory: SoulUserMemory): string {
     bullets(memory.sharedMilestones),
     "",
   ].join("\n");
+}
+
+/** Chat/router USER slice: drop legacy play lines that now live in stances. */
+export function userMemoryToPromptMd(memory: SoulUserMemory): string {
+  return userMemoryToMd({
+    ...memory,
+    preferencesHabits: everydayHabitsFrom(memory.preferencesHabits),
+  });
 }
 
 export function formatDiaryStamp(atMs: number): string {

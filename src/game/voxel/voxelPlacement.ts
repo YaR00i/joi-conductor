@@ -4,8 +4,7 @@
 import * as THREE from "three";
 import type { EmberVoxelModel, EmberVoxelPlacement } from "../content/types";
 import { blockStoryHeight } from "../tile/extruded";
-import { VOXELS_PER_BLOCK } from "./constants";
-import { voxelGridSize } from "./voxelModel";
+import { voxelDensity, voxelGridSize } from "./voxelModel";
 import { resolveEmberTransformScale } from "../world/worldTransform";
 
 /**
@@ -50,7 +49,7 @@ export function applyVoxelPlacementTransform(
   elev: number,
 ): void {
   const { sx, sz } = voxelGridSize(model);
-  const vw = tileSize / VOXELS_PER_BLOCK;
+  const vw = tileSize / voxelDensity(model);
   const w = sx * vw;
   const d = sz * vw;
   const rot = normalizeVoxelRot(placement.rot);

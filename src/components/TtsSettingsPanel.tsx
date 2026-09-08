@@ -35,6 +35,7 @@ import {
 } from "../lib/voice/qwenAutoStart";
 import { UiCheck } from "./UiCheck";
 import { VoiceRefPathField } from "./VoiceRefPathField";
+import "./voiceSettings.css";
 
 type Props = {
   voice: VoiceSettings;
@@ -66,6 +67,8 @@ type QwenStatus = {
   device?: string;
   gpu?: string;
   torch?: string;
+  backend?: string;
+  warmed?: boolean;
   baseUrl: string;
   detail: string;
 };
@@ -102,14 +105,33 @@ const ENGINE_CHOICES: Array<{
   title: string;
   sub: string;
 }> = [
-  { id: "qwen", title: "Qwen3-TTS", sub: "GPU · CustomVoice / Base" },
-  { id: "qwen-cpu", title: "Qwen3-TTS · RAM", sub: "через оперативку" },
+  { id: "qwen", title: "Qwen3-TTS", sub: "качество · RAM или VRAM" },
   { id: "sovits", title: "SoVITS", sub: "клон по рефу" },
   { id: "auto", title: "Авто", sub: "SoVITS → Qwen → Piper → Edge" },
   { id: "piper", title: "Piper", sub: "офлайн · Irina" },
   { id: "edge", title: "Edge", sub: "Microsoft Neural" },
   { id: "system", title: "Windows", sub: "системный TTS" },
 ];
+
+function formatVoiceTiming(result: {
+  generationMs?: number;
+  audioSeconds?: number;
+  realtimeX?: number;
+  device?: string;
+}): string {
+  if (!result.generationMs) return "";
+  const generated = (result.generationMs / 1000).toFixed(1);
+  const audio = result.audioSeconds?.toFixed(1);
+  const speed = result.realtimeX?.toFixed(1);
+  return [
+    `готово за ${generated} с`,
+    audio ? `аудио ${audio} с` : "",
+    speed ? `${speed}× realtime` : "",
+    result.device ? result.device.toUpperCase() : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
 
 function sampleNameEnFor(id: MistressId): string {
   switch (id) {
@@ -387,8 +409,8 @@ export function TtsSettingsPanel({ voice, onVoice, tts }: Props) {
     setQwenStarting(true);
     setHint(
       voice.ttsProvider === "qwen-cpu"
-        ? "Запускаю Qwen3-TTS в RAM… первая загрузка до нескольких минут"
-        : "Запускаю Qwen3-TTS… первая загрузка до нескольких минут",
+        ? "Загружаю Qwen3-TTS в RAM и прогреваю аудиокодек…"
+        : "Загружаю Qwen3-TTS в VRAM и прогреваю аудиокодек…",
     );
     try {
       const st = await api.qwenStart({
@@ -396,12 +418,20 @@ export function TtsSettingsPanel({ voice, onVoice, tts }: Props) {
         model: voice.qwenModel,
         flavor: inferQwenFlavor(voice.qwenModel),
         device: qwenServeDevice(voice.ttsProvider),
+        refAudio: voice.qwenRefPath,
+        refText: voice.qwenPromptText,
       });
       setQwenOnline(st.online);
       setQwenDetail(st.detail);
       setQwenManaged(Boolean(st.managedByApp));
       setQwenStarting(Boolean(st.starting));
-      setHint(st.online ? "Qwen онлайн" : st.detail);
+      setHint(
+        st.online
+          ? st.warmed
+            ? "Qwen онлайн · модель и аудиокодек прогреты"
+            : "Qwen онлайн"
+          : st.detail,
+      );
     } catch (err) {
       setHint(err instanceof Error ? err.message : "Ошибка запуска Qwen");
       await refreshQwen();
@@ -525,7 +555,7 @@ export function TtsSettingsPanel({ voice, onVoice, tts }: Props) {
       const res = await tts.testAsync(sample, "tease");
       if (res.ok) {
         setHint(
-          `Воспроизведение через Windows · ${res.engine ?? "qwen"}.`,
+          `Qwen · ${formatVoiceTiming(res) || "воспроизведение через Windows"}.`,
         );
       } else {
         setHint(res.error ?? "Синтез не удался");
@@ -578,8 +608,9 @@ export function TtsSettingsPanel({ voice, onVoice, tts }: Props) {
     try {
       const res = await tts.testAsync(samples[emotion], emotion);
       if (res.ok) {
+        const timing = formatVoiceTiming(res);
         setHint(
-          `Играет · ${emotion} · ${res.engine ?? "tts"}. Если тишина — проверь громкость.`,
+          `Играет · ${emotion} · ${res.engine ?? "tts"}${timing ? ` · ${timing}` : ""}.`,
         );
       } else {
         setHint(
@@ -675,10 +706,14 @@ export function TtsSettingsPanel({ voice, onVoice, tts }: Props) {
 
   return (
     <div className="brain-panel">
-      <div className="brain-panel__bar">
-        <span className={`brain-dot brain-dot--${engineTone}`}>
-          {voice.ttsEnabled ? engineMeta(voice.ttsProvider) : "выкл"}
-        </span>
+      <div className="voice-summary">
+        <div>
+          <span className="voice-summary__eyebrow">Активный голос</span>
+          <strong>{mistress.displayNameRu}</strong>
+          <span className={`brain-dot brain-dot--${engineTone}`}>
+            {voice.ttsEnabled ? engineMeta(voice.ttsProvider) : "выкл"}
+          </span>
+        </div>
         <div className="brain-panel__links">
           <button
             type="button"
@@ -691,103 +726,57 @@ export function TtsSettingsPanel({ voice, onVoice, tts }: Props) {
               );
             }}
           >
-            сброс профиля
+            сбросить голос
           </button>
         </div>
       </div>
-
-      <UiCheck
-        checked={voice.ttsEnabled}
-        onChange={(v) => onVoice({ ...voice, ttsEnabled: v })}
-      >
-        Читать реплики {mistress.displayNameRu} вслух
-      </UiCheck>
-      <UiCheck
-        checked={voice.captionGoogleRu}
-        onChange={(v) => onVoice({ ...voice, captionGoogleRu: v })}
-      >
-        Субтитры Google (EN→RU). Иначе на экране английский оригинал
-      </UiCheck>
+      <div className="voice-summary__switches">
+        <UiCheck
+          checked={voice.ttsEnabled}
+          onChange={(v) => onVoice({ ...voice, ttsEnabled: v })}
+        >
+          Читать реплики вслух
+        </UiCheck>
+        <UiCheck
+          checked={voice.captionGoogleRu}
+          onChange={(v) => onVoice({ ...voice, captionGoogleRu: v })}
+        >
+          Русские субтитры для английского голоса
+        </UiCheck>
+      </div>
 
       <h3 className="brain-panel__h">Движок</h3>
-      <ul className="brain-list">
+      <div className="voice-engine-grid" role="radiogroup" aria-label="Движок голоса">
         {ENGINE_CHOICES.map((engine) => {
-          const active = voice.ttsProvider === engine.id;
+          const active =
+            engine.id === "qwen"
+              ? isQwenTtsProvider(voice.ttsProvider)
+              : voice.ttsProvider === engine.id;
           return (
-            <li
+            <button
+              type="button"
+              role="radio"
+              aria-checked={active}
               key={engine.id}
-              className={"brain-row" + (active ? " is-active" : "")}
+              className={"voice-engine-card" + (active ? " is-active" : "")}
+              disabled={!voice.ttsEnabled}
+              onClick={() => {
+                if (active) return;
+                if (!active && isQwenTtsProvider(voice.ttsProvider)) {
+                  resetQwenAutoStartGate();
+                }
+                onVoice({ ...voice, ttsProvider: engine.id });
+              }}
             >
-              <div className="brain-row__main">
-                <span className="brain-row__name">{engine.title}</span>
-                <span className="brain-row__meta">
-                  {active ? "активен · " : ""}
-                  {engineMeta(engine.id)}
-                </span>
-              </div>
-              <div className="brain-row__acts">
-                {active && (engine.id === "sovits" || engine.id === "auto") ? (
-                  <>
-                    <button
-                      type="button"
-                      className="brain-act"
-                      disabled={!canStartSovits || busy || !voice.ttsEnabled}
-                      onClick={() => void startSovits()}
-                    >
-                      старт
-                    </button>
-                    <button
-                      type="button"
-                      className="brain-act"
-                      disabled={!canManageSovits || busy}
-                      onClick={() => void stopSovits()}
-                    >
-                      стоп
-                    </button>
-                  </>
-                ) : null}
-                {active && isQwenTtsProvider(engine.id) ? (
-                  <>
-                    <button
-                      type="button"
-                      className="brain-act"
-                      disabled={!canManageQwen || busy || !voice.ttsEnabled}
-                      onClick={() => void startQwen()}
-                    >
-                      старт
-                    </button>
-                    <button
-                      type="button"
-                      className="brain-act"
-                      disabled={!canManageQwen || busy}
-                      onClick={() => void stopQwen()}
-                    >
-                      стоп
-                    </button>
-                  </>
-                ) : null}
-                <button
-                  type="button"
-                  className="brain-act"
-                  disabled={active}
-                  onClick={() => {
-                    if (
-                      engine.id !== voice.ttsProvider &&
-                      (isQwenTtsProvider(engine.id) ||
-                        isQwenTtsProvider(voice.ttsProvider))
-                    ) {
-                      resetQwenAutoStartGate();
-                    }
-                    onVoice({ ...voice, ttsProvider: engine.id });
-                  }}
-                >
-                  выбрать
-                </button>
-              </div>
-            </li>
+              <span className="voice-engine-card__name">{engine.title}</span>
+              <span className="voice-engine-card__sub">{engine.sub}</span>
+              <span className={`voice-engine-card__state${active ? " is-active" : ""}`}>
+                {active ? engineMeta(voice.ttsProvider) : "выбрать"}
+              </span>
+            </button>
           );
         })}
-      </ul>
+      </div>
 
       <div className="brain-fields brain-fields--voice">
         {voice.ttsProvider === "sovits" || voice.ttsProvider === "auto" ? (
@@ -960,6 +949,40 @@ export function TtsSettingsPanel({ voice, onVoice, tts }: Props) {
               {voice.ttsProvider === "qwen-cpu" ? " · RAM" : ""} ·{" "}
               {mistress.displayNameRu}
             </h3>
+            <div
+              className="voice-runtime-grid"
+              role="radiogroup"
+              aria-label="Ресурсный профиль Qwen"
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={voice.ttsProvider === "qwen"}
+                className={`voice-runtime-card${voice.ttsProvider === "qwen" ? " is-active" : ""}`}
+                onClick={() => {
+                  resetQwenAutoStartGate();
+                  onVoice({ ...voice, ttsProvider: "qwen" });
+                }}
+              >
+                <span className="voice-runtime-card__badge">Рекомендуется</span>
+                <strong>Быстро · VRAM</strong>
+                <span>CUDA, BF16 и прогретый codec. Освободи видеопамять от тяжёлой LLM.</span>
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={voice.ttsProvider === "qwen-cpu"}
+                className={`voice-runtime-card${voice.ttsProvider === "qwen-cpu" ? " is-active" : ""}`}
+                onClick={() => {
+                  resetQwenAutoStartGate();
+                  onVoice({ ...voice, ttsProvider: "qwen-cpu" });
+                }}
+              >
+                <span className="voice-runtime-card__badge">Совместимость</span>
+                <strong>Экономно · RAM</strong>
+                <span>Видеокарта свободна для Ollama. Генерация заметно медленнее.</span>
+              </button>
+            </div>
             <UiCheck
               checked={voice.autoStartQwen}
               disabled={!voice.ttsEnabled || !canManageQwen}
@@ -994,6 +1017,9 @@ export function TtsSettingsPanel({ voice, onVoice, tts }: Props) {
                 Base
               </button>
             </div>
+            <details className="voice-advanced">
+              <summary>Сервер и модель</summary>
+              <div className="voice-advanced__body">
             <label className="brain-field">
               <span className="field__label">
                 Qwen API{" "}
@@ -1026,6 +1052,21 @@ export function TtsSettingsPanel({ voice, onVoice, tts }: Props) {
                 placeholder={qwenModelForFlavor(qwenFlavor)}
               />
             </label>
+            <label className="brain-field">
+              <span className="field__label">
+                API key (только для внешнего сервера)
+              </span>
+              <input
+                type="password"
+                value={voice.qwenApiKey}
+                onChange={(e) =>
+                  onVoice({ ...voice, qwenApiKey: e.target.value })
+                }
+                placeholder="локальному серверу ключ не нужен"
+              />
+            </label>
+              </div>
+            </details>
             {qwenFlavor === "custom_voice" ? (
               <label className="brain-field">
                 <span className="field__label">Голос CustomVoice</span>
@@ -1082,19 +1123,6 @@ export function TtsSettingsPanel({ voice, onVoice, tts }: Props) {
                 </label>
               </>
             )}
-            <label className="brain-field">
-              <span className="field__label">
-                API key (опц., если сервер с авторизацией)
-              </span>
-              <input
-                type="password"
-                value={voice.qwenApiKey}
-                onChange={(e) =>
-                  onVoice({ ...voice, qwenApiKey: e.target.value })
-                }
-                placeholder="оставь пустым для локального сервера без авторизации"
-              />
-            </label>
             <div className="brain-panel__links">
               <button
                 type="button"
@@ -1256,7 +1284,7 @@ export function TtsSettingsPanel({ voice, onVoice, tts }: Props) {
         <p className="brain-panel__hint">
           {voice.ttsProvider === "qwen-cpu"
             ? "Синтез в оперативке, без CUDA. Медленнее GPU, зато видеокарта свободна для Ollama."
-            : "Фразы короткие. Сервер отвечает когда wav готов — первый клик после старта часто 1–3 мин, не 5–20 с."}
+            : "После статуса «онлайн» модель уже прогрета. Проба покажет время генерации, длину аудио и скорость realtime."}
         </p>
       ) : null}
       <div className="brain-emo">

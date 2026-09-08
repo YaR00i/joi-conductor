@@ -54,6 +54,24 @@ interface TtsSpeakResult {
   engine?: string;
   playedOnHost?: boolean;
   hostPlayDetail?: string;
+  generationMs?: number;
+  audioSeconds?: number;
+  realtimeX?: number;
+  backend?: string;
+  device?: string;
+}
+
+interface JoiDesktopPythonApi {
+  status: () => Promise<{
+    ready: boolean;
+    pythonPath: string;
+    root: string;
+    supported: boolean;
+  }>;
+  install: () => Promise<string>;
+  onInstallProgress: (
+    cb: (payload: { phase: string; pct: number; detail?: string }) => void,
+  ) => () => void;
 }
 
 interface JoiDesktopTtsApi {
@@ -186,6 +204,7 @@ interface JoiDesktopTtsApi {
     gpu?: string;
     torch?: string;
     backend?: string;
+    warmed?: boolean;
     baseUrl: string;
     detail: string;
   }>;
@@ -194,6 +213,8 @@ interface JoiDesktopTtsApi {
     flavor?: string;
     model?: string;
     device?: string;
+    refAudio?: string;
+    refText?: string;
   }) => Promise<{
     online: boolean;
     starting?: boolean;
@@ -206,6 +227,7 @@ interface JoiDesktopTtsApi {
     gpu?: string;
     torch?: string;
     backend?: string;
+    warmed?: boolean;
     baseUrl: string;
     detail: string;
   }>;
@@ -328,6 +350,7 @@ interface JoiDesktopMediaApi {
     modelDir?: string;
     baseUrl: string;
     detail: string;
+    modelsReady?: boolean;
   }>;
   wd14Start: (opts?: {
     baseUrl?: string;
@@ -489,6 +512,7 @@ interface JoiDesktopApi {
   shell?: JoiDesktopShellApi;
   ember?: JoiDesktopEmberApi;
   ollama?: JoiDesktopOllamaApi;
+  python?: JoiDesktopPythonApi;
   tts?: JoiDesktopTtsApi;
   media?: JoiDesktopMediaApi;
   device?: JoiDesktopDeviceApi;

@@ -5,6 +5,7 @@ import {
 } from "../../../test/localStorageMock";
 import { loadCageLock } from "../../cageTimer";
 import { isAcceptedOpen, loadContractBoard } from "../../contracts/dailyBoard";
+import { liveWearKindForContract } from "../../contracts/liveObligation";
 import { loadDenialQuest } from "../../denialQuest";
 import { setActiveMistress } from "../../mistress/activeMistress";
 import { applyControlActions, splitControlReply, looksLikeControlIntent, filterControlActions } from "./actions";
@@ -60,7 +61,7 @@ describe("mistress control actions", () => {
     const board = loadContractBoard();
     expect(
       board?.contracts.some(
-        (c) => c.defId === "chastity_locked_hours" && isAcceptedOpen(c),
+        (c) => liveWearKindForContract(c) === "cage" && isAcceptedOpen(c),
       ),
     ).toBe(true);
     expect(
@@ -141,9 +142,18 @@ describe("mistress control actions", () => {
     expect(looksLikeControlIntent("ок", "Клетка на три часа. Не ной.")).toBe(true);
     expect(looksLikeControlIntent("включи цензор", "Как скажешь.")).toBe(true);
     expect(looksLikeControlIntent("привет", "Сессия будет.")).toBe(true);
+    expect(looksLikeControlIntent("Не хочу сессию сегодня", "Сегодня без сессии.")).toBe(
+      false,
+    );
+    expect(
+      looksLikeControlIntent(
+        "Если предложишь сессию — нет.",
+        "Хорошо, сегодня просто поговорим.",
+      ),
+    ).toBe(false);
   });
 
-  it("drops propose_session and set_checkin from the model", () => {
+  it("keeps session and check-in actions for the proposal mapper", () => {
     const proposal = {
       op: "propose_session" as const,
       kind: "edges" as const,
@@ -152,16 +162,16 @@ describe("mistress control actions", () => {
       finalePolicy: "ruin_norm" as const,
       noteRu: "",
     };
-    expect(
-      filterControlActions([proposal], "ок", "Сессия будет."),
-    ).toEqual([]);
+    expect(filterControlActions([proposal], "ок", "Сессия будет.")).toEqual([
+      proposal,
+    ]);
     expect(
       filterControlActions(
         [{ op: "set_checkin", kind: "hours", hours: 2, note: "x" }],
         "привет",
         "напиши через час",
       ),
-    ).toEqual([]);
+    ).toEqual([{ op: "set_checkin", kind: "hours", hours: 2, note: "x" }]);
   });
 
   it("does not start cage from a session-refuse turn", () => {

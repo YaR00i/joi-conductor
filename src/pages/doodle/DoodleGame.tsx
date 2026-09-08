@@ -23,8 +23,17 @@ import {
 import { setDeviceVibeLevel, stopDevice } from "../../lib/device/deviceClient";
 import { PuzzleTaskRunner } from "../puzzle/PuzzleTaskRunner";
 import { CindersGlyph } from "../../components/CindersGlyph";
-import { DoodleTrack, type DoodleOutcome } from "./DoodleTrack";
+import { MinigameStimToggles } from "../../components/MinigameStimToggles";
+import { MinigameMistressFace } from "../../components/MinigameMistressFace";
+import { recordMinigameClear } from "../../lib/achievements";
+import { DoodleTrack, DOODLE_SPRING_MULT, type DoodleOutcome } from "./DoodleTrack";
 import { getActiveSaveSlot } from "../../lib/saveSlots";
+import {
+  filterArcadeTasks,
+  loadRunnerSettings,
+  saveRunnerSettings,
+  stimVibeMode,
+} from "../../lib/runnerSettings";
 
 /**
  * Minigames → Doodle jump: shell around the DoodleTrack canvas.
@@ -93,6 +102,7 @@ function isImageMeta(m: FavoriteMetadata): boolean {
 export function DoodleGame({ onReward, onExit }: Props) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [diffId, setDiffId] = useState<DoodleDifficultyId>("climb");
+  const [feel, setFeel] = useState(loadRunnerSettings);
   const [runSeq, setRunSeq] = useState(0);
   const [outcome, setOutcome] = useState<DoodleOutcome | null>(null);
   const [result, setResult] = useState<DoodleRewardResult | null>(null);
@@ -107,6 +117,7 @@ export function DoodleGame({ onReward, onExit }: Props) {
   const [best, setBest] = useState(() => loadDoodleBest());
 
   /** Preloaded favorite images for task pics + milestone trophies. */
+  const claimedRef = useRef(false);
   const trophyPoolRef = useRef<TrophyImg[]>([]);
   /** Bumped on every preload start so a stale in-flight load self-cancels. */
   const trophyGenRef = useRef(0);
@@ -124,11 +135,8 @@ export function DoodleGame({ onReward, onExit }: Props) {
   // Task platforms use the shared task library; puzzle-only kinds make no
   // sense mid-jump.
   const tasks = useMemo(
-    () =>
-      loadPuzzleTasks().filter(
-        (t) => t.kind !== "per_touch" && t.kind !== "ghost_hint",
-      ),
-    [],
+    () => filterArcadeTasks(loadPuzzleTasks(), feel),
+    [feel],
   );
 
   const taskGateRef = useRef(taskGate);
@@ -215,6 +223,7 @@ export function DoodleGame({ onReward, onExit }: Props) {
 
   /** Device punishment pulse (if one is connected): level 0..5 for `sec`. */
   const punishPulse = useCallback((level: number, sec: number) => {
+    if (!feel.lovenseVibe) return;
     if (level <= 0 || sec <= 0) return;
     if (punishTimerRef.current != null) window.clearTimeout(punishTimerRef.current);
     void setDeviceVibeLevel(level);
@@ -222,7 +231,7 @@ export function DoodleGame({ onReward, onExit }: Props) {
       punishTimerRef.current = null;
       void stopDevice();
     }, sec * 1000);
-  }, []);
+  }, [feel.lovenseVibe]);
 
   const finishTaskGate = useCallback(
     (success: boolean) => {
@@ -283,6 +292,8 @@ export function DoodleGame({ onReward, onExit }: Props) {
       setResult(res);
       setFallSec(fsec);
       setBest(saveDoodleBestIfBetter(diffId, { height: o.heightM, total: res.total }));
+      recordMinigameClear("doodle");
+      claimedRef.current = false;
       setPhase("result");
     },
     [difficulty, diffId, punishPulse],
@@ -318,7 +329,10 @@ export function DoodleGame({ onReward, onExit }: Props) {
           <header className="doodle-intro__hero">
             <div className="doodle-intro__hero-icon" aria-hidden>🦘</div>
             <div>
-              <h2>Прыжки уголька</h2>
+              <div className="doodle-intro__title-row">
+                <MinigameMistressFace size="sm" />
+                <h2>Прыжки уголька</h2>
+              </div>
               <p className="muted doodle-intro__lead">
                 Уголёк скачет сам — ты выбираешь, куда лететь. Поднимайся по
                 платформам, копи жар и обналичивай его на золотых очагах. Упал
@@ -339,11 +353,13 @@ export function DoodleGame({ onReward, onExit }: Props) {
             </div>
             <div className="doodle-rule">
               <div className="doodle-rule__chips">
-                <span className="doodle-chip doodle-chip--spring">×3</span>
+                <span className="doodle-chip doodle-chip--spring">×{DOODLE_SPRING_MULT}</span>
               </div>
               <p>
-                Пружина подбрасывает втрое выше — а каждые 100 метров приносят
-                трофей из твоего избранного.
+                Пружина подбрасывает почти вдвое выше
+                {trophyCount === 0
+                  ? " — лайкай картинки на сессиях, и за каждые 100 метров выплывет трофей."
+                  : " — а каждые 100 метров приносят трофей из избранного."}
               </p>
             </div>
             <div className="doodle-rule">
@@ -363,7 +379,7 @@ export function DoodleGame({ onReward, onExit }: Props) {
                 <span className="doodle-chip doodle-chip--bad">1✕</span>
               </div>
               <p>
-                Золотые платформы ускользают из стороны в сторону, а хрупкие
+                Медные платформы ускользают из стороны в сторону, а хрупкие
                 крошатся после одного прыжка — возвращаться нельзя.
               </p>
             </div>
@@ -393,7 +409,9 @@ export function DoodleGame({ onReward, onExit }: Props) {
               </div>
               <p>
                 Огненная платформа сначала показывает брифинг — таймер стартует
-                по кнопке. Успех — <strong>Угольки и рывок вверх</strong>, провал —{" "}
+                по кнопке. Тело и стимул начинаются на огне: на Разминке он редкий
+                и поздний, на Подъёме — раньше. Успех —{" "}
+                <strong>Угольки и рывок вверх</strong>, провал —{" "}
                 <strong>штраф, туман на {difficulty.fogSec} с и удар стимула</strong>.
               </p>
             </div>
@@ -426,6 +444,14 @@ export function DoodleGame({ onReward, onExit }: Props) {
               </button>
             ))}
           </div>
+
+          <MinigameStimToggles
+            settings={feel}
+            onChange={(next) => {
+              setFeel(next);
+              saveRunnerSettings(next);
+            }}
+          />
 
           <div className="doodle-intro__footer">
             <button type="button" className="puzzle-config__start" onClick={startRun}>
@@ -472,7 +498,9 @@ export function DoodleGame({ onReward, onExit }: Props) {
           <p className="doodle-result__cause">
             {DEATH_TEXT[outcome.deathCause]}
             {fallSec > 0
-              ? ` Расплата за потерянный жар: стимул ${fallSec} с.`
+              ? feel.lovenseVibe
+                ? ` Расплата за потерянный жар: стимул ${fallSec} с.`
+                : ` Расплата за потерянный жар: стимул руками ${fallSec} с.`
               : ""}
           </p>
 
@@ -531,28 +559,43 @@ export function DoodleGame({ onReward, onExit }: Props) {
               type="button"
               className="puzzle-config__start"
               onClick={() => {
-                onReward(result.total);
+                if (!claimedRef.current) {
+                  claimedRef.current = true;
+                  onReward(result.total);
+                }
                 onExit();
               }}
             >
               <CindersGlyph className="puzzle-result__btn-glyph" />
               Забрать {result.total}
             </button>
-            <button type="button" className="puzzle-btn" onClick={startRun}>
+            <button
+              type="button"
+              className="puzzle-btn"
+              onClick={() => {
+                if (!claimedRef.current) {
+                  claimedRef.current = true;
+                  onReward(result.total);
+                }
+                startRun();
+              }}
+            >
               Новый подъём
             </button>
             <button
               type="button"
               className="puzzle-btn"
-              onClick={() => setPhase("intro")}
-              title="Вернуться к выбору сложности (незабранная награда сгорит)"
+              onClick={() => {
+                if (!claimedRef.current) {
+                  claimedRef.current = true;
+                  onReward(result.total);
+                }
+                setPhase("intro");
+              }}
             >
               ← В меню
             </button>
           </div>
-          <p className="muted doodle-result__note">
-            Незабранная награда сгорает при новом подъёме или выходе в меню.
-          </p>
         </div>
       </div>
     );
@@ -674,6 +717,7 @@ export function DoodleGame({ onReward, onExit }: Props) {
               mode="task"
               task={taskGate.task}
               allowCancel={getActiveSaveSlot() === "sandbox"}
+              vibeMode={stimVibeMode(feel)}
               onComplete={finishTaskGate}
             />
           )}

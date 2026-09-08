@@ -88,6 +88,7 @@ function requestBuffer(url, { method = "GET", body, headers, timeoutMs = 30000 }
             status: res.statusCode ?? 200,
             buf,
             contentType: res.headers["content-type"] || "",
+            headers: res.headers,
           });
         });
       },
@@ -170,6 +171,50 @@ export function qwenHealthDetail(parsed) {
   return "";
 }
 
+/** Read PCM WAV duration without decoding the full file. */
+export function wavDurationSeconds(buf) {
+  if (!Buffer.isBuffer(buf) || buf.length < 44) return 0;
+  if (buf.subarray(0, 4).toString("ascii") !== "RIFF") return 0;
+  let offset = 12;
+  let byteRate = 0;
+  let dataBytes = 0;
+  while (offset + 8 <= buf.length) {
+    const id = buf.subarray(offset, offset + 4).toString("ascii");
+    const size = buf.readUInt32LE(offset + 4);
+    if (id === "fmt " && size >= 16 && offset + 20 <= buf.length) {
+      byteRate = buf.readUInt32LE(offset + 16);
+    } else if (id === "data") {
+      dataBytes = Math.min(size, Math.max(0, buf.length - offset - 8));
+      break;
+    }
+    offset += 8 + size + (size % 2);
+  }
+  return byteRate > 0 ? dataBytes / byteRate : 0;
+}
+
+/** Normalize timing headers from the bundled server, with external-server fallbacks. */
+export function qwenSynthesisMetrics(headers, wallMs, buf) {
+  const numberHeader = (name) => {
+    const raw = headers?.[name];
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+  };
+  const generationMs = numberHeader("x-joi-generation-ms") || Math.max(0, wallMs);
+  const audioSeconds =
+    numberHeader("x-joi-audio-seconds") || wavDurationSeconds(buf);
+  const realtimeX =
+    numberHeader("x-joi-realtime-x") ||
+    (generationMs > 0 ? audioSeconds / (generationMs / 1000) : 0);
+  return {
+    generationMs: Math.round(generationMs),
+    audioSeconds,
+    realtimeX,
+    backend: String(headers?.["x-joi-backend"] || ""),
+    device: String(headers?.["x-joi-device"] || ""),
+  };
+}
+
 /**
  * Soft status probe: hit /health, then /models.
  * @param {string} baseUrl
@@ -185,6 +230,7 @@ export async function getQwenStatus(baseUrl = DEFAULT_BASE) {
       let gpu = "";
       let torch = "";
       let backend = "";
+      let warmed = false;
       try {
         const parsed = JSON.parse(buf.toString("utf8"));
         if (parsed && typeof parsed === "object") {
@@ -192,6 +238,7 @@ export async function getQwenStatus(baseUrl = DEFAULT_BASE) {
           gpu = String(parsed.gpu || "");
           torch = String(parsed.torch || "");
           backend = String(parsed.backend || parsed.engine || "");
+          warmed = parsed.warmed === true;
         }
       } catch {
         /* ignore */
@@ -208,6 +255,7 @@ export async function getQwenStatus(baseUrl = DEFAULT_BASE) {
         gpu,
         torch,
         backend,
+        warmed,
         detail,
       };
     }
@@ -295,12 +343,14 @@ export async function synthesizeQwenTts(opts) {
     extra_body: extraBody,
   });
 
-  const { buf, contentType } = await requestBuffer(`${base}/audio/speech`, {
+  const startedAt = Date.now();
+  const { buf, contentType, headers: responseHeaders } = await requestBuffer(`${base}/audio/speech`, {
     method: "POST",
     headers,
     body,
     timeoutMs: QWEN_SPEAK_TIMEOUT_MS,
   });
+  const metrics = qwenSynthesisMetrics(responseHeaders, Date.now() - startedAt, buf);
 
   // Error JSON from API
   const head = buf.subarray(0, Math.min(64, buf.length)).toString("utf8");
@@ -345,5 +395,6 @@ export async function synthesizeQwenTts(opts) {
     voice: `qwen:${voice}`,
     bytes: buf.length,
     engine: "qwen",
+    ...metrics,
   };
 }

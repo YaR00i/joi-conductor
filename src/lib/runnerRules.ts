@@ -55,7 +55,7 @@ export function drawRunnerRule(
     },
     {
       kind: "crowdN",
-      labelRu: "Доведи толпу до N",
+      labelRu: "Доведи толпу до цели",
       hintRu: "Финишировать с толпой не меньше цели. Цель — по силам этой трассы.",
       bonus: diff.base,
     },
@@ -78,7 +78,12 @@ export function drawRunnerRule(
   if (rule.kind === "crowdN") {
     // Typical play lands near typCrowd — 70% of it demands good gates but
     // stays comfortably reachable (see the balance simulation).
-    return { ...rule, targetN: Math.max(8, Math.round(track.typCrowd * 0.7)) };
+    const targetN = Math.max(8, Math.round(track.typCrowd * 0.7));
+    return {
+      ...rule,
+      targetN,
+      labelRu: `Доведи толпу до ${targetN}`,
+    };
   }
   return rule;
 }

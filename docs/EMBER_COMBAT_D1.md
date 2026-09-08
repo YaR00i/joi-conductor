@@ -133,7 +133,17 @@ D1 завершён, когда:
 
 `EmberCombatPrototype` — чистый D1 resolver: initial snapshot, timeline, valid targets, preview, commit, deterministic enemy command и outcome. `ember_combat_lab.gd` только отображает эти данные и отправляет команды. Никакого save, autoload, production Resource, loot или quest event лаборатория не создаёт.
 
-Реализованы три переключаемых представления одних боевых правил. E1: четыре позиционные области. E2: 7×5, BFS-reachability, blockers/occupancy, staged move + action, range, связанные цветные панели и фиксированный фокус. E3 добавляет semantic elevation и атомарный `cellChanges`: холод замораживает связанную мокрую группу, огонь возвращает Wet, а preview визуально показывает будущую поверхность до `F`. Обычное и принудительное движение используют один предел высоты. D2.0 уже проецирует E2/E3 штатным GridMap, сохраняя 2D diagnostics. С v1.72 основная Combat Lab — обычная Node3D-сцена со scene-owned GridMap/Camera3D и CanvasLayer HUD, а не мир внутри UI viewport. Production battle Resource/manager/save по-прежнему не вводились; следующий срез — D2.1 authoring.
+С v1.90 фиксированный состав больше не зашит в resolver: `EmberCombatUnitResource` и каталог `content/combat/units/*.tres` являются одним editor/runtime owner имени, стороны, базовых характеристик, доступных действий, основного AI action, combat tags и визуального цвета/portrait. Resolver по-прежнему владеет формулами и реакциями, а mutable HP/status/cell живут только в snapshot. Encounter хранит упорядоченные ID и редактирует состав визуальными строками с Undo/Redo.
+
+С v1.91 action definitions также являются Godot Resources в `content/combat/actions/*.tres`. Автор редактирует числа, цель, стихию, цвет/иконку и выбирает подписанный effect preset визуально; у бойца действия назначаются карточками из библиотеки с Undo/Redo. Effect preset выбирает ветку прежнего pure resolver и не является вторым gameplay script. Новый тип реакции нельзя получить произвольной строкой в Resource: он добавляется только вертикальным срезом resolver + preview + commit + AI + tests.
+
+С v1.92 враг ссылается на переиспользуемый AI Profile вместо одного жёсткого действия. Профиль ранжирует легальные preview-кандидаты по цели, порядку действий, готовой реакции и low-HP защите; ни один профиль не применяет результат сам. С v1.95 тот же профиль выбирает `держать позицию` или `искать клетку для действия`: варианты клеток строит общий grid BFS, move + action остаются одним preview/commit, а недостижимая пока атака превращается в объяснённый ход сближения. Отдельного enemy pathfinding или сохранённого маршрута нет.
+
+С v1.93 тип врага ссылается на общую визуальную Loot Table: каждая строка выбирает канонический item, независимый шанс и min/max. Финальный snapshot рассчитывает drops детерминированно, чтобы result modal и подтверждённый результат совпадали. Таблица и combat result не меняют inventory: после возврата drops присоединяются к прежней outcome action queue и выдаются тем же `grant_item`, что сюжетные награды. Encounter продолжает владеть только фиксированной наградой/продолжением, а не копией лута каждого врага.
+
+С v1.94 обзор Loot Table вынесен в полноразмерный режим `Лут врагов` существующего Ember main-screen: плиточная библиотека и поиск слева, выбранная таблица справа. Inspector врага остаётся местом назначения ссылки, но не единственным способом найти таблицу. Оба пути открывают один Resource; быстрый вход доступен через меню инструментов Ember.
+
+Реализованы три переключаемых представления одних боевых правил. E1: четыре позиционные области. E2: 7×5, BFS-reachability, blockers/occupancy, staged move + action, range, связанные цветные панели и фиксированный фокус. E3 добавляет semantic elevation и атомарный `cellChanges`: холод замораживает связанную мокрую группу, огонь возвращает Wet, а preview визуально показывает будущую поверхность до выбора цели. Обычное и принудительное движение используют один предел высоты. D2.0 уже проецирует E2/E3 штатным GridMap, сохраняя 2D diagnostics. С v1.72 основная Combat Lab — обычная Node3D-сцена со scene-owned GridMap/Camera3D и CanvasLayer HUD, а не мир внутри UI viewport. Production battle Resource/manager/save по-прежнему не вводились; следующий срез — D2.1 authoring.
 
 ## 11. Переход к 3D-полю
 
@@ -190,15 +200,23 @@ D2.0 реализован в Godot v1.71: 3D является default для E2/
 1. ~~safe resize/remap поля с anchor, preview потерь и одной Undo-операцией~~ — v1.81;
 2. ~~party/enemy deployment anchors прямо в 3D и validation конфликтов~~ — v1.81;
 3. ~~`EmberEncounterResource` с arena/battlefield/составом сторон и визуальной библиотекой~~ — v1.82;
-4. production battle session: первый `victory/defeat` return — v1.82, ещё нужны retry/escape и идемпотентная result transaction;
-5. только затем перенос hardcoded actors/actions, наград, AI и combat quest counters в проверяемые data contracts.
+4. ~~production battle session: `victory/defeat`, fullscreen radial HUD, result modal, retry/fade и идемпотентный return~~ — v1.82–v1.83;
+5. ~~result/reward bridge и combat quest counters~~ — v1.88; далее отдельно переносить hardcoded actors/actions, loot tables и AI в проверяемые data contracts.
 
 Технический и авторский план общего масштаба, Tile Kit и world→battle→world flow находится в [`EMBER_VOXEL_TILE_AND_BATTLE_FLOW.md`](EMBER_VOXEL_TILE_AND_BATTLE_FLOW.md).
 
 ## 13. Связь с exploration
 
-Бой принят как отдельная arena-сцена, но запускается прежней цепочкой взаимодействия. С v1.82 terminal-шаг **Начать бой** выбирает encounter-карточку по мини-карте. Runtime сохраняет только encounter ID, return scene path и outcome action ID, загружает прежний Combat Lab и после результата возвращает игрока на сохранённое место. Награда, флаг или реплика после исхода задаются отдельной victory/defeat chain ресурса встречи.
+Бой принят как отдельная arena-сцена, но запускается прежней цепочкой взаимодействия. С v1.82 terminal-шаг **Начать бой** выбирает encounter-карточку по мини-карте. Runtime сохраняет только encounter ID, return scene path и outcome action ID, загружает прежний Combat Lab и после результата возвращает игрока на сохранённое место. Награда, флаг или реплика после исхода задаются отдельной victory/defeat chain ресурса встречи. С v1.83 авторская сцена запрашивает fullscreen, действия выбираются в круговом HUD у активного героя, а исход подтверждается центральным окном с retry/return и fade.
 
-Это не расширение `change_map`: у боя есть типизированный результат и отдельное продолжение, хотя исходная action queue намеренно завершается до уничтожения сцены. Первый функциональный проход — `Диалог → Битва E2 → победа → возврат → victory chain`. Fade/retry и защита результата от повторного применения остаются следующим acceptance.
+Это не расширение `change_map`: у боя есть типизированный результат и отдельное продолжение, хотя исходная action queue намеренно завершается до уничтожения сцены. Функциональный проход — `Диалог → Битва E2 → победа → Continue → fade → возврат → victory chain`. Result guard ставится до изменения progress, поэтому двойное подтверждение не применяет награду повторно; retry не трогает мир.
+
+С v1.86 наведение на допустимую 3D-цель показывает pure preview, а клик является подтверждением действия: отдельной клавиши `F` нет, self-команда `G` выполняется сразу, staged movement остаётся частью одного атомарного commit. `Esc` сначала отменяет targeting, затем открывает pause menu. Встроенная developer console изменяет только текущий combat snapshot; `victory/defeat` используют обычный result modal, поэтому debug-команда не становится вторым владельцем награды или world progress.
 
 `EmberEncounterResource` не копирует cells или формулы: он ссылается на Battlefield/arena, выбирает ordered IDs текущего prototype roster и проверяет ёмкость canonical deployment. Полноценные Character/Enemy/Job Resources вводятся после result/reward gate.
+
+С v1.88 `EmberCombatResult` проецирует финальный snapshot в один отчёт enemy/tag/count и preview существующей outcome chain. `EmberCombatTransition` атомарно увеличивает numeric save counters и только затем возвращает сцену; предметы по-прежнему выдаёт outcome chain, поэтому preview не становится вторым reward owner. Quest objective выбирает `counterEventId`, но хранит прогресс в собственном `flagId`: событие попадает только в доступную цель, задаётся требуемое количество и журнал показывает `current/required`, не нарушая последовательность.
+
+С v1.96 исправлен demo-giver `sbx_quest_sign`: ссылка на Quest Resource и исполняемая action chain хранятся отдельно и одинаково в pack map/Godot scene. Это не меняет боевые counters, но закрепляет общий world-event контракт для будущих боевых заданий: завершение одной цели не должно выглядеть как завершение всего квеста на исходном объекте.
+
+С v1.97 первая граница общего Tile Kit закрыта без изменения боевых правил: model metadata различает legacy 16 и new 32 art voxels на блок, а normalized Godot mesh масштабируется world/battle adapter. `sizeBlocks` остаётся footprint, поэтому более детальный 32-grid тайл не становится вдвое больше на арене. Следующий срез — замена пяти primitive Battlefield MeshLibrary items первым voxel Battle Kit под прежними semantic ID.

@@ -13,7 +13,9 @@ import {
 } from "../lib/mistress";
 import { diaryEntryHasReplayablePlan } from "../lib/diaryPlanReplay";
 import {
+  clearDiaryEntries,
   clearDiaryEntrySouvenir,
+  deleteDiaryEntry,
   diaryCumplayNameRu,
   diaryPlanFactRows,
   entryCumFate,
@@ -359,6 +361,31 @@ export function DiaryPage({ revision = 0, onRepeatPlan, onNavigate }: Props) {
     setEntries(clearDiaryEntrySouvenir(entryId));
   }, []);
 
+  const removeEntry = useCallback((entryId: string) => {
+    if (!window.confirm("Удалить эту запись из дневника сессий?")) return;
+    void primeUiAudio();
+    playUiConfirm();
+    const next = deleteDiaryEntry(entryId);
+    setEntries(next);
+    const nextSpreads = buildSpreads(next);
+    setSpread(lastWrittenSpreadIndex(nextSpreads));
+  }, []);
+
+  const wipeBook = useCallback(() => {
+    if (entries.length === 0) return;
+    if (
+      !window.confirm(
+        "Очистить весь дневник сессий? Необратимо. Статистика не откатится.",
+      )
+    ) {
+      return;
+    }
+    void primeUiAudio();
+    playUiConfirm();
+    setEntries(clearDiaryEntries());
+    setSpread(0);
+  }, [entries.length]);
+
   const repeatPlan = useCallback(
     (entry: DiaryEntry) => {
       if (!onRepeatPlan || !diaryEntryHasReplayablePlan(entry)) return;
@@ -460,7 +487,17 @@ export function DiaryPage({ revision = 0, onRepeatPlan, onNavigate }: Props) {
           </div>
         </header>
       )}
-      <p className="diary-page__sub">{sub}</p>
+      <div className="diary-page__bar">
+        <p className="diary-page__sub">{sub}</p>
+        <button
+          type="button"
+          className="diary-page__wipe"
+          disabled={entries.length === 0}
+          onClick={wipeBook}
+        >
+          Очистить дневник
+        </button>
+      </div>
 
       <div className="diary-stage" aria-label="Дневник сессий">
         <div
@@ -508,6 +545,7 @@ export function DiaryPage({ revision = 0, onRepeatPlan, onNavigate }: Props) {
                   pageNo={displayLeftNo}
                   side="left"
                   onClearSouvenir={clearSouvenir}
+                  onDeleteEntry={removeEntry}
                   onRepeatPlan={onRepeatPlan ? repeatPlan : undefined}
                 />
               ) : (
@@ -543,6 +581,7 @@ export function DiaryPage({ revision = 0, onRepeatPlan, onNavigate }: Props) {
                   pageNo={displayRightNo}
                   side="right"
                   onClearSouvenir={clearSouvenir}
+                  onDeleteEntry={removeEntry}
                   onRepeatPlan={onRepeatPlan ? repeatPlan : undefined}
                 />
               ) : (
@@ -725,12 +764,14 @@ function DiaryEntryPage({
   pageNo,
   side,
   onClearSouvenir,
+  onDeleteEntry,
   onRepeatPlan,
 }: {
   entry: DiaryEntry;
   pageNo: number;
   side: "left" | "right";
   onClearSouvenir?: (entryId: string) => void;
+  onDeleteEntry?: (entryId: string) => void;
   onRepeatPlan?: (entry: DiaryEntry) => void;
 }) {
   const when = formatDiaryWhen(entry.createdAt);
@@ -858,6 +899,15 @@ function DiaryEntryPage({
               onClick={() => onRepeatPlan?.(entry)}
             >
               Повторить план
+            </button>
+          ) : null}
+          {onDeleteEntry ? (
+            <button
+              type="button"
+              className="diary-entry__wipe"
+              onClick={() => onDeleteEntry(entry.id)}
+            >
+              Удалить запись
             </button>
           ) : null}
         </div>

@@ -136,6 +136,13 @@ export function getActiveMistress(): MistressPack {
   return active;
 }
 
+/** Short name for HUD / task cards (Sparkle pack is "Искорка / Искра"). */
+export function activeMistressNameRu(): string {
+  const raw = active.displayNameRu.trim();
+  const short = raw.split(" / ")[0]?.trim();
+  return short || "Госпожа";
+}
+
 export function setActiveMistress(
   id: MistressId,
   unlocks?: MistressUnlockSnapshot | null,

@@ -11,6 +11,44 @@ const DEFAULT_UA = "joi-conductor/install";
 const ipv4HttpsAgent = new https.Agent({ family: 4, keepAlive: false });
 const ipv4HttpAgent = new http.Agent({ family: 4, keepAlive: false });
 
+/**
+ * Node's dual-stack connect throws AggregateError with an empty message.
+ * Electron then shows only "AggregateError" in the renderer.
+ * @param {unknown} err
+ */
+export function formatNetError(err) {
+  if (err == null) return "сетевая ошибка";
+  const anyErr = /** @type {{ name?: string, code?: string, message?: string, errors?: unknown[] }} */ (
+    err
+  );
+  const nested = Array.isArray(anyErr.errors) ? anyErr.errors : [];
+  const first = /** @type {{ code?: string, message?: string }} */ (
+    nested[0] && typeof nested[0] === "object" ? nested[0] : anyErr
+  );
+  const code = String(first.code || anyErr.code || "");
+  const raw = String(first.message || anyErr.message || "").trim();
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN") {
+    return "Нет интернета или DNS не резолвит хост.";
+  }
+  if (code === "ETIMEDOUT") {
+    return "Сеть не отвечает (таймаут).";
+  }
+  if (
+    code === "ECONNREFUSED" ||
+    code === "ECONNRESET" ||
+    code === "EHOSTUNREACH" ||
+    code === "ENETUNREACH"
+  ) {
+    return `Сеть не пускает (${code}).`;
+  }
+  if (anyErr.name === "AggregateError" || raw === "AggregateError") {
+    return code
+      ? `Сеть не пускает (${code}).`
+      : "Сеть не пускает. На Windows часто виноват IPv6 — качаем по IPv4.";
+  }
+  return raw || String(err);
+}
+
 function resolveRedirect(fromUrl, location) {
   try {
     return new URL(location, fromUrl).toString();
@@ -33,6 +71,7 @@ function resolveRedirect(fromUrl, location) {
  * @param {(pct: number) => void} [onProgress]
  * @param {number} [stallTimeoutMs]
  * @param {{ family?: number, userAgent?: string }} [opts]
+ *   family defaults to 4: Windows dual-stack otherwise fails as AggregateError.
  */
 export function downloadFile(
   url,
@@ -72,7 +111,7 @@ export function downloadFile(
       if (err) {
         file.destroy();
         failCleanup();
-        reject(err);
+        reject(new Error(formatNetError(err)));
       } else {
         resolve();
       }
@@ -97,7 +136,7 @@ export function downloadFile(
       }
       const myHop = ++hop;
       const getter = u.startsWith("https") ? https : http;
-      const family4 = opts.family === 4;
+      const family4 = (opts.family ?? 4) === 4;
       const req = getter.get(
         u,
         {

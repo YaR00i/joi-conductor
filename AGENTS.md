@@ -1,12 +1,12 @@
 # JOI Conductor — правила для AI-агентов
 
-Этот файл обязателен для Codex, Cursor, Grok и любых других агентов, меняющих проект. Для Ember дополнительно читать `docs/EMBER_AI_HANDOFF.md`; продуктовый vision находится в `docs/EMBER_JRPG_DESIGN.md`. Оболочка приложения (сайдбар, хабы Прогресс / Контент / Мини-игры) — `docs/HUB.md`. `docs/EMBER_RESTRUCTURE_PLAN.md` не исполнять: Three-волны на паузе.
+Этот файл обязателен для Codex, Cursor, Grok и любых других агентов, меняющих проект. Активный Ember вынесен в `../ember-godot`: читать там `AGENTS.md`, `docs/EMBER_TECHNICAL_HANDOFF.md` и `docs/EMBER_PRODUCT_PLAN.md`. Документы `docs/EMBER_AI_HANDOFF.md` и `docs/EMBER_JRPG_DESIGN.md` в JOI — исторический архив, не рабочий источник правды. Оболочка приложения (сайдбар, хабы Прогресс / Контент / Мини-игры) — `docs/HUB.md`. `docs/EMBER_RESTRUCTURE_PLAN.md` не исполнять: Three-волны на паузе.
 
 ## Ember: Godot, не Three
 
 С 29 августа 2026 года **Ember через Three.js приостановлен** (JOI play, `EmberThreeWorld`, World Editor viewport, crowd/atlas/свет в `src/game/three`). Не добавлять туда механики, реструктуризацию и второй renderer.
 
-**Фокус** — sibling `../ember-godot` (Godot 4 Forward+) и **постепенная миграция**, которая уже идёт: карты после импорта — `.tscn`, voxel-модели по-прежнему пара `.json` + `.vox` в этом репо. План приёмки — `../ember-godot/MIGRATION_TEST_PLAN.md`. Новые продуктовые системы только в Godot. JOI остаётся владельцем пака и voxel-скульптора; вкладки «Аномалия» / «Ember Editor» — frozen shell, не дорожная карта.
+**Фокус** — sibling `../ember-godot` (Godot 4 Forward+) и **полный постепенный переезд Ember из JOI**. Карты после импорта — `.tscn`; voxel-модели по одной переносятся в `ember-godot/content/voxel_models/*.tres`. Пары `.json + .vox` в этом репо являются только read-only очередью одноразового импорта/архивом сверки и не конечным authoring API. План приёмки — `../ember-godot/MIGRATION_TEST_PLAN.md`, полный exit plan — `../ember-godot/docs/EMBER_JOI_EXIT_PLAN.md`. Новые продуктовые системы и редактирование контента только в Godot; вкладки «Аномалия» / «Ember Editor» — frozen shell, не дорожная карта.
 
 Явная команда починить конкретный Three-баг имеет приоритет над этой паузой; не разворачивать её в новую фичу.
 
@@ -53,7 +53,7 @@ Legacy-монолиты: `styles.css`, `VoxelSculptPanel.tsx`, `MapEditorPanel.t
 - Preview обязан совпадать с commit; тяжёлая операция фиксируется один раз на pointer-up/Enter, не на каждом move/input.
 - Не меняй JSON-схему ради временного UI-состояния. Производные cache/flow/grid не сериализуются без versioning-решения.
 - Не создавать третий renderer, отдельный Creative runtime или вторую реализацию в legacy Phaser.
-- Воксельная библиотека — пара `content/ember/voxels/models/<id>.json` + `<id>.vox`. Сохранение только через `writeVoxelRegistry` с `dirtyIds`. Не дампить каталог в `registry.json`.
+- Каноническая voxel-модель после миграции — `ember-godot/content/voxel_models/<id>.tres` (`EmberVoxelModelResource`). Mesh, collision, thumbnail, prefab и MeshLibrary являются производными. Старые `content/ember/voxels/models/<id>.json + <id>.vox` разрешено только читать однонаправленным importer; запрещены обратная синхронизация и новые модели в JOI.
 
 ## Производительность и lifecycle
 
@@ -69,7 +69,7 @@ Legacy-монолиты: `styles.css`, `VoxelSculptPanel.tsx`, `MapEditorPanel.t
 3. Делать один ограниченный вертикальный срез. Не совмещать рефакторинг с новой механикой без необходимости.
 4. Сначала targeted tests, затем `npm test`, `npx tsc --noEmit`, `npx vite build` / `npm run build`. Ошибка `tsc` — регрессия.
 5. Визуальные изменения Ember — в Godot editor/play (`../ember-godot`). JOI-оболочку (хабы, контент) проверять в Electron. Для lifecycle JOI — несколько mount/unmount или Reload.
-6. Обновлять `docs/EMBER_AI_HANDOFF.md` при изменении технического контракта Ember (в т.ч. Godot-миграции, которую зеркалят в `../ember-godot`). Оболочку JOI фиксировать в `docs/HUB.md`. Продуктовые решения — `docs/EMBER_JRPG_DESIGN.md`. `EMBER_RESTRUCTURE_PLAN.md` не вести как активный backlog.
+6. Технический контракт Ember обновлять в `../ember-godot/docs/EMBER_TECHNICAL_HANDOFF.md`, продуктовые решения — в `../ember-godot/docs/EMBER_PRODUCT_PLAN.md`. В JOI вести только изменения его оболочки (`docs/HUB.md`) и legacy importer/archive boundary. `EMBER_RESTRUCTURE_PLAN.md` не вести как активный backlog.
 
 ### Коммуникация и authoring
 

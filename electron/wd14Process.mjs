@@ -190,6 +190,7 @@ export async function getWd14ProcessStatus(opts = {}) {
     online: ping.online,
     starting,
     managedByApp,
+    modelsReady: wd14ModelsReady(modelDir),
     scriptPath,
     pythonPath,
     modelDir,

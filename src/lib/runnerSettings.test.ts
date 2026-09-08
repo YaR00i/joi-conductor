@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_RUNNER_SETTINGS, filterTasksForRunner } from "./runnerSettings";
+import {
+  DEFAULT_RUNNER_SETTINGS,
+  filterArcadeTasks,
+  filterTasksForRunner,
+} from "./runnerSettings";
 import type { PuzzleTask } from "./puzzleTasks";
 
 const edge: PuzzleTask = {
@@ -40,5 +44,13 @@ describe("filterTasksForRunner", () => {
       wager: 0,
     });
     expect(filtered.map((t) => t.id)).toEqual(["edge"]);
+  });
+});
+
+describe("filterArcadeTasks", () => {
+  it("drops per-touch and ghost kinds even when vibe is on", () => {
+    const ghost: PuzzleTask = { ...edge, id: "ghost", kind: "ghost_hint" };
+    const filtered = filterArcadeTasks([...all, ghost], DEFAULT_RUNNER_SETTINGS);
+    expect(filtered.map((t) => t.id).sort()).toEqual(["edge", "edgeV", "vibe"]);
   });
 });

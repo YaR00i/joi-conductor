@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { downloadFile } from "./installDownload.mjs";
+import { downloadFile, formatNetError } from "./installDownload.mjs";
 
 let server: Server;
 let baseUrl = "";
@@ -98,5 +98,13 @@ describe("downloadFile", () => {
     await expect(
       downloadFile(`${baseUrl}/stall`, dest, undefined, 400),
     ).rejects.toThrow(/зависла/);
+  });
+});
+
+describe("formatNetError", () => {
+  it("unwraps empty AggregateError from dual-stack connect", () => {
+    const inner = Object.assign(new Error(""), { code: "ENETUNREACH" });
+    const agg = new AggregateError([inner], "");
+    expect(formatNetError(agg)).toContain("ENETUNREACH");
   });
 });

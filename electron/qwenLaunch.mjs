@@ -65,11 +65,13 @@ export function qwenDeviceMatches(running, wanted) {
  * Cap codec tokens from text length (keep in sync with scripts/qwen_tts_server.py).
  * 12Hz ≈ 12.5 tokens/s of audio; speech ≈ 15 chars/s → ~1 token/char. 2× + EOS pad.
  * A 5× cap let short lines generate ~15s of audio (~14s wait) if EOS did not fire.
+ * The old fixed ceiling of 192 cut long chat replies at ~15 seconds. Keep the
+ * length-based allowance, with a bounded 2048-token ceiling for runaway output.
  * @param {string} text
  */
 export function qwenMaxNewTokens(text) {
-  const n = String(text ?? "").trim().length;
-  return Math.min(192, Math.max(40, n * 2 + 24));
+  const n = Array.from(String(text ?? "").trim()).length;
+  return Math.min(2048, Math.max(40, n * 2 + 24));
 }
 
 /**
