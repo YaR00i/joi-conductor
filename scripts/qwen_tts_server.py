@@ -3,7 +3,7 @@ OpenAI-compatible Qwen3-TTS server (no vLLM).
 
 GET  /v1/models
 POST /v1/audio/speech  { model, input, voice, response_format, speed,
-                         extra_body: { language, instruct, ref_audio, ref_text } }
+                         extra_body: { language, instruct, ref_audio, ref_text, seed } }
 
 Speed knobs match Soul of Waifu Qwen3TTS_SOW_System (voice call):
   SDPA attention, CUDA:0 (no CPU offload), clone-prompt cache, short ICL ref,
@@ -20,6 +20,7 @@ Spawned by electron/qwenProcess.mjs. Stdlib HTTP + qwen-tts + soundfile.
 from __future__ import annotations
 
 import argparse
+import inspect
 import io
 import json
 import os
@@ -369,6 +370,60 @@ def is_base_model(model_id: str) -> bool:
     return "base" in Path(name).name or name.endswith("/base") or "-base" in name
 
 
+def _clone_accepts_instruct() -> bool:
+    fn = getattr(MODEL, "generate_voice_clone", None)
+    if not callable(fn):
+        return False
+    try:
+        return "instruct" in inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        return False
+
+
+def _parse_seed(extra: dict[str, Any]) -> int | None:
+    raw = extra.get("seed")
+    if raw is None or raw == "":
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _fn_accepts(fn: Any, name: str) -> bool:
+    if not callable(fn):
+        return False
+    try:
+        return name in inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        return False
+
+
+def _put_seed_kw(kw: dict[str, Any], extra: dict[str, Any], fn: Any) -> None:
+    seed = _parse_seed(extra)
+    if seed is None:
+        return
+    if _fn_accepts(fn, "seed"):
+        kw["seed"] = seed
+
+
+def _apply_torch_seed(seed: int) -> None:
+    import random
+
+    random.seed(seed)
+    try:
+        import numpy as np
+
+        np.random.seed(seed)
+    except Exception:
+        pass
+    import torch
+
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
 def wav_bytes(audio, sr: int) -> bytes:
     import soundfile as sf
     import numpy as np
@@ -415,6 +470,11 @@ def _gen_kw(extra: dict[str, Any], text: str) -> dict[str, Any]:
     if extra.get("max_new_tokens") is not None:
         try:
             kw["max_new_tokens"] = max(16, min(QWEN_MAX_NEW_TOKENS, int(extra["max_new_tokens"])))
+        except (TypeError, ValueError):
+            pass
+    if extra.get("repetition_penalty") is not None:
+        try:
+            kw["repetition_penalty"] = float(extra["repetition_penalty"])
         except (TypeError, ValueError):
             pass
     return kw
@@ -491,12 +551,19 @@ def synthesize(body: dict[str, Any]) -> tuple[bytes, dict[str, str]]:
     ref_audio = extra.get("ref_audio") or body.get("ref_audio")
     ref_text = extra.get("ref_text") or body.get("ref_text") or ""
     gen_kw = _gen_kw(extra, text)
+    clone_kw = dict(gen_kw)
+    if instruct and _clone_accepts_instruct():
+        clone_kw["instruct"] = str(instruct)
+    seed = _parse_seed(extra)
+    _put_seed_kw(clone_kw, extra, getattr(MODEL, "generate_voice_clone", None))
 
     model_id = str(body.get("model") or MODEL_ID)
     use_clone = is_base_model(model_id) or is_base_model(MODEL_ID)
     t0 = time.perf_counter()
     prompt_s = 0.0
     with SYNTH_LOCK, torch.inference_mode():
+        if seed is not None:
+            _apply_torch_seed(seed)
         if use_clone:
             if not ref_audio:
                 raise ValueError("Base-клон: нужен extra_body.ref_audio (wav госпожи)")
@@ -511,7 +578,7 @@ def synthesize(body: dict[str, Any]) -> tuple[bytes, dict[str, str]]:
                     xvec_only=FASTER_XVEC_ONLY,
                     append_silence=FASTER_APPEND_SILENCE,
                     non_streaming_mode=False,
-                    **gen_kw,
+                    **clone_kw,
                 )
             else:
                 t_prompt = time.perf_counter()
@@ -523,7 +590,7 @@ def synthesize(body: dict[str, Any]) -> tuple[bytes, dict[str, str]]:
                         language=language,
                         voice_clone_prompt=prompt,
                         non_streaming_mode=True,
-                        **gen_kw,
+                        **clone_kw,
                     )
                 else:
                     wav, ref_sr = _load_clone_audio(str(ref_audio))
@@ -533,7 +600,7 @@ def synthesize(body: dict[str, Any]) -> tuple[bytes, dict[str, str]]:
                         ref_audio=(wav, ref_sr),
                         ref_text=str(ref_text),
                         non_streaming_mode=True,
-                        **gen_kw,
+                        **clone_kw,
                     )
         else:
             kwargs: dict[str, Any] = {
@@ -546,6 +613,7 @@ def synthesize(body: dict[str, Any]) -> tuple[bytes, dict[str, str]]:
                 kwargs["non_streaming_mode"] = True
             if instruct:
                 kwargs["instruct"] = str(instruct)
+            _put_seed_kw(kwargs, extra, getattr(MODEL, "generate_custom_voice", None))
             wavs, sr = MODEL.generate_custom_voice(**kwargs)
     wall = time.perf_counter() - t0
     audio = wavs[0]

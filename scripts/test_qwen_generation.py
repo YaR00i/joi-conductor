@@ -27,8 +27,29 @@ class QwenGenerationBudgetTest(unittest.TestCase):
                     self.assertEqual(server._gen_kw({"max_new_tokens": 824}, "x" * 400)["max_new_tokens"], 824)
                     self.assertEqual(server._gen_kw({"max_new_tokens": 99999}, "Hi")["max_new_tokens"], 2048)
                     self.assertEqual(server._gen_kw({"max_new_tokens": 16}, "Hi")["max_new_tokens"], 16)
+                    self.assertNotIn("repetition_penalty", server._gen_kw({}, "Hi"))
+                    self.assertEqual(server._gen_kw({"repetition_penalty": 1.05}, "Hi")["repetition_penalty"], 1.05)
+                    self.assertNotIn("seed", server._gen_kw({"seed": 42}, "Hi"))
         finally:
             server.DEVICE_MODE = original
+
+    def test_seed_kw_only_if_signature_allows(self):
+        self.assertIsNone(server._parse_seed({}))
+        self.assertEqual(server._parse_seed({"seed": 42}), 42)
+        self.assertEqual(server._parse_seed({"seed": "7"}), 7)
+
+        def with_seed(*, seed=None, temperature=0.7):
+            pass
+
+        def without_seed(*, temperature=0.7):
+            pass
+
+        accepted: dict = {}
+        server._put_seed_kw(accepted, {"seed": 42}, with_seed)
+        self.assertEqual(accepted["seed"], 42)
+        skipped: dict = {}
+        server._put_seed_kw(skipped, {"seed": 42}, without_seed)
+        self.assertNotIn("seed", skipped)
 
     def test_electron_and_python_stay_in_sync(self):
         samples = ["", "Hi", "  Привет!  ", "😀" * 50] + ["x" * n for n in (83, 84, 85, 100, 200, 400, 900, 1012, 2000)]
