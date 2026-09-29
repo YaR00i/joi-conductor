@@ -1,0 +1,245 @@
+/* Long-series contracts — domain skin, not styles.css. */
+
+.contract-series {
+  margin: 0 0 1.1rem;
+  padding: 0.9rem 1rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent, #c4895a) 28%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg1, #1c1410) 88%, #000);
+}
+
+.contract-series__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.contract-series__kicker {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent, #c4895a) 80%, #fff 8%);
+}
+
+.contract-series__title {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-display, "Cormorant Garamond", Georgia, serif);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #f6ebe0;
+}
+
+.contract-series__offers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16.5rem, 1fr));
+  gap: 0.75rem;
+}
+
+.contract-series__filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.contract-series__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.contract-series__chip {
+  appearance: none;
+  border: 1px solid color-mix(in srgb, #c4a090 28%, transparent);
+  background: transparent;
+  color: #d8c4b4;
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.contract-series__chip.is-active {
+  border-color: color-mix(in srgb, var(--accent, #c4895a) 55%, transparent);
+  color: #f6ebe0;
+  background: color-mix(in srgb, var(--accent, #c4895a) 18%, transparent);
+}
+
+.contract-series__offer-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.contract-series__origin,
+.contract-series__theme,
+.contract-series__progression {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  color: #c4a090;
+}
+
+.contract-series__offer {
+  margin: 0;
+  padding: 0.8rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, #c4a090 22%, transparent);
+  background: color-mix(in srgb, var(--bg0, #120e0c) 70%, transparent);
+}
+
+.contract-series__period {
+  display: inline-block;
+  margin-bottom: 0.35rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #c4a090;
+}
+
+.contract-series__offer h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.02rem;
+  color: #f6ebe0;
+}
+
+.contract-series__desc,
+.contract-series__today,
+.contract-series__counts {
+  margin: 0 0 0.45rem;
+  font-size: 0.86rem;
+  line-height: 1.4;
+  color: #d8c4b4;
+}
+
+.contract-series__preview {
+  margin: 0 0 0.7rem;
+  padding-left: 1.1rem;
+  color: #c4a090;
+  font-size: 0.8rem;
+}
+
+.contract-series__bar {
+  height: 6px;
+  margin: 0.35rem 0 0.65rem;
+  border-radius: 99px;
+  background: color-mix(in srgb, #c4a090 18%, transparent);
+  overflow: hidden;
+}
+
+.contract-series__bar > span {
+  display: block;
+  height: 100%;
+  background: color-mix(in srgb, var(--accent, #c4895a) 80%, #fff 10%);
+}
+
+.contract-series__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.contract-series__error {
+  margin: 0 0 0.5rem;
+  color: #c48878;
+  font-size: 0.82rem;
+}
+
+.contracts-card__series-chip {
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent, #c4895a) 40%, transparent);
+  color: color-mix(in srgb, var(--accent, #c4895a) 90%, #fff 8%);
+}
+
+.contract-series-editor__toggle {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0 0 0.85rem;
+}
+
+.contract-series-editor__days {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0.6rem 0 0.85rem;
+  max-height: 32rem;
+  overflow: auto;
+}
+
+.contract-series-editor__day {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, #c4a090 16%, transparent);
+}
+
+.contract-series-editor__day-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.contract-series-editor__day span {
+  font-size: 0.78rem;
+  color: #c4a090;
+}
+
+.contract-series-editor__intensity {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.contract-series-editor__overrides {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.contract-series-editor__overrides label {
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.72rem;
+  color: #c4a090;
+}
+
+.contract-series-editor__preview-body {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #d8c4b4;
+}
+
+.contract-series-editor__generator {
+  margin: 0.7rem 0;
+  padding: 0.7rem 0.75rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, #c4a090 18%, transparent);
+}
+
+.contract-series-editor__generator legend {
+  padding: 0 0.35rem;
+  color: #f6ebe0;
+}
+
+.contract-series-editor__errors,
+.contract-series-editor__warnings {
+  margin: 0 0 0.6rem;
+  font-size: 0.82rem;
+}
+
+.contract-series-editor__errors {
+  color: #c48878;
+}
+
+.contract-series-editor__warnings {
+  color: #c4a090;
+}

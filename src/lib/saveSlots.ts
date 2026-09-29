@@ -46,6 +46,7 @@ export const PROGRESS_STORAGE_KEYS = [
   "joi-contract-journal-v1",
   "joi-contract-media-drill-v1",
   "joi-contract-session-seed-v1",
+  "joi-contract-series-v1",
   "joi-soul-v1",
   "joi-soul-control-v1",
 ] as const;
@@ -212,6 +213,7 @@ export function buildSandboxSnapshot(): ProgressSnapshot {
     "joi-contract-journal-v1": null,
     "joi-contract-media-drill-v1": null,
     "joi-contract-session-seed-v1": null,
+    "joi-contract-series-v1": null,
     "joi-soul-v1": null,
   };
 }

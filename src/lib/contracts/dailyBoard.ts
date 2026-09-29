@@ -7,15 +7,30 @@ import {
   isHabitContractId,
   type ContractCategory,
   type ContractDef,
-  type ContractRollKey,
 } from "./catalog";
+import {
+  fillContractTemplate,
+  instantiateContract,
+  instantiateMediaDrill,
+} from "./contractInstantiate";
+import {
+  contractsTodayKey,
+  endOfLocalDayMs,
+  hashSeed,
+  mulberry32,
+} from "./contractTime";
+import {
+  cancelContractSeries,
+  isSeriesContract,
+  reconcileSeriesOnBoard,
+  recordSeriesChildOutcome,
+  startContractSeries,
+  type SeriesInstantiate,
+  type StartSeriesResult,
+} from "./contractSeries";
 import { getMergedContractCatalog } from "./userCatalog";
 import {
   isMediaDrillContract,
-  MEDIA_DRILL_FOCUS_TAGS,
-  MEDIA_DRILL_TRIGGERS,
-  rollMediaDrillAction,
-  timerMinForLimit,
   mediaDrillRewardBonus,
 } from "./mediaDrill";
 import {
@@ -48,6 +63,14 @@ export type ContractInstance = {
   difficulty: 1 | 2 | 3;
   /** Set when the player accepts; carried across day/mistress board rerolls. */
   acceptedAtMs?: number;
+  /** Present only on a long-series daily child. */
+  source?: "series";
+  seriesInstanceId?: string;
+  seriesDefId?: string;
+  seriesDayIndex?: number;
+  seriesTotalDays?: number;
+  seriesIntensity?: 1 | 2 | 3 | 4 | 5;
+  seriesThemeLabelRu?: string;
 };
 
 export type DailyContractBoard = {
@@ -80,38 +103,12 @@ function emitContractLifecycle(notice: ContractLifecycleNotice): void {
   contractLifecycleListener?.(notice);
 }
 
-function pad2(n: number): string {
-  return n < 10 ? `0${n}` : String(n);
-}
-
-export function contractsTodayKey(now = new Date()): string {
-  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
-}
-
-export function endOfLocalDayMs(dayKey: string): number {
-  const [y, m, d] = dayKey.split("-").map(Number);
-  return new Date(y!, (m ?? 1) - 1, d ?? 1, 23, 59, 59, 999).getTime();
-}
-
-function hashSeed(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+export {
+  addLocalDays,
+  localCalendarDayDiff,
+  contractsTodayKey,
+  endOfLocalDayMs,
+} from "./contractTime";
 
 function pickWeighted<T>(
   items: T[],
@@ -153,16 +150,6 @@ function contractWeight(def: ContractDef, mistressId: MistressId): number {
   return w;
 }
 
-function fillTemplate(
-  template: string,
-  params: Record<string, string | number>,
-): string {
-  return template.replace(/\{(\w+)\}/g, (_, key: string) => {
-    const v = params[key];
-    return v == null ? `{${key}}` : String(v);
-  });
-}
-
 /** Pull latest catalog name/body onto open rows so copy waves land today. */
 function syncOpenContractCopy(board: DailyContractBoard): DailyContractBoard {
   let changed = false;
@@ -171,7 +158,7 @@ function syncOpenContractCopy(board: DailyContractBoard): DailyContractBoard {
     const def = getContractDef(c.defId);
     if (!def) return c;
     const titleRu = def.nameRu;
-    const bodyRu = fillTemplate(def.instructionRu, c.params);
+    const bodyRu = fillContractTemplate(def.instructionRu, c.params);
     if (
       titleRu === c.titleRu &&
       bodyRu === c.bodyRu &&
@@ -185,98 +172,66 @@ function syncOpenContractCopy(board: DailyContractBoard): DailyContractBoard {
   return changed ? { ...board, contracts } : board;
 }
 
-function rollParams(
-  def: ContractDef,
-  rng: () => number,
-): Record<string, string | number> {
-  const params: Record<string, string | number> = {};
-  const rolls = def.rolls;
-  if (!rolls) return params;
-  for (const key of Object.keys(rolls) as ContractRollKey[]) {
-    const pool = rolls[key];
-    if (!pool || pool.length === 0) continue;
-    params[key] = pool[Math.floor(rng() * pool.length)]!;
-  }
-  return params;
-}
-
-function rollReward(def: ContractDef, rng: () => number): number {
-  const lo = Math.min(def.rewardMin, def.rewardMax);
-  const hi = Math.max(def.rewardMin, def.rewardMax);
-  return lo + Math.floor(rng() * (hi - lo + 1));
-}
-
-function instantiateMediaDrill(
-  def: ContractDef,
-  dayKey: string,
-  mistressId: MistressId,
-  rng: () => number,
+function withSeriesExtras(
+  instance: ContractInstance,
+  extras: {
+    instanceId: string;
+    acceptedAtMs: number;
+    seriesInstanceId: string;
+    seriesDefId: string;
+    seriesDayIndex: number;
+    seriesTotalDays: number;
+    intensity?: 1 | 2 | 3 | 4 | 5;
+    themeLabelRu?: string;
+  },
 ): ContractInstance {
-  const limitPool = (def.rolls?.limit as number[] | undefined) ?? [
-    20, 40, 60, 80,
-  ];
-  const limit = limitPool[Math.floor(rng() * limitPool.length)]!;
-  const tag =
-    MEDIA_DRILL_FOCUS_TAGS[
-      Math.floor(rng() * MEDIA_DRILL_FOCUS_TAGS.length)
-    ]!;
-  const trigger =
-    MEDIA_DRILL_TRIGGERS[Math.floor(rng() * MEDIA_DRILL_TRIGGERS.length)]!;
-  const action = rollMediaDrillAction(rng);
-  const timerMin = timerMinForLimit(limit);
-  const params: Record<string, string | number> = {
-    limit,
-    tag,
-    trigger,
-    actionLabel: action.actionRu,
-    actionKind: action.actionKind,
-    actionN: action.actionN,
-    timerMin,
-  };
   return {
-    instanceId: `${dayKey}-${def.id}-${Math.floor(rng() * 1e9)}`,
-    defId: def.id,
-    dayKey,
-    mistressId,
-    category: def.category,
-    titleRu: def.nameRu,
-    bodyRu: fillTemplate(def.instructionRu, params),
-    reward: rollReward(def, rng),
-    deadlineMs: endOfLocalDayMs(dayKey),
-    status: "open",
-    params,
-    difficulty: def.difficulty,
+    ...instance,
+    instanceId: extras.instanceId,
+    acceptedAtMs: extras.acceptedAtMs,
+    source: "series",
+    seriesInstanceId: extras.seriesInstanceId,
+    seriesDefId: extras.seriesDefId,
+    seriesDayIndex: extras.seriesDayIndex,
+    seriesTotalDays: extras.seriesTotalDays,
+    seriesIntensity: extras.intensity,
+    seriesThemeLabelRu: extras.themeLabelRu,
   };
 }
 
-function instantiate(
-  def: ContractDef,
-  dayKey: string,
-  mistressId: MistressId,
-  rng: () => number,
-  paramOverrides?: Record<string, string | number>,
-): ContractInstance {
-  if (def.kind === "media_drill") {
-    return instantiateMediaDrill(def, dayKey, mistressId, rng);
-  }
-  const params = { ...rollParams(def, rng), ...paramOverrides };
-  if (def.kind === "finish_debrief" && def.finishDebriefPreset) {
-    params.finishDebriefPreset = def.finishDebriefPreset;
-  }
-  return {
-    instanceId: `${dayKey}-${def.id}-${Math.floor(rng() * 1e9)}`,
-    defId: def.id,
-    dayKey,
-    mistressId,
-    category: def.category,
-    titleRu: def.nameRu,
-    bodyRu: fillTemplate(def.instructionRu, params),
-    reward: rollReward(def, rng),
-    deadlineMs: endOfLocalDayMs(dayKey),
-    status: "open",
-    params,
-    difficulty: def.difficulty,
-  };
+export const createSeriesChildInstance: SeriesInstantiate = (
+  defId,
+  dayKey,
+  mistressId,
+  rng,
+  extras,
+) => {
+  const def = getContractDef(defId);
+  if (!def) return null;
+  return withSeriesExtras(
+    instantiateContract(
+      def,
+      dayKey,
+      mistressId,
+      rng,
+      extras.paramOverrides,
+    ),
+    extras,
+  );
+};
+
+function applySeriesBoard(
+  board: DailyContractBoard,
+  now: Date,
+  previousOpen: ContractInstance[],
+): DailyContractBoard {
+  return reconcileSeriesOnBoard(
+    board,
+    now,
+    createSeriesChildInstance,
+    emitContractLifecycle,
+    previousOpen,
+  );
 }
 
 /** Roll a fresh daily board: 5 contracts, prefer distinct categories. */
@@ -311,7 +266,7 @@ export function rollDailyBoard(
     if (!def) break;
     usedDefs.add(def.id);
     usedCats.add(def.category);
-    contracts.push(instantiate(def, dayKey, mistressId, rng));
+    contracts.push(instantiateContract(def, dayKey, mistressId, rng));
     if (usedDefs.size >= catalog.length) break;
   }
 
@@ -327,7 +282,7 @@ export function rollDailyBoard(
     );
     if (hard && contracts.length > 0) {
       const replaceAt = Math.floor(rng() * contracts.length);
-      contracts[replaceAt] = instantiate(hard, dayKey, mistressId, rng);
+      contracts[replaceAt] = instantiateContract(hard, dayKey, mistressId, rng);
     }
   }
 
@@ -349,7 +304,7 @@ export function rollDailyBoard(
     if (habit && contracts.length > 0) {
       let replaceAt = contracts.findIndex((c) => c.difficulty !== 3);
       if (replaceAt < 0) replaceAt = contracts.length - 1;
-      contracts[replaceAt] = instantiate(habit, dayKey, mistressId, rng);
+      contracts[replaceAt] = instantiateContract(habit, dayKey, mistressId, rng);
     }
   }
 
@@ -373,9 +328,16 @@ export function rerollDailyContractBoard(
   const existing = loadContractBoard();
   const prevSalt =
     existing && existing.dayKey === dayKey ? (existing.rerollSalt ?? 0) : 0;
-  const board = mergeCarriedAccepted(
-    rollDailyBoard(dayKey, mistressId, prevSalt + 1),
-    takeCarriedAccepted(existing),
+  const previousOpen = (existing?.contracts ?? []).filter(
+    (c) => isSeriesContract(c) && c.status === "open",
+  );
+  const board = applySeriesBoard(
+    mergeCarriedAccepted(
+      rollDailyBoard(dayKey, mistressId, prevSalt + 1),
+      takeCarriedAccepted(existing),
+    ),
+    now,
+    previousOpen,
   );
   saveContractBoard(board);
   return board;
@@ -394,11 +356,11 @@ function isBoard(raw: unknown): raw is DailyContractBoard {
 function expireOpen(board: DailyContractBoard, nowMs: number): DailyContractBoard {
   let changed = false;
   const contracts = board.contracts.map((c) => {
-    if (c.status === "open" && nowMs > c.deadlineMs && c.acceptedAtMs == null) {
-      changed = true;
-      return { ...c, status: "expired" as const };
-    }
-    return c;
+    if (c.status !== "open" || nowMs <= c.deadlineMs) return c;
+    // Series children never roll over, even if already accepted.
+    if (c.acceptedAtMs != null && !isSeriesContract(c)) return c;
+    changed = true;
+    return { ...c, status: "expired" as const };
   });
   return changed ? { ...board, contracts } : board;
 }
@@ -412,7 +374,10 @@ function takeCarriedAccepted(
 ): ContractInstance[] {
   if (!board) return [];
   return board.contracts.filter(
-    (c) => isAcceptedOpen(c) && !RETIRED_CONTRACT_DEF_IDS.has(c.defId),
+    (c) =>
+      isAcceptedOpen(c) &&
+      !isSeriesContract(c) &&
+      !RETIRED_CONTRACT_DEF_IDS.has(c.defId),
   );
 }
 
@@ -556,6 +521,9 @@ export function ensureDailyContractBoard(
   const nowMs = now.getTime();
   const existing = loadContractBoard();
   const carried = takeCarriedAccepted(existing);
+  const previousOpen = (existing?.contracts ?? []).filter(
+    (c) => isSeriesContract(c) && c.status === "open",
+  );
 
   if (
     existing &&
@@ -563,15 +531,21 @@ export function ensureDailyContractBoard(
     existing.mistressId === mistressId &&
     !boardNeedsReroll(existing)
   ) {
-    const next = syncOpenContractCopy(
-      ensureMediaDrillSlot(expireOpen(existing, nowMs)),
+    const next = applySeriesBoard(
+      syncOpenContractCopy(ensureMediaDrillSlot(expireOpen(existing, nowMs))),
+      now,
+      previousOpen,
     );
     if (next !== existing) saveContractBoard(next);
     return next;
   }
 
-  const board = ensureMediaDrillSlot(
-    mergeCarriedAccepted(rollDailyBoard(dayKey, mistressId), carried),
+  const board = applySeriesBoard(
+    ensureMediaDrillSlot(
+      mergeCarriedAccepted(rollDailyBoard(dayKey, mistressId), carried),
+    ),
+    now,
+    previousOpen,
   );
   saveContractBoard(board);
   return board;
@@ -601,22 +575,25 @@ export function reportContract(
     finishDebrief?: FinishDebriefAnswers;
     /** Override the rolled reward (e.g. activity-debrief scoring). */
     reward?: number;
+    now?: Date;
   },
 ): ContractReportResult | null {
-  const board = ensureDailyContractBoard();
+  const now = opts?.now ?? new Date();
+  const board = ensureDailyContractBoard(now);
   const idx = board.contracts.findIndex((c) => c.instanceId === instanceId);
   if (idx < 0) return null;
   const cur = board.contracts[idx]!;
   if (cur.status !== "open") {
     return { board, rewarded: 0, status: cur.status };
   }
-  if (Date.now() > cur.deadlineMs) {
+  if (now.getTime() > cur.deadlineMs) {
     const expired: ContractInstance = { ...cur, status: "expired" };
     const contracts = board.contracts.slice();
     contracts[idx] = expired;
     const next = { ...board, contracts };
     saveContractBoard(next);
     emitContractLifecycle({ instance: expired, outcome: "expired" });
+    recordSeriesChildOutcome(expired, "expired", 0, now);
     return { board: next, rewarded: 0, status: "expired" };
   }
 
@@ -666,6 +643,12 @@ export function reportContract(
     instance: updated,
     outcome: status === "done" ? "done" : "failed",
   });
+  recordSeriesChildOutcome(
+    updated,
+    status === "done" ? "done" : "failed",
+    rewarded,
+    now,
+  );
   return {
     board: next,
     rewarded,
@@ -693,7 +676,7 @@ export function assignProgramContract(
   const rng = mulberry32(
     hashSeed(`${board.dayKey}|${defId}|program|${Date.now()}`),
   );
-  const instance = instantiate(
+  const instance = instantiateContract(
     def,
     board.dayKey,
     board.mistressId,
@@ -702,7 +685,11 @@ export function assignProgramContract(
   );
   const named = titleRu ? { ...instance, titleRu } : instance;
   const replaceAt = board.contracts.findIndex(
-    (c) => c.status === "open" && c.acceptedAtMs == null && c.defId !== defId,
+    (c) =>
+      c.status === "open" &&
+      c.acceptedAtMs == null &&
+      c.defId !== defId &&
+      !isSeriesContract(c),
   );
   const contracts = board.contracts.slice();
   if (replaceAt >= 0) {
@@ -750,7 +737,7 @@ export function ensureAcceptedProgramContract(
     const nextRow: ContractInstance = {
       ...cur,
       params,
-      bodyRu: fillTemplate(def.instructionRu, params),
+      bodyRu: fillContractTemplate(def.instructionRu, params),
       titleRu: opts?.titleRu ?? cur.titleRu,
       acceptedAtMs: atMs,
       deadlineMs,
@@ -763,7 +750,7 @@ export function ensureAcceptedProgramContract(
   const rng = mulberry32(
     hashSeed(`${board.dayKey}|${defId}|live|${atMs}`),
   );
-  const instance = instantiate(
+  const instance = instantiateContract(
     def,
     board.dayKey,
     board.mistressId,
@@ -805,6 +792,28 @@ export function formatCountdown(ms: number): string {
   if (h > 0) return `${h} ч ${m} мин`;
   if (m > 0) return `${m} мин`;
   return `${s % 60} с`;
+}
+
+export function startActiveContractSeries(
+  defId: string,
+  now = new Date(),
+): StartSeriesResult & { board?: DailyContractBoard } {
+  const result = startContractSeries(defId, now);
+  if (!result.ok) return result;
+  const board = ensureDailyContractBoard(now);
+  return { ...result, board };
+}
+
+export function cancelActiveContractSeries(now = new Date()): DailyContractBoard {
+  const board = ensureDailyContractBoard(now);
+  const next = cancelContractSeries(
+    board,
+    now,
+    createSeriesChildInstance,
+    emitContractLifecycle,
+  );
+  saveContractBoard(next);
+  return next;
 }
 
 export const MISTRESS_CONTRACT_LINES: Record<MistressId, string> = {

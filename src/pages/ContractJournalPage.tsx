@@ -8,6 +8,7 @@ import {
 } from "../lib/contractJournal";
 import { CONTRACT_CATEGORY_LABELS } from "../lib/contracts/catalog";
 import { listMistressPacks } from "../lib/mistress/packs";
+import "../components/contractSeries.css";
 
 type Props = {
   revision?: number;
@@ -216,6 +217,12 @@ function JournalCard({
       </header>
       <div className="contract-journal__card-body">
         <h3 className="contract-journal__title">{e.contractInstanceTitleRu}</h3>
+        {typeof e.seriesDayIndex === "number" &&
+        typeof e.seriesTotalDays === "number" ? (
+          <span className="contracts-card__series-chip">
+            Серия · день {e.seriesDayIndex + 1}/{e.seriesTotalDays}
+          </span>
+        ) : null}
         <dl className="contract-journal__facts">
           <div>
             <dt>Госпожа</dt>

@@ -173,4 +173,18 @@ describe("applyProgressBackupLocal", () => {
     );
     expect(localStorage.getItem("joi-contracts-v1")).toBeNull();
   });
+
+  it("imports an old backup without joi-contract-series-v1 and still swaps slots", () => {
+    localStorage.setItem("joi-contract-series-v1", '{"version":1,"series":{}}');
+    applyProgressBackupLocal(
+      samplePayload({
+        progress: {
+          "joi-cinders-v1": "{}",
+        },
+      }),
+    );
+    expect(localStorage.getItem("joi-contract-series-v1")).toBeNull();
+    expect(PROGRESS_STORAGE_KEYS).toContain("joi-contract-series-v1");
+    expect(captureProgress()["joi-contract-series-v1"]).toBeNull();
+  });
 });

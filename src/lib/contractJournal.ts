@@ -54,6 +54,10 @@ export type ContractJournalEntry = {
   summaryRu?: string;
   /** Difficulty of the contract def. */
   difficulty?: 1 | 2 | 3;
+  seriesInstanceId?: string;
+  seriesDefId?: string;
+  seriesDayIndex?: number;
+  seriesTotalDays?: number;
 };
 
 function coerceEntry(raw: unknown): ContractJournalEntry | null {
@@ -108,6 +112,13 @@ function coerceEntry(raw: unknown): ContractJournalEntry | null {
       r.difficulty === 1 || r.difficulty === 2 || r.difficulty === 3
         ? r.difficulty
         : undefined,
+    seriesInstanceId:
+      typeof r.seriesInstanceId === "string" ? r.seriesInstanceId : undefined,
+    seriesDefId: typeof r.seriesDefId === "string" ? r.seriesDefId : undefined,
+    seriesDayIndex:
+      typeof r.seriesDayIndex === "number" ? r.seriesDayIndex : undefined,
+    seriesTotalDays:
+      typeof r.seriesTotalDays === "number" ? r.seriesTotalDays : undefined,
   };
 }
 
@@ -155,6 +166,18 @@ export function appendContractJournalEntry(
   return next;
 }
 
+/** Stable-id append for auto-expire / cancel so remount does not duplicate. */
+export function appendContractJournalEntryIfAbsent(
+  id: string,
+  entry: Omit<ContractJournalEntry, "id">,
+): boolean {
+  if (!id) return false;
+  const list = loadContractJournal();
+  if (list.some((e) => e.id === id)) return false;
+  saveContractJournal([{ ...entry, id }, ...list]);
+  return true;
+}
+
 export function clearContractJournal(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
@@ -200,6 +223,10 @@ export function buildContractJournalEntry(opts: {
     debriefAnswers: opts.debriefAnswers,
     summaryRu: opts.summaryRu,
     difficulty: c.difficulty,
+    seriesInstanceId: c.seriesInstanceId,
+    seriesDefId: c.seriesDefId,
+    seriesDayIndex: c.seriesDayIndex,
+    seriesTotalDays: c.seriesTotalDays,
   };
 }
 

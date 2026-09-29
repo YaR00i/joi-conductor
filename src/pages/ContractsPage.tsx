@@ -26,6 +26,7 @@ import {
 import {
   categoryLabelRu,
   CONTRACT_BOARD_REROLL_COST,
+  cancelActiveContractSeries,
   contractBrief,
   countOpenContracts,
   ensureDailyContractBoard,
@@ -35,6 +36,7 @@ import {
   msUntilDeadline,
   reportContract,
   rerollDailyContractBoard,
+  startActiveContractSeries,
   type ContractInstance,
   type ContractReportResult,
   type DailyContractBoard,
@@ -88,6 +90,12 @@ import {
   type WalletState,
 } from "../lib/wallet";
 import { playUiClick, playUiConfirm, playUiNav, primeUiAudio } from "../lib/uiSound";
+import { ContractSeriesPanel } from "../components/ContractSeriesPanel";
+import {
+  clearCompletedSeriesChoice,
+  isSeriesContract,
+} from "../lib/contracts/contractSeries";
+import { seriesChipText } from "../lib/contracts/contractSeriesView";
 
 type FilterId = "all" | ContractCategory;
 
@@ -158,6 +166,7 @@ export function ContractsPage({
   );
   const [filter, setFilter] = useState<FilterId>("all");
   const [flash, setFlash] = useState<string | null>(null);
+  const [seriesFlash, setSeriesFlash] = useState<string | null>(null);
   const [mode, setMode] = useState<"board" | "editor">("board");
   /** Contract editor is a sandbox/dev-only feature. */
   const isSandbox = getActiveSaveSlot() === "sandbox";
@@ -259,7 +268,12 @@ export function ContractsPage({
         }
       }
     };
-    return [...list].sort((a, b) => rank(a.status) - rank(b.status));
+    return [...list].sort((a, b) => {
+      const pinA = isSeriesContract(a) && a.status === "open" ? 0 : 1;
+      const pinB = isSeriesContract(b) && b.status === "open" ? 0 : 1;
+      if (pinA !== pinB) return pinA - pinB;
+      return rank(a.status) - rank(b.status);
+    });
   }, [board.contracts, filter]);
 
   const openCount = countOpenContracts(board);
@@ -437,15 +451,37 @@ export function ContractsPage({
     }
 
     if (loadActiveMediaDrill()) {
-      clearActiveMediaDrill();
-      setActiveDrill(null);
+      const drill = loadActiveMediaDrill();
+      const keep =
+        drill &&
+        board.contracts.some(
+          (c) =>
+            isSeriesContract(c) &&
+            c.status === "open" &&
+            c.instanceId === drill.instanceId,
+        );
+      if (!keep) {
+        clearActiveMediaDrill();
+        setActiveDrill(null);
+      }
     }
     if (loadActiveSessionSeed()) {
-      const side = clearActiveSessionSeedWithSideEffects();
-      if (side.clearedDenial) notifyDenialQuestChanged();
-      if (side.clearedCage) notifyCageLockChanged();
-      setActiveSeed(null);
-      onSessionSeedCleared?.();
+      const seed = loadActiveSessionSeed();
+      const keep =
+        seed &&
+        board.contracts.some(
+          (c) =>
+            isSeriesContract(c) &&
+            c.status === "open" &&
+            c.instanceId === seed.instanceId,
+        );
+      if (!keep) {
+        const side = clearActiveSessionSeedWithSideEffects();
+        if (side.clearedDenial) notifyDenialQuestChanged();
+        if (side.clearedCage) notifyCageLockChanged();
+        setActiveSeed(null);
+        onSessionSeedCleared?.();
+      }
     }
     setDebriefContract(null);
     setActivityDebriefContract(null);
@@ -460,6 +496,62 @@ export function ContractsPage({
 
   const canReroll =
     Boolean(onSpend) && wallet.balance >= CONTRACT_BOARD_REROLL_COST;
+
+  const todaySeriesChild =
+    board.contracts.find(
+      (c) => isSeriesContract(c) && c.status === "open",
+    ) ?? null;
+
+  function onStartSeries(defId: string) {
+    void primeUiAudio();
+    const result = startActiveContractSeries(defId);
+    if (!result.ok) {
+      playUiClick(0.6);
+      setSeriesFlash(result.error);
+      window.setTimeout(() => setSeriesFlash(null), 3200);
+      return;
+    }
+    playUiConfirm();
+    if (result.board) setBoard(result.board);
+    else refresh();
+    onOpenCountChange?.(countOpenContracts(result.board ?? board));
+  }
+
+  function onCancelSeries() {
+    if (
+      !window.confirm(
+        todaySeriesChild
+          ? "Прервать серию? Сегодняшний шаг закроется как провал без награды. Уже закрытые дни не изменятся."
+          : "Прервать серию? Уже закрытые дни не изменятся.",
+      )
+    ) {
+      return;
+    }
+    void primeUiAudio();
+    playUiClick();
+    const next = cancelActiveContractSeries();
+    const childId = todaySeriesChild?.instanceId;
+    if (childId && loadActiveMediaDrill()?.instanceId === childId) {
+      clearActiveMediaDrill();
+      setActiveDrill(null);
+    }
+    if (childId && loadActiveSessionSeed()?.instanceId === childId) {
+      const side = clearActiveSessionSeedWithSideEffects();
+      if (side.clearedDenial) notifyDenialQuestChanged();
+      if (side.clearedCage) notifyCageLockChanged();
+      setActiveSeed(null);
+      onSessionSeedCleared?.();
+    }
+    setBoard(next);
+    onOpenCountChange?.(countOpenContracts(next));
+    setFlash("Серия прервана");
+    window.setTimeout(() => setFlash(null), 2800);
+  }
+
+  function onChooseNewSeries() {
+    clearCompletedSeriesChoice();
+    refresh();
+  }
 
   return (
     <div className="contracts-page">
@@ -631,6 +723,14 @@ export function ContractsPage({
         <ContractEditorPage onBack={() => setMode("board")} />
       ) : (
       <>
+      <ContractSeriesPanel
+        nowMs={nowMs}
+        todayChild={todaySeriesChild}
+        flash={seriesFlash}
+        onStart={onStartSeries}
+        onCancel={onCancelSeries}
+        onChooseNew={onChooseNewSeries}
+      />
       <div className="contracts-page__tabs" role="tablist">
         {filters.map((f) => (
           <button
@@ -683,6 +783,11 @@ export function ContractsPage({
                 <span className="contracts-card__cat">
                   {categoryLabelRu(c.category)}
                 </span>
+                {seriesChipText(c) ? (
+                  <span className="contracts-card__series-chip">
+                    {seriesChipText(c)}
+                  </span>
+                ) : null}
                 <span
                   className="contracts-card__diff"
                   title={`Сложность ${c.difficulty}`}

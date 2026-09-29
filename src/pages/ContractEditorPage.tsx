@@ -33,6 +33,8 @@ import {
   type ContractEditorRow,
 } from "../lib/contracts/userCatalog";
 import { listMistressPacks } from "../lib/mistress/packs";
+import { ContractSeriesEditor } from "./ContractSeriesEditor";
+import "../components/contractSeries.css";
 
 const CATEGORIES = Object.keys(CONTRACT_CATEGORY_LABELS) as ContractCategory[];
 const KIND_OPTIONS = Object.keys(CONTRACT_KIND_RU) as Array<
@@ -61,6 +63,7 @@ export function ContractEditorPage({ onBack }: Props) {
   const [draft, setDraft] = useState<ContractEditorDraft>(EMPTY_CONTRACT_DRAFT);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [catalogKind, setCatalogKind] = useState<"singles" | "series">("singles");
   const mistressPacks = useMemo(() => listMistressPacks(), []);
   const importRef = useRef<HTMLInputElement | null>(null);
   const instructionRef = useRef<HTMLTextAreaElement | null>(null);
@@ -257,6 +260,36 @@ export function ContractEditorPage({ onBack }: Props) {
             Открой любой готовый — правь текст и награды. Сохранение пишет
             поверх встроенного на доске. «Свой» — отдельная карточка.
           </p>
+          <div className="contract-series-editor__toggle" role="tablist">
+            <button
+              type="button"
+              className={
+                catalogKind === "singles"
+                  ? "contracts-page__mode-btn is-active"
+                  : "contracts-page__mode-btn"
+              }
+              onClick={() => {
+                if (!confirmLeaveDirty()) return;
+                setCatalogKind("singles");
+              }}
+            >
+              Одиночные
+            </button>
+            <button
+              type="button"
+              className={
+                catalogKind === "series"
+                  ? "contracts-page__mode-btn is-active"
+                  : "contracts-page__mode-btn"
+              }
+              onClick={() => {
+                if (!confirmLeaveDirty()) return;
+                setCatalogKind("series");
+              }}
+            >
+              Пресеты серий
+            </button>
+          </div>
         </div>
         <button
           type="button"
@@ -270,6 +303,9 @@ export function ContractEditorPage({ onBack }: Props) {
         </button>
       </header>
 
+      {catalogKind === "series" ? (
+        <ContractSeriesEditor />
+      ) : (
       <div className="contracts-editor__body">
         <aside className="contracts-editor__list">
           <button
@@ -400,7 +436,7 @@ export function ContractEditorPage({ onBack }: Props) {
               : origin === "builtin"
                 ? "Встроенный. Сохрани — на доске будет твоя версия."
                 : origin === "override"
-                  ? "Ты уже меняла этот встроенный."
+                  ? "Этот встроенный уже изменён."
                   : "Свой контракт, не из каталога."}
             {dirty ? " · не сохранено" : ""}
           </p>
@@ -673,6 +709,7 @@ export function ContractEditorPage({ onBack }: Props) {
           </label>
         </form>
       </div>
+      )}
     </section>
   );
 }
