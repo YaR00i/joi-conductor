@@ -5,18 +5,17 @@ alwaysApply: true
 
 # Project Growth Contract
 
-- Сначала прочитай корневой `AGENTS.md`. Ember: `docs/EMBER_AI_HANDOFF.md` (статус Godot, §9.2). `EMBER_RESTRUCTURE_PLAN.md` не исполнять — Three на паузе.
+- Сначала прочитай корневой `AGENTS.md`. Ember — локальный замороженный эксперимент, не продуктовый трек JOI. `EMBER_RESTRUCTURE_PLAN.md` не исполнять — leftover Three не наращивать.
 - Перед новым helper/type/manager/renderer/collision/UI flow найди существующий контракт через `rg` и доработай его.
 - Новый leaf-модуль допустим только для отдельной ответственности; нельзя создавать параллельную V2-систему.
 - Не добавляй самостоятельные подсистемы в `MapEditorPanel`, `VoxelSculptPanel`, `SpriteEditorPanel`, `TileEditorPanel`, `mapUtils`, `EmberThreeWorld` или глобальный `styles.css`.
-- `mapUtils.ts` — compatibility barrel: не начинать Three-декомпозицию, пока пауза не снята.
-- Продуктовые системы Ember — только в Godot (`../ember-godot`). Не волны mapUtils → CSS → controllers → `EmberThreeWorld`.
-- Новое поле JOI-пака: types → validation → Godot import/runtime → tests. Не копировать формулы в Three «заодно».
+- `mapUtils.ts` — compatibility barrel: не начинать Three-декомпозицию.
+- Не волны mapUtils → CSS → controllers → `EmberThreeWorld`. leftover Three не чинить «заодно».
 - Один законченный input = один commit. Не сохраняй/remesh/rebuild на каждый pointermove.
 - Каждый listener/RAF/timer/observer/object URL/worker/GPU resource получает симметричный cleanup.
 - Не вводи special-case по map id/координате, если это можно выразить данными.
 - Не развивать Three crowd/atlas/F3 hot path.
-- Механики Ember проверяй в Godot `agent_sandbox`. Не `hu_tao_p1` / `hu_tao_yard`, не WASD в Chromium. JOI `ember-agent` — сверка пака.
+- Не WASD в Chromium. Не `hu_tao_p1` / `hu_tao_yard`. JOI `ember-agent` — только если пользователь явно просит сверку архива.
 - Не трогай попутно клипы крышек сундуков и намеренную дверь `(12,8)`.
 - Пользователь параллельно гоняет Grok / Voxel bro: пропы приходят PR-ами в `main`. Перед пушем — fetch + rebase, без force-push и без затирания `content/ember/voxels/models` из этих волн. Мержить их PR только после явного «всё ок».
-- После работы: targeted tests; для JOI — `npm test`, `npx tsc --noEmit`, `npx vite build` / `npm run build`. Обнови handoff при изменении контракта.
+- После работы: targeted tests; для JOI — `npm test`, `npx tsc --noEmit`, `npx vite build` / `npm run build`.

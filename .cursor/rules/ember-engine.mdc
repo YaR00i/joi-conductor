@@ -1,16 +1,13 @@
 ---
-description: Архитектурный контракт Ember — Godot first, Three на паузе
+description: leftover Three — замороженный эксперимент, не наращивать
 globs: "{src/game/**,src/components/ember/**,src/pages/Ember*.tsx,content/ember/**,docs/EMBER*.md}"
 alwaysApply: false
 ---
 
-# Ember Engine Contract
+# leftover Three
 
-Перед изменениями прочитай корневой `AGENTS.md` и `docs/EMBER_AI_HANDOFF.md`. Продуктовый vision — `docs/EMBER_JRPG_DESIGN.md`. Воксельный контент-бот — `docs/EMBER_VOXEL_BOT.md`, он не даёт права менять движок. `EMBER_RESTRUCTURE_PLAN.md` не исполнять.
+Перед изменениями прочитай корневой `AGENTS.md`. `docs/EMBER_*.md` — архив эксперимента, не backlog. Воксельный контент-бот — `docs/EMBER_VOXEL_BOT.md`, он не даёт права менять движок. `EMBER_RESTRUCTURE_PLAN.md` не исполнять.
 
-- **Three.js play/editor в JOI приостановлен.** Не добавлять механики, свет, crowd, atlas и подсистемы в `EmberThreeWorld` / `src/game/three`. Фокус — sibling `ember-godot` (Godot 4 Forward+) и постепенная миграция.
-- Phaser — legacy, не вторая реализация. Creative Mode отложен. Не создавать третий renderer в этом репо.
-- Координаты данных: X/Y — карта, Z — высота. Three.js (frozen): X/Z — земля, Y — вверх. Godot: Y-up, `ember(x,y,z) = vox(x,z,y)`.
-- Воксели — пара `voxels/models/<id>.json` + `<id>.vox`. Писать только через `writeVoxelRegistry` с `dirtyIds`. Не дампить `registry.json`.
-- Новая механика принимается в Godot (Inspector, Undo/Redo, save/reopen). JOI sculptor остаётся writer моделей.
-- Не reset/checkout рабочее дерево и Ember JSON. Механики проверяй в Godot `agent_sandbox`, не WASD в Chromium.
+- leftover play/editor в JOI заморожен. Не добавлять механики, свет, crowd, atlas и подсистемы в `EmberThreeWorld` / `src/game/three`. Ember не является продуктовым треком этого репозитория.
+- Phaser — legacy, не вторая реализация. Не создавать третий renderer.
+- Не reset/checkout рабочее дерево. Не WASD в Chromium. Не чинить leftover «заодно».

@@ -1,12 +1,10 @@
 # JOI Conductor — правила для AI-агентов
 
-Этот файл обязателен для Codex, Cursor, Grok и любых других агентов, меняющих проект. Активный Ember вынесен в `../ember-godot`: читать там `AGENTS.md`, `docs/EMBER_TECHNICAL_HANDOFF.md` и `docs/EMBER_PRODUCT_PLAN.md`. Документы `docs/EMBER_AI_HANDOFF.md` и `docs/EMBER_JRPG_DESIGN.md` в JOI — исторический архив, не рабочий источник правды. Оболочка приложения (сайдбар, хабы Прогресс / Контент / Мини-игры) — `docs/HUB.md`. `docs/EMBER_RESTRUCTURE_PLAN.md` не исполнять: Three-волны на паузе.
+Этот файл обязателен для Codex, Cursor, Grok и любых других агентов, меняющих проект. Продукт JOI — сессии, чат, контракты, контент, прогресс и мини-игры. Оболочка приложения (сайдбар, хабы Прогресс / Контент / Мини-игры) — `docs/HUB.md`. `docs/EMBER_RESTRUCTURE_PLAN.md` не исполнять.
 
-## Ember: Godot, не Three
+## Ember — локальный эксперимент, не трек
 
-С 29 августа 2026 года **Ember через Three.js приостановлен** (JOI play, `EmberThreeWorld`, World Editor viewport, crowd/atlas/свет в `src/game/three`). Не добавлять туда механики, реструктуризацию и второй renderer.
-
-**Фокус** — sibling `../ember-godot` (Godot 4 Forward+) и **полный постепенный переезд Ember из JOI**. Карты после импорта — `.tscn`; voxel-модели по одной переносятся в `ember-godot/content/voxel_models/*.tres`. Пары `.json + .vox` в этом репо являются только read-only очередью одноразового импорта/архивом сверки и не конечным authoring API. План приёмки — `../ember-godot/MIGRATION_TEST_PLAN.md`, полный exit plan — `../ember-godot/docs/EMBER_JOI_EXIT_PLAN.md`. Новые продуктовые системы и редактирование контента только в Godot; вкладки «Аномалия» / «Ember Editor» — frozen shell, не дорожная карта.
+Ember не ведётся в этом репозитории и не является продуктовым направлением JOI. Замороженный Three (`EmberThreeWorld`, World Editor, crowd/atlas/свет в `src/game/three`), вкладки «Аномалия» / «Ember Editor» и `content/ember` — локальный эксперимент, который дал жизнь идее. Не наращивать, не чинить «заодно», не открывать сюда тикеты, не начинать волны из `docs/EMBER_RESTRUCTURE_PLAN.md`. Документы `docs/EMBER_*.md` — архив эксперимента, не backlog и не источник правды для новой работы.
 
 Явная команда починить конкретный Three-баг имеет приоритет над этой паузой; не разворачивать её в новую фичу.
 
@@ -28,11 +26,11 @@ Legacy-монолиты: `styles.css`, `VoxelSculptPanel.tsx`, `MapEditorPanel.t
 - Новый TS/TSX-файл: цель до 500 строк, мягкий предел 800. React-компонент: цель до 300 строк. Больший размер требует объяснения в handoff.
 - Не дроби код механически на десятки файлов. Граница проходит по ответственности и ownership ресурсов, а не по числу строк.
 - В `mapUtils.ts` не добавляй новый домен: создавай leaf-модуль и временно re-export через compatibility barrel согласно плану.
-- `EmberThreeWorld` не наращивать: новые gameplay/render подсистемы идут в Godot, не в façade Three.
+- `EmberThreeWorld` не наращивать и не чинить «заодно».
 
-## Тесты механик Ember
+## Тесты leftover Three
 
-Продуктовые механики проверять в **Godot** (`scenes/agent_sandbox.tscn`, headless GDScript в `ember-godot`). JOI `npm run ember-agent` / MCP `ember-agent` — сверка пака и legacy `exploreSim`, не замена Godot play. Не водить WASD в Chromium. Не использовать арену `hu_tao_p1` и двор `hu_tao_yard`. Деревню `hu_tao_village` не водить в браузере для проверки движка. Default stage пака — арена, его не менять.
+Не развивать и не принимать leftover play/editor как продукт. Не водить WASD в Chromium. Не использовать арену `hu_tao_p1` и двор `hu_tao_yard`. Деревню `hu_tao_village` не водить в браузере. Default stage пака — арена, его не менять. `npm run ember-agent` / MCP — только если пользователь явно просит сверку архива.
 
 ## Crowd-навигация
 
@@ -42,18 +40,14 @@ Legacy-монолиты: `styles.css`, `VoxelSculptPanel.tsx`, `MapEditorPanel.t
 
 Не начинать волны из `docs/EMBER_RESTRUCTURE_PLAN.md` и не чинить Three «заодно». Документ — архив ownership, не backlog. Если пользователь явно просит узкий Three-hotfix: не rewrite, не V2 рядом со старым, не новые системы в `EmberThreeWorld`.
 
-## Вертикальный контракт Ember
+## Вертикальный контракт JOI
 
 Изменение данных считается законченным только по цепочке: schema/types → normalization/validation → editor → preview → runtime → serialization → targeted tests → документация.
 
-Новая механика Ember принимается в **Godot**: Inspector/viewport, Undo/Redo, save/reopen и ручной сценарий. Addons — реестр `../ember-godot/docs/EMBER_ADDONS.md` (версия, лицензия, support, owner данных, удаление); не заводить через addon второй gameplay/schema owner. JOI Three editor/play в эту цепочку больше не входят, пока пауза не снята.
-
-- Координаты данных: X/Y — карта, Z — высота; Three.js: X/Z — земля, Y — вверх. Используй готовые преобразования.
-- Height/collision/pathfinding игрока и AI должны опираться на одну физическую поверхность.
 - Preview обязан совпадать с commit; тяжёлая операция фиксируется один раз на pointer-up/Enter, не на каждом move/input.
 - Не меняй JSON-схему ради временного UI-состояния. Производные cache/flow/grid не сериализуются без versioning-решения.
 - Не создавать третий renderer, отдельный Creative runtime или вторую реализацию в legacy Phaser.
-- Каноническая voxel-модель после миграции — `ember-godot/content/voxel_models/<id>.tres` (`EmberVoxelModelResource`). Mesh, collision, thumbnail, prefab и MeshLibrary являются производными. Старые `content/ember/voxels/models/<id>.json + <id>.vox` разрешено только читать однонаправленным importer; запрещены обратная синхронизация и новые модели в JOI.
+- Не добавлять новые voxel-модели и не чинить leftover Three «заодно». `content/ember` — архив эксперимента.
 
 ## Производительность и lifecycle
 
@@ -68,14 +62,13 @@ Legacy-монолиты: `styles.css`, `VoxelSculptPanel.tsx`, `MapEditorPanel.t
 2. Найти существующий контракт, его потребителей и тесты. Объяснить, почему нужен новый модуль/поле.
 3. Делать один ограниченный вертикальный срез. Не совмещать рефакторинг с новой механикой без необходимости.
 4. Сначала targeted tests, затем `npm test`, `npx tsc --noEmit`, `npx vite build` / `npm run build`. Ошибка `tsc` — регрессия.
-5. Визуальные изменения Ember — в Godot editor/play (`../ember-godot`). JOI-оболочку (хабы, контент) проверять в Electron. Для lifecycle JOI — несколько mount/unmount или Reload.
-6. Технический контракт Ember обновлять в `../ember-godot/docs/EMBER_TECHNICAL_HANDOFF.md`, продуктовые решения — в `../ember-godot/docs/EMBER_PRODUCT_PLAN.md`. В JOI вести только изменения его оболочки (`docs/HUB.md`) и legacy importer/archive boundary. `EMBER_RESTRUCTURE_PLAN.md` не вести как активный backlog.
+5. JOI-оболочку (хабы, контент, сессии) проверять в Electron. Для lifecycle JOI — несколько mount/unmount или Reload.
+6. Продуктовые решения JOI вести в `docs/HUB.md` и `docs/IMPROVEMENTS.md`. `EMBER_RESTRUCTURE_PLAN.md` и `docs/EMBER_*.md` не вести как активный backlog.
 
-### Коммуникация и authoring
+### Коммуникация
 
-- Пользователь не обязан знать технические названия Godot. Перед существенным контрактным решением кратко объяснять простыми словами: что увидит автор, что хранится в данных, что происходит в runtime и почему выбран этот вариант.
-- Вместе с механикой проектировать её удобное создание и связывание в Godot. Предпочитать подписанные библиотеки, визуальные ссылки, диагностику и безопасные presets вместо требования вручную помнить ID/flags.
-- До собственной подсистемы проверять штатные Godot nodes/resources/editor APIs и поддерживаемые addons. Готовый addon можно брать как UX-референс без установки; устанавливать только после проверки ownership в `../ember-godot/docs/EMBER_ADDONS.md`.
+- Перед существенным контрактным решением кратко объяснять простыми словами: что увидит человек, что хранится в данных, что происходит в runtime и почему выбран этот вариант.
+- Предпочитать подписанные библиотеки, визуальные ссылки, диагностику и безопасные presets вместо требования вручную помнить ID/flags.
 
 ## Защищённые текущие работы
 
@@ -84,6 +77,6 @@ Legacy-монолиты: `styles.css`, `VoxelSculptPanel.tsx`, `MapEditorPanel.t
 - Не возрождать персонажа auburn: закрытые PR #5 / #6 и их ветки сняты с origin; не открывать заново.
 - Не применять `git reset`, `checkout --`, массовое удаление или форматирование всего репозитория.
 - Не затирать волны Grok voxel-ботов: их PR в `main` — ожидаемый параллельный поток. Мержить эти PR только после явного «всё ок» / «можно мержить» (skill `merge-voxel-bot-prs`).
-- Point-shadow atlas (§9.1) и весь Three play/свет заморожены вместе с паузой. Не расширять K и не чинить умбры новым bake в Three. Богатый ночной свет и механики — `ember-godot`, не второй renderer в этом репо.
+- Point-shadow atlas и весь leftover Three play/свет заморожены. Не расширять K и не чинить умбры новым bake.
 
 Если запрос противоречит этому файлу, явная последняя команда пользователя имеет приоритет. Зафиксируй исключение в итоговом сообщении.

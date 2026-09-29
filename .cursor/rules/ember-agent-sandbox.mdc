@@ -1,20 +1,12 @@
 ---
-description: Где и как агенту проверять механики Ember
+description: leftover Three не развивать; WASD в браузере не водить
 alwaysApply: true
 ---
 
-# Ember Agent Sandbox
+# leftover Three
 
-**Продуктовые механики** (телепорт, зоны, ходьба, камера, interact / shop / смена карты) проверять в **Godot** `scenes/agent_sandbox.tscn` и headless GDScript sibling-репо. JOI Three play на паузе.
+Ember не является продуктовым треком JOI. leftover play/editor и `content/ember` — замороженный локальный эксперимент. Не развивать, не чинить «заодно», не открывать сюда тикеты.
 
-JOI `npm run ember-agent` / MCP — сверка пака и legacy `exploreSim`, не замена Godot. Не ходить на арену `hu_tao_p1` и двор `hu_tao_yard`. Деревню `hu_tao_village` не водить в Chromium. Default stage пака (`hu_tao_p1`) не менять. Не WASD в браузере.
+Не ходить на арену `hu_tao_p1` и двор `hu_tao_yard`. Деревню `hu_tao_village` не водить в Chromium. Default stage пака (`hu_tao_p1`) не менять. Не WASD в браузере.
 
-| Как (JOI pack check) | Команда |
-| --- | --- |
-| Состояние | `npm run ember-agent -- state` |
-| Шаг | `npm run ember-agent -- step --dir east` |
-| До региона | `npm run ember-agent -- walk-toward --to teleport_a` |
-| Interact | `npm run ember-agent -- interact` |
-| MCP | `get_state`, `step`, `walk_toward`, `interact`, `buy`, `sell`, `save`, `load`, `reset_save` |
-
-Оси CLI/MCP — оси карты (north = −Y, east = +X), не yaw камеры. Карта по умолчанию `agent_sandbox`. Подробности: `docs/EMBER_AI_HANDOFF.md` (статус + §2.1 + §9.2).
+`npm run ember-agent` / MCP — только если пользователь явно просит сверку архива. Оси CLI/MCP — оси карты (north = −Y, east = +X), не yaw камеры. Карта по умолчанию `agent_sandbox`.
