@@ -4,9 +4,13 @@ import {
   CHAT_LLM_PROVIDERS,
   applyChatGenerationPreset,
   chatGenerationPresetLabelRu,
+  settingsAfterProviderSwitch,
+  withChatApiKey,
   chatLlmProviderLabelRu,
   chatPresetsFor,
-  chatProviderNeedsKey,
+  chatProviderShowsKeyField,
+  isGroqCloudProvider,
+  isGroqHybridProvider,
   type ChatLlmProvider,
   type ChatLlmSettings,
 } from "../lib/soul/llmSettings";
@@ -72,28 +76,33 @@ export function ChatLlmPanel({
     if (provider === value.provider) return;
     void primeUiAudio();
     playUiClick();
-    const nextPresets = chatPresetsFor(provider);
-    let nextModel = value.model;
-    if (provider !== value.provider) {
-      if (provider === "ollama") {
-        nextModel =
-          resolveInstalledOllamaName(value.model, disk) ?? disk[0] ?? "";
-      } else {
-        nextModel =
-          nextPresets.find((p) => p.id === value.model)?.id ??
-          nextPresets[0]?.id ??
-          "";
-      }
+    const switched = settingsAfterProviderSwitch(value, provider);
+    let nextModel = switched.model.trim();
+    if (!nextModel) {
+      nextModel =
+        provider === "ollama"
+          ? disk[0] ?? ""
+          : chatPresetsFor(provider)[0]?.id ?? "";
+    } else if (provider === "ollama") {
+      nextModel = resolveInstalledOllamaName(nextModel, disk) ?? nextModel;
     }
+    const keepLocalRoles =
+      (isGroqCloudProvider(value.provider) || value.provider === "ollama") &&
+      (isGroqCloudProvider(provider) || provider === "ollama");
+    const groqConversationId =
+      provider === "groq_chat"
+        ? value.groqConversationId || crypto.randomUUID()
+        : provider === "groq" && value.provider === "groq_chat"
+          ? value.groqConversationId || ""
+          : "";
     onChange({
-      ...value,
-      provider,
+      ...switched,
       model: nextModel,
-      endpoint: provider === "custom" ? value.endpoint : "",
-      apiKey: provider === value.provider ? value.apiKey : "",
-      groqLocalModel: provider === "groq" && value.provider === "ollama" ? value.model : value.groqLocalModel,
-      groqConversationId: "",
-      roleModels: provider !== value.provider && !(provider === "groq" && value.provider === "ollama") ? {} : value.roleModels,
+      groqLocalModel: isGroqHybridProvider(provider) && value.provider === "ollama"
+        ? value.groqLocalModel || value.model
+        : switched.groqLocalModel,
+      groqConversationId,
+      roleModels: keepLocalRoles ? value.roleModels : {},
     });
   }
 
@@ -190,8 +199,8 @@ export function ChatLlmPanel({
         </>
       )}
 
-      {value.provider === "groq" ? <GroqSettings value={value} onChange={onChange} /> : null}
-      {value.provider !== "groq" ? <div className="chat-llm__field">
+      {isGroqCloudProvider(value.provider) ? <GroqSettings value={value} onChange={onChange} /> : null}
+      {!isGroqCloudProvider(value.provider) ? <div className="chat-llm__field">
         <span>Роли</span>
         <SoulRoleAssign
           settings={value}
@@ -238,17 +247,23 @@ export function ChatLlmPanel({
         </label>
       ) : null}
 
-      {value.provider !== "groq" && chatProviderNeedsKey(value.provider) ? (
+      {chatProviderShowsKeyField(value.provider) ? (
         <label className="chat-llm__field">
-          <span>API-ключ</span>
+          <span>
+            {value.provider === "custom" ? "API-ключ (необязательно)" : "API-ключ"}
+          </span>
           <input
             type="password"
             autoComplete="off"
             value={value.apiKey}
             placeholder={
-              value.provider === "openrouter" ? "sk-or-…" : "sk-…"
+              value.provider === "openrouter"
+                ? "sk-or-…"
+                : value.provider === "custom"
+                  ? "пусто = без ключа"
+                  : "sk-…"
             }
-            onChange={(e) => onChange({ ...value, apiKey: e.target.value })}
+            onChange={(e) => onChange(withChatApiKey(value, e.target.value))}
           />
         </label>
       ) : null}

@@ -18,8 +18,6 @@ type Props = {
   /** Empty chat model falls back to the session Local LLM. */
   allowEmptyChat?: boolean;
   sessionFallback?: string;
-  /** Picking a disk model switches the chat provider to Ollama. */
-  preferOllama?: boolean;
 };
 
 function roleModelsOf(settings: ChatLlmSettings): SoulRoleModels {
@@ -40,7 +38,6 @@ export function SoulRoleAssign({
   installed,
   allowEmptyChat = true,
   sessionFallback = "",
-  preferOllama = false,
 }: Props) {
   const roles = roleModelsOf(settings);
   const disk = useMemo(() => sortOllamaInstalled(installed), [installed]);
@@ -54,7 +51,7 @@ export function SoulRoleAssign({
     extractor?: string;
     planner?: string;
   }) {
-    const next: ChatLlmSettings = {
+    const patched: ChatLlmSettings = {
       ...settings,
       model: patch.model ?? settings.model,
       roleModels: {
@@ -63,8 +60,7 @@ export function SoulRoleAssign({
         planner: patch.planner ?? roles.planner,
       },
     };
-    if (preferOllama) next.provider = "ollama";
-    onChange(next);
+    onChange(patched);
   }
 
   const chatOptions = ollamaSelectOptions(settings.model, disk);

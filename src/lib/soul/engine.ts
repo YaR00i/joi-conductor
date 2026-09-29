@@ -440,6 +440,7 @@ function snapshotForTurn(opts: {
 export async function sendSoulChatTurn(opts: {
   onSpeechPreview?: (text: string) => void;
   cloudConversationId?: string;
+  skipServiceRoles?: boolean;
   state: SoulMistressState;
   bible: CharacterBible;
   userText: string;
@@ -488,7 +489,7 @@ export async function sendSoulChatTurn(opts: {
       forbiddenSubjects: hardBoundarySubjectsForTurn(withUser, text),
       signal: opts.signal,
     });
-    const resolved = spoken.fallback
+    const resolved = spoken.fallback || opts.skipServiceRoles
       ? {
           speech: spoken.speech,
           proposals: [] as ChatProposal[],
@@ -626,6 +627,7 @@ export function editSoulMessage(
 export async function regenerateSoulReply(opts: {
   onSpeechPreview?: (text: string) => void;
   cloudConversationId?: string;
+  skipServiceRoles?: boolean;
   state: SoulMistressState;
   bible: CharacterBible;
   messageId: string;
@@ -668,7 +670,7 @@ export async function regenerateSoulReply(opts: {
       forbiddenSubjects: hardBoundarySubjectsForTurn(sliced, userText),
       signal: opts.signal,
     });
-    const resolved = spoken.fallback
+    const resolved = spoken.fallback || opts.skipServiceRoles
       ? {
           speech: spoken.speech,
           proposals: [] as ChatProposal[],

@@ -6,6 +6,7 @@ import {
   chatCompletionHeaders,
   DEFAULT_CHAT_SAMPLING,
   DEFAULT_ROLE_MODELS,
+  isGroqCloudProvider,
   splitThinkFromCompletion,
   type ResolvedChatLlm,
   type SoulModelRole,
@@ -54,6 +55,19 @@ function assertLocalFallback(resolved?: ResolvedChatLlm): asserts resolved is Re
 
 export function createSoulChatClient(resolved: ResolvedChatLlm): SoulLlmClient {
   const direct = createDirectSoulChatClient(resolved);
+  if (resolved.provider === "groq_chat") {
+    return {
+      async complete(opts) {
+        if (opts.signal?.aborted) throw new DOMException("Отменено", "AbortError");
+        if ((opts.role && opts.role !== "chat") || !opts.cloudMessages) {
+          return { text: "" };
+        }
+        if (!resolved.apiKey) throw new Error("Введи ключ Groq в настройках чата → Модель.");
+        const result = await direct.complete({ ...opts, messages: opts.cloudMessages });
+        return { ...result, delivery: { provider: "groq" } };
+      },
+    };
+  }
   if (resolved.provider !== "groq") return direct;
   async function local(opts: SoulLlmCompleteOpts, notice?: string): Promise<SoulLlmReply> {
     assertLocalFallback(resolved.localFallback);
@@ -126,7 +140,7 @@ export function createDirectSoulChatClient(resolved: ResolvedChatLlm): SoulLlmCl
           const retry = res.headers.get("retry-after") || "";
           const retryMs = Number.isFinite(Number(retry)) ? Number(retry) * 1000 : Date.parse(retry) - Date.now();
           throw new LlmHttpError(res.status, Number.isFinite(retryMs) ? retryMs : 60000,
-            resolved.provider === "groq"
+            isGroqCloudProvider(resolved.provider)
               ? `Groq HTTP ${res.status}: ${res.status === 401 ? "проверь API-ключ" : res.status === 400 || res.status === 404 ? "проверь модель и параметры запроса" : "сервис недоступен"}`
               : `LLM HTTP ${res.status}${errText ? `: ${errText.slice(0, 180)}` : ""}`);
         }

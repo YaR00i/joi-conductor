@@ -128,3 +128,53 @@ describe("Groq hybrid boundary", () => {
     expect(local.complete.mock.calls[0]?.[0].cloudMessages).toBeUndefined();
   });
 });
+
+describe("Groq chat-only", () => {
+  const cloudOnly = () => resolveChatLlm(
+    { ...emptyChatLlmSettings(), provider: "groq_chat", apiKey: "test-key" },
+    { endpoint: "http://127.0.0.1:11434/v1/chat/completions", model: "default-local" },
+  );
+
+  it("has no local fallback and never sends private prompts", async () => {
+    expect(cloudOnly().localFallback).toBeUndefined();
+    const fetchMock = vi.fn().mockResolvedValue(response());
+    vi.stubGlobal("fetch", fetchMock);
+    const { createSoulChatClient } = await import("./client");
+    const client = createSoulChatClient(cloudOnly());
+    const reply = await client.complete({ messages: privateMessages, cloudMessages, role: "chat" });
+    expect(reply.delivery?.provider).toBe("groq");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).messages).toEqual(cloudMessages);
+    fetchMock.mockClear();
+    await expect(client.complete({ messages: privateMessages, role: "chat" })).resolves.toEqual({ text: "" });
+    await expect(client.complete({ messages: privateMessages, cloudMessages, role: "router" })).resolves.toEqual({ text: "" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back to Ollama on 429", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("limit", { status: 429, headers: { "retry-after": "1" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { createSoulChatClient } = await import("./client");
+    await expect(createSoulChatClient(cloudOnly()).complete({ messages: privateMessages, cloudMessages }))
+      .rejects.toThrow("сервис недоступен");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips extractor cards when service roles are off", async () => {
+    const client = {
+      complete: vi.fn(async (opts: SoulLlmCompleteOpts) => {
+        if (opts.role && opts.role !== "chat") throw new Error("service role should not run");
+        return { text: "Привет! Рада тебя видеть.", delivery: { provider: "groq" as const } };
+      }),
+    };
+    const result = await sendSoulChatTurn({
+      state: emptyMistressState("Ху Тао", []),
+      bible,
+      userText: "Поставь клетку",
+      client,
+      cloudConversationId: "scope",
+      skipServiceRoles: true,
+    });
+    expect(result.proposals).toEqual([]);
+    expect(client.complete.mock.calls.every((call) => !call[0].role || call[0].role === "chat")).toBe(true);
+  });
+});

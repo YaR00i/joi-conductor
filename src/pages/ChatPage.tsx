@@ -31,6 +31,9 @@ import {
   loadChatLlmSettings,
   saveChatLlmSettings,
   resolveChatLlm,
+  chatCloudConversationId,
+  chatProviderUsesOllama,
+  isGroqHybridProvider,
   CHAT_LLM_CHANGED_EVENT,
   newSoulMessage,
   lastSoulSessionEvent,
@@ -252,7 +255,7 @@ function chatLlmGate(
   ollama: OllamaStatus | null,
 ): { ready: boolean; detailRu: string } {
   const resolved = resolveChatLlm(chat, loadVoiceSettings());
-  if (chat.provider === "groq" && !chat.groqConversationId) {
+  if (isGroqHybridProvider(chat.provider) && !chat.groqConversationId) {
     return chatLlmGate({ ...chat, provider: "ollama", model: chat.groqLocalModel || "", endpoint: "", apiKey: "" }, ollama);
   }
   switch (chat.provider) {
@@ -277,6 +280,7 @@ function chatLlmGate(
     }
     case "openrouter":
     case "openai":
+    case "groq_chat":
     case "groq":
       if (!resolved.apiKey) {
         return {
@@ -437,7 +441,7 @@ export function ChatPage({
   }
 
   useEffect(() => {
-    if (chatLlm.provider !== "ollama" && chatLlm.provider !== "groq") {
+    if (!chatProviderUsesOllama(chatLlm.provider)) {
       setOllamaStatus(null);
       return;
     }
@@ -493,10 +497,15 @@ export function ChatPage({
   function persistLlm(next: ChatLlmSettings) {
     setDeliveryNotice(null);
     setRetryTurn(null);
-    chatLlmRef.current = next;
-    saveChatLlmSettings(next);
-    setChatLlm(next);
+    const stored = saveChatLlmSettings(next);
+    chatLlmRef.current = stored;
+    setChatLlm(stored);
   }
+
+  useEffect(() => {
+    if (chatLlm.provider !== "groq_chat" || chatLlm.groqConversationId) return;
+    persistLlm({ ...chatLlm, groqConversationId: crypto.randomUUID() });
+  }, [chatLlm]);
 
   useEffect(() => {
     const sync = () => {
@@ -593,6 +602,7 @@ export function ChatPage({
   }
 
   async function runBackgroundSync(snapshot: SoulMistressState) {
+    if (chatLlmRef.current.provider === "groq_chat") return;
     if (!soulNeedsSync(snapshot) || syncingRef.current) return;
     const abort = abortRef.current;
     if (!abort || !isCurrentRequest(abort)) return;
@@ -697,7 +707,8 @@ export function ChatPage({
         nowMs,
         voiceExamples: chatLlmRef.current.voiceExamples !== false,
         llm: resolved,
-        cloudConversationId: chatLlmRef.current.provider === "groq" ? chatLlmRef.current.groqConversationId : undefined,
+        skipServiceRoles: chatLlmRef.current.provider === "groq_chat",
+        cloudConversationId: chatCloudConversationId(chatLlmRef.current),
       });
       if (!isCurrentRequest(abort)) return;
       persist(result.state);
@@ -883,7 +894,8 @@ export function ChatPage({
           mistressId: packRef.current.id,
           proposal: accepted.session,
           stances: accepted.soul.user.stances ?? [],
-          ...(chatLlmRef.current.sessionPlanner === "model"
+          ...(chatLlmRef.current.sessionPlanner === "model" &&
+          chatLlmRef.current.provider !== "groq_chat"
             ? { planner: { client, resolved, signal: abort.signal } }
             : {}),
         });
@@ -947,7 +959,8 @@ export function ChatPage({
         signal: abort.signal,
         voiceExamples: chatLlmRef.current.voiceExamples !== false,
         llm: resolved,
-        cloudConversationId: chatLlmRef.current.provider === "groq" ? chatLlmRef.current.groqConversationId : undefined,
+        skipServiceRoles: chatLlmRef.current.provider === "groq_chat",
+        cloudConversationId: chatCloudConversationId(chatLlmRef.current),
       });
       if (!isCurrentRequest(abort)) return;
       persist(result.state);
@@ -1260,7 +1273,7 @@ export function ChatPage({
               >
                 <p>{llmGate.detailRu}</p>
                 <div className="chat-page__llm-gate-acts">
-                  {(chatLlm.provider === "ollama" || chatLlm.provider === "groq") && canManageOllama() ? (
+                  {chatProviderUsesOllama(chatLlm.provider) && canManageOllama() ? (
                     <button
                       type="button"
                       className="chat-page__send"

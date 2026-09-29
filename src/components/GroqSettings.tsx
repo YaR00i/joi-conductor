@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createDirectSoulChatClient } from "../lib/soul/client";
-import { resolveChatLlm, type ChatLlmSettings } from "../lib/soul/llmSettings";
+import { isGroqHybridProvider, resolveChatLlm, withChatApiKey, type ChatLlmSettings } from "../lib/soul/llmSettings";
 import { loadVoiceSettings } from "../lib/voiceSettings";
 import "./groqSettings.css";
 
 type Props = { value: ChatLlmSettings; onChange: (next: ChatLlmSettings) => void; disabled?: boolean };
 
 export function GroqConversationSwitch({ value, onChange, disabled, compact = false }: Props & { compact?: boolean }) {
-  if (value.provider !== "groq") return null;
+  if (!isGroqHybridProvider(value.provider)) return null;
   const cloud = Boolean(value.groqConversationId);
   return <div className={`groq-mode${compact ? " groq-mode--compact" : ""}`}>
     <div className="groq-mode__choices" role="group" aria-label="Приватность разговора">
@@ -56,23 +56,27 @@ export function GroqSettings({ value, onChange }: Props) {
       if (request.current === abort) { request.current = null; setBusy(false); }
     }
   }
+  const hybrid = isGroqHybridProvider(value.provider);
   return <section className="groq-settings" aria-label="Подключение Groq">
-    <strong>Облако для разговора, Ollama для приватного режима</strong>
+    <strong>{hybrid ? "Облако для разговора, Ollama для приватного режима" : "Только облако · без Ollama"}</strong>
     <p>Создай ключ в <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">Groq Console</a>,
       вставь его ниже и проверь подключение. Проверка отправляет только тестовое приветствие.</p>
     <label className="chat-llm__field"><span>API-ключ Groq</span>
       <input type="password" autoComplete="off" value={value.apiKey} placeholder="gsk_…"
-        onChange={(event) => onChange({ ...value, apiKey: event.target.value })} />
+        onChange={(event) => onChange(withChatApiKey(value, event.target.value))} />
     </label>
+    {hybrid ? <>
     <label className="chat-llm__field"><span>Локальная модель для приватного режима и резерва</span>
       <input value={value.groqLocalModel ?? ""} placeholder={loadVoiceSettings().model || "Имя модели Ollama"}
         onChange={(event) => onChange({ ...value, groqLocalModel: event.target.value })} />
     </label>
     <p>Пустое поле — модель из настроек Ollama. Разбор, память и планирование выполняются локально.
       При лимите или временном сбое Groq ответит Ollama, если она запущена и модель установлена.</p>
+    </> : <p>Разговор идёт в Groq. Память, разбор действий и запасной локальный ответ выключены.
+      Для приватного режима и локальных ролей выбери Groq + Ollama.</p>}
     <button type="button" className="chat-llm__chip" disabled={busy || !value.apiKey.trim()}
       onClick={() => void probe()}>{busy ? "Проверяю…" : "Проверить Groq"}</button>
     <p role="status">{status}</p>
-    <GroqConversationSwitch value={value} onChange={onChange} disabled={busy} />
+    {hybrid ? <GroqConversationSwitch value={value} onChange={onChange} disabled={busy} /> : null}
   </section>;
 }

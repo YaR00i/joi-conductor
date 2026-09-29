@@ -11,8 +11,11 @@ import {
   CHAT_LLM_CHANGED_EVENT,
   loadChatLlmSettings,
   saveChatLlmSettings,
+  assignLocalChatModel,
+  localChatModelOf,
   type ChatLlmSettings,
   chatLlmProviderLabelRu,
+  isGroqHybridProvider,
 } from "../lib/soul/llmSettings";
 import {
   mergeOllamaSearchHits,
@@ -324,8 +327,7 @@ export function BrainPanel({
   }, []);
 
   function persistChatLlm(next: ChatLlmSettings) {
-    saveChatLlmSettings(next);
-    setChatLlm(next);
+    setChatLlm(saveChatLlmSettings(next));
   }
 
   useEffect(() => {
@@ -740,8 +742,8 @@ export function BrainPanel({
 
       <h3 className="brain-panel__h">На диске</h3>
       <p className="brain-panel__hint">
-        Скачанные модели. «Сессия» — Local LLM в шаблонах. «Чат» — реплики Soul.
-        Роутер и разбор — в блоке ролей ниже.
+        Скачанные модели. «Сессия» — Local LLM в шаблонах. «Чат» — локальные реплики
+        Soul, без смены облачного режима.
       </p>
       <ul className="brain-list">
         <li
@@ -767,16 +769,17 @@ export function BrainPanel({
           </li>
         ) : null}
         {disk.map((name) => {
+          const localChat = localChatModelOf(chatLlm);
           const marks = ollamaRoleMarks({
             name,
-            chat: chatLlm.model,
+            chat: localChat,
             router: chatLlm.roleModels?.router,
             extractor: chatLlm.roleModels?.extractor,
             planner: chatLlm.roleModels?.planner,
             session: selectedName,
           });
           const sessionOn = sameOllamaModel(selectedName, name);
-          const chatOn = sameOllamaModel(chatLlm.model, name);
+          const chatOn = sameOllamaModel(localChat, name);
           return (
             <li
               key={name}
@@ -800,11 +803,7 @@ export function BrainPanel({
                   className="brain-act"
                   disabled={chatOn}
                   onClick={() =>
-                    persistChatLlm({
-                      ...chatLlm,
-                      provider: "ollama",
-                      model: name,
-                    })
+                    persistChatLlm(assignLocalChatModel(chatLlm, name))
                   }
                 >
                   чат
@@ -841,25 +840,33 @@ export function BrainPanel({
         })}
       </ul>
 
-      <h3 className="brain-panel__h">{chatLlm.provider === "groq" ? "Локальные роли и резерв Groq" : "Роли чата"}</h3>
-      {chatLlm.provider === "groq" ? <p className="brain-panel__hint">
+      <h3 className="brain-panel__h">{isGroqHybridProvider(chatLlm.provider) ? "Локальные роли и резерв Groq" : "Роли чата"}</h3>
+      {isGroqHybridProvider(chatLlm.provider) ? <p className="brain-panel__hint">
         Здесь выбирается локальная модель для приватного режима и служебных ролей.
         Облачная модель и ключ — Чат → настройки → Модель.
-      </p> : chatLlm.provider !== "ollama" ? (
+      </p> : chatLlm.provider === "groq_chat" ? (
         <p className="brain-panel__hint">
-          Чат сейчас на {chatLlmProviderLabelRu(chatLlm.provider)}. Выбор модели
-          с диска переключит на Ollama.
+          Чат на чистом Groq: Ollama не нужна. Память, разбор и запасной локальный
+          ответ выключены. «Чат» в списке моделей запоминает Ollama на потом,
+          режим Groq не меняет.
+        </p>
+      ) : chatLlm.provider !== "ollama" ? (
+        <p className="brain-panel__hint">
+          Чат сейчас на {chatLlmProviderLabelRu(chatLlm.provider)}. «Чат» и роли
+          ниже запоминают локальную Ollama, режим не переключают.
         </p>
       ) : null}
+      {chatLlm.provider !== "groq_chat" ? (
       <SoulRoleAssign
-        settings={chatLlm.provider === "groq" ? { ...chatLlm, provider: "ollama", model: chatLlm.groqLocalModel || "" } : chatLlm}
-        onChange={(next) => persistChatLlm(chatLlm.provider === "groq"
-          ? { ...chatLlm, groqLocalModel: next.model, roleModels: next.roleModels } : next)}
+        settings={chatLlm.provider === "ollama" ? chatLlm : { ...chatLlm, provider: "ollama", model: localChatModelOf(chatLlm) }}
+        onChange={(next) => persistChatLlm(chatLlm.provider === "ollama"
+          ? next
+          : assignLocalChatModel({ ...chatLlm, roleModels: next.roleModels }, next.model))}
         installed={disk}
         sessionFallback={voice.model}
         allowEmptyChat
-        preferOllama
       />
+      ) : null}
 
       <h3 className="brain-panel__h">Скачать</h3>
       <p className="brain-panel__hint">

@@ -13,6 +13,7 @@ export const CHAT_LLM_CHANGED_EVENT = "joi-chat-llm-changed";
 
 export const CHAT_LLM_PROVIDERS = [
   "ollama",
+  "groq_chat",
   "groq",
   "openrouter",
   "openai",
@@ -49,11 +50,20 @@ export type SoulRoleModels = {
   planner: string;
 };
 
+export type ChatLlmProviderKeys = Partial<Record<ChatLlmProvider, string>>;
+export type ChatLlmProviderModels = Partial<Record<ChatLlmProvider, string>>;
+
 export type ChatLlmSettings = {
   provider: ChatLlmProvider;
   model: string;
   endpoint: string;
+  /** LM Studio / custom URL kept while other tabs are selected. */
+  customEndpoint?: string;
   apiKey: string;
+  /** Keys stay with their provider. Groq and Groq + Ollama share the `groq` slot. */
+  providerKeys?: ChatLlmProviderKeys;
+  /** Chat model id per provider. Groq flavors share the `groq` slot. */
+  providerModels?: ChatLlmProviderModels;
   sampling: ChatLlmSampling;
   generationPreset?: ChatGenerationPreset;
   roleModels?: Partial<SoulRoleModels>;
@@ -170,6 +180,9 @@ export const DEFAULT_CHAT_LLM: ChatLlmSettings = {
   model: "",
   endpoint: "",
   apiKey: "",
+  providerKeys: {},
+  providerModels: {},
+  customEndpoint: "",
   sampling: { ...DEFAULT_CHAT_SAMPLING },
   generationPreset: "balanced",
   roleModels: { ...DEFAULT_ROLE_MODELS },
@@ -237,6 +250,8 @@ export function chatLlmProviderLabelRu(provider: ChatLlmProvider): string {
   switch (provider) {
     case "ollama":
       return "Ollama";
+    case "groq_chat":
+      return "Groq";
     case "groq":
       return "Groq + Ollama";
     case "openrouter":
@@ -265,6 +280,7 @@ export function chatPresetsFor(
   switch (provider) {
     case "ollama":
       return CHAT_OLLAMA_PRESETS;
+    case "groq_chat":
     case "groq":
       return CHAT_GROQ_PRESETS;
     case "openrouter":
@@ -290,6 +306,7 @@ export function endpointForProvider(
       return customEndpoint.trim() || ollamaFallback;
     case "openrouter":
       return OPENROUTER_CHAT_URL;
+    case "groq_chat":
     case "groq":
       return GROQ_CHAT_URL;
     case "openai":
@@ -349,11 +366,237 @@ function sanitizeRoleModels(raw: Partial<SoulRoleModels> | undefined): SoulRoleM
   };
 }
 
+const CHAT_API_KEY_MAX = 500;
+const CHAT_MODEL_ID_MAX = 200;
+
+/** Groq and Groq + Ollama share one Groq Console key. */
+export function chatApiKeySlot(provider: ChatLlmProvider): ChatLlmProvider {
+  switch (provider) {
+    case "groq_chat":
+      return "groq";
+    case "groq":
+    case "ollama":
+    case "openrouter":
+    case "openai":
+    case "custom":
+      return provider;
+    default: {
+      const _exhaustive: never = provider;
+      return _exhaustive;
+    }
+  }
+}
+
+function clipChatApiKey(value: string): string {
+  return value.trim().slice(0, CHAT_API_KEY_MAX);
+}
+
+export function sanitizeProviderKeys(raw: unknown): ChatLlmProviderKeys {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const rec = raw as Record<string, unknown>;
+  const out: ChatLlmProviderKeys = {};
+  for (const provider of CHAT_LLM_PROVIDERS) {
+    const value = rec[provider];
+    if (typeof value !== "string") continue;
+    const trimmed = clipChatApiKey(value);
+    if (!trimmed) continue;
+    out[chatApiKeySlot(provider)] = trimmed;
+  }
+  return out;
+}
+
+export function rememberChatApiKey(
+  settings: Pick<ChatLlmSettings, "provider" | "apiKey" | "providerKeys">,
+): ChatLlmProviderKeys {
+  const keys = sanitizeProviderKeys(settings.providerKeys);
+  const current = clipChatApiKey(settings.apiKey);
+  if (settings.provider === "ollama" && looksLikeGroqApiKey(current)) {
+    if (!keys.groq) keys.groq = current;
+    delete keys.ollama;
+    return keys;
+  }
+  const slot = chatApiKeySlot(settings.provider);
+  if (current) keys[slot] = current;
+  else delete keys[slot];
+  return keys;
+}
+
+function looksLikeGroqApiKey(key: string): boolean {
+  return key.startsWith("gsk_");
+}
+
+export function hydrateChatLlmKeys(
+  provider: ChatLlmProvider,
+  apiKey: string,
+  rawKeys: unknown,
+): { apiKey: string; providerKeys: ChatLlmProviderKeys } {
+  const providerKeys = sanitizeProviderKeys(rawKeys);
+  if (
+    typeof providerKeys.ollama === "string" &&
+    looksLikeGroqApiKey(providerKeys.ollama)
+  ) {
+    if (!providerKeys.groq) providerKeys.groq = providerKeys.ollama;
+    delete providerKeys.ollama;
+  }
+  const trimmed = clipChatApiKey(apiKey);
+  const slot = chatApiKeySlot(provider);
+  if (trimmed) {
+    if (provider === "ollama" && looksLikeGroqApiKey(trimmed)) {
+      if (!providerKeys.groq) providerKeys.groq = trimmed;
+    } else {
+      providerKeys[slot] = trimmed;
+    }
+  }
+  return { providerKeys, apiKey: providerKeys[slot] ?? "" };
+}
+
+function clipChatModel(value: string): string {
+  return value.trim().slice(0, CHAT_MODEL_ID_MAX);
+}
+
+export function sanitizeProviderModels(raw: unknown): ChatLlmProviderModels {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const rec = raw as Record<string, unknown>;
+  const out: ChatLlmProviderModels = {};
+  for (const provider of CHAT_LLM_PROVIDERS) {
+    const value = rec[provider];
+    if (typeof value !== "string") continue;
+    const trimmed = clipChatModel(value);
+    if (!trimmed) continue;
+    out[chatApiKeySlot(provider)] = trimmed;
+  }
+  return out;
+}
+
+export function rememberChatModel(
+  settings: Pick<ChatLlmSettings, "provider" | "model" | "providerModels">,
+): ChatLlmProviderModels {
+  const models = sanitizeProviderModels(settings.providerModels);
+  const slot = chatApiKeySlot(settings.provider);
+  const current = clipChatModel(settings.model);
+  if (current) models[slot] = current;
+  else delete models[slot];
+  return models;
+}
+
+export function hydrateChatLlmModels(
+  provider: ChatLlmProvider,
+  model: string,
+  rawModels: unknown,
+): { model: string; providerModels: ChatLlmProviderModels } {
+  const providerModels = sanitizeProviderModels(rawModels);
+  const trimmed = clipChatModel(model);
+  const slot = chatApiKeySlot(provider);
+  if (trimmed) providerModels[slot] = trimmed;
+  return { providerModels, model: providerModels[slot] ?? "" };
+}
+
+export function rememberCustomEndpoint(
+  settings: Pick<ChatLlmSettings, "provider" | "endpoint" | "customEndpoint">,
+): string {
+  if (settings.provider === "custom") return settings.endpoint.trim();
+  return (settings.customEndpoint ?? "").trim();
+}
+
+export function persistableChatLlm(next: ChatLlmSettings): ChatLlmSettings {
+  const providerKeys = rememberChatApiKey(next);
+  const providerModels = rememberChatModel(next);
+  const apiKey = clipChatApiKey(next.apiKey);
+  const customEndpoint = rememberCustomEndpoint(next);
+  return {
+    ...next,
+    apiKey:
+      next.provider === "ollama" && looksLikeGroqApiKey(apiKey) ? "" : apiKey,
+    providerKeys,
+    providerModels,
+    customEndpoint,
+    endpoint: next.provider === "custom" ? customEndpoint : next.endpoint,
+  };
+}
+
+export function withChatApiKey(
+  settings: ChatLlmSettings,
+  apiKey: string,
+): ChatLlmSettings {
+  return persistableChatLlm({ ...settings, apiKey });
+}
+
+export function settingsAfterProviderSwitch(
+  settings: ChatLlmSettings,
+  to: ChatLlmProvider,
+): ChatLlmSettings {
+  const providerKeys = rememberChatApiKey(settings);
+  const providerModels = rememberChatModel(settings);
+  const customEndpoint = rememberCustomEndpoint(settings);
+  return {
+    ...settings,
+    provider: to,
+    providerKeys,
+    providerModels,
+    customEndpoint,
+    apiKey: providerKeys[chatApiKeySlot(to)] ?? "",
+    model: providerModels[chatApiKeySlot(to)] ?? "",
+    endpoint: to === "custom" ? customEndpoint : "",
+  };
+}
+
+export function localChatModelOf(settings: ChatLlmSettings): string {
+  switch (settings.provider) {
+    case "ollama":
+      return settings.model.trim();
+    case "groq":
+      return (settings.groqLocalModel ?? "").trim();
+    case "groq_chat":
+    case "openrouter":
+    case "openai":
+    case "custom":
+      return (settings.providerModels?.ollama ?? "").trim();
+    default: {
+      const _exhaustive: never = settings.provider;
+      return _exhaustive;
+    }
+  }
+}
+
+export function assignLocalChatModel(
+  settings: ChatLlmSettings,
+  name: string,
+): ChatLlmSettings {
+  const trimmed = clipChatModel(name);
+  const providerModels = {
+    ...rememberChatModel(settings),
+    ...(trimmed ? { ollama: trimmed } : {}),
+  };
+  if (!trimmed) delete providerModels.ollama;
+  switch (settings.provider) {
+    case "ollama":
+      return persistableChatLlm({ ...settings, model: trimmed, providerModels });
+    case "groq":
+      return persistableChatLlm({
+        ...settings,
+        groqLocalModel: trimmed,
+        providerModels,
+      });
+    case "groq_chat":
+    case "openrouter":
+    case "openai":
+    case "custom":
+      return persistableChatLlm({ ...settings, providerModels });
+    default: {
+      const _exhaustive: never = settings.provider;
+      return _exhaustive;
+    }
+  }
+}
+
 export function emptyChatLlmSettings(): ChatLlmSettings {
   return {
     ...DEFAULT_CHAT_LLM,
     sampling: { ...DEFAULT_CHAT_SAMPLING },
     roleModels: { ...DEFAULT_ROLE_MODELS },
+    providerKeys: {},
+    providerModels: {},
+    customEndpoint: "",
   };
 }
 
@@ -365,11 +608,31 @@ export function loadChatLlmSettings(): ChatLlmSettings {
     const provider = isChatLlmProvider(parsed.provider)
       ? parsed.provider
       : "ollama";
+    const keys = hydrateChatLlmKeys(
+      provider,
+      typeof parsed.apiKey === "string" ? parsed.apiKey : "",
+      parsed.providerKeys,
+    );
+    const models = hydrateChatLlmModels(
+      provider,
+      typeof parsed.model === "string" ? parsed.model : "",
+      parsed.providerModels,
+    );
+    const customEndpoint =
+      typeof parsed.customEndpoint === "string"
+        ? parsed.customEndpoint.trim()
+        : "";
+    const endpoint =
+      typeof parsed.endpoint === "string" ? parsed.endpoint.trim() : "";
     return {
       provider,
-      model: typeof parsed.model === "string" ? parsed.model : "",
-      endpoint: typeof parsed.endpoint === "string" ? parsed.endpoint : "",
-      apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : "",
+      model: models.model,
+      endpoint,
+      customEndpoint:
+        provider === "custom" ? endpoint || customEndpoint : customEndpoint,
+      apiKey: keys.apiKey,
+      providerKeys: keys.providerKeys,
+      providerModels: models.providerModels,
       sampling: sanitizeChatSampling(parsed.sampling),
       generationPreset: isChatGenerationPreset(parsed.generationPreset)
         ? parsed.generationPreset
@@ -391,13 +654,15 @@ export function notifyChatLlmChanged(): void {
   window.dispatchEvent(new Event(CHAT_LLM_CHANGED_EVENT));
 }
 
-export function saveChatLlmSettings(next: ChatLlmSettings): void {
+export function saveChatLlmSettings(next: ChatLlmSettings): ChatLlmSettings {
+  const stored = persistableChatLlm(next);
   try {
-    localStorage.setItem(CHAT_LLM_STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(CHAT_LLM_STORAGE_KEY, JSON.stringify(stored));
     notifyChatLlmChanged();
   } catch {
     /* quota */
   }
+  return stored;
 }
 
 export type ResolvedChatLlm = {
@@ -431,7 +696,9 @@ export function resolveChatLlm(
     provider: chat.provider,
     model: chat.model.trim() || fallbackModel,
     endpoint,
-    apiKey: chat.apiKey.trim(),
+    apiKey:
+      chat.apiKey.trim() ||
+      clipChatApiKey(chat.providerKeys?.[chatApiKeySlot(chat.provider)] ?? ""),
     sampling,
     generationPreset: isChatGenerationPreset(chat.generationPreset)
       ? chat.generationPreset
@@ -442,7 +709,7 @@ export function resolveChatLlm(
     ...(chat.provider === "groq" ? {
       localFallback: resolveChatLlm({
         ...chat, provider: "ollama", model: chat.groqLocalModel || "",
-        endpoint: "", apiKey: "",
+        endpoint: "", apiKey: "", providerKeys: {},
       }, voice),
     } : {}),
   };
@@ -499,6 +766,7 @@ export function samplingForRole(
 
 export function chatProviderNeedsKey(provider: ChatLlmProvider): boolean {
   switch (provider) {
+    case "groq_chat":
     case "groq":
     case "openrouter":
     case "openai":
@@ -512,6 +780,94 @@ export function chatProviderNeedsKey(provider: ChatLlmProvider): boolean {
       return _exhaustive;
     }
   }
+}
+
+export function chatProviderShowsKeyField(provider: ChatLlmProvider): boolean {
+  switch (provider) {
+    case "openrouter":
+    case "openai":
+    case "custom":
+      return true;
+    case "groq_chat":
+    case "groq":
+    case "ollama":
+      return false;
+    default: {
+      const _exhaustive: never = provider;
+      return _exhaustive;
+    }
+  }
+}
+
+/** Cloud Groq flavors share one key; hybrid still owns the local fallback. */
+export function isGroqCloudProvider(provider: ChatLlmProvider): boolean {
+  switch (provider) {
+    case "groq_chat":
+    case "groq":
+      return true;
+    case "ollama":
+    case "openrouter":
+    case "openai":
+    case "custom":
+      return false;
+    default: {
+      const _exhaustive: never = provider;
+      return _exhaustive;
+    }
+  }
+}
+
+export function isGroqHybridProvider(provider: ChatLlmProvider): boolean {
+  return provider === "groq";
+}
+
+export function chatProviderUsesOllama(provider: ChatLlmProvider): boolean {
+  switch (provider) {
+    case "ollama":
+    case "groq":
+      return true;
+    case "groq_chat":
+    case "openrouter":
+    case "openai":
+    case "custom":
+      return false;
+    default: {
+      const _exhaustive: never = provider;
+      return _exhaustive;
+    }
+  }
+}
+
+export function chatCloudConversationId(
+  chat: Pick<ChatLlmSettings, "provider" | "groqConversationId">,
+): string | undefined {
+  switch (chat.provider) {
+    case "groq_chat":
+    case "groq":
+      return chat.groqConversationId?.trim() || undefined;
+    case "ollama":
+    case "openrouter":
+    case "openai":
+    case "custom":
+      return undefined;
+    default: {
+      const _exhaustive: never = chat.provider;
+      return _exhaustive;
+    }
+  }
+}
+
+/** Visible key after a tab switch. Other providers stay in `providerKeys`. */
+export function apiKeyAfterProviderSwitch(
+  from: ChatLlmProvider,
+  to: ChatLlmProvider,
+  apiKey: string,
+  providerKeys?: ChatLlmProviderKeys,
+): string {
+  return settingsAfterProviderSwitch(
+    { ...emptyChatLlmSettings(), provider: from, apiKey, providerKeys },
+    to,
+  ).apiKey;
 }
 
 export type ChatCompletionJsonFormat = {
@@ -563,7 +919,7 @@ export function buildChatCompletionBody(
     stop: ["<|im_end|>", "<|endoftext|>"],
   };
   if (think) body.think = true;
-  if (resolved.provider === "groq") {
+  if (isGroqCloudProvider(resolved.provider)) {
     delete body.think;
     delete body.stop;
     if (resolved.model.startsWith("openai/gpt-oss-")) body.reasoning_effort = "low";

@@ -5,9 +5,16 @@ import {
 } from "../../test/localStorageMock";
 import {
   buildChatCompletionBody,
+  apiKeyAfterProviderSwitch,
+  settingsAfterProviderSwitch,
+  withChatApiKey,
+  assignLocalChatModel,
+  localChatModelOf,
   chatProviderNeedsKey,
+  chatProviderShowsKeyField,
   DEFAULT_CHAT_SAMPLING,
   endpointForProvider,
+  CHAT_LLM_STORAGE_KEY,
   loadChatLlmSettings,
   resolveChatLlm,
   saveChatLlmSettings,
@@ -16,6 +23,10 @@ import {
   collapseRepeatedSpeech,
   harvestChatCompletion,
   OPENROUTER_CHAT_URL,
+  GROQ_CHAT_URL,
+  emptyChatLlmSettings,
+  chatProviderUsesOllama,
+  chatCloudConversationId,
   modelForRole,
   samplingForRole,
 } from "./llmSettings";
@@ -41,8 +52,179 @@ describe("chat llm settings", () => {
       OPENROUTER_CHAT_URL,
     );
     expect(endpointForProvider("openai", "", "")).toContain("api.openai.com");
+    expect(endpointForProvider("groq_chat", "", "")).toBe(GROQ_CHAT_URL);
     expect(chatProviderNeedsKey("openrouter")).toBe(true);
+    expect(chatProviderNeedsKey("groq_chat")).toBe(true);
     expect(chatProviderNeedsKey("ollama")).toBe(false);
+    expect(chatProviderNeedsKey("custom")).toBe(false);
+    expect(chatProviderShowsKeyField("custom")).toBe(true);
+    expect(chatProviderShowsKeyField("openrouter")).toBe(true);
+    expect(chatProviderShowsKeyField("groq")).toBe(false);
+  });
+
+  it("treats Groq chat as cloud-only without a local fallback", () => {
+    const resolved = resolveChatLlm(
+      {
+        ...emptyChatLlmSettings(),
+        provider: "groq_chat",
+        apiKey: "gsk_test",
+        groqLocalModel: "private-local",
+      },
+      { endpoint: "http://127.0.0.1:11434/v1/chat/completions", model: "local" },
+    );
+    expect(resolved.provider).toBe("groq_chat");
+    expect(resolved.localFallback).toBeUndefined();
+    expect(resolved.endpoint).toBe(GROQ_CHAT_URL);
+    expect(chatProviderUsesOllama("groq_chat")).toBe(false);
+    expect(chatProviderUsesOllama("groq")).toBe(true);
+    expect(
+      chatCloudConversationId({
+        provider: "groq_chat",
+        groqConversationId: "c1",
+      }),
+    ).toBe("c1");
+  });
+
+  it("keeps the Groq key when switching to Ollama and back", () => {
+    const groq = {
+      ...emptyChatLlmSettings(),
+      provider: "groq" as const,
+      apiKey: "gsk_test",
+    };
+    const ollama = settingsAfterProviderSwitch(groq, "ollama");
+    expect(ollama.apiKey).toBe("");
+    expect(ollama.providerKeys?.groq).toBe("gsk_test");
+    expect(settingsAfterProviderSwitch(ollama, "groq").apiKey).toBe("gsk_test");
+    expect(settingsAfterProviderSwitch(ollama, "groq_chat").apiKey).toBe(
+      "gsk_test",
+    );
+    expect(apiKeyAfterProviderSwitch("groq", "groq", "gsk_test")).toBe(
+      "gsk_test",
+    );
+  });
+
+  it("keeps each cloud provider's key when switching tabs", () => {
+    const groq = settingsAfterProviderSwitch(
+      { ...emptyChatLlmSettings(), provider: "groq", apiKey: "gsk_test" },
+      "openrouter",
+    );
+    expect(groq.provider).toBe("openrouter");
+    expect(groq.apiKey).toBe("");
+    expect(groq.providerKeys?.groq).toBe("gsk_test");
+
+    const openrouter = withChatApiKey(groq, "sk-or-test");
+    expect(openrouter.providerKeys?.openrouter).toBe("sk-or-test");
+    expect(openrouter.providerKeys?.groq).toBe("gsk_test");
+
+    const openai = settingsAfterProviderSwitch(openrouter, "openai");
+    expect(openai.apiKey).toBe("");
+    const withOpenai = withChatApiKey(openai, "sk-openai");
+    expect(settingsAfterProviderSwitch(withOpenai, "groq").apiKey).toBe(
+      "gsk_test",
+    );
+    expect(settingsAfterProviderSwitch(withOpenai, "openrouter").apiKey).toBe(
+      "sk-or-test",
+    );
+    expect(settingsAfterProviderSwitch(withOpenai, "openai").apiKey).toBe(
+      "sk-openai",
+    );
+  });
+
+  it("migrates a leftover Groq key stored while Ollama is selected", () => {
+    saveChatLlmSettings({
+      ...emptyChatLlmSettings(),
+      provider: "ollama",
+      apiKey: "gsk_leftover",
+    });
+    const loaded = loadChatLlmSettings();
+    expect(loaded.provider).toBe("ollama");
+    expect(loaded.apiKey).toBe("");
+    expect(loaded.providerKeys?.groq).toBe("gsk_leftover");
+    expect(settingsAfterProviderSwitch(loaded, "groq").apiKey).toBe(
+      "gsk_leftover",
+    );
+  });
+
+  it("loads a Groq key from old storage that had no providerKeys", () => {
+    localStorage.setItem(
+      CHAT_LLM_STORAGE_KEY,
+      JSON.stringify({
+        provider: "openrouter",
+        apiKey: "sk-or-legacy",
+        model: "deepseek/deepseek-chat",
+      }),
+    );
+    const loaded = loadChatLlmSettings();
+    expect(loaded.apiKey).toBe("sk-or-legacy");
+    expect(loaded.providerKeys?.openrouter).toBe("sk-or-legacy");
+    expect(loaded.providerModels?.openrouter).toBe("deepseek/deepseek-chat");
+  });
+
+  it("keeps each provider's model and the custom endpoint when switching tabs", () => {
+    const groq = settingsAfterProviderSwitch(
+      {
+        ...emptyChatLlmSettings(),
+        provider: "groq",
+        model: "openai/gpt-oss-120b",
+      },
+      "openrouter",
+    );
+    expect(groq.model).toBe("");
+    expect(groq.providerModels?.groq).toBe("openai/gpt-oss-120b");
+    const openrouter = settingsAfterProviderSwitch(
+      { ...groq, model: "deepseek/deepseek-chat" },
+      "custom",
+    );
+    expect(openrouter.provider).toBe("custom");
+    expect(openrouter.providerModels?.openrouter).toBe("deepseek/deepseek-chat");
+    const custom = settingsAfterProviderSwitch(
+      {
+        ...openrouter,
+        model: "lmstudio-community/qwen",
+        endpoint: "http://127.0.0.1:1234/v1/chat/completions",
+      },
+      "groq",
+    );
+    expect(custom.endpoint).toBe("");
+    expect(custom.customEndpoint).toBe(
+      "http://127.0.0.1:1234/v1/chat/completions",
+    );
+    expect(custom.model).toBe("openai/gpt-oss-120b");
+    const back = settingsAfterProviderSwitch(custom, "custom");
+    expect(back.model).toBe("lmstudio-community/qwen");
+    expect(back.endpoint).toBe("http://127.0.0.1:1234/v1/chat/completions");
+    expect(
+      settingsAfterProviderSwitch(
+        { ...emptyChatLlmSettings(), provider: "groq_chat", model: "openai/gpt-oss-20b" },
+        "groq",
+      ).model,
+    ).toBe("openai/gpt-oss-20b");
+  });
+
+  it("assigns a local Ollama chat model without leaving Groq", () => {
+    const groq = assignLocalChatModel(
+      {
+        ...emptyChatLlmSettings(),
+        provider: "groq",
+        model: "openai/gpt-oss-120b",
+      },
+      "qwen2.5:14b",
+    );
+    expect(groq.provider).toBe("groq");
+    expect(groq.model).toBe("openai/gpt-oss-120b");
+    expect(groq.groqLocalModel).toBe("qwen2.5:14b");
+    expect(localChatModelOf(groq)).toBe("qwen2.5:14b");
+    const cloud = assignLocalChatModel(
+      {
+        ...emptyChatLlmSettings(),
+        provider: "openrouter",
+        model: "deepseek/deepseek-chat",
+      },
+      "llama3.2",
+    );
+    expect(cloud.provider).toBe("openrouter");
+    expect(cloud.model).toBe("deepseek/deepseek-chat");
+    expect(localChatModelOf(cloud)).toBe("llama3.2");
   });
 
   it("falls back to the session Ollama model when chat model is empty", () => {
@@ -188,6 +370,7 @@ describe("chat llm settings", () => {
     const loaded = loadChatLlmSettings();
     expect(loaded.provider).toBe("openrouter");
     expect(loaded.apiKey).toBe("sk-test");
+    expect(loaded.providerKeys?.openrouter).toBe("sk-test");
     expect(loaded.sampling.temperature).toBe(1.05);
     expect(loaded.generationPreset).toBe("balanced");
     expect(loaded.voiceExamples).toBe(true);
